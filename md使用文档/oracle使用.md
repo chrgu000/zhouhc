@@ -1,3 +1,7 @@
+
+
+# linux Oracle的使用
+
 ##  一、 登录服务器 
 
 ## 二 、 查看磁盘空间是否够大df -h
@@ -10,7 +14,7 @@
     none 209M 0 209M 0% /dev/shm
     /dev/sda2 4.5G 1.8G 2.5G 42% /u01
     /dev/sde1 512M 80M 433M 16% /ocfs
- 
+
 ####  2.-H根上面的-h参数相同,不过在根式化的时候,采用1000而不是1024进行容量转换
 
     [root@rac1 ~]# df -H
@@ -24,7 +28,10 @@
     [root@rac1 ~]# df -k
     Filesystem 1K-blocks Used Available Use% Mounted on
     su - oracle              切换到oracle用户（linux的一个用户名）
-### 三 、 在/home/oracle/oradata 目录下新建一个文件夹，后面创建表空间需要用到
+## 三 、创建文件夹
+
+###  在/home/oracle/oradata 目录下新建一个文件夹，后面创建表空间需要用到
+
      cd /home/oracle/oradata
      mkdir abc
 ## 四 、以dba身份登录数据库， 系统的超级用户
@@ -33,7 +40,7 @@
 ## 五 、创建临时表空间
 
 #### 1. 创建用户前必须要先创建临时表空间和数据库表空间两个表空间，否则用系统默认的表空间不好。
- 
+
 #####  create temporary tablespace abc_temp tempfile'/home/oracle/oradata/abc/abc__temp.dbf' size 1024m autoextend on next 100m maxsize 10240m extent management local;
 ####2.说明：
 
@@ -42,30 +49,30 @@
         3)1024m     表空间的初始大小
         4)100m       表空间的自动增长大小
         5)10240m     表空间最大的大小
- 
+
 ## 六 、创建数据表空间
     create tablespace abc logging datafile'/home/oracle/oradata/abc/abc.dbf' size 1024m autoextend on next 100m maxsize 10240m extent management local;
- 
+
 ## 七 、创建用户并指定表空间
     create user abc identified by abc default tablespace abc temporary tablespace abc_temp;
     注：create standardtable.sql   创建表
 ## 八 、给用户授予权限
     grant dba to abc; （给abc 用户授予了dba 所有权限）
- 
+
 ## 九 、删除用户以及用户所有的对象
 
      drop user zfmi cascade;
 
   cascade 参数是级联删除该用户所有对象，经常遇到如用户有对象而未加此参数则用户删不了的问题，所以习惯性的加此参数
- 
+
     删除oracle 用户nim 出现下面的错误:
-      
+
      SQL> drop user nim cascade;
      drop user nim cascade
      ERROR 位于第 1 行:
      ORA-00604: 递归 SQL 层 1 出现错误
      ORA-24005: 必须使用 DBMS_AQADM.DROP_QUEUE_TABLE 删除队列表
-
+    
     处理方式：
      先执行这条语句：alter session set events'10851 trace name context forever,level 2';
      再执行：drop user nim cascade; 删除用户nim
@@ -109,7 +116,12 @@
 ##### 注意：
  操作者要有足够的权限，权限不够它会提示。
   数据库时可以连上的。可以用 tnsping TEST 来获得数据库 TEST 能否连上。 
+
+* impdp test_data_manager/ak123456 full=Y directory=DATA_PUMP_DIR dumpfile=yard_init__2017_3_6.dmp logfile=yard_init_impdp.log table_exists_action=replace remap_tablespace=YARD_INIT:test_data_manager,YARD_DEV:test_data_manager remap_schema=YARD_INIT:test_data_manager,YARD_DEV:test_data_manager
+
 ## 十二 、 给用户增加导入数据权限的操作
+
+chmod  777
 
 #### 1) 启动 sql*puls
 
@@ -126,23 +138,23 @@
 ## 十三、修改用户所属表的默认表空间
 
 ### 第一步：将表迁移到目标表空间
- * 使用如下语句，可以将需要移动的表空间语句在pl/sql中列出来，
- 
+*  使用如下语句，可以将需要移动的表空间语句在pl/sql中列出来，
+
         select 'alter table ' ||table_name || ' move tablespace 目标表空间名称;' from user_all_tables where tablespace_name='源表空间名称'
    * 例如：登录数据库用户TEST。将TEST所有表从SYSTEM表空间迁移到USERS表空间。
-    
+
             select 'alter table ' ||table_name || ' move tablespace users;' from user_all_tables where tablespace_name='SYSTEM';
-将PL/SQL中列出来的语句执行一次，就完成表的迁移。
+        将PL/SQL中列出来的语句执行一次，就完成表的迁移。
 
    * 将上面语句的结果拷贝到sql文件1.sql中
 * 第二步：重新生成索引：
-  * 1)使用如下语句，生成重新编译索引语句：
-  
+   * 1)使用如下语句，生成重新编译索引语句：
+
             SELECT 'alter index ' || index_name || ' rebuild tablespace users;' FROM user_indexes WHERE index_type = 'NORMAL' AND table_owner = 'SDHY_DEV' AND dropped = 'NO';
-  * 注意：index_type包括两种类型'NORMAL'为普通表，'LOB'为blob或者clob字段生成的索引，<br> 在这里要排除掉DROPPED包括YES和NO两种类型，为YES时是废弃的索引
-  * 将上面语句的结果拷贝到sql文件2.sql中
+   * 注意：index_type包括两种类型'NORMAL'为普通表，'LOB'为blob或者clob字段生成的索引，<br> 在这里要排除掉DROPPED包括YES和NO两种类型，为YES时是废弃的索引
+   * 将上面语句的结果拷贝到sql文件2.sql中
 * 第三步：批量执行操作：
-  * 将第一步与第二步列出的语句放在SQL执行窗口中执行，就可以实现表数据及索引迁移
+   * 将第一步与第二步列出的语句放在SQL执行窗口中执行，就可以实现表数据及索引迁移
 
 
 ## 十四、oracle索引修复
@@ -160,3 +172,100 @@
     查询表空间所有表：select table_name from all_tables where TABLESPACE_NAME='表空间' 表空间名字一定要大写。
 
     查询表所在的表空间：select * from user_tables where table_name=‘表名';表名一定要大写；
+
+
+## 十五、查看[Oracle](http://www.linuxidc.com/topicnews.aspx?tid=12)数据库字符集：
+
+select userenv('language') from dual;
+
+查询结果：
+
+  SIMPLIFIED CHINESE_CHINA.AL32UTF8
+
+### 修改oracle数据库字符集：（在SQL Plus中）
+
+sql> conn / as sysdba; 
+sql> shutdown immediate;
+database closed.
+database dismounted.
+oracle instance shut down.
+sql> startup mount;
+oracle instance started.
+
+total system global area  135337420 bytes
+fixed size                          452044 bytes
+variable size                     109051904 bytes
+database buffers              25165824 bytes
+redo buffers                      667648 bytes
+database mounted.
+
+sql> alter system enable restricted session;
+
+system altered.
+
+sql> alter system set job_queue_processes=0;
+
+system altered.
+
+sql> alter system set aq_tm_processes=0;
+
+system altered.
+
+sql> alter database open;
+
+database altered.
+
+sql> alter database character set internal_use JA16SJIS;
+
+sql> shutdown immediate;
+
+sql> startup;
+
+
+
+# windows Oracle的使用
+
+## oracle创建数据库和用户
+
+oracle在创建数据库的时候要对应一个用户，数据库和用户一般一一对应，mysql和sql server 直接通过create databse “数据库名” 就可以直接创建数据库了，而oracle创建一个数据库需要以下**三个步骤**：
+
+1. 创建两个数据库的文件
+2. 创建用户与上面创建的文件形成映射关系
+3. 给用户添加权限
+
+## 一、创建两个数据库的文件（monitor.dbf 和monitor_temp.dbf 两个文件）  
+
+```
+CREATE TABLESPACE monitor LOGGING DATAFILE 'E:\app\owner\oradata\orcl\monitor.dbf' 
+SIZE 100M AUTOEXTEND ON NEXT 32M MAXSIZE 500M EXTENT MANAGEMENT LOCAL;
+
+create temporary tablespace monitor_temp tempfile 'E:\app\owner\oradata\orcl\monitor_temp.dbf'
+size 100m autoextend on next 32m maxsize 500m extent management local;
+```
+
+##  二、创建用户与上面创建的文件形成映射关系（用户名为monitor,密码为monitor）
+
+```
+CREATE USER monitor IDENTIFIED BY monitor DEFAULT TABLESPACE monitor TEMPORARY TABLESPACE monitor_temp;
+```
+
+##   三、添加权限
+
+```
+grant connect,resource,dba to monitor;
+grant create session to monitor;
+```
+
+  　　有时候也会用到删除数据库和删除用户的操作，这里也给出删除的语句
+
+## 四、删除数据库
+
+```
+DROP TABLESPACE monitor INCLUDING CONTENTS AND DATAFILES;
+```
+
+##  五、删除用户
+
+```
+drop user monitor cascade;
+```

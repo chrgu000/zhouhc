@@ -71,7 +71,7 @@ select * from v$nls_parameters
 
 
 三. 客户端关于Oracle的字符集编码设置
- 
+
 
 客户端与服务器端字符集不一致时可能导致cmd或者shell显示乱码：
 
@@ -104,5 +104,30 @@ source .bash_profile
 
 ## **文件部署网页格式本地测试**
 generate-md --layout mixu-gray --input ./input --output .\output
+
+
+
+
+
+
+
+
+
+# 怎么保存退出vi编辑
+
+```
+保存命令
+
+按ESC键 跳到命令模式，然后：
+
+:w   保存文件但不退出vi
+:w file 将修改另外保存到file中，不退出vi
+:w!   强制保存，不推出vi
+:wq  保存文件并退出vi
+:wq! 强制保存文件，并退出vi
+q:  不保存文件，退出vi
+:q! 不保存文件，强制退出vi
+:e! 放弃所有修改，从上次保存文件开始再编辑
+```
 
 
