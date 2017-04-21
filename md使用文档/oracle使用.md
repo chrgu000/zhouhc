@@ -8,26 +8,32 @@
 
 #### 1.-h更具目前磁盘空间和使用情况 以更易读的方式显示**
 
-    [root@rac1 ~]# df -h
-    Filesystem Size Used Avail Use% Mounted on
-    /dev/sda1 2.9G 2.3G 521M 82% /
-    none 209M 0 209M 0% /dev/shm
-    /dev/sda2 4.5G 1.8G 2.5G 42% /u01
-    /dev/sde1 512M 80M 433M 16% /ocfs
+```shell
+[root@rac1 ~]# df -h
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda1 2.9G 2.3G 521M 82% /
+none 209M 0 209M 0% /dev/shm
+/dev/sda2 4.5G 1.8G 2.5G 42% /u01
+/dev/sde1 512M 80M 433M 16% /ocfs
+```
 
 ####  2.-H根上面的-h参数相同,不过在根式化的时候,采用1000而不是1024进行容量转换
 
-    [root@rac1 ~]# df -H
-    Filesystem Size Used Avail Use% Mounted on
-    /dev/sda1 3.1G 2.4G 546M 82% /
-    none 219M 0 219M 0% /dev/shm
-    /dev/sda2 4.8G 1.9G 2.7G 42% /u01
-    /dev/sde1 537M 84M 454M 16% /ocfs
+```shell
+[root@rac1 ~]# df -H
+Filesystem Size Used Avail Use% Mounted on
+/dev/sda1 3.1G 2.4G 546M 82% /
+none 219M 0 219M 0% /dev/shm
+/dev/sda2 4.8G 1.9G 2.7G 42% /u01
+/dev/sde1 537M 84M 454M 16% /ocfs
+```
 
 ####   3.-k以单位显示磁盘的使用情况
-    [root@rac1 ~]# df -k
-    Filesystem 1K-blocks Used Available Use% Mounted on
-    su - oracle              切换到oracle用户（linux的一个用户名）
+```shell
+[root@rac1 ~]# df -k
+Filesystem 1K-blocks Used Available Use% Mounted on
+su - oracle              切换到oracle用户（linux的一个用户名）
+```
 ## 三 、创建文件夹
 
 ###  在/home/oracle/oradata 目录下新建一个文件夹，后面创建表空间需要用到
