@@ -274,4 +274,5 @@ DROP TABLESPACE monitor INCLUDING CONTENTS AND DATAFILES;
 
 ```
 drop user monitor cascade;
+
 ```
