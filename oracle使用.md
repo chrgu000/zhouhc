@@ -27,10 +27,10 @@
 ### 三 、 在/home/oracle/oradata 目录下新建一个文件夹，后面创建表空间需要用到
      cd /home/oracle/oradata
      mkdir abc
-## 四 、以dba身份登录数据库， 系统的超级用户
+### 四 、以dba身份登录数据库， 系统的超级用户
     sqlplus “/ as sysdba” 
 
-## 五 、创建临时表空间
+### 五 、创建临时表空间
 
 #### 1. 创建用户前必须要先创建临时表空间和数据库表空间两个表空间，否则用系统默认的表空间不好。
 
@@ -50,16 +50,16 @@ create temporary tablespace spd_temp tempfile'/opt/oracle/spd_temp.dbf' size 102
         4)100m       表空间的自动增长大小
         5)10240m     表空间最大的大小
 
-## 六 、创建数据表空间
+### 六 、创建数据表空间
     create tablespace spd logging datafile'/opt/oracle/spd.dbf' size 1024m autoextend on next 100m maxsize 10240m extent management local;
 
-## 七 、创建用户并指定表空间
+### 七 、创建用户并指定表空间
     create user spd identified by ak123456 default tablespace spd temporary tablespace spd_temp;
     注：create standardtable.sql   创建表
-## 八 、给用户授予权限
+### 八 、给用户授予权限
     grant dba to spd; （给abc 用户授予了dba 所有权限）
 
-## 九 、删除用户以及用户所有的对象
+### 九 、删除用户以及用户所有的对象
 
      drop user zfmi cascade;
 
@@ -76,7 +76,7 @@ create temporary tablespace spd_temp tempfile'/opt/oracle/spd_temp.dbf' size 102
     处理方式：
      先执行这条语句：alter session set events'10851 trace name context forever,level 2';
      再执行：drop user nim cascade; 删除用户nim
-## 十、删除表空间
+### 十、删除表空间
     前提：删除表空间之前要确认该表空间没有被其他用户使用之后再做删除
 #### drop tablespace nimeng including contents and datafiles cascade constraints ;
     including contents 删除表空间中的内容，如果删除表空间之前表空间中有内容，而未加此参数，表空间删不掉，所以习惯性的加此参数
@@ -93,7 +93,7 @@ create temporary tablespace spd_temp tempfile'/opt/oracle/spd_temp.dbf' size 102
     SQL> alter database datafile 'filename' offline drop;
     SQL> alter database open;
     SQL> drop tablespace tablespace_name including contents;
-## 十一 、导出/ 导入
+### 十一 、导出/ 导入
 ### 导出
 #####  1) 将数据库 TEST 完全导出 , 用户名 system 密码 manager 导出到 D:daochu.dmp 中
      exp system/manager@TEST file=d: / daochu.dmp full=y
@@ -116,7 +116,7 @@ create temporary tablespace spd_temp tempfile'/opt/oracle/spd_temp.dbf' size 102
 ##### 注意：
  操作者要有足够的权限，权限不够它会提示。
   数据库时可以连上的。可以用 tnsping TEST 来获得数据库 TEST 能否连上。 
-## 十二 、 给用户增加导入数据权限的操作
+### 十二 、 给用户增加导入数据权限的操作
 
 #### 1) 启动 sql*puls
 
@@ -130,29 +130,37 @@ create temporary tablespace spd_temp tempfile'/opt/oracle/spd_temp.dbf' size 102
     imp userid=system/manager full=y file=*.dmp
     或者 imp userid=system/manager full=y file=filename.dmp
 
-## 十三、修改用户所属表的默认表空间
+### 十三、修改用户所属表的默认表空间
 
-### 第一步：将表迁移到目标表空间
+####   第一步：将表迁移到目标表空间
  * 使用如下语句，可以将需要移动的表空间语句在pl/sql中列出来，
 
         select 'alter table ' ||table_name || ' move tablespace 目标表空间名称;' from user_all_tables where tablespace_name='源表空间名称'
+
    * 例如：登录数据库用户TEST。将TEST所有表从SYSTEM表空间迁移到USERS表空间。
         ​    
          select 'alter table ' ||table_name || ' move tablespace users;' from user_all_tables where tablespace_name='SYSTEM';
         将PL/SQL中列出来的语句执行一次，就完成表的迁移。
 
    * 将上面语句的结果拷贝到sql文件1.sql中
-* 第二步：重新生成索引：
-  * 1)使用如下语句，生成重新编译索引语句：
 
-           SELECT 'alter index ' || index_name || ' rebuild tablespace users;' FROM user_indexes WHERE index_type = 'NORMAL' AND table_owner = 'SDHY_DEV' AND dropped = 'NO';
-  * 注意：index_type包括两种类型'NORMAL'为普通表，'LOB'为blob或者clob字段生成的索引，<br> 在这里要排除掉DROPPED包括YES和NO两种类型，为YES时是废弃的索引
-  * 将上面语句的结果拷贝到sql文件2.sql中
+
+
+
+#### 第二步：重新生成索引：
+
+* 1)使用如下语句，生成重新编译索引语句：
+
+         SELECT 'alter index ' || index_name || ' rebuild tablespace users;' FROM user_indexes WHERE index_type = 'NORMAL' AND table_owner = 'SDHY_DEV' AND dropped = 'NO';
+* 注意：index_type包括两种类型'NORMAL'为普通表，'LOB'为blob或者clob字段生成的索引，<br> 在这里要排除掉DROPPED包括YES和NO两种类型，为YES时是废弃的索引
+* 将上面语句的结果拷贝到sql文件2.sql中
+
+
 * 第三步：批量执行操作：
   * 将第一步与第二步列出的语句放在SQL执行窗口中执行，就可以实现表数据及索引迁移
 
 
-## 十四、oracle索引修复
+### 十四、oracle索引修复
     select index_name ,status  from user_indexes where Status = 'UNUSABLE' ;
 
 
@@ -162,7 +170,7 @@ create temporary tablespace spd_temp tempfile'/opt/oracle/spd_temp.dbf' size 102
 
 
 
-## 十四、ORACLE使用
+### 十五、ORACLE使用
 
     查询表空间所有表：select table_name from all_tables where TABLESPACE_NAME='表空间' 表空间名字一定要大写。
 
