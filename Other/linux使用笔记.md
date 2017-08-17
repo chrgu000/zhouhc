@@ -14,7 +14,7 @@
   * Shift+PgDn将终端显示向下滚动
 
 
-
+#### 安装提示找不到启动盘
 
 centos 7 安装出现dracut界面时，表示找不到启动盘，这时操作如下
 
@@ -101,3 +101,94 @@ systemctl restart vsftpd.service
 1. \# netstat -utlpn | grep vsftp  
 2. tcp        0      0 0.0.0.0:2121                0.0.0.0:*                   LISTEN      23619/vsftpd  
 ~~~
+### 修改Linux IP
+
+步骤
+
+* 编辑
+
+  ~~~shell
+  vi /etc/sysconfig/network-scripts/ifcfg-eth0
+  ~~~
+
+* 填写ip地址、子网掩码、网关、DNS等。
+
+  ~~~shell
+  TYPE="Ethernet" #网络类型
+  #BOOTPROTO="dhcp" # 网卡获取IP地址的方式 Static（静态IP地址） dhcp（通过dhcp协议获取ip）bootip通过bootp协议获得的ip地址 
+  IPADDR=10.1.1.61 #ip地址
+  GATEWAY=10.1.1.1 #网关
+  DNS1=202.96.134.33 #DNS1
+  DNS2=202.96.128.86 #DNS2
+
+  DEFROUTE="yes" 
+  IPV4_FAILURE_FATAL="no"
+  IPV6INIT="yes"
+  IPV6_AUTOCONF="yes"
+  IPV6_DEFROUTE="yes"
+  IPV6_FAILURE_FATAL="no"
+  NAME="eno1" 
+  UUID="2e83941d-f373-48fb-9ada-9faa6e02ba1d"
+  DEVICE="eno1" #设备名称
+  ONBOOT="yes" #开机启动
+  PEERDNS="yes"
+  PEERROUTES="yes"
+  IPV6_PEERDNS="yes"
+  IPV6_PEERROUTES="yes"
+  IPV6_PRIVACY="no"
+  MTU=1200  #MTU
+  ~~~
+
+  ​
+
+* 编辑完后，保存退出。
+
+* 重启网络服务。
+
+  ~~~shell
+  service network restart
+  或
+  /etc/init.d/network restart
+  ~~~
+
+  ​
+
+* 摘要：
+
+---修改ip地址---
+
+即时生效:
+~~~shell
+# ifconfig eth0 192.168.1.155 netmask 255.255.255.0
+~~~
+重启生效:
+
+修改/etc/sysconfig/network-scripts/ifcfg-eth0
+
+---修改default gateway---
+
+即时生效:
+
+~~~shell
+# route add default gw 192.168.1.1
+~~~
+
+重启生效:
+
+修改/etc/sysconfig/network-scripts/ifcfg-eth0
+
+---修改dns---
+
+修改/etc/resolv.conf
+
+修改后即时生效，重启同样有效
+
+---修改host name---
+
+即时生效:
+
+\# hostname test1
+
+重启生效:
+
+修改/etc/sysconfig/network

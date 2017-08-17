@@ -18,16 +18,3 @@ Supervisord安装完成后有两个可用的命令行supervisor和supervisorctl�
 * supervisorctl update，根据最新的配置文件，启动新配置或有改动的进程，配置没有改动的进程不会受影响而重启。
 * 注意：显示用stop停止掉的进程，用reload或者update都不会自动重启。
 
-
-
-
-
-重新下载脚本
-
-/opt/deploy/
-
-
-
-
-
-eis没有权限
