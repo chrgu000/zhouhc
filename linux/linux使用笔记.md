@@ -204,3 +204,16 @@ nginx 重启
 ~~~
 
 [hehehehehe](main.sap)
+
+
+
+设置阿里云swap 空间
+
+~~~
+# dd if=/dev/zero of=/var/swapfile bs=1M count=1024 //生成1024M大小的空文件
+# mkswap /var/swapfile  //设置为swao分区
+# swapon /var/swapfile  //开启swap分区
+# chmod 7777 /var/swapfile //设置权限为7777，以便无论哪个用户启动系统都能正常运作
+# echo /var/swapfile swap swap defaults 0 0 >> /etc/fstab  //设置开机自动挂载
+~~~
+
