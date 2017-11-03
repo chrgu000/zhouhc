@@ -1,0 +1,53 @@
+package cn.ak4j.yard.spd.bizrule.to;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdReplenishRuleTO {
+	
+	private String id;
+	private String name;
+	private String ruleCode;
+	private String customName;
+	private String primaryName;
+	private Integer prior;
+	private String feedbackRuleId;
+	
+	private String fromDepotId;
+	private String fromDepotAreaType;
+	private PcsDepot fromDepot;
+	private String toDepotId;
+	private String toDepotAreaType;
+	private PcsDepot toDepot;
+	
+	private Boolean fromDepotCanApply;
+	private Boolean toDepotCanApply;
+	private Boolean fromDepotCanConfirm;
+	private Boolean toDepotCanConfirm;
+	
+	private Boolean useTurnoverBox;
+	private Boolean autoSetOffShelfTaskConfirmQty;
+	private Boolean autoSetBizConfirmQty;
+	
+	private String specificationTypeCode;
+	private String originRuleId;
+	private String originItemCondition;
+	
+	private Date createTime;
+	private Date lastUpdateTime;
+	
+	private Boolean enabled;
+	private Boolean canBeOriginRule;
+	private Boolean manualApply;
+	
+	private String displayName;
+	
+	private String description;
+
+}

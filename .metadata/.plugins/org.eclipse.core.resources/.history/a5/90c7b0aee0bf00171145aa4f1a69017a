@@ -1,0 +1,238 @@
+package cn.ak4j.yard.datahelper;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+
+@Ignore
+public class StockHelper extends BaseTest{
+
+	@Autowired private PcsUserRepository userRepository;
+	
+	//通过收货业务来进行增加库存
+	@Test public void addShelfStock() throws Exception{
+//		Conf.setCenterDepotAutoCreateOnShelfDispatcherForReceive(true);
+//		Conf.setCenterDepotAutoReviewOnShelfDispatcherForReceive(true);
+//		Conf.setNormalDepotAutoReviewOnShelfTaskForReceive(true);
+//		Conf.setCenterDepotAutoReviewOnShelfTaskForReceive(true);
+		
+		String urlTemplate = getUrlTemplate("/spd/spdReceives?accessToken={accessToken}");
+		String accessToken = getAccessToken(xykUserCode);
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		SpdReceiveBiz receiveBiz = createNewReceiveBiz(user);
+		
+		//新增收货业务
+		String json = mockMvc.perform(post(urlTemplate, accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(Global.defaultObjectMapper.writeValueAsString(receiveBiz)))
+						.andExpect(status().isOk())
+						.andReturn().getResponse().getContentAsString();
+		receiveBiz = Global.defaultObjectMapper.readValue(json, SpdReceiveBiz.class);
+		wait(5);
+		
+		urlTemplate = getUrlTemplate("/spd/spdReceives/{bizId}/checkState/commited?accessToken={accessToken}");
+		CheckStateTO checkState = new CheckStateTO(CheckState.commited.getCode(), receiveBiz.getMaintenanceInfo().getLastDate());
+		json = mockMvc.perform(put(urlTemplate, receiveBiz.getBizId(), accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(Global.defaultObjectMapper.writeValueAsString(checkState)))
+		.andExpect(status().isOk())
+		.andReturn().getResponse().getContentAsString();
+		checkState = Global.defaultObjectMapper.readValue(json, CheckStateTO.class);
+		wait(8);
+		
+		urlTemplate = getUrlTemplate("/spd/spdReceives/{bizId}/checkState/reviewed?accessToken={accessToken}");
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), checkState.getLastDate());
+		json = mockMvc.perform(put(urlTemplate, receiveBiz.getBizId(), accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(Global.defaultObjectMapper.writeValueAsString(checkState)))
+						.andExpect(status().isOk())
+						.andReturn().getResponse().getContentAsString();
+
+		wait(8);
+	}
+	
+	private SpdReceiveBiz createNewReceiveBiz(PcsUser user) {
+		SpdReceiveBiz receiveBiz = new SpdReceiveBiz();
+		receiveBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		receiveBiz.setFromOrgId("org_id_001");
+		receiveBiz.setToDepotId("depot_id_001");
+		receiveBiz.setToAreaType(PcsAreaType.normal.getCode());
+		receiveBiz.setToOrgId("626");
+		receiveBiz.setToDeptId("dept_id_001");
+		receiveBiz.setCreatorDepotId("depot_id_001");
+		
+		
+		SpdBizItems items = new SpdBizItems();
+		
+//		//1个批次的产品明细
+//		SpdBizItem item1 = new SpdBizItem("goods_id_001", "goods_lot_id_019", 1, 200, 200, 20.02f);
+//		SpdBizItem item2 = new SpdBizItem("goods_id_002", "goods_lot_id_024", 1, 300, 300, 5.20f);
+//		SpdBizItem item3 = new SpdBizItem("goods_id_003", "goods_lot_id_018", 1, 20, 20, 4.50f);
+//		
+//		//2个批次的产品明细(3种情况)
+//		SpdBizItem item4 = new SpdBizItem("goods_id_010", "goods_lot_id_033", 1, 1000, 1000, 20.50f);
+//		SpdBizItem item5 = new SpdBizItem("goods_id_010", "goods_lot_id_002", 1, 800, 800, 20.50f);
+//		
+//		SpdBizItem item6 = new SpdBizItem("goods_id_011", "goods_lot_id_003", 1, 3, 3, 50.50f);
+//		SpdBizItem item7 = new SpdBizItem("goods_id_011", "goods_lot_id_030", 1, 500, 500, 50.50f);
+//		
+//		SpdBizItem item8 = new SpdBizItem("goods_id_012", "goods_lot_id_047", 1, 5, 5, 20.50f);
+//		SpdBizItem item9 = new SpdBizItem("goods_id_012", "goods_lot_id_031", 1, 10, 10, 20.50f);
+//		
+//		//3个批次的产品明细(4种)
+//		
+//		SpdBizItem item10 = new SpdBizItem("goods_id_013", "goods_lot_id_038", 1, 1200, 1200, 6.50f);
+//		SpdBizItem item11 = new SpdBizItem("goods_id_013", "goods_lot_id_057", 1, 1300, 1300, 6.50f);
+//		SpdBizItem item12 = new SpdBizItem("goods_id_013", "goods_lot_id_058", 1, 900, 900, 6.50f);
+//		
+//		SpdBizItem item13 = new SpdBizItem("goods_id_014", "goods_lot_id_045", 1, 1000, 1000, 8.50f);
+//		SpdBizItem item14 = new SpdBizItem("goods_id_014", "goods_lot_id_039", 1, 900, 900, 8.50f);
+//		SpdBizItem item15 = new SpdBizItem("goods_id_014", "goods_lot_id_059", 1, 2, 2, 8.50f);
+//		
+//		SpdBizItem item16 = new SpdBizItem("goods_id_015", "goods_lot_id_053", 1, 1000, 1000, 16.20f);
+//		SpdBizItem item17 = new SpdBizItem("goods_id_015", "goods_lot_id_007", 1, 9, 9, 16.20f);
+//		SpdBizItem item18 = new SpdBizItem("goods_id_015", "goods_lot_id_029", 1, 3, 3, 16.20f);
+//		
+//		SpdBizItem item19 = new SpdBizItem("goods_id_016", "goods_lot_id_052", 1, 1, 1, 7.60f);
+//		SpdBizItem item20 = new SpdBizItem("goods_id_016", "goods_lot_id_012", 1, 9, 9, 7.60f);
+//		SpdBizItem item21 = new SpdBizItem("goods_id_016", "goods_lot_id_042", 1, 3, 3, 7.60f);
+//		
+//		SpdBizItem item22 = new SpdBizItem("goods_id_017", "goods_lot_id_022", 1, 22, 22, 7.60f);
+//		SpdBizItem item23 = new SpdBizItem("goods_id_017", "goods_lot_id_010", 1, 93, 93, 7.60f);
+//		SpdBizItem item24 = new SpdBizItem("goods_id_017", "goods_lot_id_028", 1, 34, 34, 7.60f);
+//		
+//		
+//		SpdBizItem item25 = new SpdBizItem("goods_id_018", "goods_lot_id_009", 1, 57, 57, 7.60f);
+//		SpdBizItem item26 = new SpdBizItem("goods_id_018", "goods_lot_id_051", 1, 81, 81, 7.60f);
+//		SpdBizItem item27 = new SpdBizItem("goods_id_018", "goods_lot_id_040", 1, 33, 33, 7.60f);
+//		
+//		SpdBizItem item28 = new SpdBizItem("goods_id_019", "goods_lot_id_004", 1, 21, 21, 7.60f);
+//		SpdBizItem item29 = new SpdBizItem("goods_id_019", "goods_lot_id_056", 1, 28, 28, 7.60f);
+//		SpdBizItem item30 = new SpdBizItem("goods_id_019", "goods_lot_id_055", 1, 95, 93, 7.60f);
+//		
+//		
+//		
+//		items.add(item1);
+//		items.add(item2);
+//		items.add(item3);
+//		items.add(item4);
+//		items.add(item5);
+//		items.add(item6);
+//		items.add(item7);
+//		items.add(item8);
+//		items.add(item9);
+//		items.add(item10);
+//		items.add(item11);
+//		items.add(item12);
+//		items.add(item13);
+//		items.add(item14);
+//		items.add(item15);
+//		items.add(item16);
+//		items.add(item17);
+//		items.add(item18);
+//		items.add(item19);
+//		items.add(item20);
+//		items.add(item21);
+//		items.add(item22);
+//		items.add(item23);
+//		items.add(item24);
+//		items.add(item25);
+//		items.add(item26);
+//		items.add(item27);
+//		items.add(item28);
+//		items.add(item29);
+//		items.add(item30);
+		
+		SpdBizItem item1 = new SpdBizItem("goods_id_004", "goods_lot_id_011", 1, 95, 93, 7.60f);
+		
+		SpdBizItem item2 = new SpdBizItem("goods_id_021", "goods_lot_id_062", 1, 200, 200, 7.60f);
+		SpdBizItem item3 = new SpdBizItem("goods_id_021", "goods_lot_id_061", 1, 345, 345, 7.60f);
+		
+
+		SpdBizItem item4 = new SpdBizItem("goods_id_022", "goods_lot_id_064", 1, 195, 193, 7.60f);
+		SpdBizItem item5 = new SpdBizItem("goods_id_022", "goods_lot_id_063", 1, 985, 985, 7.60f);
+		
+
+		SpdBizItem item6 = new SpdBizItem("goods_id_023", "goods_lot_id_066", 1, 350, 350, 7.60f);
+		SpdBizItem item7 = new SpdBizItem("goods_id_023", "goods_lot_id_065", 1, 800, 800, 7.60f);
+		
+
+		SpdBizItem item8 = new SpdBizItem("goods_id_024", "goods_lot_id_068", 1, 220, 220, 7.60f);
+		SpdBizItem item9 = new SpdBizItem("goods_id_024", "goods_lot_id_067", 1, 880, 880, 7.60f);
+		
+		SpdBizItem item11 = new SpdBizItem("goods_id_025", "goods_lot_id_070", 1, 512, 512, 7.60f);
+		
+		SpdBizItem item12 = new SpdBizItem("goods_id_026", "goods_lot_id_071", 1, 145, 145, 7.60f);
+		
+		SpdBizItem item13 = new SpdBizItem("goods_id_027", "goods_lot_id_074", 1, 556, 558, 7.60f);
+		
+
+		SpdBizItem item14 = new SpdBizItem("goods_id_034", "goods_lot_id_098", 1, 40, 40, 7.60f);
+		SpdBizItem item15 = new SpdBizItem("goods_id_034", "goods_lot_id_088", 1, 50, 50, 7.60f);
+		SpdBizItem item16 = new SpdBizItem("goods_id_034", "goods_lot_id_087", 1, 1000, 1000, 7.60f);
+		
+		SpdBizItem item17= new SpdBizItem("goods_id_035", "goods_lot_id_089", 1, 195, 193, 7.60f);
+		SpdBizItem item18 = new SpdBizItem("goods_id_035", "goods_lot_id_090", 1, 445, 445, 7.60f);
+		SpdBizItem item19 = new SpdBizItem("goods_id_035", "goods_lot_id_096", 1, 2500, 2500, 7.60f);
+		
+		SpdBizItem item20 = new SpdBizItem("goods_id_036", "goods_lot_id_092", 1, 45, 45, 7.60f);
+		SpdBizItem item21 = new SpdBizItem("goods_id_036", "goods_lot_id_091", 1, 1200, 1200, 7.60f);
+		SpdBizItem item22 = new SpdBizItem("goods_id_036", "goods_lot_id_097", 1, 4785, 4785, 7.60f);
+		
+		SpdBizItem item23 = new SpdBizItem("goods_id_037", "goods_lot_id_095", 1, 23, 23, 7.60f);
+		SpdBizItem item24 = new SpdBizItem("goods_id_037", "goods_lot_id_094", 1, 456, 456, 7.60f);
+		SpdBizItem item25 = new SpdBizItem("goods_id_037", "goods_lot_id_093", 1, 789, 789, 7.60f);
+		
+		items.add(item1);
+		items.add(item2);
+		items.add(item3);
+		items.add(item4);
+		items.add(item5);
+		items.add(item6);
+		items.add(item7);
+		items.add(item8);
+		items.add(item9);
+		items.add(item11);
+		items.add(item12);
+		items.add(item13);
+		items.add(item14);
+		items.add(item15);
+		items.add(item16);
+		items.add(item17);
+		items.add(item18);
+		items.add(item19);
+		items.add(item20);
+		items.add(item21);
+		items.add(item22);
+		items.add(item23);
+		items.add(item24);
+		items.add(item25);
+		
+		
+		
+		
+		
+		receiveBiz.setItems(items);
+		
+		return receiveBiz;
+	}
+	
+}

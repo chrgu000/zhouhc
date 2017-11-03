@@ -1,0 +1,95 @@
+package cn.ak4j.yard.yds.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+
+import org.junit.Test;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.params.SpdShelfStockParams;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.to.YdsUnuseableLotTO;
+
+public class YdsGoodsLotResourceTest extends BaseTest{
+	
+	@Test public void testFindByLotNo() throws Exception{
+		String lotNo = "160527 2C";
+		YdsGoodsLot goodsLot = getGoodsLotWithLotNo(lotNo);
+		goodsLot =  mockMvcHelper.add(YdsGoodsLot.class, testUserCode, goodsLot);
+		assertEquals(lotNo, goodsLot.getLotNo());
+		
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setLotNo(new ListParam<String>(lotNo));
+		
+		YdsGoodsLots theGoodsLots =  mockMvcHelper.findList(YdsGoodsLots.class, testUserCode, params);
+		theGoodsLots.forEach(theGoodsLot->{
+			assertEquals(lotNo, theGoodsLot.getLotNo());
+		});
+		
+	}
+	
+	@Test public void testAdd() throws Exception{
+		String lotNo = "160527 2C";
+		YdsGoodsLot theGoodsLot =  mockMvcHelper.add(YdsGoodsLot.class, testUserCode, getGoodsLotWithLotNo(lotNo));
+		assertEquals(lotNo, theGoodsLot.getLotNo());
+	}
+	
+	@Test public void testWithoutStockGoodsLots() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/yds/unuseableLots?depotId={depotId}&accessToken={accessToken}";
+		String depotId = "depot_id_001";
+		
+		List<YdsUnuseableLotTO> goodsLots = mockMvcHelper.mockGet(new TypeReference<List<YdsUnuseableLotTO>>() {}, urlTemplate, depotId, accessToken);
+		assertTrue(goodsLots.size()>0);
+		
+		SpdShelfStockParams shelfStockParams = new SpdShelfStockParams();
+		shelfStockParams.setDepotId(new ListParam<String>(depotId));
+		SpdShelfStocks shelfStocks = mockMvcHelper.findList(SpdShelfStocks.class, testUserCode, shelfStockParams);
+				
+		SpdDepotCardParams depotCardParams = new SpdDepotCardParams();
+		depotCardParams.setDepotId(new ListParam<String>(depotId));
+		depotCardParams.setEnabled(new ListParam<Boolean>(true));
+		depotCardParams.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		SpdDepotCards cards = mockMvcHelper.findList(SpdDepotCards.class, testUserCode, depotCardParams);
+		
+		goodsLots.forEach(goodsLot->{
+			SpdShelfStock shelfStock = CollectionUtils.findWhere("lotId", goodsLot.getLotId(), shelfStocks);
+			assertNull(shelfStock);
+		});
+		
+		goodsLots.forEach(goodsLot->{
+			SpdDepotCard card = CollectionUtils.findWhere("goodsId", goodsLot.getGoodsId(), cards);
+			assertNotNull(card);
+		});
+	}
+
+
+	private YdsGoodsLot getGoodsLotWithLotNo(String lotNo) {
+		YdsGoodsLot goodsLot = new YdsGoodsLot();
+		goodsLot.setLotValidity(new Date());
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.DAY_OF_YEAR, -30);
+		goodsLot.setProduceDate(cal.getTime());
+		goodsLot.setGoodsId("132456");
+		goodsLot.setLotNo(lotNo);
+		return goodsLot;
+	}
+}

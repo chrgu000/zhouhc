@@ -1,0 +1,77 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.enums.PcsAreaType;
+
+public class SpdConsumeRuleTest {
+	
+
+	@Test public void testEqualsRule(){
+		SpdConsumeRule rule1 = createConsumeRule();
+		SpdConsumeRule rule2 = createConsumeRule();
+		assertTrue(rule1.equalsRule(rule2));
+		
+		rule2.setFeedbackRuleId("cns_fb_id_14");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = createConsumeRule();
+		rule2.setAreaType("isolation");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = createConsumeRule();
+		rule2.setUsage("护士领用");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = createConsumeRule();
+		rule2.setDepotId("depot_id_02");
+		assertFalse(rule1.equalsRule(rule2));
+	}
+	
+	@Test public void testUpdate(){
+		SpdConsumeRule rule1 = createConsumeRule();
+		SpdConsumeRule rule2 = createConsumeRule();
+		SpdConsumeRule rule3 = createConsumeRule();
+		
+		rule1.setName("半自动护士领用");
+		rule1.setPrior(100);
+		rule1.setEnabled(false);
+		rule1.setCanBeOriginRule(false);
+		rule1.setUsage("护士领用");
+		rule1.setDepotId("depot_id_004");
+		rule1.setAreaType(PcsAreaType.isolation.getCode());
+		rule1.setFeedbackRuleId("cns_fb_id_14");
+		rule1.setManualApply(false);
+		
+		rule2.update(rule1);
+		
+		assertTrue(rule2.getName()!=rule3.getName());
+		assertTrue(rule2.getPrior()!=rule3.getPrior());
+		assertTrue(rule2.getEnabled()!=rule3.getEnabled());
+		assertTrue(rule2.getUsage()!=rule3.getUsage());
+		assertTrue(rule2.getCanBeOriginRule()!=rule3.getCanBeOriginRule());
+		assertTrue(rule2.getManualApply()!=rule3.getManualApply());
+		
+		assertTrue(rule2.getDepotId()==rule3.getDepotId());
+		assertTrue(rule2.getAreaType()==rule3.getAreaType());
+		assertTrue(rule2.getFeedbackRuleId()==rule3.getFeedbackRuleId());
+	}
+	
+	private SpdConsumeRule createConsumeRule(){
+		SpdConsumeRule rule = new SpdConsumeRule();
+		rule.setName("自动处方消耗");
+		rule.setCustomName("科室处方消耗");
+		rule.setPrior(99);
+		rule.setEnabled(true);
+		rule.setCanBeOriginRule(true);
+		rule.setDepotId("depot_id_01");
+		rule.setAreaType(PcsAreaType.normal.getCode());
+		rule.setUsage("处方消耗");
+		rule.setFeedbackRuleId("cns_fb_id_13");
+		return rule;
+	}
+	
+}

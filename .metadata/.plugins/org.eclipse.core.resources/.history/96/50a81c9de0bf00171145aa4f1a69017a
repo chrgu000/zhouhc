@@ -1,0 +1,1 @@
+Insert into SYS_GLOBAL_INFO (KEY,NAME,VALUE,DESCRIPTION,CREATE_TIME,LAST_UPDATE_TIME,EDITABLE) values ('intigration_params','集成参数','[{"depotId":"ff8080815e371d0c015e3762abe80e06", "params": {"outClientId":"8442","outClientName":"药剂科","outAddressId":"11996","outAddressName":"佛山市顺德区容桂大道北97号"}}] ','depotId:备货收货仓库ID;params:对应相应的集成参数对象',sysDate,sysDate,'1');

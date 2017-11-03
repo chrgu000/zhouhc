@@ -1,0 +1,16 @@
+package cn.ak4j.yard.pcs.domain;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.pcs.params.PcsUserRoleParams;
+
+@SuppressWarnings("serial")
+public class PcsUserRoles extends Entities<PcsUserRole> {
+
+	public PcsUserRoles findByUserId(String userId){
+		PcsUserRoleParams params = new PcsUserRoleParams();
+		params.setUserId(new ListParam<String>(userId));
+		return (PcsUserRoles)find(params);
+	}
+	
+}

@@ -1,0 +1,132 @@
+package cn.ak4j.yard.datahelper;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+
+@Ignore
+public class DispatcherHelper extends BaseTest{
+	//通过收货业务来增加调度作业
+	@Test public void createOnShelfDispatcher() throws Exception{
+//		Conf.setCenterDepotAutoCreateOnShelfDispatcherForReceive(true);
+//		Conf.setCenterDepotAutoReviewOnShelfDispatcherForReceive(true);
+		
+		String urlTemplate = getUrlTemplate("/spd/spdReceives?accessToken={accessToken}");
+		String accessToken = getAccessToken(xykUserCode);
+		
+		SpdReceiveBiz receiveBiz = createNewReceiveBiz();
+		//新增收货业务
+		String json = mockMvc.perform(post(urlTemplate, accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(Global.defaultObjectMapper.writeValueAsString(receiveBiz)))
+						.andExpect(status().isOk())
+						.andReturn().getResponse().getContentAsString();
+		receiveBiz = Global.defaultObjectMapper.readValue(json, SpdReceiveBiz.class);
+		wait(1);
+		
+		urlTemplate = getUrlTemplate("/spd/spdReceives/{bizId}/checkState/commited?accessToken={accessToken}");
+		CheckStateTO checkState = new CheckStateTO(CheckState.commited.getCode(), receiveBiz.getMaintenanceInfo().getLastDate());
+		json = mockMvc.perform(put(urlTemplate, receiveBiz.getBizId(), accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(Global.defaultObjectMapper.writeValueAsString(checkState)))
+		.andExpect(status().isOk())
+		.andReturn().getResponse().getContentAsString();
+		checkState = Global.defaultObjectMapper.readValue(json, CheckStateTO.class);
+		wait(1);
+		
+		urlTemplate = getUrlTemplate("/spd/spdReceives/{bizId}/checkState/reviewed?accessToken={accessToken}");
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), checkState.getLastDate());
+		json = mockMvc.perform(put(urlTemplate, receiveBiz.getBizId(), accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(Global.defaultObjectMapper.writeValueAsString(checkState)))
+						.andExpect(status().isOk())
+						.andReturn().getResponse().getContentAsString();
+
+		wait(5);
+	}
+		
+	private SpdReceiveBiz createNewReceiveBiz() {
+		SpdReceiveBiz receiveBiz = new SpdReceiveBiz();
+		receiveBiz.setFromOrgId("org_id_001");
+		receiveBiz.setToDepotId("depot_id_001");
+		receiveBiz.setToAreaType(PcsAreaType.normal.getCode());
+		receiveBiz.setToOrgId("626");
+		receiveBiz.setToDeptId("dept_id_001");
+		receiveBiz.setCreatorDepotId("depot_id_001");
+		
+		
+		SpdBizItems items = new SpdBizItems();
+		
+		//1个批次的产品明细
+		SpdBizItem item1 = new SpdBizItem("goods_id_001", "goods_lot_id_019", 1, 200, 200, 20.02f);
+		SpdBizItem item2 = new SpdBizItem("goods_id_002", "goods_lot_id_024", 1, 300, 300, 5.20f);
+		SpdBizItem item3 = new SpdBizItem("goods_id_003", "goods_lot_id_018", 1, 20, 20, 4.50f);
+		
+		//2个批次的产品明细(3种情况)
+		SpdBizItem item4 = new SpdBizItem("goods_id_010", "goods_lot_id_033", 1, 1000, 1000, 20.50f);
+		SpdBizItem item5 = new SpdBizItem("goods_id_010", "goods_lot_id_002", 1, 800, 800, 20.50f);
+		
+		SpdBizItem item6 = new SpdBizItem("goods_id_011", "goods_lot_id_003", 1, 3, 3, 50.50f);
+		SpdBizItem item7 = new SpdBizItem("goods_id_011", "goods_lot_id_030", 1, 500, 500, 50.50f);
+		
+		SpdBizItem item8 = new SpdBizItem("goods_id_012", "goods_lot_id_047", 1, 5, 5, 20.50f);
+		SpdBizItem item9 = new SpdBizItem("goods_id_012", "goods_lot_id_031", 1, 10, 10, 20.50f);
+		
+		//3个批次的产品明细(4种)
+		
+		SpdBizItem item10 = new SpdBizItem("goods_id_013", "goods_lot_id_038", 1, 1200, 1200, 6.50f);
+		SpdBizItem item11 = new SpdBizItem("goods_id_013", "goods_lot_id_057", 1, 1300, 1300, 6.50f);
+		SpdBizItem item12 = new SpdBizItem("goods_id_013", "goods_lot_id_058", 1, 900, 900, 6.50f);
+		
+		SpdBizItem item13 = new SpdBizItem("goods_id_014", "goods_lot_id_045", 1, 1000, 1000, 8.50f);
+		SpdBizItem item14 = new SpdBizItem("goods_id_014", "goods_lot_id_039", 1, 900, 900, 8.50f);
+		SpdBizItem item15 = new SpdBizItem("goods_id_014", "goods_lot_id_059", 1, 2, 2, 8.50f);
+		
+		SpdBizItem item16 = new SpdBizItem("goods_id_015", "goods_lot_id_053", 1, 1000, 1000, 16.20f);
+		SpdBizItem item17 = new SpdBizItem("goods_id_015", "goods_lot_id_007", 1, 9, 9, 16.20f);
+		SpdBizItem item18 = new SpdBizItem("goods_id_015", "goods_lot_id_029", 1, 3, 3, 16.20f);
+		
+		SpdBizItem item19 = new SpdBizItem("goods_id_016", "goods_lot_id_052", 1, 1, 1, 7.60f);
+		SpdBizItem item20 = new SpdBizItem("goods_id_016", "goods_lot_id_012", 1, 9, 9, 7.60f);
+		SpdBizItem item21 = new SpdBizItem("goods_id_016", "goods_lot_id_042", 1, 3, 3, 7.60f);
+		
+		items.add(item1);
+		items.add(item2);
+		items.add(item3);
+		items.add(item4);
+		items.add(item5);
+		items.add(item6);
+		items.add(item7);
+		items.add(item8);
+		items.add(item9);
+		items.add(item10);
+		items.add(item11);
+		items.add(item12);
+		items.add(item13);
+		items.add(item14);
+		items.add(item15);
+		items.add(item16);
+		items.add(item17);
+		items.add(item18);
+		items.add(item19);
+		items.add(item20);
+		items.add(item21);
+		
+		receiveBiz.setItems(items);
+		
+		return receiveBiz;
+	}
+}

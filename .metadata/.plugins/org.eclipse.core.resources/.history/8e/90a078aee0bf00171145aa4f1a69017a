@@ -1,0 +1,64 @@
+/**
+ */
+package cn.ak4j.yard.spd.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.domain.SpdInventoryItem;
+import cn.ak4j.yard.spd.repository.SpdInventoryItemRepository;
+import cn.ak4j.yard.spd.to.NewSpdInventoryItemTO;
+
+public class SpdInventoryItemResourceTest extends BaseTest{
+	
+	@Autowired private SpdInventoryItemRepository iiRepository;
+
+	@Test public void testAdd() throws Exception{
+		NewSpdInventoryItemTO to = buildNewSpdInventoryItemTO();
+		
+		SpdInventoryItem item = mockMvcHelper.add(SpdInventoryItem.class, xykUserCode, to);
+		assertEquals(to.getInventoryId(), item.getInventoryId());
+		assertEquals(to.getGoodsId(), item.getGoodsId());
+		assertEquals(to.getStockGoodsLotId(), to.getStockGoodsLotId());
+		assertEquals(to.getDepotId(), item.getDepotId());
+		assertEquals(to.getShelfId(), item.getShelfId());
+		assertEquals(to.getPlanQty(), item.getPlanQty());
+		assertEquals(to.getUnqualifiedQty(), item.getUnqualifiedQty());
+	}
+	
+	@Test public void testModify() throws Exception{
+		String inventoryItemId = "inventory_id_Item_003";
+		SpdInventoryItem item = iiRepository.findOne(inventoryItemId);
+		
+		assertEquals(null, item.getCheckQty());
+		item.setCheckQty(10);
+		SpdInventoryItem newItem = mockMvcHelper.modify(SpdInventoryItem.class, xykUserCode, inventoryItemId, item);
+		assertEquals(10, newItem.getCheckQty().intValue());
+	}
+	
+	@Test public void testDelete() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdInventoryItems/{inventoryItemId}?accessToken={accessToken}";
+		String inventoryItemId = "inventory_id_Item_003";
+		
+		mockMvcHelper.mockDelete(urlTemplate, inventoryItemId, accessToken);
+		SpdInventoryItem item = iiRepository.findOne(inventoryItemId);
+		assertNull(item);
+	}
+	
+	public NewSpdInventoryItemTO buildNewSpdInventoryItemTO(){
+		NewSpdInventoryItemTO to = new NewSpdInventoryItemTO();
+		to.setInventoryId("inventory_id_002");
+		to.setGoodsId("goods_id_007");
+		to.setStockGoodsLotId("goods_lot_id_023");
+		to.setPlanQty(20);
+		to.setUnqualifiedQty(0);
+		to.setDepotId("depot_id_001");
+		to.setShelfId("shelf_id_031");
+		return to;
+	}
+}

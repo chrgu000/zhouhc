@@ -1,0 +1,138 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.params.SpdShelfStockParams;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+
+@SuppressWarnings({"unchecked", "rawtypes", "serial"})
+public class YdsGoodsLots extends Entities<YdsGoodsLot> {
+
+	public YdsGoodsLots(){}
+	
+	public YdsGoodsLots(List entities){
+		super(entities);
+	}
+	
+	public void fillGoodss(YdsGoodss goodss){
+		for(YdsGoodsLot lot : this){
+			YdsGoods goods = goodss.findById(lot.getGoodsId());
+			lot.setGoods(goods);
+		}
+	}
+	
+	public void fillGoodss(YdsGoodsRepository goodsRepository, YdsGoodsLotRepository glRepository, SpdShelfStockRepository ssRepository){
+		List<String> goodsIds = this.pluck("goodsId");
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds).fillUsableLots(glRepository, ssRepository);
+		fillGoodss(goodss);
+	}
+	
+	public YdsGoodss getAllGoodss(){
+		YdsGoodss result = new YdsGoodss();
+		this.forEach(lot->result.add(lot.getGoods()));
+		return result;
+	}
+
+	public YdsGoodsLot findById(String lotId) {
+		if(StringUtils.isEmpty(lotId)){
+			return null;
+		}
+		return CollectionUtils.findWhere("goodsLotId", lotId, this);
+	}
+	
+	public YdsGoodsLots findUsableLots(YdsGoodsLotParams params, SpdShelfStockRepository ssRepository){
+		YdsGoodsLots result = new YdsGoodsLots();
+		SpdShelfStockParams shelfStockParams = new SpdShelfStockParams();
+		shelfStockParams.setGoodsId(params.getGoodsId());
+		shelfStockParams.setQtyByMinUnit(params.getStockQty());
+		if(shelfStockParams.isNotEmpty()){
+			SpdShelfStocks stocks = ssRepository.find(shelfStockParams);
+			if(stocks.size() != 0){
+				params.setGoodsLotId(new ListParam<String>(stocks.pluck("lotId")));
+			}else{
+				return result;
+			}
+		}
+		if(params.isNotEmpty()){
+			result = new YdsGoodsLots(findByPage(params, OrderParam.getDefaultOrder(), -1, -1));
+		}
+
+		return result;
+	}
+	
+	public YdsGoodsLots find(YdsGoodsLotParams params, YdsGoodsRepository goodsRepository){
+		return this.findByPage(params, null, -1, -1, goodsRepository);
+	}
+	
+	public YdsGoodsLots findByPage(YdsGoodsLotParams params, OrderParam order, int pageNo, int pageSize, YdsGoodsRepository goodsRepository){
+		if(params !=null){
+			YdsGoodsParams ydsGoodsParams = new YdsGoodsParams();
+			ydsGoodsParams.setFormatName(params.getFormatName());
+			if(ydsGoodsParams.isNotEmpty()){
+				YdsGoodss ydsGoodss = new YdsGoodss(goodsRepository.findAll().find(ydsGoodsParams));
+				if(ydsGoodss.size() == 0){
+					return new YdsGoodsLots();
+				}
+				params.setGoodsId(new ListParam<String>(ydsGoodss.getIds()));
+			}
+		}
+		return new YdsGoodsLots(this.findByPage(params, order, pageNo, pageSize));
+	}
+
+	public YdsGoodsLots findByIds(List<String> lotIds) {
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setGoodsLotId(new ListParam(lotIds));
+		return new YdsGoodsLots(find(params));
+	}
+
+	public YdsGoodsLots findByGoodsIds(List<String> goodsIds) {
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setGoodsId(new ListParam<String>(goodsIds));
+		return new YdsGoodsLots(find(params));
+	}
+
+	public YdsGoodsLots findByGoodsId(String goodsId) {
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setGoodsId(new ListParam<String>(goodsId));
+		return new YdsGoodsLots(find(params));
+	}
+
+	public YdsGoodsLot findWithSameLotNo(String lotNo, String id, String goodsId){
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setGoodsLotId(new ListParam<String>(id,QueryParam.operation_not_in));
+		params.setGoodsId(new ListParam<String>(goodsId));
+    	params.setLotNo(new ListParam<String>(lotNo));
+    	YdsGoodsLots ydsGoodsLots = new YdsGoodsLots(find(params));
+    	return ydsGoodsLots.size()>0?ydsGoodsLots.get(0):null;
+	}
+
+	public YdsGoodsLot findByGoodsLotNoAndGoodsId(String lotNo, String goodsId){
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setLotNo(new ListParam<String>(lotNo));
+		params.setGoodsId(new ListParam<String>(goodsId));
+    	YdsGoodsLots ydsGoodsLots = new YdsGoodsLots(find(params));
+    	if(ydsGoodsLots.size()>0){
+    		return ydsGoodsLots.get(0);
+    	}
+    	return null;
+	}
+	
+	public YdsGoodsLot getByGoodsLotNoAndGoodsId(String lotNo, String goodsId){
+		String[] fieldNames = {"lotNo", "goodsId"};
+		return CollectionUtils.findWhere(fieldNames, this, lotNo, goodsId);
+	}
+	
+}

@@ -1,0 +1,52 @@
+package cn.ak4j.yard.spd.bizplan.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdReceiveBizParams extends QueryParams{
+
+	private ListParam<String> bizId;
+	private ListParam<String> planId;
+	private ListParam<Integer> checkStateCode;
+	private ListParam<String> toOrgId;
+	private ListParam<String> fromOrgId;
+	private ListParam<String> bizCode;
+	//private ListParam<String> generalCode;
+	private ListParam<String> toDepotId;
+	private ListParam<String> finalDepotId;
+	private ListParam<String> toDeptId;
+	private ListParam<String> bizStatusCode;
+	private ListParam<String> sendCode;
+	private ListParam<String> sendId;
+	private ListParam<String> fromOrgName;//关联原货主机构名
+	private ListParam<String> fromDeptId;
+	private ListParam<String> fromDeptName;
+	private ListParam<String> toOrgName;//关联入库机构名
+	private ListParam<String> toDepotName;
+	private ListParam<String> finalDepotName;
+	private ListParam<String> collectDepotName;
+	private ListParam<String> toDeptName;
+	private ListParam<String> finalDeptName;
+	private ListParam<String> prepareInformBizId; //备货通知业务Id
+	private ListParam<Boolean> recorded;
+	private ListParam<Boolean> saleCompleted;
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	private DateRangeParam maintenanceInfo_lastDate;
+	private ListParam<String> maintenanceInfo_createUserId;
+	private ListParam<String> maintenanceInfo_lastUserId;
+	
+	private ListParam<String> prepareInformBizCode;//备货通知业务编码
+	
+	private ListParam<String> lastUserName;
+	
+	private ListParam<String> bizRuleId;
+	private ListParam<String> bizRuleName;//收货规则名称
+	private ListParam<String> name;//规则关联显示名称
+	
+}

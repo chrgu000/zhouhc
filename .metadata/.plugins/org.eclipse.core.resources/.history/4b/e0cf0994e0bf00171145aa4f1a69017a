@@ -1,0 +1,43 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.List;
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+
+@SuppressWarnings({"serial"})
+public class YdsWorkBooks extends Entities<YdsWorkBook> {
+
+	public YdsWorkBooks(){}
+	
+	public YdsWorkBooks(List<YdsWorkBook> workBooks){
+		super(workBooks);
+	}
+
+	public YdsWorkBook findById(String workbookId) {
+		return CollectionUtils.findWhere("workbookId", workbookId, this);
+	}
+
+	public YdsWorkBooks findBySortCode(String sortCode) {
+		return new YdsWorkBooks(CollectionUtils.find("sortCode", sortCode, this));
+	}
+	
+	public YdsWorkBooks findSameSortAndName(YdsWorkBook workBook){
+		YdsWorkBooks sortCodeWorkBooks = new YdsWorkBooks(CollectionUtils.find("sortCode", workBook.getSortCode(), this));
+		return new YdsWorkBooks(CollectionUtils.find("keyName", workBook.getKeyName(), sortCodeWorkBooks));
+	}
+	
+	public YdsWorkBooks findSameSortAndInx(YdsWorkBook workBook){
+		YdsWorkBooks sortCodeWorkBooks = new YdsWorkBooks(CollectionUtils.find("sortCode", workBook.getSortCode(), this));
+		return new YdsWorkBooks(CollectionUtils.find("keyInx", workBook.getKeyInx(), Integer.class, sortCodeWorkBooks));
+	}
+
+	public YdsWorkBooks findByIds(List<String> ids) {
+		YdsWorkBooks result = new YdsWorkBooks();
+		ids.forEach(id->{
+			result.add(findById(id));
+		});
+		
+		return result;
+	}
+	
+}

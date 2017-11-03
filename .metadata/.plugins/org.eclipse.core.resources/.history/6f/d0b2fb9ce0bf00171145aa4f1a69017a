@@ -1,0 +1,1 @@
+alter table spd_adjust_stock_rule modify init_adjust default 0;

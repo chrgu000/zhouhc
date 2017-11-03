@@ -1,0 +1,71 @@
+package cn.ak4j.yard;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.AcknowledgeMode;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+
+@Configuration("testRabbitMQConfiguration")
+public class RabbitMQConfiguration {
+
+	@SuppressWarnings("unused")
+	private Logger logger = LoggerFactory.getLogger(RabbitMQConfiguration.class);
+	
+	private String queueName = "eis_queue";
+	@Value("${eis.eisRabbitMQAddress}") private String eisRabbitMQAddress;
+	@Value("${eis.eisRabbitMQUserName}") private String eisRabbitMQUserName;
+	@Value("${eis.eisRabbitMQPassword}") private String eisRabbitMQPassword;
+	@Value("${eis.eisRabbitMQVirtualHost}") private String eisRabbitMQVirtualHost;
+	@Autowired private AMQPMsgs msgs;
+	
+	@Primary
+	@Bean(name="eisConnectionFactory")
+	ConnectionFactory eisConnectionFactory(){
+		CachingConnectionFactory cf = new CachingConnectionFactory();
+		cf.setAddresses(eisRabbitMQAddress);
+		cf.setUsername(eisRabbitMQUserName);
+		cf.setPassword(eisRabbitMQPassword);
+		cf.setVirtualHost(eisRabbitMQVirtualHost);
+		cf.setRequestedHeartBeat(3);
+		cf.setPublisherConfirms(true);
+		return cf;
+	}
+
+	@Bean(name="testAmqpMsgListener")
+	TestAMQPMsgListener amqpMsgListener(){
+		return new TestAMQPMsgListener(msgs);
+	}
+	
+	@Bean(name="eisRabbitTemplate")
+	RabbitTemplate eisRabbitTemplate(@Qualifier("eisConnectionFactory")ConnectionFactory connectionFactory){
+		return new RabbitTemplate(connectionFactory);
+	}
+	
+	@Bean(name="testAmqpMsgListenerContainer")
+	SimpleMessageListenerContainer msgListenerContainer(@Qualifier("eisConnectionFactory")ConnectionFactory connectionFactory, 
+													    @Qualifier("testAmqpMsgListener")Object amqpMsgListener){
+		SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
+		container.setConnectionFactory(connectionFactory);
+		container.setQueueNames(new String[]{queueName});
+		container.setMessageListener(amqpMsgListener);
+		container.setAutoStartup(true);
+		//定义三个的处理消息的worker，相当于拥有三个并发处理消息的线程
+		container.setConcurrentConsumers(1);
+		//设置应答模式
+		container.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+		return container;
+	}
+	
+}
+
+

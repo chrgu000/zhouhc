@@ -1,0 +1,202 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import java.net.URLEncoder;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.extend.gep.domain.SpdGepPrepareInformBizTO;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdPrepareInformBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdPrepareInformBizService;
+import cn.ak4j.yard.spd.bizplan.vo.SpdPrepareReceiveQty;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.utils.ExcelBuilder;
+import lombok.extern.slf4j.Slf4j;
+
+@RestController
+@SuppressWarnings({"rawtypes", "unchecked"})
+@Slf4j
+public class SpdPrepareInformResource {
+
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private SpdPrepareInformBizService pibService;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@Autowired private YardExcelFormatFactory excelFormatFactory;
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/iTakeChargeOfPrepareInforms/uncompletePrepareInforms", method = RequestMethod.GET)
+	public SpdPrepareInformBizs getITakeChargeOfUncompletePrepareInforms(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdPrepareInformBizParams params = SpdPrepareInformBizParams.buildParamsFromJson(paramsStr, SpdPrepareInformBizParams.class);
+		if(params == null){
+			params = new SpdPrepareInformBizParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		return pibService.findITakeChargeOfUncompletePrepares(user, params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/iTakeChargeOfPrepareInforms/uncompletePrepareInforms/count", method = RequestMethod.GET)
+	public int countITakeChargeOfUncompletePrepares(@RequestParam(value = "params", required = false) String paramsStr, HttpServletRequest request){		
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdPrepareInformBizParams params = SpdPrepareInformBizParams.buildParamsFromJson(paramsStr, SpdPrepareInformBizParams.class);
+		if(params == null){
+			params = new SpdPrepareInformBizParams();
+		}
+
+		SpdPrepareInformBizs prepareInforms = pibService.findITakeChargeOfUncompletePrepares(user, params, null, -1, -1);
+		return prepareInforms.size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/iTakeChargeOfPrepareInforms/completedPrepareInforms", method = RequestMethod.GET)
+	public SpdPrepareInformBizs getITakeChargeOfCompletedPrepares(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdPrepareInformBizParams params = SpdPrepareInformBizParams.buildParamsFromJson(paramsStr, SpdPrepareInformBizParams.class);
+		if(params == null){
+			params = new SpdPrepareInformBizParams();
+		}
+		
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		return pibRepository.findITakeChargeOfCompletedPrepares(user, params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/iTakeChargeOfPrepareInforms/completedPrepareInforms/count", method = RequestMethod.GET)
+	public int countITakeChargeOfCompletedPrepares(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdPrepareInformBizParams params = SpdPrepareInformBizParams.buildParamsFromJson(paramsStr, SpdPrepareInformBizParams.class);
+		if(params == null){
+			params = new SpdPrepareInformBizParams();
+		}
+		
+		SpdPrepareInformBizs prepareInforms = pibRepository.findITakeChargeOfCompletedPrepares(user, params, null, -1, -1);
+		
+		return prepareInforms.size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/whichICanReview", method = RequestMethod.GET)
+	public SpdPrepareInformBizs findWhihchICanReview(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdPrepareInformBizParams params = SpdPrepareInformBizParams.buildParamsFromJson(paramsStr, SpdPrepareInformBizParams.class);
+		if(params == null){
+			params = new SpdPrepareInformBizParams();
+		}
+		
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		return pibService.findWhichICanReview(user, params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/whichICanReview/count", method = RequestMethod.GET)
+	public int findWhihchICanReview(@RequestParam(value = "params", required = false) String paramsStr, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdPrepareInformBizParams params = SpdPrepareInformBizParams.buildParamsFromJson(paramsStr, SpdPrepareInformBizParams.class);
+		if(params == null){
+			params = new SpdPrepareInformBizParams();
+		}
+		
+		return pibService.findWhichICanReview(user, params, null, -1, -1).size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/{id}/informStatus", method=RequestMethod.PUT)
+	public Map<String, Date> updateInformed(@PathVariable("id")String id, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdPrepareInformBiz prepareInform = pibService.informSupplier(id, user);
+		Map<String, Date> result = new HashMap<String, Date>();
+		result.put("informTime", prepareInform.getInformTime());
+		result.put("lastUpdateTime", prepareInform.getLastUpdateTime());
+		return result;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/ids,{ids}", method=RequestMethod.GET)
+	public SpdPrepareInformBizs getByIds(@PathVariable("ids")String ids){
+		return pibRepository.findByIds(Arrays.asList(ids.split(",")));
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/{id}/prepareReceiveQtys", method=RequestMethod.GET)
+	public List<SpdPrepareReceiveQty> getPrepareReceiveQty(@PathVariable("id")String id){
+		return pibService.findPrepareReceiveQty(id);
+	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/yard/spd/spdPrepareInform,{id}/excel", method = RequestMethod.GET)
+	public void downloadExcelfile(@PathVariable("id") String id,HttpServletResponse response) throws Exception {
+		SpdBizItems items = biRepository.findWithGoodsByBizId(id);
+		
+		ExcelBuilder exportExcel = new ExcelBuilder<SpdBizItem>();
+		byte[] bytes = exportExcel.buildExcel("备货计划表", items, excelFormatFactory.getExcelFormats("parepareInformItem"));
+		
+		response.reset();
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding(Global.defaultCharset.name());
+		response.setHeader("Content-Disposition", "attachment;filename="+ URLEncoder.encode("备货计划.xls", Global.defaultCharset.name()));
+		IOUtils.write(bytes, response.getOutputStream());
+	}
+	
+	/**
+	 * 回填预计送达时间
+	 */
+	@RequestMapping(value="/yard/spd/spdPrepareInforms/bizCode,{bizCode}/estimatedDeliveryTime", method = RequestMethod.PUT)
+	public SpdPrepareInformBiz updateEstimatedDeliveryTime(
+			@PathVariable("bizCode") String bizCode,
+			@RequestBody SpdGepPrepareInformBizTO prepareInformBizTO,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		String estimatedDeliveryTimeStr = Global.sdfYMDHms.format(prepareInformBizTO.getEstimatedDeliveryTime());
+		log.info("备货通知单[{}]更新预计送达时间:{}", bizCode, estimatedDeliveryTimeStr);
+		SpdPrepareInformBiz prepareInform = pibService.updateEstimatedDeliveryTime(bizCode, prepareInformBizTO.getEstimatedDeliveryTime(), user);
+		
+		return prepareInform;
+	}
+	
+	@RequestMapping(value="/yard/spd/prepareInformCreateTasks", method = RequestMethod.POST)
+	public String prepareInformCreateTask(@RequestParam(value = "bizId", required = false) String bizId, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		int batchGoodsSize = giRepository.findAll().findByKey(YardGlobalInfo.prepareInform_batch_goods_size).getIntValue();
+		return pibService.autoCreatePrepareInformItemsAndSplit(bizId, batchGoodsSize, user);
+	}
+}

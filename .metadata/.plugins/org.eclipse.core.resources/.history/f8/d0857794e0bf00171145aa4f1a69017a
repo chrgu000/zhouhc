@@ -1,0 +1,154 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.web;
+
+import java.net.URLEncoder;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.utils.ExcelBuilder;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdGoodsLotStock;
+import cn.ak4j.yard.spd.stock.domain.SpdGoodsLotStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdStockReport;
+import cn.ak4j.yard.spd.stock.factory.SpdStockReportFactory;
+import cn.ak4j.yard.spd.stock.params.SpdShelfStockParams;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+/**
+ * 批次库存
+ * @Description: 将同批次的所有货区的库存进行合并
+ * @author wuyw
+ * @date 2017年10月24日上午10:11:33
+ *
+ */
+@RestController
+public class SpdGoodsLotStockResource {
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private YardExcelFormatFactory excelFormatFactory;
+	@Autowired private SpdStockReportFactory ssrFactory;
+	
+	//用于查询当前用户的仓库的批次库存
+	@RequestMapping(value="/yard/spd/spdDepotGoodsLotStocks/mine")
+	public SpdGoodsLotStocks findDepotGoodsLotStock(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdShelfStockParams params = SpdShelfStockParams.buildParamsFromJson(paramsStr, SpdShelfStockParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdShelfStockParams();
+		}
+		
+		PcsDepots fromDepots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(CollectionUtils.isEmpty(fromDepots)){
+			return new SpdGoodsLotStocks();
+		}
+		params.setDepotId(new ListParam<String>(fromDepots.getIds()));
+		
+		SpdShelfStocks shelfStocks = ssRepository.find(params, order, -1, -1);
+		shelfStocks.fillGoodsLots(glRepository);
+		shelfStocks.fillDepotShelf(dcRepository.findAll(), dsRepository.findAll());
+		
+		SpdGoodsLotStocks goodsLotStocks = new SpdGoodsLotStocks(shelfStocks);
+		return new SpdGoodsLotStocks(goodsLotStocks.findByPage(null, order, currentPage-1, pageSize));
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotGoodsLotStocks/mine/count")
+	public int countDepotGoodsLotStock(
+			@RequestParam(value = "params", required = false) String paramsStr,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdShelfStockParams params = SpdShelfStockParams.buildParamsFromJson(paramsStr, SpdShelfStockParams.class);
+		if(params == null){
+			params = new SpdShelfStockParams();
+		}
+		
+		PcsDepots fromDepots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(CollectionUtils.isEmpty(fromDepots)){
+			return 0;
+		}
+		params.setDepotId(new ListParam<String>(fromDepots.getIds()));
+		
+		SpdShelfStocks shelfStocks = ssRepository.find(params, null, -1, -1);
+		shelfStocks.fillGoodsLots(glRepository);
+		shelfStocks.fillDepotShelf(dcRepository.findAll(), dsRepository.findAll());
+		
+		SpdGoodsLotStocks goodsLotStocks = new SpdGoodsLotStocks(shelfStocks);
+		return goodsLotStocks.size();
+	}
+	
+	/**
+	 * 下载批次库存报表
+	 */
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@RequestMapping(value="/yard/spd/spdGoodsLotStocks/excel", method = RequestMethod.GET)
+	public void getGoodsLotStocksReport(
+			@RequestParam(value="params",required=false)String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request,HttpServletResponse response) throws Exception{
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdShelfStockParams params = SpdShelfStockParams.buildParamsFromJson(paramsStr, SpdShelfStockParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		if(params == null){
+			params = new SpdShelfStockParams();
+		}
+		
+		PcsDepots fromDepots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(CollectionUtils.isEmpty(fromDepots)){
+			throw new InvalidDataException("未找到仓库");
+		}
+		params.setDepotId(new ListParam<String>(fromDepots.getIds()));
+		
+		
+		SpdShelfStocks shelfStocks = ssRepository.find(params, order, -1, -1);
+		shelfStocks.fillGoodsLots(glRepository);
+		shelfStocks.fillDepot(depotRepository);
+		shelfStocks.fillGoods(goodsRepository);
+		
+		SpdGoodsLotStocks goodsLotStocks = new SpdGoodsLotStocks(shelfStocks);
+		
+		SpdStockReport report = ssrFactory.buildGoodsLotStockReport(goodsLotStocks);
+		ExcelBuilder exportExcel = new ExcelBuilder<SpdGoodsLotStock>();
+		byte[] bytes = exportExcel.buildExcel("库存信息一览表", report, excelFormatFactory.getExcelFormats("goodsLotStock"));
+		
+		response.reset();
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding(Global.defaultCharset.name());
+		response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode("仓库批次库存.xls", Global.defaultCharset.name()));
+		IOUtils.write(bytes, response.getOutputStream());
+	}
+}

@@ -1,0 +1,16 @@
+package cn.ak4j.yard.spd.task.params;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdDispatcherRefParams extends QueryParams{
+
+	private ListParam<String> dispatcherRefId;
+	private ListParam<String> dispatcherId;
+	private ListParam<String> refObjectId;
+}

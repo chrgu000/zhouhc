@@ -1,0 +1,154 @@
+package cn.ak4j.yard.extend.zhjw;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.transaction.Transactional;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.extend.CustomComponentDoc;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import cn.ak4j.yard.yds.service.IYdsEdsGoodsEventProcessor;
+import cn.ak4j.yard.yds.service.YdsEdsGoodsService;
+import cn.ak4j.yard.yds.service.YdsGoodsService;
+import lombok.Getter;
+
+public class ZhjwEdsGoodsEventProcessor implements IYdsEdsGoodsEventProcessor{
+	
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YdsGoodsService goodsService;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsService egService;
+	
+	@Getter private CustomComponentDoc doc;
+	
+	public ZhjwEdsGoodsEventProcessor(){
+		String name = "珠海金湾医院企业产品事件处理器";
+		String summary = "处理企业产品相关事件";
+		String beanName = "defaultEdsGoodsEventProcessor";
+		String className = getClass().getName();
+		
+		Map<String, String> methodDesc = new HashMap<String, String>();
+		methodDesc.put("新增企业产品事件", "自动创建相关标准产品,并关联");
+		
+		doc = new CustomComponentDoc(name, summary, beanName, className, null, methodDesc);
+	}
+	
+	@Override
+	@Transactional
+	public void process(YdsEdsGoods edsGoods, String userId, AmqpMsgType msgType) {
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		if(msgType.equals(AmqpMsgType.ADD_EDS_GOODS)){
+			
+			if(StringUtils.isEmpty(edsGoods.getYardGoodsId())){
+				YdsGoods goods = buildGoods(edsGoods);
+				goods = goodsService.add(goods, user);
+				edsGoods.setYardGoodsId(goods.getGoodsId());
+				egService.modify(edsGoods, user);
+			}
+			
+		}else if(msgType.equals(AmqpMsgType.UPDATE_EDS_GOODS)){
+			YdsGoods goodsPO = goodsRepository.findAll().findById(edsGoods.getYardGoodsId());
+			YdsGoods newGoods = new YdsGoods();
+			try {
+				BeanUtils.copyProperties(newGoods, goodsPO);
+			} catch (Exception e) {
+				e.printStackTrace();
+			} 
+			YdsGoods theGoods = buildGoods(edsGoods);
+			setFields(theGoods, newGoods);
+			
+			goodsPO.setCheckStateCode(CheckState.new_created.getCode());
+			goodsPO.updatePackageSpecifications(newGoods, user);
+			if(goodsPO.getEnabled()){
+				goodsPO.setCheckStateCode(CheckState.commited.getCode());
+			}
+			goodsRepository.save(newGoods);
+			
+		}
+		
+	}
+	
+	private void setFields(YdsGoods goods, YdsGoods newGoods){
+		List<Integer> bizUnits = Conf.getAllGlobalInfos().getBizUnitSetting();
+		if(bizUnits.contains(YdsUnitLv.big.getLv())){
+			newGoods.setBigName(goods.getBigName());
+		}
+		if(bizUnits.contains(YdsUnitLv.mid.getLv())){
+			newGoods.setMidName(goods.getMidName());
+		}
+		if(bizUnits.contains(YdsUnitLv.min.getLv())){
+			newGoods.setMinName(goods.getMinName());
+		}
+		if(bizUnits.contains(YdsUnitLv.base.getLv())){
+			newGoods.setBaseName(goods.getBaseName());
+		}
+		newGoods.setBigSum(goods.getBigSum());
+		newGoods.setMidSum(goods.getMidSum());
+		newGoods.setMinSum(goods.getMinSum());
+		newGoods.setGoodsType(goods.getGoodsType());
+		newGoods.setGoodsName(goods.getGoodsName());
+		newGoods.setWareName(goods.getWareName());
+		newGoods.setGoodsSpec(goods.getGoodsSpec());
+		newGoods.setGoodsModel(goods.getGoodsModel());
+		newGoods.setGoodsDesc(goods.getGoodsDesc());
+		newGoods.setPackingSpec(goods.getPackingSpec());
+		newGoods.setUnitPrice(goods.getUnitPrice());
+		newGoods.setFactName(goods.getFactName());
+		newGoods.setAthDoc(goods.getAthDoc());
+		newGoods.setEquipmentLevel(goods.getEquipmentLevel());
+		newGoods.setEquipmentSortName(goods.getEquipmentSortName());
+		newGoods.setMCode(goods.getMCode());
+		newGoods.calculateFormatName();
+	}
+
+	private YdsGoods buildGoods(YdsEdsGoods edsGoods){
+		
+		YdsGoods goods = new YdsGoods();
+		goods.setGoodsId(edsGoods.getYardGoodsId());
+		goods.setGoodsType(edsGoods.getEdsGoodsType());
+		goods.setWareName(edsGoods.getEdsWareName());
+		goods.setGoodsName(edsGoods.getEdsGoodsName());
+		goods.setGoodsCode(edsGoods.getEdsGoodsCode());
+		goods.setGoodsSpec(edsGoods.getEdsGoodsSpec());
+		goods.setGoodsModel(edsGoods.getEdsGoodsModel());
+		goods.setGoodsDesc(edsGoods.getEdsGoodsDesc());
+		goods.setPackingSpec(edsGoods.getEdsPackingSpec());
+		goods.setUnitPrice(edsGoods.getEdsPrice());
+		goods.setFactName(edsGoods.getEdsFactName());
+		goods.setAthDoc(edsGoods.getEdsAthDoc());
+		goods.setMinName(edsGoods.getDeliveryUnitName());
+		goods.setBaseName(edsGoods.getDeliveryUnitName());
+		goods.setMinSum(1);
+		goods.setMidSum(1);
+		goods.setBigSum(1);
+		goods.setMCode(edsGoods.getEdsMCode());
+		goods.setEquipmentLevel(edsGoods.getEquipmentLevel());
+		goods.setEquipmentSortName(edsGoods.getEquipmentSortName());
+		goods.calculateFormatName();
+		
+		goods.setPrepareUnitLv(2);
+		goods.setStoreUnitLv(2);
+		goods.setSettleUnitLv(2);
+		goods.setConsumeUnitLv(2);
+		goods.setEnabled(edsGoods.isEnabled());
+		goods.setMaintenanceInfo(edsGoods.getMaintenanceInfo());
+		return goods;
+	}
+	
+
+
+}

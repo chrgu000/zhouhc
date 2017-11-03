@@ -1,0 +1,130 @@
+package cn.ak4j.yard.web;
+
+import java.io.IOException;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.catalina.connector.ClientAbortException;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import cn.ak4j.exception.BaseException;
+import cn.ak4j.exception.ErrorInfo;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.exception.common.UnAuthorizatedException;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+
+@ControllerAdvice
+public class GlobalExceptionAdvice {
+
+	private Logger logger = LoggerFactory.getLogger(GlobalExceptionAdvice.class);
+	@Autowired private MGProxy mgProxy;
+	@Autowired private PcsOrgRepository orgRepository;
+	
+	@ResponseBody
+	@ExceptionHandler
+	ErrorInfo handleBaseException(BaseException e, HttpServletRequest request, HttpServletResponse response) throws IOException{
+		if(e instanceof UnAuthorizatedException){
+			response.setHeader("WWW-Authenticate", "Digest realm=\"tech@aokasoft.cn\"");
+			response.setStatus(HttpStatus.UNAUTHORIZED.value());
+		}
+		
+		else if(e instanceof OperateForbiddenException){
+			response.setStatus(HttpStatus.FORBIDDEN.value());
+		}
+		
+		else if(e instanceof NotFoundException){
+			response.setStatus(HttpStatus.NOT_FOUND.value());
+		}
+		
+		else if(e instanceof InvalidDataException){
+			response.setStatus(HttpStatus.BAD_REQUEST.value());
+		}
+		
+		else if(e instanceof OperateFailException){
+			response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+		}
+		
+		else{
+			response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+			if(Conf.isSendExceptionMail()){
+				mgProxy.sendMail(getErrorMailTitle(), ExceptionUtils.getStackTrace(e), "spd@1ycloud.net");
+			}
+			logger.error(request.getMethod()+":"+request.getRequestURI()+"\n"+ExceptionUtils.getStackTrace(e));
+		}
+		logger.warn(request.getMethod()+":"+request.getRequestURI()+" "+e.getErrorInfo().toString());
+		return e.getErrorInfo();
+	}
+	
+	@ResponseBody
+	@ExceptionHandler({MethodArgumentNotValidException.class})
+	ErrorInfo handleBadRequest(Exception e, HttpServletRequest request, HttpServletResponse response) throws IOException {
+		response.setStatus(400);
+		String errMsg = e.getMessage();
+		String[] errArray = errMsg.split(";");
+		StringBuffer err = new StringBuffer();
+		int i=1;
+		for(String s:errArray){
+			if(s.trim().startsWith("default message")){
+				if ((i%2)==0){
+					err.append(s.substring(s.indexOf("[")+1,s.indexOf("]]")));
+					err.append("!\r\n");
+				}
+				i++;
+			}
+		}
+
+		logger.warn(request.getMethod()+":"+request.getRequestURI()+"\n"+e.getMessage());
+		return new ErrorInfo(400, "数据检验错误！", err.toString());
+	}
+	
+	@ResponseBody
+	@ExceptionHandler({HttpRequestMethodNotSupportedException.class})
+	ErrorInfo handleNotSupportRequests(Exception e, HttpServletRequest request, HttpServletResponse response) throws IOException {
+		response.setStatus(405);
+		logger.warn(request.getMethod()+":"+request.getRequestURI()+"\n"+ExceptionUtils.getStackTrace(e));
+		return new ErrorInfo(405, "不支持当前请求", String.format("Request method '%s' not supported", request.getMethod()));
+	}	
+
+	@ResponseBody
+	@ExceptionHandler({ClientAbortException.class, UnsatisfiedServletRequestParameterException.class})
+	void handleCleintAbortRequests(Exception e, HttpServletRequest request, HttpServletResponse response) throws IOException {
+		logger.warn(request.getMethod()+":"+request.getRequestURI()+"\n"+e.getMessage());
+	}
+	
+	@ResponseBody
+	@ExceptionHandler({Exception.class})
+	ErrorInfo handleBadRequests(Exception e, HttpServletRequest request, HttpServletResponse response) throws IOException {
+		response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+		logger.error(request.getMethod()+":"+request.getRequestURI()+"\n"+ExceptionUtils.getStackTrace(e));
+		if(Conf.isSendExceptionMail()){
+			mgProxy.sendMail(getErrorMailTitle(), request.getMethod()+":"+request.getRequestURI()+" "+ExceptionUtils.getStackTrace(e), "spd@1ycloud.net");
+		}
+		return new ErrorInfo(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务器内部错误", ExceptionUtils.getMessage(e));
+	}
+	
+	private String getErrorMailTitle(){
+		if(Conf.getEnv().equals("prod")){
+			PcsOrg org = orgRepository.findAll().getMainOrg();
+			return String.format("[%s]YARD_SERVICE故障", org.getOrgAbbr());
+		}else{
+			return "[澳加测试]YARD_SERVICE故障";
+		}
+	}
+}

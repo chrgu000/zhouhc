@@ -1,0 +1,203 @@
+package cn.ak4j.yard;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.context.ConfigurableApplicationContext;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRules;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.params.SpdDailyCleanBizParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdDailyCleanBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationItemRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.service.SpdDailyCleanBizService;
+import cn.ak4j.yard.spd.reconciliation.service.SpdFinacialReconciliationBizService;
+import cn.ak4j.yard.spd.reconciliation.service.SpdGeneralLedgerService;
+import cn.ak4j.yard.spd.reconciliation.service.SpdPropertyChangeService;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: 对账数据生成器
+* @author zhengyf
+* @date 2017年9月27日 下午3:15:44
+* @version V1.0.0
+*/
+@Slf4j
+public class ReconciliationDataGenerator {
+
+	public void generateLedger(ConfigurableApplicationContext cac){
+		log.info("生成总账数据...");
+		SpdReceiveBizRepository rbRepository = (SpdReceiveBizRepository)cac.getBean(SpdReceiveBizRepository.class);
+		SpdGeneralLedgerService glService = (SpdGeneralLedgerService)cac.getBean(SpdGeneralLedgerService.class);
+		
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setRecorded(new ListParam<Boolean>(false));
+		params.setCheckStateCode(new ListParam<Integer>()
+								.addValue(CheckState.completed.getCode()));
+		
+		SpdReceiveBizs receives = rbRepository.find(params);
+		log.info("共查找到{}个收货", receives.size());
+		receives.forEach(receive->{
+			log.info("总账借入， 收货业务:{}", receive.getBizCode());
+			glService.debit(receive.getBizId());
+		});
+	}
+	
+	public void generatePropertyChangeRecords(ConfigurableApplicationContext cac){
+		log.info("生成物权变更数据...");
+		
+		SpdPropertyChangeRuleRepository pcrRepository = (SpdPropertyChangeRuleRepository)cac.getBean(SpdPropertyChangeRuleRepository.class);
+		SpdPropertyChangeRules rules = pcrRepository.findAllWithRelations().getEnabledRules();
+		log.info("查找到{}个启用的物权变更规则", rules.size());
+		
+		SpdReplenishBizRepository rbRepository = (SpdReplenishBizRepository)cac.getBean(SpdReplenishBizRepository.class);
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		params.setCheckStateCode(new ListParam<Integer>().addValue(CheckState.completed.getCode()));
+		SpdReplenishBizs replenishs = rbRepository.find(params);
+		log.info("查找到{}个申领业务", replenishs.size());
+		
+		SpdReplenishBizService rbService = (SpdReplenishBizService)cac.getBean(SpdReplenishBizService.class);
+		SpdPropertyChangeService pcService = (SpdPropertyChangeService)cac.getBean(SpdPropertyChangeService.class);
+		replenishs.forEach(replenish->{
+			rbService.fillAllRelations(replenish);
+			SpdPropertyChangeRule rule = rules.findByDepotIdAndBizType(replenish.getToDepotId(), SpdBizType.replenish_biz).get(0);
+			log.info("为申领业务[{}]生成物权变更", replenish.getBizCode());
+			pcService.change(rule, replenish, replenish.getDeliveryTasks().get(0).getTaskId());
+		});
+		
+		log.info("生成物权变更数据完成");
+	}
+	
+	public void generateDailyCleans(ConfigurableApplicationContext cac){
+		log.info("生成日清对账数据...");
+		
+		SpdBizRuleRepository brRepository = (SpdBizRuleRepository)cac.getBean(SpdBizRuleRepository.class);
+		PcsDepotRepository depotRepository = (PcsDepotRepository)cac.getBean(PcsDepotRepository.class);
+		PcsDeptRepository deptRepository = (PcsDeptRepository)cac.getBean(PcsDeptRepository.class);
+		PcsUserRepository userRepository = (PcsUserRepository)cac.getBean(PcsUserRepository.class);
+		SpdDailyCleanBizService dcbService = (SpdDailyCleanBizService)cac.getBean(SpdDailyCleanBizService.class);
+		
+		SpdDailyCleanRules rules = brRepository.findAllWithRelations().getAllDailyCleanRules();
+		PcsDepts allDepts = deptRepository.findAll();
+		PcsDepots allDepots = depotRepository.findAll();
+		PcsUsers users = userRepository.findAll();
+		for(SpdDailyCleanRule rule : rules){
+			List<Date> days = dcbService.findCleanDays(rule.getDepotId());
+			log.info("仓库[{}]共找到[{}]个物权变更日", rule.getDepot().getDepotName(), days.size());
+			for(Date day : days){
+				SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz(rule.getId(), day);
+				String userId = allDepts.findById(allDepots.findById(rule.getDepotId()).getManageDeptId()).getDefaultUserId();
+				PcsUser user = users.findById(userId);
+				log.info("创建日清对账: 仓库[{}], 日期[{}]", rule.getDepot().getDepotName(), Global.sdfYMD.format(day));
+				dcbService.add(dailyClean, user);
+			}
+		}
+		
+		log.info("生成日清对账完成");
+	}
+	
+	public void generateInitFinacialReconciliation(ConfigurableApplicationContext cac){
+		log.info("生成财务对账初始化数据...");
+		
+		SpdBizRuleRepository brRepository = (SpdBizRuleRepository)cac.getBean(SpdBizRuleRepository.class);
+		SpdFinacialReconciliationBizService frbService = (SpdFinacialReconciliationBizService)cac.getBean(SpdFinacialReconciliationBizService.class);
+		PcsDeptRepository deptRepository = (PcsDeptRepository)cac.getBean(PcsDeptRepository.class);
+		PcsUserRepository userRepository = (PcsUserRepository)cac.getBean(PcsUserRepository.class);
+		
+		SpdFinacialReconciliationRules rules = brRepository.findAllWithRelations().getAllFinacialReconciliationRules();
+		
+		PcsDepts allDepts = deptRepository.findAll();
+		PcsUsers users = userRepository.findAll();
+		//初始化财务对账
+		for(SpdFinacialReconciliationRule rule : rules){
+			PcsUser user = users.findById(allDepts.findById(rule.getApplyDeptId()).getDefaultUserId());
+			frbService.createInitReconciliation(rule.getId(), new SpdFinacialReconciliationItems(), user);
+		}
+		
+		log.info("生成财务对账初始化完成");
+	}
+	
+	public void generateFinacialReconciliation(ConfigurableApplicationContext cac){
+		log.info("生成财务对账数据...");
+		
+		SpdBizRuleRepository brRepository = (SpdBizRuleRepository)cac.getBean(SpdBizRuleRepository.class);
+		SpdFinacialReconciliationBizService frbService = (SpdFinacialReconciliationBizService)cac.getBean(SpdFinacialReconciliationBizService.class);
+		SpdFinacialReconciliationBizRepository frbRepository = (SpdFinacialReconciliationBizRepository)cac.getBean(SpdFinacialReconciliationBizRepository.class);
+		SpdFinacialReconciliationItemRepository friRepository = (SpdFinacialReconciliationItemRepository)cac.getBean(SpdFinacialReconciliationItemRepository.class);
+		
+		SpdDailyCleanBizRepository dcbRepository = (SpdDailyCleanBizRepository)cac.getBean(SpdDailyCleanBizRepository.class);
+		PcsDeptRepository deptRepository = (PcsDeptRepository)cac.getBean(PcsDeptRepository.class);
+		PcsUserRepository userRepository = (PcsUserRepository)cac.getBean(PcsUserRepository.class);
+		
+		SpdFinacialReconciliationRules rules = brRepository.findAllWithRelations().getAllFinacialReconciliationRules();
+		
+		PcsDepts allDepts = deptRepository.findAll();
+		PcsUsers users = userRepository.findAll();
+		//初始化财务对账
+		for(SpdFinacialReconciliationRule rule : rules){
+			PcsUser user = users.findById(allDepts.findById(rule.getApplyDeptId()).getDefaultUserId());
+			SpdFinacialReconciliationBiz beginReconciliation = frbRepository.findCompletedByRuleIdAndWithoutNextConciliation(rule.getId()).get(0);
+			
+			List<String> depotIds = Arrays.asList(rule.getTargetDepotIds().split(","));
+			SpdDailyCleanBizParams params = new SpdDailyCleanBizParams();
+			params.setDepotId(new ListParam<String>(depotIds));
+			SpdDailyCleanBizs dailyCleans = dcbRepository.findByUnreconciliation(params, new OrderParam(), -1, -1);
+			
+			for(SpdDailyCleanBiz dailyClean : dailyCleans){
+				List<Date> targetDates = new ArrayList<Date>();
+				targetDates.add(dailyClean.getTargetDate());
+				//有问题，但用于测试不影响
+				SpdFinacialReconciliationBiz reconciliation = new SpdFinacialReconciliationBiz(rule.getId(), beginReconciliation.getBizId(), targetDates);
+				frbService.add(reconciliation, user);
+				
+				try {
+					Thread.sleep(8000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				SpdFinacialReconciliationItems items = friRepository.findByReconciliationId(reconciliation.getBizId());
+				items.forEach(item->item.setSettlementQty(item.getReconciliationQty()));
+				friRepository.saveAll(items);
+				
+				reconciliation = frbService.updateCheckState(reconciliation.getBizId(), CheckState.commited.getCode(), reconciliation.getLastUpdateTime(), user);
+				
+				frbService.updateCheckState(reconciliation.getBizId(), CheckState.reviewed.getCode(), reconciliation.getLastUpdateTime(), user);
+			}
+		}
+		
+		log.info("生成财务对账完成");
+	}
+}

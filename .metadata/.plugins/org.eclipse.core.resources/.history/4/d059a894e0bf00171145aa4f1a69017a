@@ -1,0 +1,53 @@
+package cn.ak4j.yard.spd.reconciliation.report.base;
+
+import java.text.DecimalFormat;
+import java.util.Date;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.Global;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 财务报表基础类
+* @author zhengyf
+* @date 2017年10月14日 下午2:57:00
+* @version V1.0.0
+*/
+
+@Data
+@NoArgsConstructor
+public abstract class SpdReconciliationReport<T extends SpdReconciliationReportItems<?>> {
+
+	private Date startDate;
+	private Date endDate;
+	private String reconciliationCode;
+	private String supplierCode;
+	private String supplierName;
+	private Date generateTime;
+	private String[] targetDepotNames;
+	private float totalAmount;
+	
+	private T items;
+
+	public abstract SpdReconciliationReportType getReportType();
+	
+	public String getTargetDepotNamesStr(){
+		return StringUtils.join(targetDepotNames, ",");
+	}
+	
+	public String getStartDateStr(){
+		return Global.sdfYMD.format(startDate);
+	}
+	
+	public String getEndDateStr(){
+		return Global.sdfYMD.format(endDate);
+	}
+	
+	public String getTotalAmountStr(){
+		DecimalFormat decimalFormat = new DecimalFormat(".00");
+		return decimalFormat.format(totalAmount);
+	}
+	
+}

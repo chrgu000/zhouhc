@@ -1,0 +1,34 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import static org.junit.Assert.*;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizplan.domain.SpdGoodsBizPlan;
+
+@SuppressWarnings("rawtypes")
+public class SpdBizPlanRepositoryTest extends BaseTest{
+
+	@Autowired private SpdBizPlanRepository bpRepository;
+	
+	@Test public void testFindBiz(){
+		String repBizId = "rep_biz_id_003";
+		String receBizId = "rece_biz_id_003";
+		String adjuBizId = "adju_biz_id_002";
+		String moveBizId = "move_biz_id_001";
+		
+		SpdGoodsBizPlan biz = bpRepository.findOne(repBizId);
+		assertNotNull(biz);
+		
+		biz = bpRepository.findOne(receBizId);
+		assertNotNull(biz);
+		
+		biz = bpRepository.findOne(adjuBizId);
+		assertNotNull(biz);
+		
+		biz = bpRepository.findOne(moveBizId);
+		assertNotNull(biz);
+	}
+}

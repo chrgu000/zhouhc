@@ -1,0 +1,26 @@
+package cn.ak4j.yard.spd.bizplan.vo;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 备货收货数量
+* @author zhengyf
+* @date 2017年9月8日 下午3:58:53
+* @version V1.0.0
+*/
+
+@Data
+@NoArgsConstructor
+public class SpdPrepareReceiveQty {
+
+	private String prepareInformId;
+	private String itemId;
+	private int qty;
+	
+	public SpdPrepareReceiveQty(String prepareInformId, String itemId, int qty){
+		this.prepareInformId = prepareInformId;
+		this.itemId = itemId;
+		this.qty = qty;
+	}
+}

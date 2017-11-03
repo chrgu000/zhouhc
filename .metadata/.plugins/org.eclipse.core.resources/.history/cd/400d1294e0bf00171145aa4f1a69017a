@@ -1,0 +1,23 @@
+package cn.ak4j.yard.web.request;
+
+import javax.servlet.http.HttpServletRequest;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 修改资源请求
+* @author zhengyf
+* @date 2016年11月28日 下午7:09:03
+* @version V1.0.0
+*/
+public class YardModifyRequest extends YardRequest{
+
+	@Getter @Setter private String resourceId;
+	
+	public YardModifyRequest(HttpServletRequest request){
+		super(request);
+		setResourceId(getUriArr()[4]);
+	}
+	
+}

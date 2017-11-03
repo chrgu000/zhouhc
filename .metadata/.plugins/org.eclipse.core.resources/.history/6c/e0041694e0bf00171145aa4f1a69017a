@@ -1,0 +1,46 @@
+package cn.ak4j.yard.web;
+
+/**
+* @Description: web资源请求类型
+* @author zhengyf
+* @date 2016年11月29日 上午10:21:28
+* @version V1.0.0
+*/
+public enum RequestType {
+
+	add("add", "新增", "/%s/%s"),
+	delete("delete", "删除", "/%s/%s/{resourceId}"),
+	getByIds("getByIds", "多ID获取列表", "/%s/%s/ids,{resourceIds}"),
+	count("count", "获取统计", "/%s/%s/count"),
+	get("get", "获取单个资源", "/%s/%s/{resourceId}"),
+	list("list", "获取列表", "/%s/%s"),
+	modify("modify", "修改", "/%s/%s/{resourceId}"),
+	updateCheckState("updateCheckState", "更新审核状态", "/%s/%s/{resourceId}/checkState");
+	
+	private String type;
+	private String name;
+	private String uriTemplate;
+	
+	private RequestType(String type, String name, String uriTemplate){
+		this.type = type;
+		this.name = name;
+		this.uriTemplate = uriTemplate;
+	}
+
+	public String getType() {
+		return type;
+	}
+
+	public String getName() {
+		return name;
+	}
+	
+	public String toString(){
+		return type;
+	}
+
+	public String getUriTemplate() {
+		return uriTemplate;
+	}
+	
+}

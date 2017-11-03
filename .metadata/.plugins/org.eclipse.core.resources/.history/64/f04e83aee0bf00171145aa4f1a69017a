@@ -1,0 +1,211 @@
+package cn.ak4j.yard.spd.stock.service;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChange;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfLockStockRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdDecrementShelfStocksTest extends BaseTest{
+	
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdShelfLockStockRepository slsRepository;
+
+	@Rule public ExpectedException thrown = ExpectedException.none();
+
+	private static String depotId = "depot_id_001";
+	
+	//测试增加货位库存锁
+	@Test public void testScheduleDecrementShelfStocks(){
+		testScheduleDecrementShelfStocks(PcsAreaType.normal.getCode());
+		//TODO 等待移仓业务完成，通过移仓来制造隔离货区库存然后测试该段代码
+//			testScheduleDecrementShelfStocks(AreaType.isolation.getCode());
+	}
+	
+	private void testScheduleDecrementShelfStocks(String areaType){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		
+		//准备批次
+		List<String> lotIds = new ArrayList<String>();
+		String goodsId007_lotId014_2940 = "goods_lot_id_014";
+		String goodsId007_lotId023_1500 = "goods_lot_id_023";
+		String goodsId011_lotId003_30 = "goods_lot_id_003";
+		lotIds.add(goodsId007_lotId014_2940);
+		lotIds.add(goodsId007_lotId023_1500);
+		lotIds.add(goodsId011_lotId003_30);
+		YdsGoodsLots lots = glRepository.findAll().findByIds(lotIds);
+		lots.fillGoodss(goodsRepository, glRepository, ssRepository);
+		
+		//查询变更前的货位库存记录
+		SpdShelfStocks originStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+		
+		//构造用于货位锁库存的变更的库存变更集合
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put(goodsId007_lotId014_2940, 20);
+		map.put(goodsId007_lotId023_1500, 34);
+		map.put(goodsId011_lotId003_30, 20);
+		
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges();
+		SpdDepotCards cards = dcRepository.findAll().findByDepot(depotId);
+		map.entrySet().forEach(entry->{
+			YdsGoodsLot lot = lots.findById(entry.getKey());
+			SpdDepotCard card = cards.findEnableCardByGoodsId(lot.getGoodsId());
+			stockChanges.add(new SpdShelfStockChange(lot, depot, areaType, card.getShelfId(PcsAreaType.typeOf(areaType)), entry.getValue().intValue()));
+		});
+		String bizId = "biz_test_id_001";
+		//执行货位库存扣减
+		dsService.scheduleDecrementShelfStocks(stockChanges, bizId);
+		
+		//检查货位库存锁
+		SpdShelfLockStocks lockStocks = slsRepository.findByBizId(bizId);
+		SpdShelfStocks newStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+		newStocks.forEach(newStock->{
+			YdsGoodsLot goodsLot = lots.findById(newStock.getLotId());
+			SpdShelfStock originStock = originStocks.findByDepotAndGoodsLot(depotId, areaType, newStock.getLotId());
+			SpdShelfStockChange stockChange = stockChanges.findByGoodsLot(goodsLot);
+			int newLockQtyByMinUnit = originStock.getLockQtyByMinUnit()+stockChange.getQtyByStoreUnit();
+			assertEquals(newLockQtyByMinUnit, newStock.getLockQtyByMinUnit().intValue());
+			
+			SpdShelfLockStock lockStock = lockStocks.findByShelfStockId(newStock.getShelfStockId());
+			assertEquals(stockChange.getQtyByBaseUnit(), lockStock.getQtyByMinUnit().intValue());
+		});
+	}
+	
+	//测试增加库存锁遇到库存不足的情况
+	@Test public void testScheduleDecrementShelfStocksWithStockNotEnough(){
+		//声明异常
+		thrown.expect(OperateFailException.class);
+		
+		String areaType = PcsAreaType.normal.getCode();
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		
+		//准备批次
+		List<String> lotIds = new ArrayList<String>();
+		String goodsId007_lotId014_2940 = "goods_lot_id_014";
+		String goodsId007_lotId023_1500 = "goods_lot_id_023";
+		String goodsId003_lotId018_360 = "goods_lot_id_018";
+		lotIds.add(goodsId007_lotId014_2940);
+		lotIds.add(goodsId007_lotId023_1500);
+		lotIds.add(goodsId003_lotId018_360);
+		YdsGoodsLots lots = glRepository.findAll().findByIds(lotIds);
+		lots.fillGoodss(goodsRepository, glRepository, ssRepository);
+		
+		//构造用于货位锁库存的变更的库存变更集合
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put(goodsId003_lotId018_360, 310);
+		map.put(goodsId007_lotId014_2940, 20);
+		map.put(goodsId007_lotId023_1500, 34);
+//		map.put(goodsId011_lotId003_30, 40);
+		
+		SpdDepotCards cards = dcRepository.findAll().findByDepot(depotId);
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges();
+		map.entrySet().forEach(entry->{
+			YdsGoodsLot lot = lots.findById(entry.getKey());
+			String shelfId = cards.findEnableCardByGoodsId(lot.getGoodsId()).getShelfId(PcsAreaType.normal);
+			stockChanges.add(new SpdShelfStockChange(lot, depot, areaType, shelfId, entry.getValue().intValue()));
+		});
+		
+		//执行货位库存扣减
+		dsService.scheduleDecrementShelfStocks(stockChanges, "biz_test_id_001");
+	}
+
+	//测试按计划执行货位库存扣减
+	@Test public void testDoDecrementShelfStocksAsPlan(){
+		testDoDecrementShelfStocks(0);
+	}
+
+	//测试不按计划执行货位库存扣减
+	@Test public void testDoDecrementShelfStocksNotAsPlan(){
+		testDoDecrementShelfStocks(10);
+	}
+	
+	private void testDoDecrementShelfStocks(int dist){
+		String areaType = PcsAreaType.normal.getCode();
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		
+		//准备批次
+		List<String> lotIds = new ArrayList<String>();
+		String goodsId007_lotId014_2940 = "goods_lot_id_014";
+		String goodsId007_lotId023_1500 = "goods_lot_id_023";
+		String goodsId011_lotId003_30 = "goods_lot_id_003";
+		lotIds.add(goodsId007_lotId014_2940);
+		lotIds.add(goodsId007_lotId023_1500);
+		lotIds.add(goodsId011_lotId003_30);
+		YdsGoodsLots lots = glRepository.findAll().findByIds(lotIds);
+		lots.fillGoodss(goodsRepository, glRepository, ssRepository);
+		
+		//查询变更前的货位库存记录
+		SpdShelfStocks originStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+		
+		//构造用于货位锁库存的变更的库存变更集合
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put(goodsId007_lotId014_2940, 20);
+		map.put(goodsId007_lotId023_1500, 34);
+		map.put(goodsId011_lotId003_30, 20);
+		
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges();
+		SpdDepotCards cards = dcRepository.findAll().findByDepot(depotId);
+		map.entrySet().forEach(entry->{
+			YdsGoodsLot lot = lots.findById(entry.getKey());
+			SpdDepotCard card = cards.findEnableCardByGoodsId(lot.getGoodsId());
+			stockChanges.add(new SpdShelfStockChange(lots.findById(entry.getKey()), depot, areaType, card.getShelfId(PcsAreaType.normal), entry.getValue().intValue()));
+		});
+		
+		//增加锁库存
+		dsService.scheduleDecrementShelfStocks(stockChanges, "biz_test_id_001");
+		
+		//执行货位库存扣减
+		stockChanges.forEach(stockChange->{
+			stockChange.setPlanQtyByStoreUnit(stockChange.getQtyByStoreUnit());
+			stockChange.setQtyByStoreUnit(stockChange.getQtyByStoreUnit() - dist);
+		});
+		dsService.doDecrementShelfStocks(stockChanges, "biz_test_id_001");
+		
+		//检查货位库存
+		SpdShelfStocks newStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+		newStocks.forEach(newStock->{
+			YdsGoodsLot goodsLot = lots.findById(newStock.getLotId());
+			SpdShelfStock originStock = originStocks.findByDepotAndGoodsLot(depotId, areaType, newStock.getLotId());
+			SpdShelfStockChange stockChange = stockChanges.findByGoodsLot(goodsLot);
+			
+			int newLockQtyByMinUnit = originStock.getLockQtyByMinUnit();
+			assertEquals(newLockQtyByMinUnit, newStock.getLockQtyByMinUnit().intValue());
+			
+			int newQtyByMinUnit = originStock.getQtyByMinUnit() - stockChange.getQtyByBaseUnit();
+			assertEquals(newQtyByMinUnit, newStock.getQtyByMinUnit().intValue());
+		});
+	}
+		
+}

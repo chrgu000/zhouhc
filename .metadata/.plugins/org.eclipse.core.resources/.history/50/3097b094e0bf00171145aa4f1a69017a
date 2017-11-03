@@ -1,0 +1,116 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.YardEntity;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 物权变更记录
+* @author zhengyf
+* @date 2017年8月8日 下午7:57:57
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@EqualsAndHashCode(callSuper=false)
+@Entity
+@Table(name="spd_property_change")
+public class SpdPropertyChangeRecord extends YardEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter 
+	private String id;
+	
+	@Getter @Setter private String dailyCleanId;
+	@Getter @Setter private String propertyChangeRuleId;
+	@Getter @Setter private String bizTypeCode;
+	@Getter @Setter private String bizId;
+	@Getter @Setter private String bizCode;
+	@Getter @Setter private String taskId;
+	@Getter @Setter private String taskCode;
+	@Getter @Setter private String triggerBizStepCode;
+	
+	//借入机构id
+	@Getter @Setter @NotNull(message="借入机构不能为空") 
+	private String debitOrgId;
+	
+	@Getter @Setter @NotNull(message="借入部门不能为空")
+	private String debitDeptId;
+	
+	@Getter @Setter 
+	private String debitDepotId;
+	
+	//贷出机构id
+	@Getter @Setter @NotNull(message="贷出机构不能为空")
+	private String creditOrgId;
+	
+	@Getter @Setter @NotNull(message="贷出部门不能为空")
+	private String creditDeptId; 
+	
+	@Getter @Setter 
+	private String creditDepotId;
+	
+	@Getter @Setter 
+	private String description;
+	
+	@Getter @Setter
+	private Date targetDate;
+	
+	private Date createTime;
+	
+	@Getter @Setter 
+	private Date lastUpdateTime;
+	
+	@Transient @JsonIgnore @Getter @Setter 
+	private SpdPropertyChangeRecordItems items;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdPropertyChangeRule rule;
+	
+	public SpdPropertyChangeRecord(){
+		this.createTime = new Date();
+		this.lastUpdateTime = new Date();
+	}
+
+	public void updateItemsRecordIdAndTime(){
+		if(CollectionUtils.isNotEmpty(getItems())){
+			getItems().forEach(item->{
+					item.setRecordId(getId());
+					item.initDateInfo();
+				});
+		}
+	}
+	
+	public boolean isRelatedDepot(String depotId){
+		if(depotId.equals(getDebitDepotId()) || depotId.equals(getCreditDepotId())){
+			return true;
+		}
+		return false;
+	}
+
+	public Date getCreateTime() {
+		return createTime;
+	}
+
+	public void setCreateTime(Date createTime) {
+		this.createTime = createTime;
+	}
+	
+}

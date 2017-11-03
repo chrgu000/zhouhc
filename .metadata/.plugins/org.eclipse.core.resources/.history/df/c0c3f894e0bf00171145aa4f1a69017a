@@ -1,0 +1,495 @@
+package cn.ak4j.yard.spd.bizplan.service.assistant;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.factory.SpdReplenishFactory;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRefs;
+import cn.ak4j.yard.spd.task.domain.SpdDispatchers;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.factory.SpdDispatcherFactory;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRefRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+import cn.ak4j.yard.spd.task.service.SpdDispatcherService;
+import cn.ak4j.yard.spd.task.service.SpdLogisticsTaskService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SpdReplenishBizAssistantService extends SpdBizAssistantService<SpdReplenishBiz>{
+
+	@Autowired private SpdReplenishBizService rbService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdDispatcherFactory dispatcherFactory;
+	@Autowired private SpdDispatcherService dispatcherService;
+	@Autowired private SpdDispatcherRefRepository drRepository;
+	@Autowired private SpdLogisticsTaskService ltService;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdLogisticsTaskItemRepository liRepository;
+	@Autowired private SpdReplenishFactory replenishFactory;
+	@Autowired private NotifyMsgBuilder notifyMsgBuilder;
+	
+	public void process(SpdReplenishBiz replenish, String taskId, String userId, String action) {
+		rbService.fillAllRelations(replenish);
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		SpdBizStep lastBizStep = replenish.getCurrentBizStep();
+		replenish = forwardBizStep(replenish, taskId, action);
+		//是否步进
+		boolean didForward = !replenish.getCurrentBizStep().equals(lastBizStep);
+		boolean isEmptyBizAutoFeedback = replenish.getBizRule().getFeedbackRule().getEmptyBizAutoFeedback();
+		
+		try{
+			if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.create_replenish) && replenish.hasItems()){
+				boolean isAutoCommitFeedback = replenish.getBizRule().getFeedbackRule().getAutoCommitReplenish();
+				boolean isItemsNotEmpty = CollectionUtils.isNotEmpty(replenish.getItems());
+				boolean isEmptyPlan = replenish.getItems().isAllPlanEmpty();
+				if((isAutoCommitFeedback && isItemsNotEmpty) || ( isEmptyBizAutoFeedback && isEmptyPlan)){
+					//判断当前用户是否可以发起，如果不能发起则查找发起方仓库管理部门的默认用户
+					PcsUser executeUser = user;
+					if(!replenish.getBizRule().canApplyByUser(user)){
+						executeUser = getApplyDepotDefaultUser(replenish);
+					}
+					rbService.commitReplenish(replenish, replenish.getMaintenanceInfo().getLastDate(), executeUser);
+
+					//由非确认仓库发起，需要自己来确认的发送通知
+					MailMsg mail = notifyMsgBuilder.buildConfirmReplenishMail(replenish);
+					mgProxy.sendMail(mail);
+				}
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.commit_replenish)){
+				processReplenishCommited(replenish, user);
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.review_replenish)){
+				boolean isAutoCreateOffShelfDispatcher = replenish.getBizRule().getFeedbackRule().getAutoCreateOffShelfDispatcher();
+				boolean isEmptyConfirm = replenish.getItems().isAllConfirmEmpty();
+				if(isAutoCreateOffShelfDispatcher || (isEmptyBizAutoFeedback && isEmptyConfirm)){
+					//发货方仓库的管理部门的默认用户
+					PcsUser executeUser = user;
+					String fromDeptId = replenish.getFromDepot().getManageDeptId();
+					if(!user.getDeptId().equals(fromDeptId)){
+						executeUser = getFromDepotDefaultUser(replenish.getFromDepot());
+					}
+					SpdDispatcher dispatcher = dispatcherFactory.buildDispatcherFromBiz(replenish, SpdDispatcherType.off_shelf, executeUser);
+					dispatcherService.add(dispatcher, executeUser);
+				}
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.create_off_shelf_dispatcher)){
+				boolean isAutoReviewOffShelfDispatcher = replenish.getBizRule().getFeedbackRule().getAutoReviewOffShelfDispatcher();
+				boolean isEmptyConfirm = replenish.getItems().isAllConfirmEmpty();
+				if(isAutoReviewOffShelfDispatcher || (isEmptyBizAutoFeedback && isEmptyConfirm)){
+					//如果当前用户不是发货方仓库用户，采用发货方仓库的管理部门的默认用户
+					PcsUser executeUser = user;
+					String formDeptId = replenish.getFromDepot().getManageDeptId();
+					if(!user.getDeptId().equals(formDeptId)){
+						executeUser = getFromDepotDefaultUser(replenish.getFromDepot());
+					}
+					reviewDispatcher(replenish, executeUser, SpdDispatcherType.off_shelf);
+				}
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.create_off_shelf_task)){
+				processOffShelfTaskCreated(replenish, user);
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.complete_off_shelf_task) && didForward){
+				SpdOffShelfTaskItems offShelfTaskItems = new SpdOffShelfTaskItems(replenish.getOffShelfTasks().getAllItems());
+				//如果当前用户不是发货方仓库用户，采用发货方仓库的管理部门的默认用户
+				PcsUser executeUser = user;
+				String formDeptId = replenish.getFromDepot().getManageDeptId();
+				if(!user.getDeptId().equals(formDeptId)){
+					executeUser = getFromDepotDefaultUser(replenish.getFromDepot());
+				}
+				ltService.createDeliveryTask(replenish.getBizId(), replenish.getFromDepot(), replenish.getToDepot(), offShelfTaskItems, executeUser);
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.create_delivery_task)){
+				processDeliveryTaskCreated(replenish,user);
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.commit_delivery_task)){
+				boolean isAutoReviewDeliveryTask = replenish.getBizRule().getFeedbackRule().getAutoReviewDeliveryTask();
+				
+				for(SpdLogisticsTask task : replenish.getDeliveryTasks()){
+					boolean isEmptyPlan = task.getItems().isAllPlanEmpty();
+					
+					boolean isReviewTask = false;
+					if(isAutoReviewDeliveryTask){
+						isReviewTask = true;
+					}else{
+						if(isEmptyBizAutoFeedback && isEmptyPlan){
+							isReviewTask = true;
+						}
+					}
+					
+					if(isReviewTask){
+						task.getItems().receiveAsConfirm();
+						liRepository.saveAll(task.getItems());
+						
+						PcsUser executeUser = user;
+						String toDeptId = replenish.getToDepot().getManageDeptId();
+						if(!user.getDeptId().equals(toDeptId)){
+							executeUser = getToDepotDefaultUser(replenish.getToDepot());
+						}
+						ltService.review(task, executeUser);
+					}
+				}
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.review_delivery_task)){
+				boolean isAutoCreateOnShelfDispatcher = replenish.getBizRule().getFeedbackRule().getAutoCreateOnShelfDispatcher();
+				
+				for(SpdLogisticsTask deliveryTask : replenish.getDeliveryTasks()){
+					boolean isEmptyReceive = deliveryTask.getItems().isAllReceiveEmpty(); 
+					
+					boolean isCreateOnShelfDispatcher = false;
+					if(isAutoCreateOnShelfDispatcher){
+						isCreateOnShelfDispatcher = true;
+					}else{
+						if(isEmptyBizAutoFeedback && isEmptyReceive){
+							isCreateOnShelfDispatcher = true;
+						}
+					}
+					
+					if(isCreateOnShelfDispatcher){
+						if(deliveryTask.getTaskId().equals(taskId)){
+							//如果当前用户不是收货方仓库用户，采用收货方仓库的管理部门的默认用户
+							PcsUser executeUser = user;
+							String toDeptId = deliveryTask.getToDepot().getManageDeptId();
+							if(!user.getDeptId().equals(toDeptId)){
+								executeUser = getToDepotDefaultUser(deliveryTask.getToDepot());
+							}
+							SpdDispatcher dispatcher = dispatcherFactory.buildDispatcherFromLogisticsTask(deliveryTask, SpdDispatcherType.on_shelf, executeUser);
+							dispatcherService.add(dispatcher, executeUser);
+						}
+					}
+				}
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.create_on_shelf_dispatcher)){
+				boolean isAutoReviewOnShelfDispatcher = replenish.getBizRule().getFeedbackRule().getAutoReviewOnShelfDispatcher();
+				
+				replenish.getDeliveryTasks().forEach(deliveryTask->{
+					boolean isEmptyReceive = deliveryTask.getItems().isAllReceiveEmpty();
+					
+					boolean  isReviewOnShelfDispatcher = false;
+					if(isAutoReviewOnShelfDispatcher){
+						isReviewOnShelfDispatcher = true;
+					}else{
+						if(isEmptyBizAutoFeedback && isEmptyReceive){
+							isReviewOnShelfDispatcher = true;
+						}
+					}
+					
+					if(isReviewOnShelfDispatcher){
+						SpdDispatcherRefs refs = drRepository.findByRefObjectId(deliveryTask.getTaskId());
+						List<String> dispatcherIds = CollectionUtils.pluck("dispatcherId", refs);
+						SpdDispatchers dispatchers = dispatcherRepository.findWithRelationsByIds(dispatcherIds);
+						SpdDispatcher onShelfDispatcher = CollectionUtils.findWhere("dispatcherType", SpdDispatcherType.on_shelf.getCode(), dispatchers);
+						
+						//如果当前用户不是收货方仓库用户，采用收货方仓库的管理部门的默认用户
+						PcsUser executeUser = user;
+						String toDeptId = deliveryTask.getToDepot().getManageDeptId();
+						if(!user.getDeptId().equals(toDeptId)){
+							executeUser = getToDepotDefaultUser(deliveryTask.getToDepot());
+						}
+						dispatcherService.review(onShelfDispatcher, executeUser);	
+					}
+				});
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.create_on_shelf_task)){
+				boolean isAutoReviewOnShelfTask = replenish.getBizRule().getFeedbackRule().getAutoReviewOnShelfTask();
+				
+				for(SpdDepotTask task : replenish.getOnShelfTasks()){
+					boolean isEmptyPlan = task.getItems().isAllPlanEmpty();
+					
+					boolean isReviewOnShelfTask = false;
+					if(isAutoReviewOnShelfTask){
+						isReviewOnShelfTask = true;
+					}else{
+						if(isEmptyBizAutoFeedback && isEmptyPlan){
+							isReviewOnShelfTask = true;
+						}
+					}
+					if(isReviewOnShelfTask){
+						PcsUser executeUser = user;
+						String toDeptId = replenish.getToDepot().getManageDeptId();
+						if(!user.getDeptId().equals(toDeptId)){
+							executeUser = getToDepotDefaultUser(replenish.getToDepot());
+						}
+						
+						task.getItems().confirmAsPlan();
+						tiRepository.saveAll(task.getItems());
+						dtService.reviewDepotTask(task, executeUser);
+					}
+				}
+			}
+			
+			else if(replenish.getCurrentBizStep().equals(SpdReplenishBizSteps.complete_on_shelf_task)){
+				//TODO 发送运营消息
+				if(replenish.getOnShelfTasks().isAllReviewed() && replenish.getCheckState() == CheckState.reviewed){
+					//如果当前用户不是发货方仓库用户，采用发起方仓库的管理部门的默认用户
+					PcsUser creator =  userRepository.findAll().findById(replenish.getMaintenanceInfo().getCreateUserId());
+					PcsUser executeUser = user;
+					String creatorDeptId = creator.getDeptId();
+					if(!user.getDeptId().equals(creatorDeptId)){
+						executeUser = getFromDepotDefaultUser(replenish.getCreatorDepot());
+					}
+					rbService.completeReplenish(replenish, executeUser);
+					
+					//添加判断申领收货的收货数量是否小于确认数量：【是：就应用该申领规则对应的退货规则产生申领退货业务】
+					if(replenish.getBizRule().isApply()){
+						SpdLogisticsTaskItems taskItems = replenish.getDeliveryTasks().getAllItems().getAllNotEntireReceiveItems();
+						if(CollectionUtils.isNotEmpty(taskItems)){
+							SpdReplenishBiz theReplenish = replenishFactory.buildReturnReplenishFromApply(replenish.getBizRule(), taskItems, executeUser);
+						    if(theReplenish != null){
+						    	 rbService.add(theReplenish, executeUser);
+						    }
+						}
+					}
+				}
+			}
+		}catch(Exception e){
+			handleException(action, replenish, e);
+		}
+		saveBizLog(replenish, user);
+		rbRepository.save(replenish);
+	}
+
+	private void processReplenishCommited(SpdReplenishBiz replenish, PcsUser user) {	
+		boolean isEmptyBizAutoFeedback = replenish.getBizRule().getFeedbackRule().getEmptyBizAutoFeedback();
+		boolean isEmptyPlan = replenish.getItems().isAllPlanEmpty();
+		boolean isAutoReviewReplenish = replenish.getBizRule().getFeedbackRule().getAutoReviewReplenish();
+		boolean isAutoSetBizConfirmQty = replenish.getBizRule().getTaskRule().getAutoSetBizConfirmQty();
+		
+		if(isAutoReviewReplenish || isAutoSetBizConfirmQty || isEmptyPlan){
+			if(isEmptyPlan){
+				replenish.getItems().confirmAsPlan();
+			}else{
+				//自动确认数量：根据实际可用数量进行确认
+				List<SpdGoodsQty> planGoodsQtys = replenish.getItems().getPlanGoodsQtysByStoreUnit();
+				List<SpdGoodsQty> realQtysByStoreUnit = dsService.findRealShelfStoreUnitStocks(replenish.getFromDepotId(), replenish.getFromAreaType(), planGoodsQtys);
+				replenish.getItems().confirm(realQtysByStoreUnit);
+			}
+			biRepository.saveAll(replenish.getItems());
+		}
+		
+		if(isAutoReviewReplenish || (isEmptyBizAutoFeedback && isEmptyPlan)){
+			//确认方仓库的管理部门的默认用户
+			PcsUser executeUser = user;
+			if(!replenish.getBizRule().canConfirmByUser(user)){
+				executeUser = getConfirmDepotDefaultUser(replenish);
+			}
+			rbService.reviewReplenish(replenish, replenish.getMaintenanceInfo().getLastDate(), executeUser);
+		}
+	}
+	
+	private void processDeliveryTaskCreated(SpdReplenishBiz replenish, PcsUser user) {
+		boolean isAutoCommitDeliveryTask = replenish.getBizRule().getFeedbackRule().getAutoCommitDeliveryTask();
+		boolean isEmptyBizAutoFeedback = replenish.getBizRule().getFeedbackRule().getEmptyBizAutoFeedback();
+		
+		replenish.getDeliveryTasks().forEach(task->{
+			boolean isEmptyPlan = task.getItems().isAllPlanEmpty();
+			
+			boolean isAutoCommiteTask = false;
+			if(isAutoCommitDeliveryTask){
+				isAutoCommiteTask = true;
+			}else{
+				if(isEmptyBizAutoFeedback && isEmptyPlan){
+					isAutoCommiteTask = true;
+				}
+			}
+			
+			if(isAutoCommiteTask){
+				//如果当前用户不是发货方仓库用户，采用发货方仓库的管理部门的默认用户
+				PcsUser executeUser = user;
+				String formDeptId = replenish.getFromDepot().getManageDeptId();
+				if(!user.getDeptId().equals(formDeptId)){
+					executeUser = getFromDepotDefaultUser(replenish.getFromDepot());
+				}
+				ltService.commit(task, executeUser);
+			}
+		});
+	}
+	
+	private void processOffShelfTaskCreated(SpdReplenishBiz replenish, PcsUser user) {
+		boolean isAutoReviewTaskFeedback = replenish.getBizRule().getFeedbackRule().getAutoReviewOffShelfTask();
+		boolean isEmptyBizAutoFeedback = replenish.getBizRule().getFeedbackRule().getEmptyBizAutoFeedback();
+		
+		replenish.getOffShelfTasks().forEach(task->{
+			boolean isEmptyPlan = task.getItems().isAllPlanEmpty();
+			
+			boolean isAutoReviewTask = false;
+			if(isAutoReviewTaskFeedback || (isEmptyBizAutoFeedback && isEmptyPlan)){
+				isAutoReviewTask = true;
+			}
+			
+			if(isAutoReviewTask){
+				task.getItems().confirmAsPlan();
+				tiRepository.saveAll(task.getItems());
+				
+				//如果当前用户不是发货方仓库用户，采用发货方仓库的管理部门的默认用户
+				PcsUser executeUser = user;
+				String fromDeptId = replenish.getFromDepot().getManageDeptId();
+				if(!user.getDeptId().equals(fromDeptId)){
+					executeUser = getFromDepotDefaultUser(replenish.getFromDepot());
+				}
+				dtService.reviewDepotTask(task, executeUser);
+			}
+		});
+	}
+
+	@Override
+	protected SpdReplenishBiz forwardBizStep(SpdReplenishBiz biz, String taskId, String action) {
+		SpdBizStep currentStep = biz.getCurrentBizStep();
+		String currentStatusName = biz.getCurrentBizStep()==null?"":biz.getCurrentBizStep().getStatusName();
+		if(currentStep == null){
+			biz.setBizStatusCode(biz.getBizSteps().get(0).getStatusCode());
+		}else{
+			SpdBizStep nextStep = CollectionUtils.findWhere("index", currentStep.getIndex()+1, Integer.class, biz.getBizSteps());
+			if(nextStep == null){
+				return biz;
+			}
+			if(nextStep == SpdReplenishBizSteps.create_replenish && action.equals(AmqpMsgType.CREATE_REPLENISH_BIZ.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep.equals(SpdReplenishBizSteps.commit_replenish) && action.equals(AmqpMsgType.COMMIT_REPLENISH_BIZ.getCode())){
+				//等待业务计划为提交状态
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep.equals(SpdReplenishBizSteps.review_replenish) && action.equals(AmqpMsgType.REVIEW_REPLENISH_BIZ.getCode())){
+				//等待业务计划为审核状态
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep.equals(SpdReplenishBizSteps.create_off_shelf_dispatcher) && action.equals(AmqpMsgType.CREATE_OFF_SHELF_DISPATCHER.getCode())){
+				//等待下架调度创建完成
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep.equals(SpdReplenishBizSteps.create_off_shelf_task)){
+				if(action.equals(AmqpMsgType.CREATE_OFF_SHELF_TASK.getCode())){
+					//等待调度审核完成
+					biz.setBizStatusCode(nextStep.getStatusCode());
+				}
+			}else if(nextStep.equals(SpdReplenishBizSteps.complete_off_shelf_task)){
+				if(action.equals(AmqpMsgType.CONFIRM_OFF_SHELF_TASK.getCode())){
+					//所有下架作业完成更新业务事务状态
+					if(biz.getOffShelfTasks().isAllReviewed()){
+						biz.setBizStatusCode(nextStep.getStatusCode());
+					}
+				}
+			}else if(nextStep.equals(SpdReplenishBizSteps.create_delivery_task)){
+				if(action.equals(AmqpMsgType.CREATE_DELIVERY_TASK.getCode())){
+					//所有送货创建完成更新业务事务状态
+					//if(biz.getDeliveryTasks().size() == biz.getOffShelfTasks().size()){
+					biz.setBizStatusCode(nextStep.getStatusCode());
+					//}
+				}
+			}else if(nextStep.equals(SpdReplenishBizSteps.commit_delivery_task)){
+				if(action.equals(AmqpMsgType.COMMIT_DELIVERY_TASK.getCode())){
+					//所有送货作业完成更新业务事务状态
+					if(biz.getDeliveryTasks().isAllCommited()){
+						biz.setBizStatusCode(nextStep.getStatusCode());
+					}
+				}
+			}else if(nextStep.equals(SpdReplenishBizSteps.review_delivery_task)){
+				if(action.equals(AmqpMsgType.CONFIRM_DELIVERY_TASK.getCode())){
+					//所有送货作业审核完成更新业务事务状态
+					if(biz.getDeliveryTasks().isAllReviewed()){
+						biz.setBizStatusCode(nextStep.getStatusCode());
+					}
+				}
+			}else if(nextStep.equals(SpdReplenishBizSteps.create_on_shelf_dispatcher)){
+				if(action.equals(AmqpMsgType.CREATE_ON_SHELF_DISPATCHER.getCode())){
+					//所有上架调度创建完成更新业务事务状态
+					if(findDispatcher(biz, SpdDispatcherType.on_shelf).size() == biz.getDeliveryTasks().size()){
+						biz.setBizStatusCode(nextStep.getStatusCode());
+					}
+				}
+			}else if(nextStep.equals(SpdReplenishBizSteps.create_on_shelf_task)){
+				if(action.equals(AmqpMsgType.CREATE_ON_SHELF_TASK.getCode())){
+					//所有上架调度创建完成更新业务事务状态
+					if(biz.getOnShelfTasks().size() == biz.getDeliveryTasks().size()){
+						biz.setBizStatusCode(nextStep.getStatusCode());
+					}
+				}
+			}else if(nextStep.equals(SpdReplenishBizSteps.complete_on_shelf_task)){
+				if(action.equals(AmqpMsgType.CONFIRM_ON_SHELF_TASK.getCode())){
+					//所有上架作业审核完成更新业务事务状态
+					if(biz.getOnShelfTasks().isAllReviewed()){
+						biz.setBizStatusCode(nextStep.getStatusCode());
+					}
+				}
+			}else{
+				log.warn(String.format("业务事务步骤步进失败:%s=>%s,当前:[%s]", action, nextStep.getStatusName(), biz.getCurrentBizStep().getStatusName()));
+			}
+
+			log.debug("action:{}[{} >> {}], next:{}", action, currentStatusName, biz.getCurrentBizStep().getStatusName(), nextStep.getStatusName());
+		}
+		return biz;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private SpdDispatchers findDispatcher(SpdReplenishBiz biz, SpdDispatcherType dispatcherType){
+		if(dispatcherType == SpdDispatcherType.off_shelf){
+			SpdDispatcherRefs refs = drRepository.findByRefObjectId(biz.getBizId());
+			List<String> dispatcherIds = CollectionUtils.pluck("dispatcherId", refs);
+			SpdDispatchers dispatchers = dispatcherRepository.findWithRelationsByIds(dispatcherIds);
+			dispatchers = new SpdDispatchers(CollectionUtils.find("dispatcherType", dispatcherType.getCode(), dispatchers));
+			return dispatchers;
+		}else{
+			SpdDispatcherRefs refs = drRepository.findByRefObjectIds(biz.getDeliveryTasks().pluck("taskId"));
+			List<String> dispatcherIds = CollectionUtils.pluck("dispatcherId", refs);
+			SpdDispatchers dispatchers = dispatcherRepository.findWithRelationsByIds(dispatcherIds);
+			dispatchers = new SpdDispatchers(CollectionUtils.find("dispatcherType", dispatcherType.getCode(), dispatchers));
+			return dispatchers;
+		}
+	}
+	
+	private PcsUser getApplyDepotDefaultUser(SpdReplenishBiz replenish){
+		String defaultUserId = replenish.getBizRule().getApplyDepot().getManageDept().getDefaultUserId();
+		PcsUser defaultUser = userRepository.findAll().findById(defaultUserId);
+		return defaultUser;
+	}
+	
+	private PcsUser getConfirmDepotDefaultUser(SpdReplenishBiz replenish){
+		String defaultUserId = replenish.getBizRule().getConfirmDepot().getManageDept().getDefaultUserId();
+		PcsUser defaultUser = userRepository.findAll().findById(defaultUserId);
+		return defaultUser;
+	}
+	
+	private PcsUser getFromDepotDefaultUser(PcsDepot fromDepot) {
+		String defaultUserId = fromDepot.getManageDept().getDefaultUserId();
+		PcsUser defaultUser = userRepository.findAll().findById(defaultUserId);
+		return defaultUser;
+	}
+	
+	private PcsUser getToDepotDefaultUser(PcsDepot toDepot) {
+		String defaultUserId = toDepot.getManageDept().getDefaultUserId();
+		PcsUser defaultUser = userRepository.findAll().findById(defaultUserId);
+		return defaultUser;
+	}
+	
+}

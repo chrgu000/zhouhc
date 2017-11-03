@@ -1,0 +1,3 @@
+alter table spd_prepare_inform_rule add(excess_delivery CHAR(1 BYTE));
+alter table spd_prepare_inform_rule add(multi_delivery CHAR(1 BYTE));
+

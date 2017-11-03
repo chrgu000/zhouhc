@@ -1,0 +1,124 @@
+package cn.ak4j.yard.pcs.service;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.factory.PcsUserFactory;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.utils.PdfPrintor;
+
+@Service
+public class PcsDeptService extends IYardService<PcsDept>{
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsUserService userService;
+	@Autowired private PcsUserFactory userFactory;
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepts\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDeptsWithRelations\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPropertyChangeRulesWithRelation\""),
+					@CacheEvict(value = "longTimeCache", key = "\"allPcsUsers\""), 
+					@CacheEvict(value="countCache", key="\"allUserCount\"")})
+	public PcsDept add(@Valid PcsDept dept, IUser user){
+		PcsOrg org = orgRepository.findAll().findById(dept.getOrgId());
+		if(org == null){
+			throw new InvalidDataException(String.format("未找到对应机构[id:%s]！", dept.getOrgId()));
+		}
+		
+		dept.verify(deptRepository,userRepository);
+		
+		dept = deptRepository.save(dept);
+		
+		PcsUser defaultUser = userService.add(userFactory.buildAutoDefaultUser(dept, user), user);
+		dept.setDefaultUserId(defaultUser.getUserId());
+		dept.setDefaultUser(defaultUser);
+		dept = deptRepository.save(dept);
+		
+		return dept;
+	}
+
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepts\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDeptsWithRelations\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPropertyChangeRulesWithRelation\"")})
+	public void delete(String deptId, IUser user){
+		PcsDept pcsDept = deptRepository.findAll().findById(deptId);
+		if(!pcsDept.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, pcsDept.getDeptName());
+		}
+		//TODO: 检查是否有子部门
+		
+		deptRepository.delete(pcsDept);
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepts\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDeptsWithRelations\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPropertyChangeRulesWithRelation\"")})
+	public PcsDept modify(@Valid PcsDept dept, IUser user){
+		PcsOrg org = orgRepository.findAll().findById(dept.getOrgId());
+		if(org == null){
+			throw new InvalidDataException(String.format("未找到对应机构[id:%s]！", dept.getOrgId()));
+		}
+		PcsDept deptPO = deptRepository.findAll().findById(dept.getDeptId());
+		
+		dept.verify(deptRepository, userRepository);
+		deptPO.update(dept, user.getOrgId(), user.getUserId());
+		deptRepository.save(deptPO);
+		return deptPO;
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepts\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDeptsWithRelations\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPropertyChangeRulesWithRelation\"")})
+	public PcsDept updateCheckState(String deptId, int checkStateCode,Date lastDate, IUser user){
+		PcsDept pcsDeptPO = deptRepository.findAll().findById(deptId);
+		pcsDeptPO.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		deptRepository.save(pcsDeptPO);
+		return pcsDeptPO;
+	}
+	
+	public ResponseEntity<byte[]> downloadPdf() throws Exception{
+		Map<String,Object> parmerters = new HashMap<String,Object>();
+		parmerters.put("usernm", "郑庆先");
+		//String filePath=this.getClass().getClassLoader().getResource("").getPath() +"/reports/pcs/Dept.jasper";
+		String filePath="d:/reports/pcs/Dept.jasper";
+		List<PcsDept> pcsDepts=deptRepository.findAllWithRelations();
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+		headers.setContentDispositionFormData("attachment", "PCSDept.pdf");
+		byte[] content=PdfPrintor.downloadPdfByteArray(parmerters, filePath, pcsDepts);
+		return new ResponseEntity<byte[]>(content, headers, HttpStatus.CREATED);
+	}
+
+}

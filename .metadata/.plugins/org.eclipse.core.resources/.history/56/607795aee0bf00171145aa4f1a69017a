@@ -1,0 +1,127 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Date;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.enums.PcsAreaType;
+
+public class SpdPrepareInformRuleTest {
+
+	@Test public void testEqualsRule(){
+		SpdPrepareInformRule rule1 = buildPrepareInformRule("prp_fb_id_011");
+		SpdPrepareInformRule rule2 = buildPrepareInformRule("prp_fb_id_011");
+		
+		assertTrue(rule1.equalsRule(rule2));
+		
+		rule2.setFeedbackRuleId("prp_fb_id_012");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		//要对每一个子规则的属性进行设置进行相等判断的断言
+		rule2 = buildPrepareInformRule("prp_fb_id_011");
+		rule2.getDirectionRule().setToDepotId("depot_id_002");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = buildPrepareInformRule("prp_fb_id_011");
+		rule2.getDirectionRule().setFromOrgId("org_id_002");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = buildPrepareInformRule("prp_fb_id_011");
+		rule2.getDirectionRule().setFromDeptId("dept_id_003");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = buildPrepareInformRule("prp_fb_id_011");
+		rule2.getDirectionRule().setToAreaType(PcsAreaType.unqualified.getCode());
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = buildPrepareInformRule("prp_fb_id_011");
+		rule2.setOriginRuleId("rep_rule_id_09");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = buildPrepareInformRule("prp_fb_id_011");
+		rule2.setConfirmDeptId("dept_id_007");
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = buildPrepareInformRule("prp_fb_id_011");
+		rule2.setMultiDelivery(true);
+		assertFalse(rule1.equalsRule(rule2));
+		
+		rule2 = buildPrepareInformRule("prp_fb_id_011");
+		rule2.setExcessDelivery(true);
+		assertFalse(rule1.equalsRule(rule2));
+	}
+	
+	@Test public void testUpdate(){
+		SpdPrepareInformRule rule1 = buildPrepareInformRule("prp_fb_id_011");
+		SpdPrepareInformRule rule2 = buildPrepareInformRule("prp_fb_id_011");
+		SpdPrepareInformRule rule3 = buildPrepareInformRule("prp_fb_id_011");
+		
+		rule1.setName("测试");
+		rule1.setPrior(100);
+		rule1.setEnabled(false);
+		rule1.setCanBeOriginRule(false);
+		rule1.setInformComponent("通知组件");
+		rule1.setManualInformSupplier(true);
+		rule1.setSupplierBizName("测试供应商业务名称");
+		rule1.setConfirmDeptId("dept_id_006");
+		rule1.setManualApply(false);
+		
+		rule1.setFeedbackRuleId("prp_fb_id_012");
+		rule1.getDirectionRule().setFromOrgId("org_id_002");
+		rule1.getDirectionRule().setFromDeptId("dept_id_009");
+		rule1.getDirectionRule().setToDepotId("depot_id_003");
+		rule1.getDirectionRule().setToAreaType(PcsAreaType.isolation.getCode());
+		rule1.getDirectionRule().setCollectDepotId("depot_id_006");
+		rule1.getDirectionRule().setCollectAreaType(PcsAreaType.isolation.getCode());
+		
+		rule2.update(rule1);
+		
+		assertTrue(rule2.getName()!=rule3.getName());
+		assertTrue(rule2.getPrior()!=rule3.getPrior());
+		assertTrue(rule2.getEnabled()!=rule3.getEnabled());
+		assertTrue(rule2.getCanBeOriginRule()!=rule3.getCanBeOriginRule());
+		assertTrue(rule2.getInformComponent()!=rule3.getInformComponent());
+		assertTrue(rule2.getManualInformSupplier()!=rule3.getManualInformSupplier());
+		assertTrue(rule2.getSupplierBizName()!=rule3.getSupplierBizName());
+		assertTrue(rule2.getConfirmDeptId()!=rule3.getConfirmDeptId());
+		assertTrue(rule2.getManualApply()!=rule3.getManualApply());
+		
+		assertTrue(rule2.getFeedbackRuleId()==rule3.getFeedbackRuleId());
+		assertTrue(rule2.getDirectionRule().getFromOrgId()==rule3.getDirectionRule().getFromOrgId());
+		assertTrue(rule2.getDirectionRule().getFromDeptId()==rule3.getDirectionRule().getFromDeptId());
+		assertTrue(rule2.getDirectionRule().getToDepotId()==rule3.getDirectionRule().getToDepotId());
+		assertTrue(rule2.getDirectionRule().getToAreaType()==rule3.getDirectionRule().getToAreaType());
+		assertTrue(rule2.getDirectionRule().getCollectDepotId()==rule3.getDirectionRule().getCollectDepotId());
+		assertTrue(rule2.getDirectionRule().getCollectAreaType()==rule3.getDirectionRule().getCollectAreaType());
+	}
+	
+	private SpdPrepareInformRule buildPrepareInformRule(String feedbackRuleId){
+		SpdPrepareInformRule rule = new SpdPrepareInformRule();
+		rule.setName("test_receive_001");
+		rule.setPrior(99);
+		rule.setEnabled(true);
+		rule.setCanBeOriginRule(true);
+		rule.setInformComponent("");
+		rule.setId("rec_id_001");
+		rule.setFeedbackRuleId(feedbackRuleId);
+		rule.setCreateTime(new Date());
+		rule.setManualInformSupplier(false);
+		rule.setSupplierBizName("");
+		rule.setExcessDelivery(false);
+		rule.setMultiDelivery(false);
+		rule.setConfirmDeptId("dept_id_001");
+		SpdPrepareInformDirectionRule directionRule = new SpdPrepareInformDirectionRule();
+		directionRule.setFromDeptId("dept_id_005");
+		directionRule.setFromOrgId("org_id_001");
+		directionRule.setToDepotId("depot_id_001");
+		directionRule.setToAreaType(PcsAreaType.normal.getCode());
+		rule.setDirectionRule(directionRule);
+		
+		return rule;
+	}
+}

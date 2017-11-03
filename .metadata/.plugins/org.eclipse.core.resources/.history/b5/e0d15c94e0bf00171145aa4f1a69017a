@@ -1,0 +1,122 @@
+package cn.ak4j.yard.spd.task.repository;
+
+import java.util.Arrays;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.params.PcsDepotShelfParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskItemParams;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import lombok.Getter;
+
+@Repository
+@SuppressWarnings({"unchecked", "rawtypes"})
+public class SpdDepotTaskItemRepository extends BaseRepository<SpdDepotTaskItem, SpdDepotTaskItems<SpdDepotTaskItem>, SpdDepotTaskItemParams,String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired YdsGoodsLotRepository glRepository;
+	@Autowired PcsDepotShelfRepository dsRepository;
+	
+	public SpdDepotTaskItems<SpdDepotTaskItem> find(SpdDepotTaskItemParams params, OrderParam order, int pageNo, int pageSize) {
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			SpdDepotTaskItems<SpdDepotTaskItem> depotTaskItems = new SpdDepotTaskItems(doQuery(params, order, pageNo, pageSize));
+			depotTaskItems.fillGoodsLots(glRepository);
+			return depotTaskItems;	
+		}
+		return new SpdDepotTaskItems();
+	}
+	
+	public int count(SpdDepotTaskItemParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+
+	private boolean setRelationParams(SpdDepotTaskItemParams params) {
+		if(params == null){
+			return true;
+		}
+		
+		YdsGoodsLotParams glParams = new YdsGoodsLotParams();
+		glParams.setLotNo(params.getLotNo());
+		glParams.setLotValidity(params.getLotValidity());
+		glParams.setGoodsLotId(params.getLotId());
+		glParams.setSterilizeLotNo(params.getSterilizeLotNo());
+		glParams.setSterilizeTime(params.getSterilizeTime());
+		glParams.setProduceDate(params.getProduceDate());
+		if(!glParams.isEmpty()){
+			YdsGoodsLots goodsLots = new YdsGoodsLots(glRepository.findAll().find(glParams));
+			if(goodsLots.size() == 0){
+				return false;
+			}
+			params.setLotId(new ListParam<String>(goodsLots.getIds()));
+		}
+		
+		PcsDepotShelfParams dsParams = new PcsDepotShelfParams();
+		dsParams.setShelfName(params.getShelfName());
+		if(!dsParams.isEmpty()){
+			PcsDepotShelfs depotShelfs = new PcsDepotShelfs(dsRepository.findAll().find(dsParams));
+			if(depotShelfs.size() == 0){
+				return false;
+			}
+			params.setShelfId(new ListParam<String>(depotShelfs.getIds()));
+		}
+		
+		return true;
+	}
+
+	public SpdDepotTaskItems getSpdTaskItems(String ids) {
+		String[] idArray = ids.split(",");
+		List<String> idList = Arrays.asList(idArray);
+		SpdDepotTaskItemParams params = new SpdDepotTaskItemParams();
+		params.setTaskItemId(new ListParam(idList));
+		return find(params);
+	}
+
+	public SpdDepotTaskItems findByTask(SpdDepotTaskItemParams params, OrderParam order, int pageNo, int pageSize, String taskId) {
+		if(params == null){
+			params = new SpdDepotTaskItemParams();
+		}
+		params.setTaskId(new ListParam<String>(taskId));
+		return find(params, order, pageNo, pageSize);
+	}
+
+	public SpdDepotTaskItems<SpdDepotTaskItem> findByTaskId(String taskId){
+		Query query = entityManager.createQuery("from SpdDepotTaskItem where taskId = :taskId");
+		query.setParameter("taskId", taskId);
+		SpdDepotTaskItems result = new SpdDepotTaskItems(query.getResultList());
+		
+		return result;
+	}
+	
+	public SpdDepotTaskItems findByTaskIds(List ids) {
+		if(CollectionUtils.isEmpty(ids)){
+			return new SpdDepotTaskItems();
+		}
+		Query query = entityManager.createQuery("from SpdDepotTaskItem where taskId in (:taskIds)");
+		query.setParameter("taskIds", ids);
+		SpdDepotTaskItems result = new SpdDepotTaskItems(query.getResultList());
+		
+		return result;
+	}
+
+}

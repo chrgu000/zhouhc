@@ -1,0 +1,1 @@
+alter table pcs_user add(primary char(1 byte));

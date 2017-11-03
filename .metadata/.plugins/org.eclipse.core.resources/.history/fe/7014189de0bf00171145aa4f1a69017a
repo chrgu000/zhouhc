@@ -1,0 +1,15 @@
+--修改字典的值
+delete  yds_workbook where workbook_id in('tax_ratiot_001','tax_ratiot_002','tax_ratiot_003','tax_ratiot_004');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,editable) 
+values ('tax_ratiot_001','开票税率','tax_ratiot ','0.00','0%',1,'1',628,1,'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'出口货物','0');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,editable)
+values ('tax_ratiot_002','开票税率','tax_ratiot ','0.03','3%',2,'1',628,1,'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'小规模纳税人   包括原增值税纳税人和营改增纳税人   从事货物销售，提供增值税加工、修理修配劳务，以及营改增各项应税服务  征收率3%。','0');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,editable) 
+values ('tax_ratiot_003','开票税率','tax_ratiot ','0.06','6%',3,'1',628,1,'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'税率 6%：现代服务业  研发和技术服务， 信息技术服务，文化创意服务，物流辅助服务  鉴证咨询服务，广播影视服务。','0');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,editable)
+values ('tax_ratiot_004','开票税率','tax_ratiot ','0.11','11%',4,'1',628,1,'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'税率 11%：交通运输 陆路（含铁路）运输、水路运输、航空运输和管道运输服务；邮政普遍服务、邮政特殊服务、其他邮政服务。','0');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,editable) 
+values ('tax_ratiot_005','开票税率','tax_ratiot ','0.17','17%',5,'1',628,1,'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'628','628',to_date('2017-09-07 10:20:43','YYYY-MM-DD HH24:MI:SS'),'税率17% ：  销售或者进口货物（另有列举的货物除外）；提供加工、修理修配劳务','0');
+
+--修改物资价格维护税率的值
+update yds_goods_info set prepare_tax_rate = '0.17', consume_tax_rate = '0.17';

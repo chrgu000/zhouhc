@@ -1,0 +1,33 @@
+package cn.ak4j.yard.domain;
+
+import java.util.HashMap;
+
+@SuppressWarnings({"serial"})
+public class StateFlowTemplates extends HashMap<String, String[]>{
+
+
+	public static  String statesFlow_n = "statesFlow_n";//不需要状态
+	public static  String statesFlow_n_c = "statesFlow_n_c";//新增_提交
+	public static  String statesFlow_n_r = "statesFlow_n_r";//新增_审核
+	public static  String statesFlow_n_f = "statesFlow_n_f";//新增_完成
+	public static  String statesFlow_n_c_r = "statesFlow_n_c_r";//新增_提交_审核
+	public static  String statesFlow_n_r_f = "statesFlow_n_r_f";//新增_审核_完成
+	public static String statesFlow_n_c_r_f = "statesFlow_n_c_r_f";//新增_提交_审核_完成
+	
+	private final static StateFlowTemplates allTemplates = new StateFlowTemplates();
+	
+	static{
+		allTemplates.put(statesFlow_n, new String[]{CheckState.new_created.getName()});
+		allTemplates.put(statesFlow_n_c, new String[]{CheckState.new_created.getName(), CheckState.commited.getName()});
+		allTemplates.put(statesFlow_n_r, new String[]{CheckState.new_created.getName(), CheckState.reviewed.getName()});
+		allTemplates.put(statesFlow_n_f, new String[]{CheckState.new_created.getName(), CheckState.completed.getName()});
+		allTemplates.put(statesFlow_n_c_r, new String[]{CheckState.new_created.getName(), CheckState.commited.getName(), CheckState.reviewed.getName()});
+		allTemplates.put(statesFlow_n_r_f, new String[]{CheckState.new_created.getName(), CheckState.reviewed.getName(), CheckState.completed.getName()});
+		allTemplates.put(statesFlow_n_c_r_f, new String[]{CheckState.new_created.getName(), CheckState.commited.getName(), CheckState.reviewed.getName(), CheckState.completed.getName()});
+	}
+
+	public static StateFlowTemplates getAlltemplates() {
+		return allTemplates;
+	}
+	
+}

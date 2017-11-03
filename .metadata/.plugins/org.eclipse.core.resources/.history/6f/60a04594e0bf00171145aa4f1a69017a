@@ -1,0 +1,107 @@
+package cn.ak4j.yard.spd.wrapper.service;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.transaction.Transactional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SpdTurnoverBoxService extends IYardService<SpdTurnoverBox> {
+
+	@Autowired private SpdTurnoverBoxRepository turnoverBoxRepository;
+	@Autowired private YardCodeService ycService;
+
+	@Transactional @CacheEvict(value = "longTimeCache", key = "\"allTurnoverBoxs\"")
+	public SpdTurnoverBox add(SpdTurnoverBox turnoverBox, IUser user) {
+		YardArbitraryCode sysCode = ycService.publishCode(CodeSort.zhouzhuanxiang, turnoverBox.getWrapperNo());
+		turnoverBox.setWrapperNo(sysCode.getCode());
+		turnoverBox.verifyTurnoverBoxCodeExist(turnoverBoxRepository);
+
+		return turnoverBoxRepository.save(turnoverBox);
+	}
+	
+	@Transactional @CacheEvict(value = "longTimeCache", key = "\"allTurnoverBoxs\"")
+	public synchronized SpdTurnoverBox use(String wrapperNo, String ownerId, SpdSceneType scene) {
+		SpdTurnoverBox turnoverBox = turnoverBoxRepository.findAll().findByWrapperNo(wrapperNo);
+		if(turnoverBox == null){
+			throw new NotFoundException(String.format("周转箱[%s]未找到", wrapperNo));
+		}
+		if(turnoverBox.isUseable()){
+			turnoverBox.usedBy(ownerId, scene);
+			turnoverBoxRepository.save(turnoverBox);
+			return turnoverBox;
+		}else{
+			if(turnoverBox.getSceneType() != SpdSceneType.idle && turnoverBox.getOwnerId().equals(ownerId)){
+				log.info("当前容器[{}]已经用于[{}:{}]，将忽略对其的使用", wrapperNo, ownerId, scene.getCode());
+				return turnoverBox;
+			}
+			throw new OperateForbiddenException(YardExceptionType.forbide_use_turnover_box, turnoverBox.getWrapperNo());
+		}
+	}
+
+	@Transactional @CacheEvict(value = "longTimeCache", key = "\"allTurnoverBoxs\"")
+	public SpdTurnoverBox release(String boxCode) {
+		SpdTurnoverBox turnoverBox = turnoverBoxRepository.findAll().findByWrapperNo(boxCode);
+		turnoverBox.release();
+		turnoverBoxRepository.save(turnoverBox);
+		return turnoverBox;
+	}
+	
+	@Transactional @CacheEvict(value = "longTimeCache", key = "\"allTurnoverBoxs\"")
+	public void release(List<String> turnoverBoxCodes) {
+		turnoverBoxCodes.forEach(boxCode->release(boxCode));
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allTurnoverBoxs\"")
+	public SpdTurnoverBox modify(SpdTurnoverBox turnoverBox, IUser user) {
+		YardArbitraryCode sysCode = ycService.publishCode(CodeSort.zhouzhuanxiang, turnoverBox.getWrapperNo());
+		turnoverBox.setWrapperNo(sysCode.getCode());
+		turnoverBox.verifyTurnoverBoxCodeExist(turnoverBoxRepository);
+		
+		SpdTurnoverBox turnoverBoxPO = turnoverBoxRepository.findAll().findById(turnoverBox.getId());
+		if (turnoverBox.canUpdate()) {
+			turnoverBoxPO.update(turnoverBox, user.getOrgId(), user.getUserId());
+			return turnoverBoxRepository.save(turnoverBox);
+		}
+
+		throw new OperateForbiddenException(YardExceptionType.forbide_update, turnoverBoxPO.getWrapperNo());
+	}
+
+	@CacheEvict(value = "longTimeCache", key = "\"allTurnoverBoxs\"")
+	public SpdTurnoverBox updateCheckState(String turnoverBoxId, int checkStateCode, Date lastUpdateDate, IUser user) {
+		SpdTurnoverBox turnoverBoxPO = turnoverBoxRepository.findAll().findById(turnoverBoxId);
+		
+		if(!turnoverBoxPO.isIdle()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_non_idel_turnover_box,turnoverBoxPO.getWrapperNo());
+		}
+		
+		turnoverBoxPO.updateCheckState(checkStateCode, lastUpdateDate, user.getOrgId(), user.getUserId());
+		return turnoverBoxRepository.save(turnoverBoxPO);
+	}
+
+
+	@Override
+	public void delete(String id, IUser user) {
+		// TODO Auto-generated method stub
+	}
+
+
+}

@@ -1,0 +1,55 @@
+package cn.ak4j.yard.sys.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.sys.domain.YardTimeSequenceCode;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.domain.YardCodeSequence;
+import cn.ak4j.yard.sys.domain.YardCodeSequences;
+import cn.ak4j.yard.sys.repository.YardCodeSequenceRepository;
+
+/**
+* @Description: SPD编码服务，通过该服务来提供发布编码等服务
+* @author zhengyf
+* @date 2017年3月16日 下午2:36:47
+* @version V1.0.0
+*/
+@Service
+public class YardCodeService {
+
+	@Autowired private YardCodeSequenceRepository ycsRepository;
+	
+	/**
+	 * 根据所提供的分类码发布一个SPD编码用于具体的业务场景
+	 * @param sortCode 分类码
+	 */
+	public synchronized YardTimeSequenceCode publishCode(CodeSort codeSort){
+		//查找当前分类码的编码序列
+		YardCodeSequences sequences = ycsRepository.getAll();
+		YardCodeSequence sequence = CollectionUtils.findWhere("sortCode", codeSort.getCode(), sequences);
+		if(sequence == null){
+			throw new NotFoundException(String.format("分类码[%s]未找到序列", codeSort.getCode()));
+		}
+		
+		//使用序列对象发布SPD编码对象
+		YardTimeSequenceCode yardCode = sequence.publishYardCode();
+		
+		//保存序列对象
+		ycsRepository.save(sequence);
+		
+		return yardCode;
+	}
+	
+	public YardArbitraryCode publishCode(CodeSort codeSort, String meterialCode){
+		return new YardArbitraryCode(codeSort, meterialCode);
+	}
+	
+	public int findCurrentCodeSequence(CodeSort codeSort){
+		return ycsRepository.findOne(codeSort.getCode()).getSequence().intValue();
+	}
+	
+}

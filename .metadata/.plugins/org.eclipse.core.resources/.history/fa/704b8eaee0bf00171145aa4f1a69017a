@@ -1,0 +1,73 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.params.SpdBizRuleParams;
+import cn.ak4j.yard.spd.bizrule.to.SpdBizRuleTO;
+
+public class SpdBizRuleResourceTest extends BaseTest{
+	
+
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdBizRules?accessToken={accessToken}";
+		
+		List<SpdBizRuleTO> rules  = mockMvcHelper.mockGet(new TypeReference<List<SpdBizRuleTO>>() {}, url, accessToken);
+		assertEquals(20, rules.size());
+		
+		SpdBizRuleParams params = new SpdBizRuleParams();
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setCanBeOriginRule(new ListParam<Boolean>(true));
+		
+		String urlParams = "/spd/spdBizRules?accessToken={accessToken}&params={params}";
+		rules  = mockMvcHelper.mockGet(new TypeReference<List<SpdBizRuleTO>>() {}, urlParams, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		assertEquals(20, rules.size());
+		rules.forEach(rule->{
+			assertTrue(rule.getEnabled());
+			assertTrue(rule.getCanBeOriginRule());
+		});
+	}
+	
+	@Test public void testFindAllWithParams() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdBizRules?params={params}&accessToken={accessToken}&pageSize=-1";
+		SpdBizRuleParams params = new SpdBizRuleParams();
+		List<String> bizTypeCodes = new ArrayList<String>();
+		bizTypeCodes.add(SpdBizType.daily_clean_biz.getCode());
+		bizTypeCodes.add(SpdBizType.finacial_reconciliation_biz.getCode());
+		
+		params.setBizTypeCode(new ListParam<String>(bizTypeCodes, QueryParam.operation_not_in));
+		
+		List<SpdBizRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdBizRuleTO>>() {}, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(91, rules.size());
+		rules.forEach(rule->{
+			assertNotEquals(SpdBizType.daily_clean_biz.getCode(), rule.getBizTypeCode());
+			assertNotEquals(SpdBizType.finacial_reconciliation_biz.getCode(), rule.getBizTypeCode());
+		});
+	}
+	
+	@Test public void testGet() throws Exception {
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdBizRules/{id}?accessToken={accessToken}";
+		String id = "rep_rule_id_20";
+		SpdBizRuleTO to = mockMvcHelper.mockGet(SpdBizRuleTO.class, url, id, accessToken);
+		assertNotNull(to);
+		assertEquals(id, to.getId());
+	}
+	
+}

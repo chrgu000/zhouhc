@@ -1,0 +1,24 @@
+package cn.ak4j.yard.yds.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.IntegerParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class YdsWorkBookParams extends QueryParams{
+	private static final long serialVersionUID = 211223698388314087L;
+	
+	private ListParam<String> workbookId;
+	 private ListParam<String> sortName;
+	 private ListParam<String> sortCode;
+	 private ListParam<String> keyValue;
+	 private ListParam<String> keyName;
+	 private IntegerParam keyInx;
+	 private ListParam<Boolean> enabled;
+	 private ListParam<Boolean> editable;
+	 private DateRangeParam maintenanceInfo_createDate;//创建时间
+}

@@ -1,0 +1,180 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveDirectionRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdReceiveRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.bizrule.service.SpdBizRuleService;
+import cn.ak4j.yard.spd.bizrule.to.SpdReceiveRuleTO;
+
+@RestController
+public class SpdReceiveRuleResource {
+	
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdBizRuleService brService;
+	@Autowired private PcsDepotRepository depotRepository;
+	private SpdReceiveRuleAssember assember = new SpdReceiveRuleAssember();
+	
+	@RequestMapping(value="/yard/spd/spdReceiveRules", method = RequestMethod.GET)
+	public List<SpdReceiveRuleTO> findAllReceiveRules(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdReceiveRuleParams params = SpdReceiveRuleParams.buildParamsFromJson(paramsStr, SpdReceiveRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdReceiveRules receiveRules = brRepository.findAllWithRelations().getAllReceiveRules();
+		receiveRules = new SpdReceiveRules(receiveRules.findByPage(params, order, currentPage-1, pageSize));
+		
+		return assember.buildList(receiveRules);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReceiveRules/count", method = RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdReceiveRuleParams params = SpdReceiveRuleParams.buildParamsFromJson(paramsStr, SpdReceiveRuleParams.class);
+		SpdReceiveRules receiveRules = brRepository.findAllWithRelations().getAllReceiveRules();
+		receiveRules = new SpdReceiveRules(receiveRules.find(params));
+		return assember.buildList(receiveRules).size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReceiveRules/ids,{ids}", method=RequestMethod.GET)
+	public List<SpdReceiveRuleTO> getByIds(@PathVariable(value = "ids", required = false) String ids){
+		List<SpdReceiveRule> rules =  brRepository.findAllWithRelations().getAllReceiveRules().findByIds(Arrays.asList(ids.split(",")));
+		return assember.buildList(rules);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReceiveRules/{id}", method = RequestMethod.GET)
+	public SpdReceiveRuleTO get(@PathVariable("id")String id){
+		SpdReceiveRules rules = brRepository.findAllWithRelations().getAllReceiveRules();
+		SpdReceiveRuleTO receiveTO = assember.build(CollectionUtils.findWhere("id", id, rules));
+		return receiveTO;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReceiveRules", method = RequestMethod.POST)
+	public SpdReceiveRuleTO add(@RequestBody SpdReceiveRuleTO receiveRuleTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdReceiveRule receiveRule = assember.build(receiveRuleTO);
+		
+		receiveRule.getDirectionRule().fillDepotRelations(depotRepository);
+		
+		receiveRule = (SpdReceiveRule)brService.add(receiveRule, user);
+		SpdReceiveRules receiveRules = brRepository.findAllWithRelations().getAllReceiveRules();
+		
+		receiveRuleTO = assember.build(CollectionUtils.findWhere("id", receiveRule.getId(), receiveRules));
+		return receiveRuleTO;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReceiveRules/{id}", method = RequestMethod.PUT)
+	public SpdReceiveRuleTO update(@RequestBody SpdReceiveRuleTO receiveRuleTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdReceiveRule receiveRule = assember.build(receiveRuleTO);
+		
+		receiveRule.getDirectionRule().fillDepotRelations(depotRepository);
+		
+		receiveRule = (SpdReceiveRule)brService.modify(receiveRule, user);
+		SpdReceiveRules receiveRules = brRepository.findAllWithRelations().getAllReceiveRules();
+		
+		receiveRuleTO = assember.build(CollectionUtils.findWhere("id", receiveRule.getId(), receiveRules));
+		return receiveRuleTO;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReceiveRules/whichICanApply", method = RequestMethod.GET)
+	public List<SpdReceiveRuleTO> whichICanApply(@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdReceiveRuleParams params = SpdReceiveRuleParams.buildParamsFromJson(paramsStr, SpdReceiveRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		SpdReceiveRules allReceiveRules = brRepository.findAllWithRelations().getAllReceiveRules();
+		SpdReceiveRules rules = new SpdReceiveRules(allReceiveRules.whichCanApplyByUser(user));
+		return assember.buildList(rules.findByPage(params, order, -1, -1));
+	}
+	
+}
+
+class SpdReceiveRuleAssember{
+
+	public List<SpdReceiveRuleTO> buildList(List<SpdReceiveRule> receiveRules) {
+		List<SpdReceiveRuleTO> result = new ArrayList<SpdReceiveRuleTO>();
+		receiveRules.forEach(rule->{
+			SpdReceiveRuleTO receiveRuleTO = build(rule);
+			result.add(receiveRuleTO);
+		});
+		return result;
+	}
+	
+	public SpdReceiveRule build(SpdReceiveRuleTO receiveRuleTO) {
+		SpdReceiveRule receiveRule = new SpdReceiveRule();
+		
+		SpdReceiveDirectionRule directionRule = new SpdReceiveDirectionRule();
+		
+		String[] ignoreProperties = {};
+		if(StringUtils.isNotEmpty(receiveRuleTO.getCollectDepotId())){
+			ignoreProperties = new String[]{"toDepotId","toAreaType"};
+			
+			directionRule.setToDepotId(receiveRuleTO.getCollectDepotId());
+			directionRule.setToAreaType(receiveRuleTO.getCollectAreaType());
+			
+			directionRule.setFinalDepotId(receiveRuleTO.getToDepotId());
+			directionRule.setFinalAreaType(receiveRuleTO.getToAreaType());
+		}
+		
+		BeanUtils.copyProperties(receiveRuleTO, directionRule, ignoreProperties);
+		
+		receiveRule.setDirectionRule(directionRule);
+		
+		BeanUtils.copyProperties(receiveRuleTO, receiveRule);
+		receiveRule.setCreateTime(new Date());
+		receiveRule.setLastUpdateTime(new Date());
+		
+		return receiveRule;
+	}
+
+
+	public SpdReceiveRuleTO build(SpdReceiveRule receiveRule) {
+		SpdReceiveRuleTO receiveRuleTO = new SpdReceiveRuleTO();
+		String[] ignoreProperties = {};
+		if(StringUtils.isNotEmpty(receiveRule.getDirectionRule().getFinalDepotId())){
+			ignoreProperties = new String[]{"toDepotId","toAreaType"};
+			
+			receiveRuleTO.setCollectDepotId(receiveRule.getDirectionRule().getToDepotId());
+			receiveRuleTO.setCollectAreaType(receiveRule.getDirectionRule().getToAreaType());
+			
+			receiveRuleTO.setToDepotId(receiveRule.getDirectionRule().getFinalDepotId());
+			receiveRuleTO.setToAreaType(receiveRule.getDirectionRule().getFinalAreaType());
+		}
+		
+		
+		BeanUtils.copyProperties(receiveRule.getDirectionRule(), receiveRuleTO, ignoreProperties);
+		
+		BeanUtils.copyProperties(receiveRule, receiveRuleTO);
+		receiveRuleTO.setPrimaryName(receiveRule.getPrimaryName());
+		
+		
+		return receiveRuleTO;
+	}
+	
+}

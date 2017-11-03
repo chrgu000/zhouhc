@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 有包装的作业明细，目前应用于下架作业、送货作业、收货作业
+* @author zhengyf
+* @date 2017年3月8日 上午8:54:42
+* @version V1.0.0
+*/
+@NoArgsConstructor
+@Entity
+@Table(name="SPD_OFF_SHELF_TASK_ITEM")
+@SuppressWarnings({"serial"})
+public class SpdOffShelfTaskItem extends SpdDepotTaskItem{
+	
+}

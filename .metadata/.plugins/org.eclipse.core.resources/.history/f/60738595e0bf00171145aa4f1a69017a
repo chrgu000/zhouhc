@@ -1,0 +1,42 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 交易价格策略
+* @author zhengyf
+* @date 2017年8月12日 下午3:16:40
+* @version V1.0.0
+*/
+
+@JsonSerialize(using = CommonEnumJsonSerializer.class)
+public enum SpdDealPriceStratage implements ITypeEnum{
+
+	basic_price("basic_pric", "基础价格", "从产品基础信息中获取的价格"),
+	receive_price("receive_price", "收货价格", "从收货业务中获取的价格"),
+	contract_price ("contract_price", "合同价格", "从合同中获取的价格");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SpdDealPriceStratage (String code,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdDealPriceStratage typeOf(String typeCode){
+		for(SpdDealPriceStratage stratage : SpdDealPriceStratage.values()){
+			if(stratage.getCode().equals(typeCode)){
+				return stratage;
+			}
+		}
+		
+		return null;
+	}
+	
+}

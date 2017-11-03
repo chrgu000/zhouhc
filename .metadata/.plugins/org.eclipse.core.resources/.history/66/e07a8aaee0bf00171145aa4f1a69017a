@@ -1,0 +1,170 @@
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.SpdDealPriceStratage;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRuleParams;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdPropertyChangeRuleResourceTest extends BaseTest{
+	
+	@Autowired private YardCodeService codeService;
+	
+	@Test public void testAdd() throws Exception{
+		SpdPropertyChangeRule rule = createRule();
+		SpdPropertyChangeRule newRule = mockMvcHelper.add(SpdPropertyChangeRule.class, testUserCode, "spd", "spdPropertyChangeRules", rule);
+		assertNotNull(newRule.getId());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.wuquanbiangengguize);
+		assertEquals(CodeSort.wuquanbiangengguize.getCode()+getCurrentDateCode()+sequenceCode, newRule.getRuleCode());
+		assertEquals(rule.getName(), newRule.getName());
+		assertEquals(rule.getCustomName(), newRule.getCustomName());
+		assertEquals(rule.getBizRuleId(), newRule.getBizRuleId());
+		assertEquals(rule.getBizTypeCode(), newRule.getBizTypeCode());
+		assertEquals(rule.getCreditOrgId(), newRule.getCreditOrgId());
+		assertEquals(rule.getCreditDeptId(), newRule.getCreditDeptId());
+		assertEquals(rule.getDebitOrgId(), newRule.getDebitOrgId());
+		assertEquals(rule.getDebitDeptId(), newRule.getDebitDeptId());
+		assertEquals(rule.getDebitDepotId(), newRule.getDebitDepotId());
+		assertEquals(rule.getEnabled(), newRule.getEnabled());
+		assertEquals(rule.getTriggerStepCode(), newRule.getTriggerStepCode());
+		assertEquals(SpdDealPriceStratage.basic_price.getCode(), newRule.getDealPriceStratageCode());
+		
+		mockMvcHelper.add(SpdPropertyChangeRule.class, testUserCode, "spd", "spdPropertyChangeRules", rule, status().is4xxClientError(), YardExceptionType.invalid_exist_same_property_change_rule);
+		
+		SpdPropertyChangeRule rule01 = createRule();
+		rule01.setCreditOrgId(rule01.getDebitOrgId());
+		mockMvcHelper.add(SpdPropertyChangeRule.class, testUserCode, "spd", "spdPropertyChangeRules", rule01, status().is4xxClientError(), YardExceptionType.invalid_debit_org_and_credit_org_same);
+	}
+	
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRules?accessToken={accessToken}";
+		
+		SpdPropertyChangeRules rules = mockMvcHelper.mockGet(SpdPropertyChangeRules.class, url, accessToken);
+		assertEquals(8, rules.size());
+		
+		url = "/spd/spdPropertyChangeRules?params={params}&accessToken={accessToken}";
+		SpdPropertyChangeRuleParams params = new SpdPropertyChangeRuleParams();
+		String bizRuleId = "rep_rule_id_07";
+		params.setBizRuleName(new ListParam<String>("库房调拨"));
+		
+		rules = mockMvcHelper.mockGet(SpdPropertyChangeRules.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		rules.forEach(rule->{
+			assertEquals(bizRuleId, rule.getBizRuleId());
+		});
+		
+		params = new SpdPropertyChangeRuleParams();
+		String debitOrgId = "626";
+		String creditOrgId = "org_id_001";
+		String debitDeptId = "dept_id_006";
+		String creditDeptId = "dept_id_005";
+		String debitDepotId = "depot_id_003";
+		params.setDebitOrgName(new ListParam<String>("中山大学孙逸仙纪念医院"));
+		params.setCreditOrgName(new ListParam<String>("中山医医药有限公司"));
+		params.setDebitDeptName(new ListParam<String>("门诊药房"));
+		params.setCreditDeptName(new ListParam<String>("中山医销售部"));
+		params.setDebitDepotId(new ListParam<>("depot_id_003"));
+		rules = mockMvcHelper.mockGet(SpdPropertyChangeRules.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		rules.forEach(rule->{
+			assertEquals(debitOrgId, rule.getDebitOrgId());
+			assertEquals(creditOrgId, rule.getCreditOrgId());
+			assertEquals(debitDeptId, rule.getDebitDeptId());
+			assertEquals(creditDeptId, rule.getCreditDeptId());
+			assertEquals(debitDepotId, rule.getDebitDepotId());
+		});
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRules/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(8, count);
+	}
+	
+	@Test public void testGet() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String id = "prp_change_rule_04";
+		String url = "/spd/spdPropertyChangeRules/{id}?accessToken={accessToken}";
+		SpdPropertyChangeRule rule = mockMvcHelper.mockGet(SpdPropertyChangeRule.class, url, id, accessToken);
+		assertEquals(id, rule.getId());
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String ids = "prp_change_rule_01,prp_change_rule_02,prp_change_rule_05";
+		String url = "/spd/spdPropertyChangeRules/ids,{ids}?accessToken={accessToken}";
+		
+		SpdPropertyChangeRules rules = mockMvcHelper.mockGet(SpdPropertyChangeRules.class, url, ids, accessToken);
+		assertEquals(3, rules.size());
+		rules.forEach(rule->{
+			assertTrue(ids.indexOf(rule.getId())>=0);
+		});
+	}
+	
+	@Test public void testModify() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String id = "prp_change_rule_04";
+		String url = "/spd/spdPropertyChangeRules/{id}?accessToken={accessToken}";
+		
+		SpdPropertyChangeRule rule = mockMvcHelper.mockGet(SpdPropertyChangeRule.class, url, id, accessToken);
+		rule.setEnabled(false);
+		rule.setName("申领收货结算");
+		rule.setCustomName("自定义申领收货结算");
+		rule = mockMvcHelper.modify(SpdPropertyChangeRule.class, testUserCode, id, rule);
+		assertFalse(rule.getEnabled());
+		assertEquals("申领收货结算", rule.getName());
+		assertEquals("自定义申领收货结算", rule.getCustomName());
+		
+		rule.setCreditOrgId(rule.getDebitOrgId());
+		rule = mockMvcHelper.modify(SpdPropertyChangeRule.class, testUserCode, id, rule, status().is4xxClientError(), YardExceptionType.invalid_debit_org_and_credit_org_same);
+	}
+	
+	@Test public void testFindPropertyChangePoints() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdPropertyChangeRules/propertyChangePoints?accessToken={accessToken}");
+		
+		mockMvc.perform(get(urlTemplate, accessToken))
+				//.andDo(print())
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		
+	}
+	
+	
+	private SpdPropertyChangeRule createRule(){
+		SpdPropertyChangeRule rule = new SpdPropertyChangeRule();
+		rule.setName("申领收货结算");
+		rule.setCustomName("自定义申领收货结算");
+		rule.setBizRuleId("rep_rule_id_13");
+		rule.setBizTypeCode(SpdBizType.replenish_biz.getCode());
+		rule.setCreditOrgId("org_id_001");
+		rule.setCreditDeptId("dept_id_005");
+		
+		rule.setDebitOrgId("626");
+		rule.setDebitDeptId("dept_id_002");
+		rule.setDebitDepotId("depot_id_002");
+		
+		rule.setEnabled(true);
+		rule.setTriggerStepCode(SpdReplenishBizSteps.review_delivery_task.getStatusCode());
+		rule.setDealPriceStratageCode(SpdDealPriceStratage.basic_price.getCode());
+		return rule;
+	}
+	
+}

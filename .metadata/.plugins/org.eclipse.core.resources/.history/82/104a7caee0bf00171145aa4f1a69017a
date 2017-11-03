@@ -1,0 +1,233 @@
+package cn.ak4j.yard.spd.task.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.List;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStock;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdDepotStockRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdAbstractWrapper;
+import cn.ak4j.yard.spd.wrapper.domain.SpdWrappers;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import cn.ak4j.yard.spd.wrapper.service.SpdWrapperService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@SuppressWarnings({"unchecked"})
+public class SpdLogisticsTaskServiceTest extends BaseTest{
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private SpdLogisticsTaskService ltServices;
+	@Autowired private PcsUserRepository usRepository;
+	@Autowired private SpdDepotStockRepository dsRepository;
+	@Autowired private SpdDepotTaskService dtService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdDepotTaskItemRepository dtiRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdReplenishBizService rbService;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdWrapperService wrapperService;
+	@Autowired private SpdTurnoverBoxRepository tbRepository;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+
+	@Test public void testCommitLogisticsTask(){
+		//获取送货作业，
+		String deliveryTaskId = "logi_task_id_001";
+		SpdLogisticsTask task = ltRepository.findOne(deliveryTaskId);
+		ltServices.fillAllRelations(task);
+		
+		task.getItems().forEach(item->{
+			item.setReceiveQty(item.getConfirmQty());
+			ltServices.modifyItem(item);
+		});
+		ltServices.fillAllRelations(task);
+		//task.getItems().removeTurnoverBox();
+		//获取提交前每个批号对应的仓库的库存
+		List<String> lotIds = CollectionUtils.pluck("lotId", task.getItems());
+		SpdDepotStocks originDepotStocks = dsRepository.findByDepotAndGoodsLots(task.getFromDepotId(), lotIds);
+		
+		//提交送货单
+		PcsUser user = usRepository.findAll().findById(xykUserId);
+		ltServices.commit(task, user);
+		
+		//获取送货单提交后对应的仓库的库存
+		SpdDepotStocks newDepotStocks = dsRepository.findByDepotAndGoodsLots(task.getFromDepotId(), lotIds);
+		
+		//断言送货单的状态是否改变
+		assertEquals(CheckState.commited,task.getCheckState());
+		assertNotNull(task.getDeliveryTime());
+		
+		//断言送货明细的数量
+		task.getItems().forEach(item->{
+			assertTrue(item.getConfirmQty().intValue()>0);
+			assertEquals(item.getConfirmQty().intValue(),item.getPlanQty().intValue());
+		});
+		
+		//断言送货方的仓库库存变更的情况
+		originDepotStocks.forEach(originDepotStock->{
+			SpdDepotStock newDepotStock = CollectionUtils.findWhere("goodsLotId", originDepotStock.getGoodsLotId(), newDepotStocks);
+			assertNotNull(newDepotStock);
+			
+			assertEquals(originDepotStock.getMinStockQty().intValue() - 
+					task.getItems().getSameLotConfirmQtyByBaseUnit(originDepotStock.getGoodsLotId()), 
+					newDepotStock.getMinStockQty().intValue());
+		});
+	}
+	
+	
+	@Test public void testReviewLogisticsTask(){
+		String taskId = "logi_task_id_002";
+		SpdLogisticsTask logisticsTask = ltRepository.findOne(taskId);
+		ltServices.fillAllRelations(logisticsTask);
+		//logisticsTask.getItems().removeTurnoverBox();
+		PcsUser user = usRepository.findAll().findById(xykUserId);
+		
+		List<String> lotIds = logisticsTask.getItems().pluck("lotId");
+		
+		//获取收货方的仓库库存情况
+		SpdDepotStocks originDepotStocks = dsRepository.findByDepotAndGoodsLots(logisticsTask.getToDepotId(), lotIds);
+		
+		//审核送货单
+		ltServices.review(logisticsTask, user);
+		
+		//断言送货单的状态是否改变
+		assertEquals(CheckState.reviewed, logisticsTask.getCheckState());
+		
+		//获取审核送货单后的收货方仓库库存情况
+		SpdDepotStocks newDepotStocks = dsRepository.findByDepotAndGoodsLots(logisticsTask.getToDepotId(), lotIds);
+		
+		//断言产品批次的当前仓库库存的数量情况
+		originDepotStocks.forEach(originDepotStock->{
+			SpdDepotStock newDepotStock = CollectionUtils.findWhere("goodsLotId", originDepotStock.getGoodsLotId(), newDepotStocks);
+			int sameLotStockQty = logisticsTask.getItems().getSameLotConfirmQtyByBaseUnit(originDepotStock.getGoodsLotId());
+		    assertEquals(newDepotStock.getMinStockQty().intValue(), sameLotStockQty+originDepotStock.getMinStockQty().intValue());
+		});
+	}
+	
+	@Test public void testCreateLogiticsTaskWithOneTurnoverBox(){
+		String bizId = "rep_biz_id_004";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		SpdReplenishBiz replenish = rbRepository.findOne(bizId);
+		rbService.fillAllRelations(replenish);
+		
+		SpdDepotTask offShelfTask = replenish.getOffShelfTasks().get(0); 
+		
+		//仓库作业明细按确认数量按计划执行
+		for(SpdDepotTaskItem item : offShelfTask.getItems()){
+			item.confirmAsPlaned();
+		}
+		dtiRepository.saveAll(offShelfTask.getItems());
+		offShelfTask.getItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		SpdOffShelfTaskItems offShelfTaskItems = new SpdOffShelfTaskItems(offShelfTask.getItems());
+		
+		//释放周转箱
+		wrapperService.removeDepotTaskWrapper(offShelfTask.getTaskId(), offShelfTask.getWrappers().get(0).getWrapperNo());
+		
+		ltServices.createDeliveryTask(bizId, replenish.getFromDepot(), replenish.getToDepot(), offShelfTaskItems, user);
+		wait(2);
+		
+		SpdLogisticsTask logisticsTask = ltRepository.findWithItemsByBizId(bizId).get(0);
+		ltServices.fillAllRelations(logisticsTask);
+		
+		//断言明细总数量
+		assertEquals(offShelfTask.getItems().size(), logisticsTask.getItems().size());
+		
+		//断言明细，根据批次进行遍历，比较同批次的仓库作业明细和物流作业明细
+		List<String> lotIds = CollectionUtils.pluck("lotId", offShelfTask.getItems());
+		lotIds.remove(Constant.none);
+		for(String lotId : lotIds){
+			SpdOffShelfTaskItems depotTaskItems = new SpdOffShelfTaskItems(CollectionUtils.find("lotId", lotId, offShelfTask.getItems()));
+			SpdLogisticsTaskItems logisticsTaskItems = new SpdLogisticsTaskItems(CollectionUtils.find("lotId", lotId, logisticsTask.getItems()));
+			//比较同批次的仓库作业明细和物流作业明细的数量
+			assertEquals(depotTaskItems.size(), logisticsTaskItems.size());
+			
+			//比较痛批次的仓库作业明细的确认数量和物流作业明细的计划数量的sum
+			assertEquals(depotTaskItems.getTotalConfirmQtyByStoreUnit(), logisticsTaskItems.getTotalPlanQtyByStoreUnit());
+		}
+		
+		assertEquals(1, logisticsTask.getWrappers().size());
+		SpdAbstractWrapper wrapper = logisticsTask.getWrappers().get(0);
+		assertEquals(SpdSceneType.logistic_task, wrapper.getSceneType());
+		assertEquals(logisticsTask.getTaskId(), wrapper.getOwnerId());
+		assertEquals(2, wrapper.getItems().size());
+	}
+	
+	@Test public void testReviewLogiticsTaskWithOneTurnoverBox(){
+		String bizId = "rep_biz_id_004";
+		SpdReplenishBiz replenish = rbRepository.findOne(bizId);
+
+		replenish.setBizRuleId("rep_rule_id_10");
+		rbRepository.save(replenish);
+		
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		rbService.fillAllRelations(replenish);
+		
+		SpdDepotTaskItems<SpdDepotTaskItem> offShelfTaskItems = replenish.getOffShelfTasks().getAllItems(); 
+		
+		//仓库作业明细按确认数量按计划执行
+		for(SpdDepotTaskItem item : offShelfTaskItems){
+			item.confirmAsPlaned();
+		}
+		dtiRepository.saveAll(offShelfTaskItems);
+		offShelfTaskItems.fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+				
+		List<String> lotIds = CollectionUtils.pluck("lotId", offShelfTaskItems);
+		lotIds.remove(Constant.none);
+		
+		//获取收货方的仓库库存情况
+		SpdDepotStocks originDepotStocks = dsRepository.findByDepotAndGoodsLots(replenish.getToDepotId(), lotIds);
+
+		dtService.batchReview(replenish.getOffShelfTasks(), user);
+		wait(5);
+		
+		SpdLogisticsTask logisticsTask = ltRepository.findWithItemsByBizId(bizId).get(0);
+		ltServices.fillAllRelations(logisticsTask);
+		
+		//对库存进行断言
+		SpdDepotStocks newDepotStocks = dsRepository.findByDepotAndGoodsLots(logisticsTask.getToDepotId(), lotIds);
+				
+		//断言产品批次的当前仓库库存的数量情况
+		originDepotStocks.forEach(originDepotStock->{
+			SpdDepotStock newDepotStock = CollectionUtils.findWhere("goodsLotId", originDepotStock.getGoodsLotId(), newDepotStocks);
+			int sameLotStockQty = logisticsTask.getItems().getSameLotConfirmQtyByBaseUnit(originDepotStock.getGoodsLotId());
+		    assertEquals(newDepotStock.getMinStockQty().intValue(), sameLotStockQty+originDepotStock.getMinStockQty().intValue());
+		});
+		
+		//对周转箱进行断言
+		SpdWrappers wrappers = tbRepository.findAll().findByOwnerIds(logisticsTask.getItems().getAllParentWrapperIds());
+		wrappers.forEach(wrapper->{
+			assertEquals(SpdSceneType.idle, wrapper.getSceneType());
+		});
+	}
+	
+}

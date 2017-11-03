@@ -1,0 +1,107 @@
+package cn.ak4j.yard.spd.task.repository;
+
+import java.util.Arrays;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.params.PcsDepotShelfParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItems;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskItemParams;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdOnShelfTaskItemRepository extends BaseRepository<SpdOnShelfTaskItem, SpdOnShelfTaskItems, SpdDepotTaskItemParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired YdsGoodsLotRepository glRepository;
+	@Autowired PcsDepotShelfRepository dsRepository;
+	
+	public SpdOnShelfTaskItems findByTaskId(String taskId){
+		SpdDepotTaskItemParams params = new SpdDepotTaskItemParams();
+		params.setTaskId(new ListParam<String>(taskId));
+		return find(params, new OrderParam(), -1, -1);
+	}
+
+	public SpdOnShelfTaskItems find(SpdDepotTaskItemParams params, OrderParam order, int pageNo, int pageSize) {
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			SpdOnShelfTaskItems onShelfTaskItems = new SpdOnShelfTaskItems(doQuery(params, order, pageNo, pageSize));
+			onShelfTaskItems.fillGoodsLots(glRepository);
+			return onShelfTaskItems;
+		}
+		
+		return new SpdOnShelfTaskItems();
+	}
+	
+	public int count(SpdDepotTaskItemParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+
+	private boolean setRelationParams(SpdDepotTaskItemParams params) {
+		if(params == null){
+			return true;
+		}
+		
+		YdsGoodsLotParams goodsLotParams = new YdsGoodsLotParams();
+		goodsLotParams.setLotNo(params.getLotNo());
+		goodsLotParams.setLotValidity(params.getLotValidity());
+		goodsLotParams.setGoodsLotId(params.getLotId());
+		goodsLotParams.setSterilizeLotNo(params.getSterilizeLotNo());
+		goodsLotParams.setSterilizeTime(params.getSterilizeTime());
+		goodsLotParams.setProduceDate(params.getProduceDate());
+		if(!goodsLotParams.isEmpty()){
+			YdsGoodsLots ydsGoodsLots = new YdsGoodsLots(glRepository.findAll().find(goodsLotParams));
+			if(ydsGoodsLots.size() == 0){
+				return false;
+			}
+			params.setLotId(new ListParam<String>(ydsGoodsLots.getIds()));
+		}
+		
+		PcsDepotShelfParams depotShelfParams = new PcsDepotShelfParams();
+		depotShelfParams.setShelfName(params.getShelfName());
+		if(!depotShelfParams.isEmpty()){
+			PcsDepotShelfs shelfs = new PcsDepotShelfs(dsRepository.findAll().find(depotShelfParams));
+			if(shelfs.size() == 0){
+				return false;
+			}
+			params.setShelfId(new ListParam<String>(shelfs.getIds()));
+		}
+		
+		return true;
+	}
+
+	public SpdOnShelfTaskItems getSpdTaskItems(String ids) {
+		String[] idArray = ids.split(",");
+		List<String> idList = Arrays.asList(idArray);
+		SpdDepotTaskItemParams params = new SpdDepotTaskItemParams();
+		params.setTaskItemId(new ListParam<String>(idList));
+		return find(params, new OrderParam(), -1, -1);
+	}
+
+	public SpdOnShelfTaskItems findByTask(SpdDepotTaskItemParams params, OrderParam order, int pageNo, int pageSize, String taskId) {
+		if(params == null){
+			params = new SpdDepotTaskItemParams();
+		}
+		params.setTaskId(new ListParam<String>(taskId));
+		return find(params, order, pageNo, pageSize);
+	}
+	
+}

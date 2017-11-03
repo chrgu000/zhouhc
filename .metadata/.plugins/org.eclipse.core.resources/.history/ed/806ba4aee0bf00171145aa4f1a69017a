@@ -1,0 +1,66 @@
+package cn.ak4j.yard.pcs.service;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+
+public class PcsDepotShelfServiceTest extends BaseTest{
+	
+	@Autowired PcsUserRepository userRepository;
+	@Autowired PcsDepotShelfRepository dsRepository;
+	@Autowired PcsDepotShelfService dsService;
+
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testAddDepotShelfCheckExistCode(){
+		thrown.expect(OperateForbiddenException.class);
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		dsService.add(createDepotShelf(user), user);
+		dsService.add(createDepotShelf(user), user);
+	}
+	
+	@Test
+	public void testForbiddenUpdateVirtualShelf(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		String shelfId = "shelf_id_034";
+		PcsDepotShelf depotShelf = dsRepository.findAll().findById(shelfId);
+		
+		thrown.expect(OperateForbiddenException.class);
+		dsService.modify(depotShelf, user);
+	}
+	
+	@Test
+	public void testForbiddenDeleteVirtualShelf(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		String shelfId = "shelf_id_034";
+		PcsDepotShelf depotShelf = dsRepository.findAll().findById(shelfId);
+		
+		thrown.expect(OperateForbiddenException.class);
+		dsService.delete(depotShelf.getDepotShelfId(), user);
+	}
+
+	private PcsDepotShelf createDepotShelf(PcsUser user) {
+		PcsDepotShelf depotShelf = new PcsDepotShelf();
+		depotShelf.setAreaId("area_id_015");
+		depotShelf.setShelfCode(PcsDepotShelf.virtual_shelf_code);
+		depotShelf.setShelfName(PcsDepotShelf.virtual_shelf_name);
+		depotShelf.setStoreType("常温");
+		depotShelf.setMixedGoods(true);
+		depotShelf.setEnabled(true);
+		depotShelf.setDepotId("depot_id_005");
+		depotShelf.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		return depotShelf;
+	}
+	
+}

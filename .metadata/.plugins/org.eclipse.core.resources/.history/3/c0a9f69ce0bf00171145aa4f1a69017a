@@ -1,0 +1,16 @@
+alter table spd_property_change_item drop column receive_id;
+alter table spd_property_change_item drop column receive_item_id;
+alter table spd_property_change_item drop column send_code;
+alter table spd_property_change_item drop column send_item_code;
+
+create table spd_prp_chg_item_relation
+(
+  id                       varchar2(32) not null,
+  prop_chg_item_id         varchar2(32) not null,
+  receive_id               varchar2(32) not null,
+  receive_item_id          varchar2(32) not null,
+  send_code                varchar2(32) not null,
+  send_item_code           varchar2(32) not null,
+  primary key (id)
+);
+comment on table spd_prp_chg_item_relation is '物权变更明细关联表';

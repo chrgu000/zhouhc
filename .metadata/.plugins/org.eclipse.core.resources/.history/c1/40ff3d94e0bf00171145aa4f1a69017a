@@ -1,0 +1,24 @@
+package cn.ak4j.yard.sys.datacheck.params;
+
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.IntegerParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SysLoggingEventParams extends QueryParams{
+
+	private FloatRangeParam timestmpNum;
+	private ListParam<String> loggerName;
+	private ListParam<String> levelString;
+	private IntegerParam referenceFlag;
+	private ListParam<String> callerFilename;
+	private ListParam<String> callerMethod;
+	private IntegerRangeParam callerLine;
+	private IntegerParam eventId;
+}

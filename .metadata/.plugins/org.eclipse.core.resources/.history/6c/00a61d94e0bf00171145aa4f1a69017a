@@ -1,0 +1,20 @@
+package cn.ak4j.yard.sys.to;
+
+import java.util.Date;
+
+import lombok.Data;
+
+@Data
+public class YdsEdsGoodsLotImportTO {
+
+	private String edsGoodsCode;
+	private String edsGoodsName;
+	private String edsLotNo;
+	private Date produceDate;
+	private Date edsLotValidity;
+	private String sterilizeLotNo;
+	private Date sterilizeTime;
+	private String ownerOrgCode;
+	private String ownerOrgName;
+	
+}

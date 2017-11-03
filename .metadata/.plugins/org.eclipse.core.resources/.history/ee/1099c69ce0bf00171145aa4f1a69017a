@@ -1,0 +1,17 @@
+<#if replenish??>
+<h4>发货仓库:${replenish.fromDepot.depotName}</h4>
+<h4>收货仓库:${replenish.toDepot.depotName}</h4>
+<h4>申领编码:${replenish.bizCode}</h4>
+</br>
+<h4>详细信息:</h4>
+<ul>
+<#list replenish.items as replenishItem>
+<li>
+<pre>
+产品:${"[${replenishItem.goods.goodsCode}]"}${replenishItem.goods.wareName}
+计划数量:${"[${replenishItem.planQty}${replenishItem.storePackageUnitLvName}]"}
+</pre>
+</li>
+</#list>
+</ul>
+</#if>

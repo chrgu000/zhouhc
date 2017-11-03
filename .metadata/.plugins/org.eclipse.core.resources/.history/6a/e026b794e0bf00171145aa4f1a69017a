@@ -1,0 +1,230 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.Valid;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRule;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 财务对账业务
+* 财务对账业务的生成分两个阶段：
+* 1）引入日清对账
+* 2）生成对账明细
+* 然后由人工进行期初期末处理
+* @author zhengyf
+* @date 2017年8月15日 下午2:05:50
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+@Entity
+@Table(name="spd_fin_rec_biz")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdFinacialReconciliationBiz extends SpdReconciliationBizPlan<SpdFinacialReconciliationRule>{
+
+	public static final String init_rec_id = "init";
+	public static final String end_rec_id = "end";
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_c_r_f;
+	
+	@Transient
+	private Date startDate;
+	
+	@Transient
+	private Date endDate;
+	
+	@Getter @Setter private String cleanDays;
+	@Getter @Setter private String supplierDeptId;
+	@Getter @Setter private String deptId;
+	
+	/**
+	 * 期末余额
+	 */
+	@Getter @Setter private Float endingBalance = 0f;
+	
+	/**
+	 * 当期初对账id也即该字段为init_rec_id表示当前是一个‘初始化期末’的财务对账业务
+	 */
+	@Getter @Setter @Column(name="begining_rec_id")
+	private String beginingReconciliationId;
+	
+	/**
+	 * 当nextReconciliationId字段为end_rec_id表示该财务对账业务直接终止，即使它还有期末余额
+	 */
+	@Getter @Setter @Column(name="next_rec_id")
+	private String nextReconciliationId;
+	
+	@Getter @Setter private Date reconciliationDate;
+	@Getter @Setter private String confirmUserId;
+	@Getter @Setter private String description;
+	
+	/**
+	 * 同步到供应商的时间
+	 */
+	@Getter @Setter private Date syncDate;
+	
+	/**
+	 * 财务对账基于一组日清对账，选中日清对账后根据日清对账进行汇总计算财务对账明细，该字段用于表示财务对账明细是否生成。
+	 */
+	@Getter @Setter private Boolean itemGenerated = false;
+	
+	@Getter @Setter @Transient @JsonIgnore
+	private PcsDept dept;
+	
+	@Getter @Setter @Transient @JsonIgnore
+	private PcsDept supplierDept;
+	
+	@Getter @Setter @Valid @Transient @JsonIgnore
+	private SpdFinacialReconciliationItems items;
+	
+	@Getter @Setter @Transient @JsonIgnore
+	private SpdDailyCleanBizs dailyCleans;
+	
+	public SpdFinacialReconciliationBiz(String bizRuleId, List<Date> targetDates) {
+		setBizRuleId(bizRuleId);
+		targetDates.sort((Date d1, Date d2)->{return (int)(d1.getTime()-d2.getTime());});
+		
+		StringBuffer buf = new StringBuffer();
+		for(int i = 0; i < targetDates.size(); i++){
+			buf.append(Global.sdfYMD.format(targetDates.get(i)));
+			buf.append(i!=targetDates.size()-1?Global.generalSeparator:"");
+		}
+		setCleanDays(buf.toString());
+	}
+
+	public SpdFinacialReconciliationBiz(String bizRuleId, String beginingReconciliationId, List<Date> targetDates) {
+		this(bizRuleId, targetDates);
+		this.beginingReconciliationId = beginingReconciliationId;
+	}
+	
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.finacial_reconciliation_biz;
+	}
+
+	@Override
+	public void applyRule(SpdFinacialReconciliationRule rule, PcsUser user) {
+		if(!rule.canApplyByUser(user)){
+			throw new OperateFailException(YardExceptionType.forbid_can_not_apply_biz, rule.getApplyDept().getDeptCode(), rule.getDisplayName());
+		}
+		setBizRule(rule);
+		setDeptId(rule.getApplyDeptId());
+		setSupplierDeptId(rule.getSupplierDeptId());
+	}
+
+	public void setBizRule(SpdFinacialReconciliationRule rule){
+		super.setBizRule(rule);
+		if(rule == null){
+			return ;
+		}
+		setDept(rule.getApplyDept());
+		setSupplierDept(rule.getSupplierDept());
+	}
+
+	@Transient
+	public List<Date> getCleanDates() {
+		List<Date> result = new ArrayList<Date>();
+		if(StringUtils.isNotEmpty(cleanDays)){
+			try{
+				List<String> dateStrList = Arrays.asList(getCleanDays().split(","));
+				for(String dateStr : dateStrList){
+					Date date = Global.sdfYMD.parse(dateStr);
+					result.add(date);
+				}
+			}catch(ParseException e){
+				throw new InvalidDataException(YardExceptionType.invalid_clean_days, getBizCode(), cleanDays);	
+			}
+		}
+		
+		return result;
+	}
+	
+	@Transient public boolean isInitReconciliation(){
+		return init_rec_id.equals(beginingReconciliationId);
+	}
+
+	public boolean isValid(){
+		boolean valid = super.isValid();
+		
+		if(!isInitReconciliation()){
+			valid = valid && StringUtils.isNotEmpty(cleanDays);
+		}
+		
+		return valid;
+	}
+	
+	public String getValidateMsg(){
+		StringBuffer buf = new StringBuffer();
+		
+		String msg = super.getValidateMsg();
+		if(StringUtils.isNotEmpty(msg)){
+			buf.append(msg).append(Global.generalSeparator);
+		}
+		
+		if(!isInitReconciliation() && StringUtils.isEmpty(cleanDays)){
+			buf.append("没有关联日清对账");
+		}
+		
+		return buf.toString();
+	}
+
+	public void updateEndingBalance() {
+		float endingBalance = 0f;
+		for(SpdFinacialReconciliationItem item : items){
+			endingBalance += item.getEndingBalance();
+		}
+		this.endingBalance = endingBalance;
+	}
+	
+	public Date getStartDate(){
+		if(StringUtils.isNotEmpty(cleanDays)){
+			String[] cleanDaysArr = cleanDays.split(",");
+			try{
+				return Global.sdfYMD.parse(cleanDaysArr[0]);
+			}catch(ParseException e){
+				throw new InvalidDataException(String.format("日清日期数据无效:[%s]", cleanDays));
+			}
+		}
+		return null;
+	}
+	
+	public Date getEndDate(){
+		if(StringUtils.isNotEmpty(cleanDays)){
+			String[] cleanDaysArr = cleanDays.split(",");
+			try{
+				int endInx = cleanDaysArr.length>1?(cleanDaysArr.length-1):0;
+				return Global.sdfYMD.parse(cleanDaysArr[endInx]);
+			}catch(ParseException e){
+				throw new InvalidDataException(String.format("日清日期数据无效:[%s]", cleanDays));
+			}
+		}
+		return null;
+	}
+}

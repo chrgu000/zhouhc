@@ -1,0 +1,6 @@
+update spd_biz_item set origin_item_id='ff8080815f206c12015f27ea8fe5071d', origin_id='ff8080815f206c12015f27ea8fde071c' 
+where biz_item_id='ff8080815f5c53ea015f5c55aeb60002';
+
+update spd_biz_item set return_qty=2 where biz_item_id='ff8080815f206c12015f27ea8fe5071d';
+
+update spd_receive_biz set sale_completed='1' where biz_id='ff8080815f206c12015f27ea8fde071c';

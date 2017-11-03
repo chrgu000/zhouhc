@@ -1,0 +1,220 @@
+package cn.ak4j.yard.pcs.web;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.params.PcsDepotShelfParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotAreaRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.pcs.service.PcsDepotShelfService;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.sys.domain.ReportConfig;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.web.PdfExportHelper;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@RestController
+public class PcsDepotShelfResource {
+
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	@Autowired private PcsDepotAreaRepository daRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PdfExportHelper pdfExportHelper;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDepotShelfService dsService;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs", method = RequestMethod.GET)
+	public PcsDepotShelfs findAll(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		PcsDepotShelfParams params = PcsDepotShelfParams.buildParamsFromJson(paramsStr, PcsDepotShelfParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		return new PcsDepotShelfs(dsRepository.findAll().findByPage(params, order, currentPage-1, pageSize));
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/count", method = RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		PcsDepotShelfParams params = PcsDepotShelfParams.buildParamsFromJson(paramsStr, PcsDepotShelfParams.class);
+		
+		return dsRepository.findAll().findByPage(params, null, -1, -1).size();
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/whichCanConfigDepotCard", method = RequestMethod.GET)
+	public PcsDepotShelfs findWhichCanConfigDepotCard(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		PcsDepotShelfParams params = PcsDepotShelfParams.buildParamsFromJson(paramsStr, PcsDepotShelfParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return dsService.findWhichCanConfigDepotCard(params, order, currentPage - 1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/whichCanConfigDepotCard/count", method = RequestMethod.GET)
+	public int findWhichCanConfigDepotCard(@RequestParam(value = "params", required = false) String paramsStr){
+		PcsDepotShelfParams params = PcsDepotShelfParams.buildParamsFromJson(paramsStr, PcsDepotShelfParams.class);
+		return dsService.findWhichCanConfigDepotCard(params, new OrderParam(), -1, -1).size();
+	}
+
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/areaId,{areaId}", method = RequestMethod.GET)
+	public PcsDepotShelfs findAreaId(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, @PathVariable("areaId") String areaId) {
+		PcsDepotShelfParams params = QueryParams.buildParamsFromJson(paramsStr, PcsDepotShelfParams.class);
+		if (params == null) {
+			params = new PcsDepotShelfParams();
+		}
+
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return new PcsDepotShelfs(dsRepository.findAll().findByAreaId(areaId).findByPage(params, order, currentPage-1, pageSize));
+	}
+	
+
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/areaId,{areaId}/count", method = RequestMethod.GET)
+	public long findAreaIdCount(@RequestParam(value = "params", required = false) String paramsStr,
+			@PathVariable("areaId") String areaId) {
+		PcsDepotShelfParams params = QueryParams.buildParamsFromJson(paramsStr, PcsDepotShelfParams.class);
+		if (params == null) {
+			params = new PcsDepotShelfParams();
+		}
+		params.setAreaId(new ListParam<String>(areaId));
+		return dsRepository.findAll().find(params).size();
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/ids,{ids}", method = RequestMethod.GET)
+	public PcsDepotShelfs listByIds(@PathVariable(value = "ids", required = false) String ids) {
+		PcsDepotShelfParams params = new PcsDepotShelfParams();
+		params.setDepotShelfId(new ListParam<String>(Arrays.asList(ids.split(","))));
+		return new PcsDepotShelfs(dsRepository.findAll().find(params));
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/{shelfId}", method = RequestMethod.GET)
+	public PcsDepotShelf findOne(@PathVariable(value = "shelfId", required = false) String shelfId) {
+		return dsRepository.findAll().findById(shelfId);
+	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/pdf", method = RequestMethod.GET)
+	public void getAllShelfPdf(HttpServletRequest request, HttpServletResponse response, 
+			@RequestParam(value = "params", required = false) String paramsStr)throws Exception{
+		PcsDepotShelfParams params = QueryParams.buildParamsFromJson(paramsStr, PcsDepotShelfParams.class);
+		
+		OrderParam order = new OrderParam("shelfCode", "desc");
+		
+		PcsDepotShelfs depotShelfs = (PcsDepotShelfs)dsRepository.findAll().findByPage(params, order, -1, -1);
+		depotShelfs.fillDepotArea(daRepository);
+		depotShelfs.fillDepotCard(goodsRepository, depotRepository, dcRepository);
+		
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.all_shelf_lables_report).getConfig();
+		
+		pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, transfer(depotShelfs), "inline", response);
+	}
+	
+	private List<PcsDepotShelfReport> transfer(PcsDepotShelfs depotShelfs) {
+		List<PcsDepotShelfReport> reports = new ArrayList<PcsDepotShelfReport>();
+	
+		for(PcsDepotShelf shelf : depotShelfs){
+			if(shelf.isMixedGoods()){
+				reports.add(new PcsDepotShelfReport(PcsDepotShelfReport.type_mixGoods_report, shelf));
+			}else{
+				reports.add(new PcsDepotShelfReport(PcsDepotShelfReport.type_singleGoods_report, shelf));
+			}
+		}
+		
+		return reports;
+	}
+
+	@ResponseBody
+	@RequestMapping(value = "/yard/pcs/pcsDepotShelfs/depotShelfId,{depotShelfId}/pdf", method = RequestMethod.GET)
+	public void getShelfPdf(@PathVariable("depotShelfId")String depotShelfId,HttpServletRequest request,HttpServletResponse response)throws Exception{
+		PcsDepotShelf depotShelf = dsRepository.findAll().findById(depotShelfId);
+		if(depotShelf.isMixedGoods()){
+			printMixedGoodsShelfPdf(depotShelf, response);
+		}else{
+			printSingleGoodsShelfPdf(depotShelf, response);
+		}
+	}
+
+	private void printMixedGoodsShelfPdf(PcsDepotShelf depotShelf, HttpServletResponse response) throws Exception {
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		parameters.put("shelfCode", depotShelf.getShelfCode());
+		parameters.put("shelfName", depotShelf.getShelfName());
+		ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.mixed_shelf_lable_report).getConfig();
+		
+		pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, null, "inline", response);
+	}
+
+	private void printSingleGoodsShelfPdf(PcsDepotShelf depotShelf, HttpServletResponse response) throws Exception {
+		PcsDepotArea depotArea = daRepository.findAllWithRelation().findById(depotShelf.getAreaId());
+		SpdDepotCardParams dcParams = new SpdDepotCardParams();
+		dcParams.setDepotId(new ListParam<String>(depotShelf.getDepotId()));
+		if(depotArea.getAreaType().equals(PcsAreaType.normal.getCode())){
+			dcParams.setShelfId(new ListParam<String>(depotShelf.getDepotShelfId()));
+		}else if(depotArea.getAreaType().equals(PcsAreaType.isolation.getCode())){
+			dcParams.setIsolationShelfId(new ListParam<String>(depotShelf.getDepotShelfId()));
+		}else{
+			dcParams.setUnqualifiedShelfId(new ListParam<String>(depotShelf.getDepotShelfId()));
+		}
+		SpdDepotCards depotCards = new SpdDepotCards(dcRepository.findAll().find(dcParams));
+		
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		parameters.put("shelfCode", depotShelf.getShelfCode());
+		parameters.put("shelfName", depotShelf.getShelfName());
+		parameters.put("sysCode", depotShelf.getSysCode().getMeterialCode());
+		if(depotCards.size() > 0){
+			depotCards.fillGoodss(goodsRepository, depotRepository, dcRepository);
+			SpdDepotCard depotCard = depotCards.get(0);
+			parameters.put("wareName", depotCard.getGoods().getWareName());
+			parameters.put("goodsName", depotCard.getGoods().getGoodsName());
+			parameters.put("packingSpec", depotCard.getGoods().getPackingSpec());
+			parameters.put("factName", depotCard.getGoods().getFactName());
+			parameters.put("wholeQty", depotCard.getGoods().getPrepareToStoreRatio());
+			parameters.put("blockQtyInStoreLvUnitName", depotCard.getGoods().getBlockQtyInStoreLvUnitName());
+			
+		}else{
+			parameters.put("wareName", "无产品");
+			parameters.put("goodsName", "无产品");
+			parameters.put("packingSpec", "无产品");
+			parameters.put("factName", "无产品");
+			parameters.put("wholeQty", 0);
+		}
+		
+		ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.simple_shelf_lable_report).getConfig();
+		
+		pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, null, "inline", response);
+	}
+
+}

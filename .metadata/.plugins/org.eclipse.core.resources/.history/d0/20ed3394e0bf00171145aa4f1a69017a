@@ -1,0 +1,88 @@
+package cn.ak4j.yard.sys.domain;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import cn.ak4j.yard.enums.CommonEnumJsonSerializer;
+import cn.ak4j.yard.enums.ITypeEnum;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 编码分类
+* @author zhengyf
+* @date 2017年3月17日 上午11:02:16
+* @version V1.0.0
+*/
+
+@JsonSerialize(using = CommonEnumJsonSerializer.class)
+public enum CodeSort implements ITypeEnum{
+
+	xiajiadan("100", "下架单号"),
+	xiajiamingxi("101", "下架明细单号"),
+	shangjiadan("102", "上架单号"),
+	shangjiamingxi("103", "上架明细单号"),
+	shouhuodan("104", "收货单号"),
+	shangjiadiaodudan("105", "上架调度单号"),
+	xiajiadiaodudan("106", "下架调度单号"),
+	shenlingdanhao("107", "申领单号"),
+	shouhuodanmingxi("108", "收货明细单号"),
+	kucuntiaojiedan("109", "库存调节单号"),
+	yicangdan("110", "移仓单号"),
+	pandiandan("111","盘点单号"),
+	beihuodan("112","备货单号"),
+	xiaohaodan("113", "消耗单号"),
+	tuihuodan("114", "退货单号"),
+	
+	riqingdan("151", "日清对账单号"),
+	caiwudan("152", "财务对账单号"),
+	
+	cangku("200","仓库编号"),
+	huoqu("201","货区编号"),
+	huowei("202","货位编号"),
+	
+	shouhuoguize("203", "收货规则编码"),
+	tuihuoguize("204", "退货规则编码"),
+	tiaojieguize("205", "调节规则编码"),
+	yicangguize("206", "移仓规则编码"),
+	wuquanbiangengguize("207", "物权变更规则编码"),
+	riqingduizhangguize("208", "日清对账规则编码"),
+	caiwuduizhangguize("209", "财务对账规则编码"),
+	shenlingguize("210", "申领规则编码"),
+	xiaohaoguize("211", "消耗规则编码"),
+	tongzhiguize("212", "通知规则编码"),
+	
+	zhangye("300","帐页编码"),
+	
+	zhouzhuanxiang("600", "周转箱号");
+	
+	private String code;
+	private String name;
+	@Getter @Setter private String description;
+	
+	public static CodeSort sortOf(String code){
+		for(CodeSort codeSort : values()){
+			if(codeSort.getCode().equals(code)){
+				return codeSort;
+			}
+		}
+		return null;
+	}
+	
+	private CodeSort(String code, String name){
+		this.code = code;
+		this.name = name;
+	}
+
+	public String getCode() {
+		return code;
+	}
+
+	public String getName() {
+		return name;
+	}
+	
+	public String toString() {
+		return this.getCode();
+	}
+	
+}

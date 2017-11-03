@@ -1,0 +1,1 @@
+update yds_goods set unit_big_sum = 1 where unit_big_sum = 99999999;

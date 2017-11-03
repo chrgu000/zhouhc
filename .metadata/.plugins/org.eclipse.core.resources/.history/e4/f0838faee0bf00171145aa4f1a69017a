@@ -1,0 +1,161 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizrule.to.SpdPrepareInformRuleTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdPrepareInformRuleResourceTest extends BaseTest{
+	
+	@Autowired private YardCodeService codeService;
+	
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPrepareInformRules?accessToken={accessToken}";
+		List<SpdPrepareInformRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdPrepareInformRuleTO>>() {}, url, accessToken);
+		assertEquals(16, rules.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPrepareInformRules/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(16, count);
+		
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPrepareInformRules/ids,{ids}?accessToken={accessToken}";
+		List<String> ids = new ArrayList<String>();
+		ids.add("prp_inf_rule_id_001");
+		List<SpdPrepareInformRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdPrepareInformRuleTO>>() {}, url, StringUtils.join(ids, ","), accessToken);
+		assertEquals(1, rules.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("id", id, rules));
+		}
+	}
+	
+	@Test public void testAdd() throws Exception{
+		SpdPrepareInformRuleTO ruleTO = createPrepareInformRule();
+		String originRuleId = "rep_rule_id_09";
+		String collectDepotId = "depot_id_006";
+		ruleTO.setExcessDelivery(false);
+		ruleTO.setMultiDelivery(false);
+		ruleTO.setOriginRuleId(originRuleId);
+		ruleTO.setCollectDepotId(collectDepotId);
+		ruleTO.setCollectAreaType(PcsAreaType.isolation.getCode());
+		
+		SpdPrepareInformRuleTO newRuleTO = mockMvcHelper.add(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", ruleTO);
+		assertNotNull(newRuleTO.getCustomName());
+		assertTrue(newRuleTO.getId() != null);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.tongzhiguize);
+		assertEquals(CodeSort.tongzhiguize.getCode()+getCurrentDateCode()+sequenceCode, newRuleTO.getRuleCode());
+		assertEquals(ruleTO.getName(), newRuleTO.getName());
+		assertEquals(ruleTO.getCustomName(), newRuleTO.getCustomName());
+		assertEquals(ruleTO.getPrior(), newRuleTO.getPrior());
+		assertEquals(ruleTO.getFromDeptId(), newRuleTO.getFromDeptId());
+		assertEquals(ruleTO.getFromOrgId(), newRuleTO.getFromOrgId());
+		assertEquals(ruleTO.getEnabled(), newRuleTO.getEnabled());
+		assertEquals(ruleTO.getFeedbackRuleId(), newRuleTO.getFeedbackRuleId());
+		assertEquals(originRuleId, newRuleTO.getOriginRuleId());
+		assertEquals(collectDepotId, newRuleTO.getCollectDepotId());
+		assertEquals(PcsAreaType.isolation.getCode(), newRuleTO.getCollectAreaType());
+		assertEquals(newRuleTO.getToDepot().getGoodsType(), newRuleTO.getCollectDepot().getGoodsType());
+		mockMvcHelper.add(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", ruleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		ruleTO.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.add(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", ruleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+		
+		ruleTO.setFeedbackRuleId(newRuleTO.getFeedbackRuleId());
+		ruleTO.setCollectDepotId("depot_id_007");
+		mockMvcHelper.add(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", ruleTO, status().is4xxClientError(), YardExceptionType.invalid_depot_goods_type_different);
+	}
+
+	@Test public void testModify() throws Exception{
+		String id = "prp_inf_rule_id_005";
+		String name = "测试修改";
+		
+		//获取并修改备货通知规则
+		SpdPrepareInformRuleTO ruleTO = mockMvcHelper.findOne(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", id);
+		ruleTO.setName(name);;
+		ruleTO.setCustomName("自定义备货通知");
+		
+		//提交修改检查修改成功
+		SpdPrepareInformRuleTO newRuleTO = mockMvcHelper.modify(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", id, ruleTO, status().isOk(), null);
+		assertTrue(newRuleTO.getName().equals(name));
+		assertNotNull(newRuleTO.getCustomName());
+		assertEquals("自定义备货通知", newRuleTO.getCustomName());
+		newRuleTO = mockMvcHelper.modify(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", id, newRuleTO, status().isOk(), null);
+
+		SpdPrepareInformRuleTO prePareInformRuleTO = createPrepareInformRule();
+		
+		SpdPrepareInformRuleTO thePrepareInformRuleTO = mockMvcHelper.add( SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", prePareInformRuleTO);
+		thePrepareInformRuleTO.setName("手动备货通知");
+		thePrepareInformRuleTO.setFeedbackRuleId("prp_fb_id_011");
+		thePrepareInformRuleTO.setSupplierBizName("testSupplier");
+		thePrepareInformRuleTO.setFromDeptId("dept_id_005");
+		thePrepareInformRuleTO.setFromOrgId("org_id_001");
+		thePrepareInformRuleTO.setToDepotId("depot_id_001");
+		thePrepareInformRuleTO.setToAreaType(PcsAreaType.normal.getCode());
+		mockMvcHelper.modify(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", thePrepareInformRuleTO.getId(), thePrepareInformRuleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		thePrepareInformRuleTO.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.modify(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", thePrepareInformRuleTO.getId(), thePrepareInformRuleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+		
+		thePrepareInformRuleTO.setFeedbackRuleId("prp_fb_id_011");
+		thePrepareInformRuleTO.setCollectDepotId("depot_id_007");
+		mockMvcHelper.modify(SpdPrepareInformRuleTO.class, testUserCode, "spd", "spdPrepareInformRules", thePrepareInformRuleTO.getId(), thePrepareInformRuleTO, status().is4xxClientError(), YardExceptionType.invalid_depot_goods_type_different);
+	}
+	
+	@Test public void whichICanInform() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdPrepareInformRules/whichICanApply?accessToken={accessToken}";
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		List<SpdPrepareInformRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdPrepareInformRuleTO>>() {}, url, accessToken);
+		assertEquals(6, rules.size());
+		
+		rules.forEach(rule->{
+			assertEquals(rule.getToDepot().getManageDeptId(), user.getDeptId());
+		});
+	}
+	
+	private SpdPrepareInformRuleTO createPrepareInformRule() {
+		SpdPrepareInformRuleTO ruleTo = new SpdPrepareInformRuleTO();
+		ruleTo.setName("自动备货通知");
+		ruleTo.setCustomName("自定义自动备货通知");
+		ruleTo.setPrior(45);
+		ruleTo.setFeedbackRuleId("prp_fb_id_011");
+		ruleTo.setEnabled(true);
+		ruleTo.setManualInformSupplier(true);
+		ruleTo.setFromOrgId("org_id_003");
+		ruleTo.setFromDeptId("dept_id_008");
+		ruleTo.setToDepotId("depot_id_001");
+		ruleTo.setConfirmDeptId("dept_id_001");
+		ruleTo.setToAreaType(PcsAreaType.normal.getCode());
+		ruleTo.setSupplierBizName("test");
+		ruleTo.setExcessDelivery(false);
+		ruleTo.setMultiDelivery(false);
+		ruleTo.setCanBeOriginRule(false);
+		return ruleTo;
+	}
+
+}

@@ -1,0 +1,2 @@
+alter table spd_receive_biz add(recorded char(1 byte));
+alter table spd_biz_item rename column deal_count to deal_qty;

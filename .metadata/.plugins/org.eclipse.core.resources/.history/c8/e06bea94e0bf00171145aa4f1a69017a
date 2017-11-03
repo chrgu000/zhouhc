@@ -1,0 +1,43 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.io.Serializable;
+
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
+
+import cn.ak4j.yard.domain.IDescribable;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * @Description:申领业务的作业规则
+ * @author wuyw
+ * @date 2017年7月21日下午5:53:39
+ *
+ */
+@SuppressWarnings("serial")
+@Embeddable
+public class SpdReplenishTaskRule implements Serializable, IDescribable, IChildRule{
+
+	@Getter @Setter private Boolean useTurnoverBox;
+	@Column(name="AUTO_SET_OSTASK_CFM_QTY")
+	@Getter @Setter private Boolean autoSetOffShelfTaskConfirmQty;
+	@Getter @Setter private Boolean autoSetBizConfirmQty;
+
+	@Override
+	public String getDescription() {
+		return null;
+	}
+
+	public boolean equals(SpdReplenishTaskRule rule){
+		if(rule.getUseTurnoverBox().equals(getUseTurnoverBox())
+				&& rule.getAutoSetOffShelfTaskConfirmQty().equals(getAutoSetOffShelfTaskConfirmQty())
+				&& rule.getAutoSetBizConfirmQty().equals(getAutoSetBizConfirmQty())){
+			return true;
+		}
+		return false;
+	}
+	
+}

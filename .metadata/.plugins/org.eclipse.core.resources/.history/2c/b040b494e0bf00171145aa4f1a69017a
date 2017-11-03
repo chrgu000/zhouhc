@@ -1,0 +1,115 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.io.Serializable;
+
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.spd.reconciliation.factory.SpdGeneralLedgerFactory;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 供应商业务总账
+* @author zhengyf
+* @date 2017年8月18日 上午11:43:17
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Data
+@NoArgsConstructor
+@EqualsAndHashCode(callSuper=false)
+public class SpdGeneralLedger implements Serializable{
+
+	private PcsDept supplierDept;
+	private SpdGeneralLedgerItems items;
+	
+	public SpdGeneralLedger(PcsDept dept, SpdGeneralLedgerItems items) {
+		this.supplierDept = dept;
+		this.items = items;
+	}
+	
+	/**
+	 * 根据收货明细借入
+	 */
+	@SuppressWarnings("unchecked")
+	public SpdGeneralLedgerItems debit(SpdBizItems receiveItems, SpdGeneralLedgerFactory factory) {
+		SpdGeneralLedgerItems generalLedgerItems = items.findByLotIds(receiveItems.pluck("lotId"));
+		
+		for(SpdBizItem receiveItem : receiveItems){
+			if(receiveItem.getConfirmQty() == 0){
+				continue;
+			}
+			SpdGeneralLedgerItem generalLedgerItem = CollectionUtils.findWhere("lotId", receiveItem.getLotId(), generalLedgerItems);
+			
+			//新增业务总账明细
+			if(generalLedgerItem == null){
+				//log.debug("supplier dept: {}", getSupplierDept());
+				generalLedgerItem = factory.build(getSupplierDept(), receiveItem);
+				generalLedgerItems.add(generalLedgerItem);
+			}
+			
+			//更新业务总账明细
+			else{
+				generalLedgerItem.debit(receiveItem.getConfirmQty(YdsUnitLv.base.getLv()), receiveItem.getPrice(YdsUnitLv.base.getLv()));
+			}
+		}
+		
+		return generalLedgerItems;
+	}
+
+
+	/**
+	 * 根据产品数量进行借入，该方法仅用于院方退货造成的总账借入
+	 */
+	public SpdGeneralLedgerItems debit(SpdGoodsQtys goodsQtys, SpdGeneralLedgerFactory factory) {
+		SpdGeneralLedgerItems generalLedgerItems = items.findByLotIds(goodsQtys.getLotIds());
+		
+		for(SpdGoodsQty goodsQty : goodsQtys){
+			if(goodsQty.getQty() == 0){
+				continue;
+			}
+			SpdGeneralLedgerItem generalLedgerItem = CollectionUtils.findWhere("lotId", goodsQty.getSpecialGoodsLot().getGoodsLotId(), generalLedgerItems);
+			
+			//新增业务总账明细
+			if(generalLedgerItem == null){
+				throw new NotFoundException(YardExceptionType.not_found_general_ledger_item, goodsQty.getGoods().getGoodsId(), 
+																							goodsQty.getGoods().getGoodsCode(), 
+																							goodsQty.getSpecialGoodsLot().getGoodsLotId(), 
+																							goodsQty.getSpecialGoodsLot().getLotNo());
+			}
+			
+			//更新业务总账明细
+			else{
+				generalLedgerItem.returnDebit(goodsQty.getQty(YdsUnitLv.base.getLv()), generalLedgerItem.getUnitPrice());
+			}
+		}
+		
+		return generalLedgerItems;
+	}
+
+	public SpdGeneralLedgerItems credit(SpdGoodsQtys goodsQtys) {
+		SpdGeneralLedgerItems result = new SpdGeneralLedgerItems();
+		for(SpdGeneralLedgerItem item : this.getItems()){
+			for(SpdGoodsQty goodsQty : goodsQtys){
+				if(!goodsQty.getGoods().getGoodsId().equals(item.getGoodsId())
+					|| !goodsQty.getSpecialGoodsLot().getGoodsLotId().equals(item.getLotId())){
+					continue;
+				}
+				
+				item.credit(goodsQty);
+				result.add(item);
+			}
+		}
+		
+		return result;
+	}
+	
+}

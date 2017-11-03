@@ -1,0 +1,1 @@
+update spd_receive_biz set sale_completed=0 where biz_id='ff8080815f33e225015f38a73fae090d';

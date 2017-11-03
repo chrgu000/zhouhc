@@ -1,0 +1,23 @@
+package cn.ak4j.yard.pcs.params;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class PcsRoleOpParams extends QueryParams{
+
+	private ListParam<String> id;
+	private ListParam<String> roleId;
+	private ListParam<String>opId;
+	private ListParam<String> functionId;
+	private ListParam<String> functionName;//功能名
+	private ListParam<String> menuName;//菜单名
+	private ListParam<String> opName;//操作名
+	private ListParam<String> menuParentName;//父菜单名
+	private ListParam<String> systemName;
+	
+}

@@ -1,0 +1,59 @@
+package cn.ak4j.yard.enums;
+
+import java.io.IOException;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+@JsonSerialize(using = YdsUnitLvSerializer.class)
+public enum YdsUnitLv {
+	big(4, "大包装"),
+	mid(3, "中包装"),
+	min(2, "小包装"),
+	base(1, "最小包装");
+
+	private int lv;
+
+	private String name;
+
+	private YdsUnitLv(int lv, String name) {
+		this.lv = lv;
+		this.name = name;
+	}
+
+	public int getLv() {
+		return lv;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public static YdsUnitLv unitOf(int lv) {
+		for (YdsUnitLv unitCode : YdsUnitLv.values()) {
+			if (unitCode.getLv() == lv) {
+				return unitCode;
+			}
+		}
+		return null;
+	}
+}
+
+class YdsUnitLvSerializer extends JsonSerializer<YdsUnitLv> {
+
+	public void serialize(YdsUnitLv ydsGoodsPackLvlUnit, JsonGenerator generator, SerializerProvider provider)
+			throws IOException, JsonProcessingException {
+
+		generator.writeStartObject();
+
+		if (ydsGoodsPackLvlUnit != null) {
+			generator.writeNumberField(ydsGoodsPackLvlUnit.getName(), ydsGoodsPackLvlUnit.getLv());
+		}
+
+		generator.writeEndObject();
+	}
+
+}

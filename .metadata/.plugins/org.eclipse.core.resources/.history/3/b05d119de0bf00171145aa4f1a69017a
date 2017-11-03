@@ -1,0 +1,67 @@
+-- CREEATE TABLE SPD_INVENTORY
+create table SPD_INVENTORY
+(
+  inventory_id    VARCHAR2(100) not null,
+  inventory_code  VARCHAR2(100),
+  inventory_type  VARCHAR2(50),
+  inventory_state VARCHAR2(100),
+  inventory_date  DATE,
+  inventory_user  VARCHAR2(100),
+  is_fixed        CHAR(1),
+  org_id          VARCHAR2(100),
+  dept_id         VARCHAR2(100),
+  depot_id        VARCHAR2(100),
+  area_id         VARCHAR2(100) not null,
+  yard_id         INTEGER,
+  check_state     INTEGER,
+  create_user     VARCHAR2(100),
+  create_date     DATE,
+  create_yard     INTEGER,
+  create_org      VARCHAR2(100),
+  last_user       VARCHAR2(100),
+  last_date       DATE,
+  last_yard       VARCHAR2(100),
+  last_org        VARCHAR2(100),
+  sync_date       DATE,
+  clean_date      DATE,
+  describe        VARCHAR2(500)
+);
+comment on column SPD_INVENTORY.inventory_type
+  is '1：静盘 2：静盘(盲)';
+comment on column SPD_INVENTORY.is_fixed
+  is '0:散件 1:定数';
+alter table SPD_INVENTORY
+  add constraint PK_SPD_INVENTORY primary key (INVENTORY_ID);
+  
+ 
+
+-- CREATE TABLE SPD_INVENTORY_ITEM
+create table SPD_INVENTORY_ITEM
+(
+  inventory_item_id  VARCHAR2(100) not null,
+  inventory_id       VARCHAR2(100),
+  card_id            VARCHAR2(100),
+  goods_id           VARCHAR2(100),
+  stock_goods_lot_id VARCHAR2(100),
+  plan_qty           NUMBER(10),
+  show_qty           NUMBER(10),
+  check_qty          NUMBER(10),
+  off_grade_qty      NUMBER(10),
+  depot_id           VARCHAR2(100),
+  shelf_id           VARCHAR2(100),
+  yard_id            INTEGER,
+  check_state        INTEGER,
+  create_user        VARCHAR2(100),
+  create_date        DATE,
+  create_yard        INTEGER,
+  create_org         VARCHAR2(100),
+  last_user          VARCHAR2(100),
+  last_date          DATE,
+  last_yard          VARCHAR2(100),
+  last_org           VARCHAR2(100),
+  sync_date          DATE,
+  clean_date         DATE,
+  describe           VARCHAR2(500)
+);
+alter table SPD_INVENTORY_ITEM
+  add constraint PK_SPD_INVENTORY_ITEM primary key (INVENTORY_ITEM_ID);

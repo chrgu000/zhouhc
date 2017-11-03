@@ -1,0 +1,2 @@
+delete from yds_goods_info where goods_id not in(select goods_id from yds_goods);
+delete from spd_depot_goods_config where goods_id not in(select goods_id from yds_goods);

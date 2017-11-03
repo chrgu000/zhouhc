@@ -1,0 +1,148 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdFinacialReconciliationFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 财务对账规则
+* @author zhengyf
+* @date 2017年8月15日 下午1:42:54
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_fin_rec_rule")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdFinacialReconciliationRule extends SpdAbstractBizRule<SpdFinacialReconciliationFeedbackRule>{
+
+	/**
+	 * 发起部门
+	 */
+	@Getter @Setter @NotNull(message="发起部门不能为空")
+	private String applyDeptId;
+	
+	@Getter @Setter @NotNull(message="供应商部门不能为空")
+	private String supplierDeptId;
+	
+	/**
+	 * 对账的针对仓库
+	 */
+	@Getter @Setter @NotNull(message="对账仓库不能为空")
+	private String targetDepotIds;
+	
+	@Getter @Setter
+	private String intigrationComponent; //集成组件
+
+	@Transient @Getter @Setter  
+	private PcsDepots targetDepots;
+	
+	@Transient @Getter @Setter 
+	private PcsDept applyDept;
+	
+	@Transient @Getter @Setter 
+	private PcsDept supplierDept;
+	
+	@SuppressWarnings("rawtypes") @Override
+	public void update(SpdAbstractBizRule theRule) {
+		this.setTargetDepotIds(((SpdFinacialReconciliationRule)theRule).getTargetDepotIds());
+		setName(theRule.getName());
+		setPrior(theRule.getPrior());
+		setCustomName(theRule.getCustomName());
+		setEnabled(theRule.getEnabled());
+		setCanBeOriginRule(theRule.getCanBeOriginRule());
+		setFeedbackRuleId(theRule.getFeedbackRuleId());
+		setManualApply(theRule.getManualApply());
+	}
+	
+	@Override
+	public String getDescription() {
+		return null;
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.finacial_reconciliation_biz;
+	}
+
+	/**
+	 * Collections.disjoint为true意味着两个集合中包含相同元素，在这里表示同一个仓库不能参与两个财务结算规则
+	 */
+	@SuppressWarnings("rawtypes") @Override
+	public boolean equalsRule(SpdAbstractBizRule theRule) {
+		if(theRule.getBizType() != getBizType()){
+			return false;
+		}
+		SpdFinacialReconciliationRule rule = (SpdFinacialReconciliationRule)theRule;
+		List<String> targetDepotIdList = Arrays.asList(targetDepotIds.split(","));
+		List<String> theTargetDepotIdList = Arrays.asList(rule.getTargetDepotIds().split(","));
+		if(!Collections.disjoint(targetDepotIdList, theTargetDepotIdList) && rule.getSupplierDeptId().equals(getSupplierDeptId())){
+			return true;
+		}
+		
+		return false;
+	}
+
+	@Override
+	public String getDisplayName() {
+		return null;
+	}
+
+	@Override
+	public boolean canApplyByUser(PcsUser user) {
+		return getApplyDeptId().equals(user.getDeptId());
+	}
+
+	@SuppressWarnings("unchecked") @Override
+	public void checkRule(SpdBizRules<?> allRules, SpdPropertyChangeRules propertyChangeRules) {
+		List<String> targetDepotIds = Arrays.asList(getTargetDepotIds().split(","));
+		List<PcsDept> supplierDepts = propertyChangeRules.findByDebitDepotIds(targetDepotIds).pluck("creditDept");
+		if(supplierDepts.size() > 1){
+			List<String> deptNames = CollectionUtils.pluck("deptName", supplierDepts);
+			throw new InvalidDataException(YardExceptionType.invalid_target_depots, StringUtils.join(deptNames, ","));
+		}
+	}
+	
+	public boolean hasIntigrationComponent(){
+		return StringUtils.isNotEmpty(getIntigrationComponent());
+	}
+	
+	public boolean equals(Object obj){
+		if(obj == null || !(obj instanceof SpdFinacialReconciliationRule)){
+			return false;
+		}
+		SpdFinacialReconciliationRule theRule = (SpdFinacialReconciliationRule)obj;
+		
+		return equalsRule(theRule) 
+				&& getName().equals(theRule.getName())
+				&& getApplyDeptId().equals(theRule.getApplyDeptId())
+				&& getSupplierDeptId().equals(theRule.getSupplierDeptId())
+				&& getFeedbackRuleId().equals(theRule.getFeedbackRuleId())
+				&& getEnabled().equals(theRule.getEnabled()
+				&& getManualApply().equals(theRule.getManualApply()));
+	}
+
+
+}

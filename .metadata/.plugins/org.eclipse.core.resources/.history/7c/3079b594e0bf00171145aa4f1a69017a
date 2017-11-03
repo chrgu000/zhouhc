@@ -1,0 +1,42 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdDailyCleanBizs extends Entities<SpdDailyCleanBiz>{
+	
+	public SpdDailyCleanBizs (List<SpdDailyCleanBiz> entities){
+		super(entities);
+	}
+
+	public void fillRecords(SpdPropertyChangeRecords changeRecords) {
+		this.forEach(dailyClean->{
+			SpdPropertyChangeRecords theChangeRecords = new SpdPropertyChangeRecords(CollectionUtils.find("dailyCleanId", dailyClean.getBizId(), changeRecords));
+			dailyClean.setPropertyChangeRecords(theChangeRecords);
+		});
+	}
+
+	public SpdPropertyChangeRecordItems getAllPropertyChangeItems() {
+		SpdPropertyChangeRecordItems result = new SpdPropertyChangeRecordItems();
+		this.forEach(dailyClean->{
+			SpdPropertyChangeRecordItems items = dailyClean.getPropertyChangeRecords().getAllItems();
+			result.addAll(items);
+		});
+		return result;
+	}
+	
+	public SpdPropertyChangeRecords getAllPropertyChanges() {
+		SpdPropertyChangeRecords result = new SpdPropertyChangeRecords();
+		this.forEach(dailyClean->{
+			SpdPropertyChangeRecords records = dailyClean.getPropertyChangeRecords();
+			result.addAll(records);
+		});
+		return result;
+	}
+
+}

@@ -1,0 +1,166 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishOperation;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdReplenishRules extends SpdBizRules<SpdReplenishRule>{
+	
+	public SpdReplenishRules(List<SpdReplenishRule> rules){
+		super(rules);
+	}
+	
+	public List<SpdReplenishOperation> getReplenishOperationByUser(PcsUser user) {
+		List<SpdReplenishOperation> operations = new ArrayList<SpdReplenishOperation>();
+		this.forEach(rule->{
+			SpdReplenishOperation operation = new SpdReplenishOperation(rule.getId(), rule.canApplyByUser(user), rule.canConfirmByUser(user));
+			operations.add(operation);
+		});
+		return operations;
+	}
+	
+	public SpdReplenishRules getWhichCanApplyByUser(PcsUser user){
+		SpdReplenishRules result = new SpdReplenishRules();
+		this.forEach(rule->{
+			if(rule.canApplyByUser(user)){
+				result.add(rule);
+			}
+		});
+		return result;
+	}
+
+	public SpdReplenishRules getWhichCanConfirmByUser(PcsUser user) {
+		SpdReplenishRules result = new SpdReplenishRules();
+		this.forEach(rule->{
+			if(rule.canConfirmByUser(user)){
+				result.add(rule);
+			}
+		});
+		return result;
+	}
+
+	@SuppressWarnings("rawtypes")
+	public void fillAllRelations(PcsDepots allDepots, SpdAbstractBizRules rules) {
+		for(SpdReplenishRule replenishRule : this){
+			PcsDepot fromDepot = allDepots.findById(replenishRule.getDirectionRule().getFromDepotId());
+			PcsDepot toDepot = allDepots.findById(replenishRule.getDirectionRule().getToDepotId());
+			replenishRule.getDirectionRule().setFromDepot(fromDepot);
+			replenishRule.getDirectionRule().setToDepot(toDepot);
+			
+			if(StringUtils.isNotEmpty(replenishRule.getOriginRuleId())){
+				SpdAbstractBizRule originRule = rules.findById(replenishRule.getId());
+				replenishRule.setOriginRule(originRule);
+			}
+		}
+	}
+
+	public SpdReplenishRules getAllApplyRules() {
+		SpdReplenishRules result = new SpdReplenishRules();
+		this.forEach(rule->{
+			if(rule.isApply()){
+				result.add(rule);
+			}
+		});
+		return result;
+	}
+	
+	public SpdReplenishRules getAllToDepotAllocateRules(){
+		SpdReplenishRules result = new SpdReplenishRules();
+		this.forEach(rule->{
+			if(rule.isToDepotAllocate()){
+				result.add(rule);
+			}
+		});
+		return result;
+	}
+
+	public SpdReplenishRules getAllFromDepotAllocateRules(){
+		SpdReplenishRules result = new SpdReplenishRules();
+		this.forEach(rule->{
+			if(rule.isFromDepotAllocate()){
+				result.add(rule);
+			}
+		});
+		return result;
+	}
+
+	/**
+	 * 这是一个很糟糕的方法，因为其逻辑太个性化，缺乏广泛性:
+	 * 根据指定的申领业务规则查找流向规则、契约规则、产品规则相同并且反馈规则全自动的申领规则
+	 */
+	public SpdReplenishRule findSameRuleButTotalAutoFeedbackRule(SpdReplenishRule replenishRule) {
+		for(SpdReplenishRule theReplenishRule : this){
+			if(replenishRule.getDirectionRule().equals(theReplenishRule.getDirectionRule())
+				&& replenishRule.getContractRule().equals(theReplenishRule.getContractRule())
+				&& replenishRule.getGoodsRule().equals(theReplenishRule.getGoodsRule())
+				&& theReplenishRule.getFeedbackRule().isTotalAuto()){
+				return theReplenishRule;
+			}
+		}
+		return null;
+	}
+
+	public PcsDepots getAllDepots(){
+		PcsDepots depots = new PcsDepots();
+		this.forEach(replenishRule->{
+			if(!depots.contains(replenishRule.getDirectionRule().getFromDepot())){
+				depots.add(replenishRule.getDirectionRule().getFromDepot());
+			}
+			if(!depots.contains(replenishRule.getDirectionRule().getToDepot())){
+				depots.add(replenishRule.getDirectionRule().getToDepot());
+			}
+		});
+		return depots;
+	}
+	
+	public PcsDepots getFromDepots(){
+		PcsDepots depots = new PcsDepots();
+		this.forEach(replenishRule->{
+			if(!depots.contains(replenishRule.getDirectionRule().getFromDepot())){
+				depots.add(replenishRule.getDirectionRule().getFromDepot());
+			}
+		});
+		return depots;
+	}
+
+	public SpdReplenishRule findByOriginRuleId(String bizRuleId) {
+		return CollectionUtils.findWhere("originRuleId", bizRuleId, this);
+	}
+	
+	public SpdReplenishRules findByDepotId(String depotId){
+		SpdReplenishRules result = new SpdReplenishRules();
+		this.forEach(rule->{
+			boolean isDepotCorrelation = rule.getDirectionRule().getFromDepotId().equals(depotId) || rule.getDirectionRule().getToDepotId().equals(depotId);
+			if(isDepotCorrelation){
+				result.add(rule);
+			}
+		});
+		
+		return result;
+	}
+
+	/**
+	 * 查找当前请领规则相关的申领退货规则
+	 */
+	public SpdReplenishRules findRelateReturnRule(SpdReplenishRule rule) {
+		SpdReplenishRules result = new SpdReplenishRules();
+		this.forEach(theRule->{
+			boolean isReturnApply = theRule.isReturnApply(rule);
+			if(isReturnApply){
+				result.add(theRule);
+			}
+		});
+		
+		return result;
+	}
+}

@@ -1,0 +1,106 @@
+package cn.ak4j.yard.spd.bizrule.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizPlans;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.service.SpdBizPlanService;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRules;
+import cn.ak4j.yard.spd.bizrule.domain.SpdBizRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.bizrule.repository.SpdFeedbackRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+@SuppressWarnings("rawtypes")
+@Service
+public class SpdBizRuleService extends IYardService<SpdAbstractBizRule>{
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private SpdBizPlanService bpService;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdFeedbackRuleRepository frRepository;
+	
+	@SuppressWarnings("unchecked") @Override
+	@CacheEvict(value = "longTimeCache", key = "\"allBizRulesWithRelation\"")
+	public SpdAbstractBizRule add(@Valid SpdAbstractBizRule rule, IUser user) {
+		if(!rule.isValid()){
+			throw new InvalidDataException(rule.getValidateMsg());
+		}
+		SpdBizType bizType = frRepository.findAll().findById(rule.getFeedbackRuleId()).getBizType();
+		if(!rule.getBizType().equals(bizType)){
+			throw new InvalidDataException(YardExceptionType.invalid_rule_biz_type_different, rule.getName(), rule.getBizType().getName(), bizType.getName());
+		}
+		
+		//检查是否已经存在相同规则属性的业务规则
+		SpdBizRules allRules = new SpdBizRules(brRepository.findAllWithRelations().getEnabledRules());
+		if(allRules.containsRule(rule)){
+			throw new InvalidDataException(YardExceptionType.invalid_rule_exsit);
+		}
+		rule.init();
+		rule.setRuleCode(codeService.publishCode(rule.getCodeSort()).getCode());
+		rule.checkRule(allRules, pcrRepository.findAllWithRelations());
+		
+		rule = brRepository.save(rule);
+		
+		return rule;
+	}
+
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	@CacheEvict(value = "longTimeCache", key = "\"allBizRulesWithRelation\"")
+	public SpdAbstractBizRule modify(SpdAbstractBizRule rule, IUser user) {
+		if(!rule.isValid()){
+			throw new InvalidDataException(rule.getValidateMsg());
+		}
+		SpdAbstractBizRules allRules = brRepository.findAllWithRelations();
+		SpdAbstractBizRule rulePO = allRules.findById(rule.getId());
+		SpdBizType bizType = frRepository.findAll().findById(rule.getFeedbackRuleId()).getBizType();
+		if(!rule.getBizType().equals(bizType)){
+			throw new InvalidDataException(YardExceptionType.invalid_rule_biz_type_different, rule.getName(), rule.getBizType().getName(), bizType.getName());
+		}
+		//检查是否已经存在相同规则属性的业务规则
+		SpdAbstractBizRule sameConditionRule = allRules.findWithSameRuleProps(rule);
+		if(sameConditionRule != null && !sameConditionRule.getId().equals(rule.getId())){
+			throw new InvalidDataException(YardExceptionType.invalid_rule_exsit);
+		}
+		
+		//检查是否有未完成的业务
+		SpdBizPlans uncompleteBizPlans = bpService.findUncompleteBizPlans(rule.getBizType(), rule.getId());
+		if(CollectionUtils.isNotEmpty(uncompleteBizPlans)){
+			throw new OperateForbiddenException(YardExceptionType.forbid_exist_uncomplete_biz_plan, rule.getBizType().getName());
+		}
+		
+		rule.checkRule(new SpdBizRules(allRules), pcrRepository.findAllWithRelations());
+		
+		rulePO.update(rule);
+		rulePO.updateLastUpdateTime();
+		return brRepository.save(rulePO);
+	}
+
+	@Override
+	public SpdAbstractBizRule updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+	
+}

@@ -1,0 +1,2 @@
+alter table spd_replenish_biz add(channel_type_code VARCHAR2(50));
+alter table spd_receive_biz add(channel_type_code VARCHAR2(50));

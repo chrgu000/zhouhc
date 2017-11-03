@@ -1,0 +1,148 @@
+package cn.ak4j.yard.spd.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+
+@Entity
+@Table(name = "spd_seller_send_tax_item")
+@JsonIgnoreProperties(ignoreUnknown = true)
+@SuppressWarnings({"serial"})
+public class SpdSellerSendTaxItem  extends YardMaintenceEntity {
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	private String taxItemId;
+	private String taxId;//发票ID
+	@NotEmpty(message = "送货明细必须选择")
+	private String sendItemId;//送货明细ID
+	private Integer taxRow;//发票条目序号
+	private float unitPrice;//发票单价
+	private float taxRatio;//发票税率
+	@NotNull(message = "发票数量不能为空")
+	@Min(value = 0, message = "发票数量是无效数据")
+	private Integer taxQty;//发票数量
+	private float taxAmount;//发票金额(含税)
+	private float noFeeAmount;//发票金额(不含税)
+	
+	
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	@Transient
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+	@Embedded
+	private MaintenanceInfo maintenanceInfo;
+
+	
+	public String getTaxItemId() {
+		return taxItemId;
+	}
+
+	public void setTaxItemId(String taxItemId) {
+		this.taxItemId = taxItemId;
+	}
+
+	public String getTaxId() {
+		return taxId;
+	}
+
+	public void setTaxId(String taxId) {
+		this.taxId = taxId;
+	}
+
+	public String getSendItemId() {
+		return sendItemId;
+	}
+
+	public void setSendItemId(String sendItemId) {
+		this.sendItemId = sendItemId;
+	}
+
+	public Integer getTaxRow() {
+		return taxRow;
+	}
+
+	public void setTaxRow(Integer taxRow) {
+		this.taxRow = taxRow;
+	}
+
+
+
+	public float getUnitPrice() {
+		return unitPrice;
+	}
+
+	public void setUnitPrice(float unitPrice) {
+		this.unitPrice = unitPrice;
+	}
+
+	public float getTaxRatio() {
+		return taxRatio;
+	}
+
+	public void setTaxRatio(float taxRatio) {
+		this.taxRatio = taxRatio;
+	}
+
+	public Integer getTaxQty() {
+		return taxQty;
+	}
+
+	public void setTaxQty(Integer taxQty) {
+		this.taxQty = taxQty;
+	}
+
+	public float getTaxAmount() {
+		return taxAmount;
+	}
+
+	public void setTaxAmount(float taxAmount) {
+		this.taxAmount = taxAmount;
+	}
+
+	public float getNoFeeAmount() {
+		return noFeeAmount;
+	}
+
+	public void setNoFeeAmount(float noFeeAmount) {
+		this.noFeeAmount = noFeeAmount;
+	}
+
+	public Integer getCheckStateCode() {
+		return checkStateCode;
+	}
+
+	public void setCheckStateCode(Integer checkStateCode) {
+		this.checkStateCode = checkStateCode;
+	}
+	
+
+	public String getStateFlow() {
+		return stateFlow;
+	}
+
+	public MaintenanceInfo getMaintenanceInfo() {
+		return maintenanceInfo;
+	}
+
+	public void setMaintenanceInfo(MaintenanceInfo maintenanceInfo) {
+		this.maintenanceInfo = maintenanceInfo;
+	}
+	
+}

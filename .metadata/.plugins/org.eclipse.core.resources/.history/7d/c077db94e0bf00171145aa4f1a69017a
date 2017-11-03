@@ -1,0 +1,48 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.bizrule.params.SpdFeedbackRuleParams;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+public class SpdFeedbackRules extends Entities<SpdAbstractFeedbackRule>{
+
+	private static final long serialVersionUID = 7475715998261905928L;
+	
+	public SpdFeedbackRules(List<SpdAbstractFeedbackRule> items){
+		super(items);
+	}
+	
+	public SpdAbstractFeedbackRule findById(String id){
+		return CollectionUtils.findWhere("id", id, this);
+	}
+
+	public Entities<SpdAbstractFeedbackRule> find(SpdFeedbackRuleParams params){
+		Entities<SpdAbstractFeedbackRule> result = new Entities<SpdAbstractFeedbackRule>();
+		if(params!= null && params.isNotEmpty()){
+			this.forEach(rule->{
+				if(params.getBizTypeCode().getValue().contains(rule.getBizType().getCode())){
+					result.add(rule);
+				}
+			});
+		}else{
+			return this;
+		}
+		return result;
+	}
+
+	public Entities<SpdAbstractFeedbackRule> findByIds(List<String> ids) {
+		Entities<SpdAbstractFeedbackRule> result = new Entities<SpdAbstractFeedbackRule>();
+		ids.forEach(id->{
+			SpdAbstractFeedbackRule abstractFeedbackRule = CollectionUtils.findWhere("id", id, this);
+			if(abstractFeedbackRule != null){
+				result.add(abstractFeedbackRule);
+			}
+		});
+		return result;
+	}
+	
+}

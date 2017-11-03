@@ -1,0 +1,46 @@
+package cn.ak4j.yard.domain;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.AKStringUtils;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public abstract class AbstractScheduleTask implements IScheduleTask{
+
+	@Autowired protected MGProxy mgProxy;
+	@Autowired protected NotifyMsgBuilder msgBuilder;
+	
+	@Setter @Getter
+	protected boolean active = true;
+	
+	@Setter @Getter
+	private boolean running = false;
+	
+	@Override
+	public String getBeanName() {
+		return AKStringUtils.lowerCaseFirstChar(getClass().getSimpleName());
+	}
+	
+	@Override
+	public void run() {
+		try {
+			if(active && !running){
+				running = true;
+				executeTask();
+			}
+		} catch (Exception e) {
+			MailMsg mail = msgBuilder.buildScheduleTaskErrorMsg(e, getName());
+			mgProxy.sendMail(mail);
+			log.error("定时任务执行失败", e);
+		}finally {
+			running = false;
+		}
+		
+	}
+}

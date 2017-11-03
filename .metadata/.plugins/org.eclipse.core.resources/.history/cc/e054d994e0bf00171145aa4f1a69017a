@@ -1,0 +1,40 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.Column;
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity  
+@DiscriminatorValue("financial_reconciliation") 
+public class SpdFinacialReconciliationFeedbackRule extends SpdAbstractFeedbackRule{
+
+	@Column(name="auto_commit_fin_rec")
+	private Boolean autoCommitFinancialReconciliation;
+	
+	@Column(name="auto_review_fin_rec")
+	private Boolean autoReviewFinancialReconciliation;
+	
+	@Column(name="auto_sync_to_supplier")
+	private Boolean autoSyncToSupplier;
+	
+	@Column(name="auto_complete_fin_rec")
+	private Boolean autoCompleteFinancialReconciliation;
+
+	@Override
+	public String getDescription() {
+		return null;
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.finacial_reconciliation_biz;
+	}
+	
+}

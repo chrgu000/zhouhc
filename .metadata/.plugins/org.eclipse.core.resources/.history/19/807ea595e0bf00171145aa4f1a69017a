@@ -1,0 +1,143 @@
+package cn.ak4j.yard;
+
+import javax.sql.DataSource;
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.PosixParser;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
+import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
+import org.springframework.boot.autoconfigure.freemarker.FreeMarkerAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsRoleOpRepository;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsWorkBookRepository;
+import lombok.extern.slf4j.Slf4j;
+
+
+@Slf4j
+@SpringBootApplication
+@EnableScheduling
+@EnableTransactionManagement
+@EnableAutoConfiguration(exclude={DataSourceAutoConfiguration.class, DataSourceTransactionManagerAutoConfiguration.class, FlywayAutoConfiguration.class, RabbitAutoConfiguration.class, FreeMarkerAutoConfiguration.class})
+@ComponentScan({"cn.ak4j"})
+public class Application{
+	
+	@Bean
+	public ObjectMapper objectMapper(){
+		return new ObjectMapper();
+	}
+	
+	@Bean
+	RequestMappingHandlerMapping requestHandlerMapping(){
+		RequestMappingHandlerMapping requestHandlerMapping = new RequestMappingHandlerMapping();
+		requestHandlerMapping.setUseSuffixPatternMatch(true);
+		return requestHandlerMapping;
+	}
+	
+	private static void initLoadData(ConfigurableApplicationContext cac){
+		PcsDepotRepository depotRepository = cac.getBean(PcsDepotRepository.class);
+        depotRepository.findAll();
+        log.info("初始加载{}个仓库", depotRepository.findAllWithRelations().size());
+        
+        SpdDepotCardRepository dcRepository = cac.getBean(SpdDepotCardRepository.class);
+        log.info("初始加载{}个账页", dcRepository.findAll().size());
+        
+        YdsGoodsRepository goodsRepository = cac.getBean(YdsGoodsRepository.class);
+        log.info("初始加载{}个产品", goodsRepository.findAll().size());
+        
+        YdsGoodsLotRepository glRepository = cac.getBean(YdsGoodsLotRepository.class);
+        glRepository.findAll();
+        log.info("初始加载{}个批次", glRepository.findAllWithGoods().size());
+        
+        YdsEdsGoodsRepository egRepository = cac.getBean(YdsEdsGoodsRepository.class);
+        log.info("初始加载{}个企业产品", egRepository.findAll().size());
+        
+        YdsEdsGoodsLotRepository eglRepository = cac.getBean(YdsEdsGoodsLotRepository.class);
+        log.info("初始加载{}个企业产品批次", eglRepository.findAll().size());
+        
+        PcsRoleOpRepository roRepository = cac.getBean(PcsRoleOpRepository.class);
+        log.info("初始加载{}个角色操作", roRepository.findAll().size());
+        
+        YdsWorkBookRepository wbRepository = cac.getBean(YdsWorkBookRepository.class);
+        log.info("初始加载{}个字典数据", wbRepository.findAll().size());
+        
+        SpdBizRuleRepository brRepository = cac.getBean(SpdBizRuleRepository.class);
+        log.info("初始加载{}个业务规则", brRepository.findAllWithRelations().size());
+        
+        YardGlobalInfoRepository giRepository = cac.getBean(YardGlobalInfoRepository.class);
+		Conf.setAllGlobalInfos(giRepository.findAll());
+        log.info("初始加载{}个全局信息", giRepository.findAll().size());
+        
+        log.info("初始加载完毕");
+	}
+	
+	private static void processCommand(String[] args, ConfigurableApplicationContext cac){
+		Options options = new Options();
+        options.addOption("ibd", "import-base-data", true, "导出基础数据, 参数格式为: 业务场id,机构编码,机构名"); //true 需要带参数，false 不用参数 
+        options.addOption("gl", "generate-ledger", false, "生成业务总账");
+        options.addOption("gpcr", "generate-property-change-record", false, "生成物权变更记录");
+        options.addOption("gdc", "generate-daily-clean", false, "生成日清对账");
+        options.addOption("gfri", "generate-finacial-reconciliation-init", false, "生成财务对账初始化数据");
+        options.addOption("gfr", "generate-finacial-reconciliation", false, "生成财务对账");
+        
+        CommandLineParser parser = new PosixParser(); 
+        try{
+	        CommandLine cmd = parser.parse(options, args); 
+	        if(cmd.hasOption("ibd")){
+	        	String importParams = cmd.getOptionValue("ibd");
+	        	log.debug("导入参数: {}", importParams);
+	        	String[] paramsArr = importParams.split(",");
+	        	
+	        	BaseDataImporter dataImporter = new BaseDataImporter();
+	        	dataImporter.importData(cac.getBean(DataSource.class), paramsArr[0], paramsArr[1], paramsArr[2]);
+	        }else if(cmd.hasOption("gl") || cmd.hasOption("gpcr") || cmd.hasOption("gdc") || cmd.hasOption("gfri") || cmd.hasOption("gfr")){
+	        	ReconciliationDataGenerator dataGenerator = new ReconciliationDataGenerator();
+	        	if(cmd.hasOption("gl")){
+	        		dataGenerator.generateLedger(cac);
+	        	}else if(cmd.hasOption("gpcr")){
+	        		dataGenerator.generatePropertyChangeRecords(cac);
+	        	}else if(cmd.hasOption("gdc")){
+	        		dataGenerator.generateDailyCleans(cac);
+	        	}else if(cmd.hasOption("gfri")){
+	        		dataGenerator.generateInitFinacialReconciliation(cac);
+	        	}else if(cmd.hasOption("gfr")){
+	        		dataGenerator.generateFinacialReconciliation(cac);
+	        	}
+	        }
+        }catch(Exception e){
+        	e.printStackTrace();
+        }
+	}
+	
+	public static void main(String[] args) {
+		SpringApplication app = new SpringApplication(Application.class);
+		ConfigurableApplicationContext cac = app.run(args);
+		
+		processCommand(args, cac);
+        initLoadData(cac);
+	}
+	
+}

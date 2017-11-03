@@ -1,0 +1,25 @@
+package cn.ak4j.yard.spd.reconciliation.params;
+
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdPropertyChangeRecordItemParams extends QueryParams{
+
+	private ListParam<String> id;
+	private ListParam<String> recordId;
+	private ListParam<String> goodsId;
+	private ListParam<String> lotId;
+	private ListParam<String> unitName;
+	private ListParam<Integer> unitLv;
+	private IntegerRangeParam qty;
+	private ListParam<String> originItemId;
+	
+	private ListParam<String> formatName;
+	private ListParam<String> lotNo;
+}

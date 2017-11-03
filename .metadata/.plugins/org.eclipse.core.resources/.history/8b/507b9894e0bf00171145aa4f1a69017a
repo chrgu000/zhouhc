@@ -1,0 +1,12 @@
+package cn.ak4j.yard.spd.reconciliation.repository;
+
+import org.springframework.data.repository.CrudRepository;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.yard.spd.reconciliation.domain.SpdReconciliationBizPlan;
+
+@SuppressWarnings("rawtypes")
+@Repository
+public interface SpdReconciliationBizRepository extends CrudRepository<SpdReconciliationBizPlan, String>{
+
+}

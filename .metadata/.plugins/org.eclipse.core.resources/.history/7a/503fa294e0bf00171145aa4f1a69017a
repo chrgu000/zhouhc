@@ -1,0 +1,17 @@
+package cn.ak4j.yard.spd.reconciliation.report.hspt_credit_rep_detail;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReport;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportType;
+
+
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class Report extends SpdReconciliationReport<Items>{
+
+	@Override
+	public SpdReconciliationReportType getReportType() {
+		return SpdReconciliationReportType.hospital_credit_replenish_detail;
+	}
+
+}

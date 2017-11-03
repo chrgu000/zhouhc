@@ -1,0 +1,63 @@
+package cn.ak4j.yard.configuration;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import cn.ak4j.yard.domain.Conf;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Configuration
+public class ConfConfiguration {
+	
+	@Value("${ak.yardCenter.yardId}")
+	private Integer yardId;
+	
+	@Value("${ak.weixinUrl}")
+	private String weixinUrl;
+	
+	@Value("${ak.autoUpdateDBSchema}")
+	private boolean autoUpdateDBSchema;
+	
+	@Value("${ak.env}")
+	private String env;
+	
+	@Value("${ak.envCode}")
+	private String envCode;
+	
+	@Value("${ak.sendExceptionMail}")
+	private boolean sendExceptionMail;
+	
+	@Value("${ak.amqpMsgDelay}")
+	private int amqpMsgDelay;
+	
+	@Value("${ak.depotCardQueryThreadPoolSize}")
+	private int depotCardQueryThreadPoolSize;
+	
+	@Value("${ak.depotNotifyEmails}")
+	private String depotNotifyEmails;
+	
+	@Value("${ak.initPhase}")
+	private boolean initPhase;
+	
+	@SuppressWarnings("static-access")
+	@Bean("conf")
+	public Conf conf(){
+		Conf conf = new Conf();
+		conf.setYardId(yardId);
+		conf.setWeixinUrl(weixinUrl);
+		conf.setAutoUpdateDBSchema(autoUpdateDBSchema);
+		conf.setEnv(env);
+		conf.setEnvCode(envCode);
+		conf.setSendExceptionMail(sendExceptionMail);
+		conf.setAmqpMsgDelay(amqpMsgDelay);
+		conf.setDepotCardQueryThreadPoolSize(depotCardQueryThreadPoolSize);
+		conf.setDepotNotifyEmails(depotNotifyEmails);
+		conf.setInitPhase(initPhase);
+		
+		log.info("加载Conf配置:{}", conf.toString());
+		return conf;
+	}
+	
+}

@@ -1,0 +1,74 @@
+package cn.ak4j.yard.utils;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ui.jasperreports.JasperReportsUtils;
+
+import cn.ak4j.utils.CachableFileLoader;
+import net.sf.jasperreports.engine.JRAbstractExporter;
+import net.sf.jasperreports.engine.JRDataSource;
+import net.sf.jasperreports.engine.JRException;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.JasperRunManager;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.export.JRPdfExporter;
+
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class PdfPrintor {
+	private static Logger logger = LoggerFactory.getLogger(PdfPrintor.class);
+	
+	public static byte[] printPdfFile(Map parmerters, String reportFile, List dataList) throws Exception{
+		byte[] byteArray = CachableFileLoader.getInstance().loadByteArrayInputStream(reportFile);
+		ByteArrayInputStream in = null;
+		try{ 
+			in = new ByteArrayInputStream(byteArray);
+			// 生成pdf 
+			byte[] bytes = null;
+			JRDataSource jrDataSource = new JRBeanCollectionDataSource(dataList);
+			bytes = JasperRunManager.runReportToPdf(in, parmerters, jrDataSource);
+			return bytes;
+		}
+		catch(JRException ex){ 
+			logger.error(ExceptionUtils.getStackTrace(ex));
+			return new byte[0];
+		} finally{
+			if(in != null){
+				in.close();
+			}
+		}
+	}
+	
+	/**
+	 * 功能：打印报表，以二进制字节数组的形式传回。
+	 * @param parmerters : 报表参数，例如：子报表等
+	 * @param fielNm     : 报表模板的路径和名称
+	 * 
+	 * @param dataSource ：填充报表的list
+	 * @throws Exception
+	 */
+	public static byte[] downloadPdfByteArray(Map parmerters,String reportfielNm, List dataList) throws Exception{
+		ByteArrayOutputStream ous=new ByteArrayOutputStream(); 
+	    try {
+	        //填充报表
+	       JRDataSource jrDataSource = new JRBeanCollectionDataSource(dataList);
+	       JasperPrint print =JasperFillManager.fillReport(reportfielNm, parmerters, jrDataSource);
+	       //导出报表到response
+	        JRAbstractExporter exporter =new JRPdfExporter();
+	        //指向
+	        JasperReportsUtils.render(exporter, print,ous);
+	        ous.flush();
+	        ous.close();
+	    }catch (Exception e) {
+	    	logger.error(ExceptionUtils.getStackTrace(e) + " ireport生成报表出错！");
+	    }
+	    return ous.toByteArray();
+	}
+	
+}

@@ -1,0 +1,263 @@
+package cn.ak4j.yard.pcs.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+
+public class PcsDepotServiceTest extends BaseTest{
+
+	@Autowired private PcsDepotService depotService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testAddExistDepot(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		String depotCode = "039";
+		String depotName = "测试仓库";
+		
+		PcsDepot depot = createDepot(depotCode, depotName);
+		
+		thrown.expect(InvalidDataException.class);
+		depotService.add(depot, user);
+		
+		depotCode = "22222";
+		depotName = "雅和仓库";
+		
+		depot = createDepot(depotCode, depotName);
+		
+		thrown.expect(InvalidDataException.class);
+		depotService.add(depot, user);
+	}
+	
+	@Test public void testAddDepot(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		PcsDepot depot = buildDepot(user);
+		depotService.add(depot, user);
+		
+		depot = depotRepository.findAll().findByDepotCode(depot.getDepotCode());
+		assertNotNull(depot);
+	}
+	
+	@Test public void testModifyWithExistDepotCode(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		String depotCode = "40";
+		String depotName = "测试仓库";
+		String existDepotCode = "39";
+		
+		//新增仓库
+		PcsDepot depot = createDepot(depotCode, depotName);
+		depot = depotService.add(depot, user);
+
+		//设置已存在编码
+		depot.setDepotCode(existDepotCode);
+		thrown.expect(InvalidDataException.class);
+		depotService.modify(depot, user);
+	}
+	
+	@Test public void testModifyWithExistDepotName(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		String depotCode = "40";
+		String depotName = "测试仓库";
+		String existDepotName = "三号仓库";
+		
+		//新增仓库
+		PcsDepot depot = createDepot(depotCode, depotName);
+		depot = depotService.add(depot, user);
+
+		//设置已存在仓库名称
+		depot.setDepotName(existDepotName);
+		thrown.expect(InvalidDataException.class);
+		depotService.modify(depot, user);
+	}
+	
+	@Test public void testInitDepot(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		//测试仓库没有货区的情况
+		PcsDepot withoutAreaDepot = buildDepot(user);
+		depotService.add(withoutAreaDepot, user);
+		
+		withoutAreaDepot = depotService.initDepotAreaAndShelf(withoutAreaDepot.getDepotId(), user);
+		withoutAreaDepot = depotRepository.findAllWithRelations().findById(withoutAreaDepot.getDepotId());
+		assertEquals(3, withoutAreaDepot.getAreas().size());
+		assertEquals(1, withoutAreaDepot.getAreas().get(0).getShelfs().size());
+		assertEquals(1, withoutAreaDepot.getAreas().get(1).getShelfs().size());
+		assertEquals(1, withoutAreaDepot.getAreas().get(2).getShelfs().size());
+		
+		PcsDepotAreas normalAreas = withoutAreaDepot.getAreas().findByAreaType(PcsAreaType.normal);
+		PcsDepotAreas isolationAreas = withoutAreaDepot.getAreas().findByAreaType(PcsAreaType.isolation);
+		PcsDepotAreas unqualifiedAreas = withoutAreaDepot.getAreas().findByAreaType(PcsAreaType.unqualified);
+		
+		normalAreas.forEach(normalArea->{
+			assertNotNull(normalArea);
+			assertTrue(normalArea.isPrimary());
+			assertEquals(1, normalArea.getShelfs().size());
+			assertEquals("合格货区", normalArea.getAreaName());
+			assertEquals("虚拟货位", normalArea.getShelfs().get(0).getShelfName());
+			assertTrue(normalArea.getShelfs().get(0).isPrimary());
+		});
+		
+		isolationAreas.forEach(isolationArea->{
+			assertNotNull(isolationArea);
+			assertTrue(isolationArea.isPrimary());
+			assertTrue(isolationArea.getShelfs().get(0).isPrimary());
+			assertEquals(1, isolationArea.getShelfs().size());
+			assertEquals("隔离货区", isolationArea.getAreaName());
+			assertEquals("虚拟货位", isolationArea.getShelfs().get(0).getShelfName());
+		});
+		
+		unqualifiedAreas.forEach(unqualifiedArea->{
+			assertNotNull(unqualifiedArea);
+			assertTrue(unqualifiedArea.isPrimary());
+			assertTrue(unqualifiedArea.getShelfs().get(0).isPrimary());
+			assertEquals(1, unqualifiedArea.getShelfs().size());
+			assertEquals("不合格货区", unqualifiedArea.getAreaName());
+			assertEquals("虚拟货位", unqualifiedArea.getShelfs().get(0).getShelfName());
+		});
+		
+		//测试仓库只有正常货区
+		String oneAreaDepotId = "depot_id_005";
+		PcsDepot oneAreaDepot = depotService.initDepotAreaAndShelf(oneAreaDepotId, user);
+		oneAreaDepot = depotRepository.findAllWithRelations().findById(oneAreaDepotId);
+		
+		normalAreas = oneAreaDepot.getAreas().findByAreaType(PcsAreaType.normal);
+		isolationAreas = oneAreaDepot.getAreas().findByAreaType(PcsAreaType.isolation);
+		unqualifiedAreas = oneAreaDepot.getAreas().findByAreaType(PcsAreaType.unqualified);
+		
+		assertTrue(normalAreas.size()>=1);
+		assertEquals(1, isolationAreas.size());
+		assertEquals(1, unqualifiedAreas.size());
+		
+		normalAreas.forEach(normalArea->{
+			assertNotNull(normalArea);
+			assertFalse(normalArea.isPrimary());
+			assertTrue(normalArea.getShelfs().size()>=1);
+			PcsDepotShelf shelf = CollectionUtils.findWhere("shelfName", "虚拟货位", normalArea.getShelfs());
+			assertNotNull(shelf);
+			assertEquals("虚拟货位", shelf.getShelfName());
+			assertTrue(shelf.isPrimary());
+		});
+		
+		isolationAreas.forEach(isolationArea->{
+			assertNotNull(isolationArea);
+			assertTrue(isolationArea.isPrimary());
+			assertTrue(isolationArea.getShelfs().get(0).isPrimary());
+			assertEquals(1, isolationArea.getShelfs().size());
+			PcsDepotShelf shelf = CollectionUtils.findWhere("shelfName", "虚拟货位", isolationArea.getShelfs());
+			assertNotNull(shelf);
+			assertEquals("虚拟货位", shelf.getShelfName());
+		});
+		
+		unqualifiedAreas.forEach(unqualifiedArea->{
+			assertNotNull(unqualifiedArea);
+			assertTrue(unqualifiedArea.isPrimary());
+			assertTrue(unqualifiedArea.getShelfs().get(0).isPrimary());
+			assertEquals(1, unqualifiedArea.getShelfs().size());
+			PcsDepotShelf shelf = CollectionUtils.findWhere("shelfName", "虚拟货位", unqualifiedArea.getShelfs());
+			assertNotNull(shelf);
+			assertEquals("虚拟货位", shelf.getShelfName());
+		});
+		
+		//测试仓库三种货区类型都有
+		String allAreaDepotId = "depot_id_001";
+		PcsDepot allAreaDepot = depotService.initDepotAreaAndShelf(allAreaDepotId, user);
+		allAreaDepot = depotRepository.findAllWithRelations().findById(allAreaDepotId);
+		
+		normalAreas = allAreaDepot.getAreas().findByAreaType(PcsAreaType.normal);
+		isolationAreas = allAreaDepot.getAreas().findByAreaType(PcsAreaType.isolation);
+		unqualifiedAreas = allAreaDepot.getAreas().findByAreaType(PcsAreaType.unqualified);
+		
+		assertTrue(normalAreas.size()>=1);
+		assertTrue(isolationAreas.size()>=1);
+		assertTrue(unqualifiedAreas.size()>=1);
+		
+		normalAreas.fillShelfs(dsRepository);
+		normalAreas.forEach(normalArea->{
+			assertNotNull(normalArea);
+			assertFalse(normalArea.isPrimary());
+			assertTrue(normalArea.getShelfs().size()>=1);
+			PcsDepotShelf shelf = CollectionUtils.findWhere("shelfName", "虚拟货位", normalArea.getShelfs());
+			assertNotNull(shelf);
+			assertEquals("虚拟货位", shelf.getShelfName());
+			assertTrue(shelf.isPrimary());
+		});
+		
+		isolationAreas.fillShelfs(dsRepository);
+		isolationAreas.forEach(isolationArea->{
+			assertNotNull(isolationArea);
+			assertFalse(isolationArea.isPrimary());
+			assertTrue(isolationArea.getShelfs().size()>=1);
+			PcsDepotShelf shelf = CollectionUtils.findWhere("shelfName", "虚拟货位", isolationArea.getShelfs());
+			assertNotNull(shelf);
+			assertEquals("虚拟货位", shelf.getShelfName());
+			assertTrue(shelf.isPrimary());
+		});
+		
+		unqualifiedAreas.fillShelfs(dsRepository);
+		unqualifiedAreas.forEach(unqualifiedArea->{
+			assertNotNull(unqualifiedArea);
+			assertTrue(unqualifiedArea.getShelfs().size()>=1);
+			assertFalse(unqualifiedArea.isPrimary());
+			PcsDepotShelf shelf = CollectionUtils.findWhere("shelfName", "虚拟货位", unqualifiedArea.getShelfs());
+			assertNotNull(shelf);
+			assertEquals("虚拟货位", shelf.getShelfName());
+			assertTrue(shelf.isPrimary());
+		});
+	}
+	
+	private PcsDepot buildDepot(PcsUser user) {
+		PcsDepot depot = new PcsDepot();
+		depot.setDepotType("1");
+		depot.setManageDeptId("dept_id_001");
+		depot.setManageOrgId("626");
+		depot.setCentral(false);
+		depot.setFixed(false);
+		depot.setDepotCode("CK01");
+		depot.setDepotName("四号仓库");
+		depot.setDepotAddress("一楼302室");
+		depot.setLinkMan("张三");
+		depot.setLinkTel("13800800800");
+		depot.setEnabled(false);
+		depot.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		return depot;
+	}
+	
+	private PcsDepot createDepot(String depotCode, String depotName){
+		String deptId = "dept_id_001";
+		PcsDepot depot = new PcsDepot();
+
+		depot.setDepotName(depotName);
+		depot.setDepotCode(depotCode);
+		
+		depot.setManageOrgId(orgId);
+		depot.setManageDeptId(deptId);
+		
+		return depot;
+	}
+}

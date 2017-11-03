@@ -1,0 +1,9 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.extend.ICustomComponent;
+
+public interface ISpdReceiveEventProcessor extends ICustomComponent{
+
+	public void process(SpdReceiveBiz receive, String userId, AmqpMsgType msgType);
+}

@@ -1,0 +1,32 @@
+package cn.ak4j.yard;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;
+
+import com.rabbitmq.client.Channel;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.domain.Constant;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+public class TestAMQPMsgListener implements ChannelAwareMessageListener{
+
+	private Logger logger = LoggerFactory.getLogger(TestAMQPMsgListener.class);
+	private AMQPMsgs msgs;
+
+	public TestAMQPMsgListener(AMQPMsgs msgs){
+		this.msgs = msgs;
+	}
+	
+	public void onMessage(Message message, Channel channel) throws Exception {
+		String msgType = (String)message.getMessageProperties().getHeaders().get(Constant.AMQP_MSG_TYPE);
+		String msgBody = new String(message.getBody(), Global.defaultCharset);
+		logger.info(">>>>>>>> receive message, msg type:{}, msg body::{} ", msgType, msgBody);
+		msgs.add(new AMQPMsg(msgType, msgBody));
+		
+		channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+	}
+}

@@ -1,0 +1,89 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.params.SpdAdjustStockBizParams;
+import lombok.Getter;
+
+@Repository
+public class SpdAdjustStockBizRepository extends BaseRepository<SpdAdjustStockBiz, SpdAdjustStockBizs, SpdAdjustStockBizParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	
+	public SpdAdjustStockBizs find(SpdAdjustStockBizParams params, OrderParam order, int pageNo, int pageSize, PcsUser user){
+		getParamsByUser(params, user);
+		if(setRelationParams(params)){
+			if(order == null){
+				order = OrderParam.getDefaultOrder();
+			}
+			return new SpdAdjustStockBizs(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdAdjustStockBizs();
+	}
+	
+	private boolean setRelationParams(SpdAdjustStockBizParams params) {
+		if(params != null){
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			if(!depotParams.isEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+				if(depots.size() == 0){
+					return false;
+				}
+				params.setDepotId(new ListParam<String>(depots.getIds()));
+			}
+		}
+		return true;
+	}
+
+	public long countByParams(SpdAdjustStockBizParams params, PcsUser user) {
+		getParamsByUser(params, user);
+		return count(params);
+	}
+	
+	private void getParamsByUser(SpdAdjustStockBizParams params, PcsUser user){
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setManageDeptId(new ListParam<String>(user.getDeptId()));
+		PcsDepots pcsDepots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+		if(pcsDepots.size()>0){
+			params.setDepotId(new ListParam<String>(pcsDepots.getIds()));
+		}
+	}
+
+	@Transactional
+	public SpdAdjustStockBiz saveWithItems(SpdAdjustStockBiz adjustStock){
+		adjustStock = save(adjustStock);
+		adjustStock.updateItemsBizIdAndTime();
+		biRepository.saveAll(adjustStock.getItems());
+		return adjustStock;
+	}
+
+	public SpdAdjustStockBiz getWithItems(String bizId) {
+		SpdAdjustStockBiz adjustStock = findOne(bizId);
+		SpdBizItems items = biRepository.findWithGoodsByBizId(bizId);
+		adjustStock.setItems(items);
+		return adjustStock;
+	}
+
+}

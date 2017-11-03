@@ -1,0 +1,330 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class SpdReceiveBizServiceTest extends BaseTest{
+
+	@Autowired private SpdReceiveBizService rbService;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdReceiveBizRepository receiveRepository;
+	@Autowired private SpdPrepareInformBizService pibService;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private SpdReplenishBizRepository replenishRepository;
+	//@Autowired private YdsGoodsService goodsService;
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testAddWithoutLotNo(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		List<String> goodsIds = new ArrayList<String>();
+		goodsIds.add("goods_id_003");
+		goodsIds.add("goods_id_004");
+		List<String> goodsLotIds = new ArrayList<String>();
+		goodsLotIds.add("goods_lot_id_018");
+		goodsLotIds.add("goods_lot_id_test");
+		
+		SpdReceiveBiz receive = createNewReceiveBizWithGoodsIdsAndLotIds(goodsIds, goodsLotIds, user);
+		thrown.expect(OperateFailException.class);
+		rbService.add(receive, user);
+	}
+	
+	@Test public void testAddWithoutDepotCard(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		List<String> goodsIds = new ArrayList<String>();
+		goodsIds.add("goods_id_048");
+		List<String> goodsLotIds = new ArrayList<String>();
+		goodsLotIds.add("goods_lot_id_018");
+		goodsLotIds.add("goods_lot_id_011");
+		
+		SpdReceiveBiz receive = createNewReceiveBizWithGoodsIdsAndLotIds(goodsIds, goodsLotIds, user);
+		thrown.expect(OperateFailException.class);
+		rbService.add(receive, user);
+	}
+	
+	//收货之后自动补货到科室
+	@Test public void addReceiveAndAutoReplenish(){
+		String prepareInfromBizId = "prp_inf_biz_id_030";
+		String userId = "user_id_002";
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdPrepareInformBiz prepareInform = pibRepository.getWithItems(prepareInfromBizId);
+		
+		SpdReceiveBiz receive = new SpdReceiveBiz();
+		SpdReceiveRule rule =  brRepository.findAllWithRelations().getAllReceiveRules().findById("rec_rule_id_04");
+		receive.applyRule(rule, user);
+		
+		SpdBizItems items = new SpdBizItems();
+		
+		YdsGoods goods1 = goodsRepository.findAll().findById("goods_id_013");
+		YdsGoods goods2 = goodsRepository.findAll().findById("goods_id_014");
+		YdsGoods goods3 = goodsRepository.findAll().findById("goods_id_015");
+		
+		SpdBizItem item1 = new SpdBizItem(goods1.getGoodsId(), "goods_lot_id_038", goods1.getPrepareUnitLv(), 10, -1, goods1.getPreparePrice());
+		SpdBizItem prepareInformItem1 = CollectionUtils.findWhere("goodsId", goods1.getGoodsId(), prepareInform.getItems());
+		item1.setOriginId(prepareInfromBizId);
+		item1.setOriginItemId(prepareInformItem1.getBizItemId());
+		
+		SpdBizItem item2 = new SpdBizItem(goods2.getGoodsId(), "goods_lot_id_039", goods2.getPrepareUnitLv(), 10, -1, goods2.getPreparePrice());
+		SpdBizItem prepareInformItem2 = CollectionUtils.findWhere("goodsId", goods2.getGoodsId(), prepareInform.getItems());
+		item1.setOriginId(prepareInfromBizId);
+		item1.setOriginItemId(prepareInformItem2.getBizItemId());
+		
+		SpdBizItem item3 = new SpdBizItem(goods3.getGoodsId(), "goods_lot_id_053", goods3.getPrepareUnitLv(), 10, -1, goods3.getPreparePrice());
+		SpdBizItem prepareInformItem3 = CollectionUtils.findWhere("goodsId", goods3.getGoodsId(), prepareInform.getItems());
+		item1.setOriginId(prepareInfromBizId);
+		item1.setOriginItemId(prepareInformItem3.getBizItemId());
+		
+		items.add(item1);
+		items.add(item2);
+		items.add(item3);
+		
+		receive.setItems(items);
+		receive.setPrepareInformBizId(prepareInfromBizId);
+		receive.setMaintenanceInfo(new MaintenanceInfo(user));
+		receive = rbService.add(receive, user);
+		wait(12);
+
+		SpdBizItems replenishBizItems = biRepository.findByOriginId(receive.getBizId());
+		SpdReplenishBiz replenish = replenishRepository.findOne(replenishBizItems.get(0).getBizId());
+		assertEquals(SpdReplenishBizSteps.complete_on_shelf_task.getStatusCode(), replenish.getBizStatusCode());
+		assertEquals(receive.getToDepotId(), replenish.getFromDepotId());
+		assertEquals(receive.getFinalDepotId(), replenish.getToDepotId());
+		replenishBizItems.forEach(item->{
+			assertTrue(item.getAsPlanned());
+		});
+	}
+	
+	@Ignore
+	@Test public void testAllConfirmEmpty(){
+		String bizId = "rece_biz_id_008";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdReceiveBiz receive = rbRepository.getWithItems(bizId);
+		
+		receive.getItems().forEach(item->{
+			log.debug("confirmQty:{}", item.getConfirmQty());
+			item.setConfirmQty(0);
+		});
+		
+		biRepository.saveAll(receive.getItems());
+		
+		receive.getItems().forEach(item->{
+			log.debug("confirmQty:{}", item.getConfirmQty());
+		});
+		
+		rbService.reviewReceive(receive, receive.getLastUpdateTime(), user);
+	}
+	
+	private SpdReceiveBiz createNewReceiveBizWithGoodsIdsAndLotIds(List<String> goodsIds, List<String> goodsLotIds, PcsUser user){
+		SpdReceiveBiz receiveBiz = new SpdReceiveBiz();
+		receiveBiz.setFromOrgId("org_id_001");
+		receiveBiz.setToOrgId("626");
+		receiveBiz.setToDepotId("depot_id_001");
+		receiveBiz.setToDeptId("dept_id_001");
+		receiveBiz.setPrepareInformBizId("prp_inf_biz_id_030");
+		receiveBiz.setToAreaType(PcsAreaType.normal.getCode());
+		receiveBiz.setCreatorDepotId("depot_id_001");
+		receiveBiz.setItems(createNewBizItemWithGoodsIdsAndLotIds(goodsIds, goodsLotIds));
+		receiveBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		return receiveBiz;
+	}
+	
+	private SpdBizItems createNewBizItemWithGoodsIdsAndLotIds(List<String> goodsIds, List<String> goodsLotIds){
+		SpdBizItems items = new SpdBizItems();
+		
+		if(CollectionUtils.isEmpty(goodsIds) || CollectionUtils.isEmpty(goodsLotIds)){
+			return items;
+		}
+		
+		int count = goodsIds.size() > goodsLotIds.size() ? goodsLotIds.size() : goodsIds.size();
+		
+		for(int i = 0; i < count; i++){
+			SpdBizItem item = new SpdBizItem();
+			item.setPlanQty(300);
+			item.setGoodsId(goodsIds.get(i));
+			item.setLotId(goodsLotIds.get(i));
+			item.setUnitPrice(20.5f);
+			item.setUnitLv(1);
+			items.add(item);
+		}
+		return items;
+	}
+	
+	@Test @SuppressWarnings("unchecked")
+	public void testVerification(){
+		/**
+		 * 该SQL可用来辅助查找对应的收货明细的数据
+		 * select goods_id,lot_id,confirm_qty,unit_lv,deal_qty_by_base_unit,create_time,biz_id from spd_biz_item where biz_item_type='receive' 
+		 * and confirm_qty>0 and goods_id in('goods_id_001', 'goods_id_002', 'goods_id_003',
+         * 'goods_id_010') and biz_id in(select biz_id from spd_receive_biz 
+         * where check_state_code=3 or check_state_code=4) order by goods_id,create_time;
+         * 
+         * 查找单位转换比:
+         * select goods_id, unit_big_sum, unit_mid_sum,unit_min_sum from yds_goods where goods_id in('goods_id_001', 
+         * 'goods_id_002', 'goods_id_003', 'goods_id_010');
+		 */
+		String deptId = "dept_id_005";
+		String goodsId004 = "goods_id_004";
+		String goodsId021 = "goods_id_021";
+		String goodsId022 = "goods_id_022";
+		String goodsId023 = "goods_id_023";
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put(goodsId004, 9);
+		map.put(goodsId021, 30);
+		map.put(goodsId022, 6);
+		map.put(goodsId023, 35);
+		
+		String[] goodsIdArr = new String[]{goodsId004, goodsId021, goodsId022, goodsId023};
+		String[] lotIdArr = new String[]{"goods_lot_id_011", "goods_lot_id_061", "goods_lot_id_064", "goods_lot_id_066"};
+		
+		Entities<YdsGoods> goodss = goodsRepository.findAll().findByIds(Arrays.asList(goodsIdArr));
+		YdsGoodsLots lots = glRepository.findAll().findByIds(Arrays.asList(lotIdArr));
+		
+		SpdGoodsQtys goodsQtys = new SpdGoodsQtys();
+		for(YdsGoods goods : goodss){
+			YdsGoodsLot lot = lots.findByGoodsId(goods.getGoodsId()).get(0);
+			SpdGoodsQty goodsQty = new SpdGoodsQty(goods, lot, 4);
+			goodsQty.setQty(map.get(goods.getGoodsId()));
+			goodsQtys.add(goodsQty);
+		}
+		
+		//查找核销相关的收货明细(核销前)
+		SpdReceiveBizs originReceives = rbService.findVerificationReceives(deptId, Arrays.asList(goodsIdArr), Arrays.asList(lotIdArr));
+		
+		//对收货进行核销
+		SpdReceiveItems verificationItems = new SpdReceiveItems(rbService.verification(deptId, goodsQtys).getAllItems());
+		assertEquals(4, verificationItems.size());
+		
+		//查找核销相关的收货明细(核销后)
+		SpdReceiveItems newItems = new SpdReceiveItems(biRepository.findByIds(originReceives.getAllItems().getIds()));
+		
+		//验证核销数量以及销售完成的状态位
+		goodsQtys.forEach(goodsQty->{
+			SpdReceiveItems originItems = new SpdReceiveItems(CollectionUtils.find("goodsId", goodsQty.getGoods().getGoodsId(), originReceives.getAllItems()));
+			int originDealQty = originItems.intSum("dealQtyByBaseUnit");
+			
+			SpdReceiveItems newItemsWithSpecialLot = new SpdReceiveItems(CollectionUtils.find("goodsId", goodsQty.getGoods().getGoodsId(), newItems));
+			int newDealQty = newItemsWithSpecialLot.intSum("dealQtyByBaseUnit");
+			assertEquals(goodsQty.getQty(YdsUnitLv.base.getLv()), newDealQty-originDealQty);
+		});
+	}
+	
+	@Ignore @Test @SuppressWarnings("unchecked")
+	public void testChargeOff(){
+		String deptId = "dept_id_005";
+		String goodsId001 = "goods_id_001";
+		String goodsId002 = "goods_id_002";
+		String goodsId003 = "goods_id_003";
+		String goodsId010 = "goods_id_010";
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put(goodsId001, 500);
+		map.put(goodsId002, 400);
+		map.put(goodsId003, 60);
+		map.put(goodsId010, 2300);
+		
+		String[] goodsIdArr = new String[]{goodsId001, goodsId002, goodsId003, goodsId010};
+		String[] lotIdArr = new String[]{"goods_lot_id_019", "goods_lot_id_024", "goods_lot_id_018", "goods_lot_id_002"};
+		
+		Entities<YdsGoods> goodss = goodsRepository.findAll().findByIds(Arrays.asList(goodsIdArr));
+		YdsGoodsLots lots = glRepository.findAll().findByIds(Arrays.asList(lotIdArr));
+		
+		SpdGoodsQtys goodsQtys = new SpdGoodsQtys();
+		for(YdsGoods goods : goodss){
+			YdsGoodsLot lot = lots.findByGoodsId(goods.getGoodsId()).get(0);
+			SpdGoodsQty goodsQty = new SpdGoodsQty(goods, lot, 4);
+			goodsQty.setQty(map.get(goods.getGoodsId()));
+			goodsQtys.add(goodsQty);
+		}
+		
+		//查找冲账相关的收货明细(冲账前)
+		SpdReceiveBizs originReceives = rbService.findChargeOffReceives(deptId, Arrays.asList(goodsIdArr), Arrays.asList(lotIdArr));
+		
+		//对收货进行冲账
+		rbService.chargeOff(deptId, goodsQtys);
+		
+		//查找冲账相关的收货明细(冲账后)
+		SpdReceiveItems newItems = new SpdReceiveItems(biRepository.findByIds(originReceives.getAllItems().getIds()));
+		
+		//验证冲账数量以及销售完成的状态位
+		goodsQtys.forEach(goodsQty->{
+			SpdReceiveItems originItems = new SpdReceiveItems(CollectionUtils.find("goodsId", goodsQty.getGoods().getGoodsId(), originReceives.getAllItems()));
+			int originDealQty = originItems.intSum("dealQtyByBaseUnit");
+			
+			SpdReceiveItems newItemsWithSpecialLot = new SpdReceiveItems(CollectionUtils.find("goodsId", goodsQty.getGoods().getGoodsId(), newItems));
+			int newDealQty = newItemsWithSpecialLot.intSum("dealQtyByBaseUnit");
+			log.debug("goodsQty:{}, originDealQty:{}, newDealQty:{}", goodsQty.getQty(YdsUnitLv.base.getLv()), originDealQty, newDealQty);
+			assertEquals(goodsQty.getQty(YdsUnitLv.base.getLv()), originDealQty-newDealQty);
+		});
+	}
+	
+	@Ignore @Test public void addPrepareInformByReceices(){
+		SpdReceiveBizs receives = receiveRepository.getAll();
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		for(SpdReceiveBiz receive : receives){
+			receive = receiveRepository.getWithItems(receive.getBizId());
+			SpdPrepareInformBiz prepareInform = pibService.add(receive, user);
+			receive.setPrepareInformBizId(prepareInform.getBizId());
+			
+			SpdBizItems prepareInformItems = biRepository.findByBizId(prepareInform.getBizId());
+			
+			receive.getItems().forEach(receiveItem->{
+				SpdBizItem prepareInformItem = CollectionUtils.findWhere("goodsId", receiveItem.getGoodsId(), prepareInformItems);
+				receiveItem.setOriginItemId(prepareInformItem.getBizItemId());
+				receiveItem.setOriginId(prepareInform.getBizId());
+			});
+			
+			receiveRepository.save(receive);
+			biRepository.saveAll(receive.getItems());
+		}
+		wait(20);
+	}
+}

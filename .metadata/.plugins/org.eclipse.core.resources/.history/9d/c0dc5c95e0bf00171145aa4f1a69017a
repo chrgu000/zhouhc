@@ -1,0 +1,81 @@
+package cn.ak4j.yard.extend.zsy;
+
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.extend.zsy.domain.B2BTaskBill;
+import cn.ak4j.yard.extend.zsy.domain.B2BTaskBillItem;
+import cn.ak4j.yard.extend.zsy.domain.SpdZsyIntegrationParams;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrder;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItem;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItems;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import lombok.extern.slf4j.Slf4j;
+
+@Component
+@Slf4j
+public class SpdZsyDeliveryOrderFactory {
+	
+	private final String integrationParams = "zsy_" + YardGlobalInfo.integration_params;
+
+	public SpdDeliveryOrders buildDeliveryOrder(List<B2BTaskBill> taskBills) throws Exception{
+		SpdDeliveryOrders deliveryOrders = new SpdDeliveryOrders();
+		
+		String integrationParamsStr = Conf.getAllGlobalInfos().findByKey(integrationParams).getValue();
+		
+		List<SpdZsyIntegrationParams> integrationParamsList = Global.defaultObjectMapper.readValue(integrationParamsStr, new TypeReference<List<SpdZsyIntegrationParams>>() {});
+		
+		
+		taskBills.forEach(taskBill->{
+			SpdDeliveryOrder deliveryOrder = new SpdDeliveryOrder();
+			
+			String supplierDepotId = taskBill.getItems().get(0).getClientId();
+
+			log.info("supplierDepotId:{}", supplierDepotId);
+			for(SpdZsyIntegrationParams params : integrationParamsList){
+				if(params.getParams().getOutClientId().equals(supplierDepotId)){
+					deliveryOrder.setDepotId(params.getDepotId());
+				}
+			}
+			
+			String prepareInfromBizCode = taskBill.getItems().get(0).getOutOrderId();
+			deliveryOrder.setPrepareInformBizCode(prepareInfromBizCode);
+			
+			deliveryOrder.setOrderId(taskBill.getTaskId());
+			deliveryOrder.setOrderNo(taskBill.getTaskNo());
+			
+			deliveryOrder.setDeliveryDate(new Date());
+			deliveryOrder.setItems(buildDeliveryOrderItems(taskBill.getItems()));
+			deliveryOrders.add(deliveryOrder);
+		});
+		return deliveryOrders;
+	}
+
+	private SpdDeliveryOrderItems buildDeliveryOrderItems(List<B2BTaskBillItem> billItems) {
+		SpdDeliveryOrderItems deliveryItems = new SpdDeliveryOrderItems();
+		billItems.forEach(billItem->{
+			SpdDeliveryOrderItem deliveryItem = new SpdDeliveryOrderItem();
+			deliveryItem.setOrderId(billItem.getOrderId());
+			deliveryItem.setItemId(billItem.getTaskItemId());
+//			deliveryItem.setItemCode(billItem.getOutOrderItemId());
+			deliveryItem.setEdsGoodsCode(billItem.getGdsId());
+			deliveryItem.setEdsLotNo(billItem.getLotNo());
+			deliveryItem.setEdsLotValidity(billItem.getLotExpDate());
+			deliveryItem.setEdsProduceDate(billItem.getLotProDate());
+			deliveryItem.setQty(billItem.getQty());
+			deliveryItem.setUnitName(billItem.getGdsUnit());
+			deliveryItem.setUnitPrice(billItem.getPrice());
+			deliveryItem.setGoodsType(YdsGoodsType.drug.getCode());
+			deliveryItems.add(deliveryItem);
+		});
+		return deliveryItems;
+	}
+}

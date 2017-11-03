@@ -1,0 +1,75 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import java.text.ParseException;
+import java.util.Date;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.Global;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class B2BTaskBillItem {
+
+	private String orderItemId;
+	private String addressName;
+	private String addressId;
+	private int amount;
+	private String clientId;
+	private String clientName;
+	private String clientNo;
+	private String gdsCode;
+	private String gdsFormatName;
+	private String gdsId;
+	private String gdsUnit;
+	private Date lotExpDate;
+	private String lotNo;
+	private Date lotProDate;
+	private String orderId;
+	private String orderType;
+	private String outOrderId;//备货业务ID
+	private String outOrderItemId;//备货业务明细ID
+	private float price;
+	private int qty;
+	private String taskItemId;
+	private String transCode;
+	
+	public YdsEdsGoodsLot buildEdsGoodsLot(YdsEdsGoodss edsGoodss, String orgId, PcsUser user){
+		
+		YdsEdsGoodsLot edsGoodsLot = new YdsEdsGoodsLot();
+		Date produceDate = null;
+		Date lotValidity = null;
+		try {
+			produceDate = this.lotProDate == null ? Global.sdfYMDHms.parse(Constant.lot_no_produce) :  this.lotProDate;
+			lotValidity = this.lotExpDate == null ? Global.sdfYMDHms.parse(Constant.lot_no_validity) :  this.lotExpDate;
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		
+		String theEdsLotNo = StringUtils.isNotEmpty(this.lotNo) ? this.lotNo : Constant.lot_no_empty;
+		
+		YdsEdsGoods edsGoods = CollectionUtils.findWhere("edsGoodsCode", this.gdsId, edsGoodss);
+		edsGoodsLot.setEdsGoodsId(edsGoods.getEdsGoodsId());
+		edsGoodsLot.setEdsLotNo(theEdsLotNo);
+		edsGoodsLot.setProduceDate(produceDate);
+		edsGoodsLot.setEdsLotValidity(lotValidity);
+		edsGoodsLot.setCreateTime(new Date());
+		edsGoodsLot.setEnabled(true);
+		edsGoodsLot.setCheckStateCode(CheckState.commited.getCode());
+		edsGoodsLot.setOwnerOrgId(orgId);
+		edsGoodsLot.setMaintenanceInfo(new MaintenanceInfo(user));
+		return edsGoodsLot;
+	}
+	
+}

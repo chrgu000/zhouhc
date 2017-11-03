@@ -1,0 +1,84 @@
+package cn.ak4j.yard.extend.z2;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.extend.CustomComponentDoc;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfo;
+import cn.ak4j.yard.yds.service.IYdsGoodsEventProcessor;
+import cn.ak4j.yard.yds.service.YdsGoodsInfoService;
+import cn.ak4j.yard.yds.service.YdsGoodsService;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * 中二院产品事件处理器，处理两类事件
+ * 1）新增产品：新增产品将触发自动提交产品；判断是否设置大包装转换比，如没有设置则邮件通知
+ * 2）提交产品：提交产品将触发自动为所有科室以及库房创建产品账页并发送邮件通知
+ * @author Administrator
+ *
+ */
+@Slf4j
+public class Z2GoodsEventProcessor implements IYdsGoodsEventProcessor{
+
+	@Autowired private YdsGoodsService goodsService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YdsGoodsInfoService goodsInfoService;
+	
+	@Value("${ak.addNewGoodsNotifyEmail}")
+	private String addNewGoodsNotifyEmail;
+	
+	//@Getter private int defaultBigSum = 99999999;
+	//@Autowired private NotifyMsgBuilder notifyMsgBuilder;
+	//@Autowired private MGProxy mgProxy;
+	
+	@Getter private CustomComponentDoc doc;
+	
+	public Z2GoodsEventProcessor() {
+		String name = "中二医院标准产品事件处理器";
+		String summary = "处理标准产品相关事件,在SPD服务初始化阶段,不处理事件消息。";
+		String beanName = "defaultGoodsEventProcessor";
+		String className = getClass().getName();
+		
+		Map<String, String> methodDesc = new HashMap<String, String>();
+		methodDesc.put("新增标准产品事件", "新增的标准产品为启用时,自动提交");
+		methodDesc.put("修改标准产品价格事件", "自动修改价格维护信息");
+		
+		doc = new CustomComponentDoc(name, summary, beanName, className, null, methodDesc);
+	}
+	
+	@Transactional public void process(YdsGoods goods, String userId, AmqpMsgType msgType){
+		if(Conf.isInitPhase() && msgType.equals(AmqpMsgType.COMMIT_GOODS)){
+			log.info("SPD服务初始化阶段，不处理产品提交的事件消息");
+			return ;
+		}
+		
+		PcsUser user = userRepository.findAll().findById(userId);
+		if(msgType.equals(AmqpMsgType.ADD_GOODS)){
+			if(!goods.getEnabled()){
+				return ;
+			}
+			
+			goodsService.updateCheckState(goods.getGoodsId(), CheckState.commited.getCode(), goods.getMaintenanceInfo().getLastDate(), user);
+			
+			//判断大包装转换比如果为99999999则邮件通知更新大包装转换比
+			//if(goods.getBigSum() == defaultBigSum && !Conf.isInitPhase()){
+			//	MailMsg mail = notifyMsgBuilder.buildSettingGoodsBisSumMail(goods, addNewGoodsNotifyEmail, defaultBigSum);
+			//	mgProxy.sendMail(mail);
+			//}
+			
+		}else if(msgType.equals(AmqpMsgType.UPDATE_GOODS_PRICE)){
+			goodsInfoService.modify((new YdsGoodsInfo(goods)), user);
+		}
+	}
+}

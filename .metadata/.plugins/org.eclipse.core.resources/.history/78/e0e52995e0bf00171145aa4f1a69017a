@@ -1,0 +1,20 @@
+package cn.ak4j.yard.pcs.to;
+
+import javax.persistence.Embedded;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import lombok.Data;
+
+@JsonIgnoreProperties(ignoreUnknown=true)
+@Data
+public class NewPcsUserRoleTO {
+	
+	@Embedded
+	private MaintenanceInfo maintenanceInfo;
+	private Integer yardId;
+	private String userId;
+	private String roleId;
+
+}

@@ -1,0 +1,1 @@
+update sys_global_info set VALUE='{"reportTypeCode":"hospital_credit_replenish_detail","reportTypeCode":"hospital_credit_replenish_aggregate_by_goods"}' where key='reconciliation_report_names';

@@ -1,0 +1,33 @@
+/**
+ */
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using = CommonEnumJsonSerializer.class)
+public enum SpdMoveAreaUsage implements ITypeEnum{
+
+	isolation("隔离", "隔离", "");
+	
+	@Getter @Setter	private String code;
+	@Getter @Setter	private String name;
+	@Getter @Setter	private String description;
+	
+	private SpdMoveAreaUsage(String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdMoveAreaUsage typeOf(String code){
+		for(SpdMoveAreaUsage type : SpdMoveAreaUsage.values()){
+			if(type.getCode().equals(code)){
+				return type;
+			}
+		}
+		return null;
+	}
+}

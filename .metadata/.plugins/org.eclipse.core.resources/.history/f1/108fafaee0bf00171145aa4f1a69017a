@@ -1,0 +1,32 @@
+package cn.ak4j.yard.domain;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+
+public class YardEntitiesTest {
+
+	@Test public void testFind(){
+		PcsOrgs orgs = new PcsOrgs();
+		
+		PcsOrg org1 = new PcsOrg();
+		org1.setOrgName("中山医");
+		orgs.add(org1);
+		
+		PcsOrg org2 = new PcsOrg();
+		org2.setOrgName("国药集团");
+		orgs.add(org2);
+		
+		PcsOrgParams params = new PcsOrgParams();
+		params.setOrgName(new ListParam<String>("集团",QueryParam.operation_like_in));
+		assertEquals(orgs.findByPage(params, new OrderParam(), -1, -1).size(), 1);
+	}
+	
+}

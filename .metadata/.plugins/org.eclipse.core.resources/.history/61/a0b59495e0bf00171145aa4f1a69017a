@@ -1,0 +1,256 @@
+package cn.ak4j.yard.amqp;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.annotation.PostConstruct;
+
+import org.apache.commons.lang.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.BaseException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+
+/**
+* @Description: 通知消息构造器
+* @author zhengyf
+* @date 2016年11月21日 下午2:21:33
+* @version V1.0.0
+*/
+@Component
+public class NotifyMsgBuilder {
+	
+	private Logger logger = LoggerFactory.getLogger(NotifyMsgBuilder.class);
+
+	@Autowired @Qualifier("defaultFmConfiguration") private Configuration fmConfiguration;
+	@Autowired private PcsOrgRepository orgRepository;
+	public static String toHisEmails = "zhengyf@1ycloud.net,wuyw@1ycloud.net,zhouhc@1ycloud.net,lianyk@1ycloud.net,bradyin@1ycloud.net";
+	public static String toSupEmails = "zhengyf@1ycloud.net,wuyw@1ycloud.net,zhouhc@1ycloud.net,lianyk@1ycloud.net,bradyin@1ycloud.net";
+	
+	@PostConstruct
+	public void setFmConfiguration(){
+		fmConfiguration.setDefaultEncoding(Global.defaultCharset.name());
+	}
+
+	public MailMsg buildConfirmReceiveNotifyEmail(SpdReceiveBiz receive){
+		String title = buildReceiveConfirmMailTitle();
+		String content = "";
+		try{
+			Template template = fmConfiguration.getTemplate("confirmReceive.fm");
+			Map<String, Object> model = new HashMap<String, Object>();
+			model.put("receive", receive);
+			content = FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+		}catch(Exception e){
+			logger.error(e.getMessage(), e);
+		}
+				
+		return new MailMsg(title, content, Conf.getDepotNotifyEmails());
+	}
+	
+	public MailMsg buildSyncPrepareInformFailEmail(SpdPrepareInformBiz prepareInform, OperateFailException e){
+		String titleContent = String.format("同步备货通知[%s]失败", prepareInform.getBizCode());
+		String title = buildMailTitle(titleContent);
+		return new MailMsg(title, ExceptionUtils.getFullStackTrace(e.getCause()), "spd@1ycloud.net");
+	}
+	
+	private String buildReceiveConfirmMailTitle(){
+		if(Conf.getEnv().equals("prod")){
+			PcsOrg org = orgRepository.findAll().getMainOrg();
+			return String.format("[%s]SPD系统收货确认通知", org.getOrgAbbr());
+		}else{
+			return "[澳加测试]SPD系统收货确认通知";
+		}
+	}
+	
+	public MailMsg buildAutoCreateDepotCardEmail(YdsGoods goods, SpdDepotCards depotCards, PcsDepots depots){
+		String title = buildMailTitle("帐页创建通知");
+		String content = "";
+		//TODO 完成构造自动创建账页的通知邮件
+		try{
+			Template template = fmConfiguration.getTemplate("createDepotCardTemplate.fm");
+			Map<String, Object> model = new HashMap<String, Object>();
+			model.put("goods", goods);
+			model.put("depotCards", depotCards);
+			model.put("depots", depots);
+			model.put("count", depots.size());
+			content = FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+		}catch(Exception e){
+			logger.error(e.getMessage(), e);
+		}
+		return new MailMsg(title, content, Conf.getDepotNotifyEmails());
+	}
+	
+	public MailMsg buildSettingGoodsBisSumMail(YdsGoods goods, String addNewGoodsNotifyEmail, int defaultBigSum){
+		String title = buildMailTitle("产品大包装转换比设置通知");
+		String content = String.format("[%s]%s没有设置大包装转换比,默认设置为:%d,请及时调整！", goods.getGoodsCode(), goods.getGoodsName(), defaultBigSum);
+		return new MailMsg(title, content, addNewGoodsNotifyEmail);
+	}
+	
+	public MailMsg buildHisDeliveryOrderMail(SpdDeliveryOrders deliveryOrders, PcsUser user){
+		return new MailMsg(buildMailTitle("有新的收货单，请及时确认"), buildHisDeleveryOrderMailContent(deliveryOrders, user), toHisEmails);
+	}
+	
+	public MailMsg buildSupDeliveryOrderMail(SpdDeliveryOrders deliveryOrders, PcsUser user){
+		return new MailMsg(buildSupDeliveryOrderMailTitle(user.getOrgId()), buildSupDeleveryOrderMailContent(deliveryOrders), toSupEmails);
+	}
+	
+	private String buildSupDeliveryOrderMailTitle(String orgId){
+		String supMailTitle = "[澳加测试]发货单发送成功";
+		if(Conf.getEnv().equals("prod")){
+			String supOrgName = orgRepository.findAll().findById(orgId).getOrgAbbr();
+			supMailTitle = String.format("[%s]发货单发送成功", supOrgName);
+		}
+		return supMailTitle;
+	}
+	
+	private String buildHisDeleveryOrderMailContent(SpdDeliveryOrders deliveryOrders, PcsUser user){
+		String hisMailContent = "";
+		try {
+			PcsOrg supplier = orgRepository.findAll().findById(user.getOrgId());
+			Template hisTemplate = fmConfiguration.getTemplate("hisDeliverySheetTemplate.fm");
+			Map<String, Object> model = new HashMap<String, Object>();
+			model.put("deliveryOrders", deliveryOrders);
+			model.put("supplier", supplier);
+			model.put("emptyLotNo", Constant.lot_no_empty);
+			model.put("emptyProduce", Global.sdfYMDHms.parse(Constant.lot_no_produce));
+			model.put("emptyValidity", Global.sdfYMDHms.parse(Constant.lot_no_validity));
+			hisMailContent = FreeMarkerTemplateUtils.processTemplateIntoString(hisTemplate, model);
+		} catch (Exception e) {
+			logger.error("邮件内容编译失败", e);
+			hisMailContent = "邮件内容编译失败";
+		}
+		return hisMailContent;
+	}
+	
+	private String buildSupDeleveryOrderMailContent(SpdDeliveryOrders deliveryOrders){
+		String supMailContent = "";
+		try {
+			Template supTemplate = fmConfiguration.getTemplate("supDeliverySheetTemplate.fm");
+			Map<String, Object> model = new HashMap<String, Object>();
+			model.put("deliveryOrders", deliveryOrders);
+			supMailContent = FreeMarkerTemplateUtils.processTemplateIntoString(supTemplate, model);
+		} catch (Exception e) {
+			logger.error("邮件内容编译失败", e);
+			supMailContent = "邮件内容编译失败";
+		}
+		return supMailContent;
+	}
+
+	public MailMsg buildConfirmReplenishMail(SpdReplenishBiz replenish) {
+		String mailTitle = buildMailTitle("有新的申领业务，请及时确认");
+		String mailContent = "";
+		try {
+			Template template = fmConfiguration.getTemplate("confirmReplenish.fm");
+			Map<String, Object> model = new HashMap<String, Object>();
+			model.put("replenish", replenish);
+			mailContent = FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+		} catch (Exception e) {
+			logger.error("邮件内容编译失败", e);
+			mailContent = "邮件内容编译失败";
+		}
+		
+		return new MailMsg(mailTitle, mailContent, Conf.getDepotNotifyEmails());
+	}
+
+	public MailMsg buildReplenishHasNotLotMail(SpdReplenishBiz replenish, SpdBizItems hasNotLotBizItems) {
+		String mailTitle = buildMailTitle("请领产品无批次通知");
+		String mailContent = "";
+		try {
+			Template template = fmConfiguration.getTemplate("newReplenishHasNotLot.fm");
+			Map<String, Object> model = new HashMap<String, Object>();
+			model.put("replenish", replenish);
+			model.put("bizItems", hasNotLotBizItems);
+			mailContent = FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+		} catch (Exception e) {
+			logger.error("邮件内容编译失败", e);
+			mailContent = "邮件内容编译失败";
+		}
+		
+		return new MailMsg(mailTitle, mailContent, "spd@1ycloud.net");
+	}
+	
+	public String getMailTitlePref(){
+		if(Conf.getEnv().equals("prod")){
+			PcsOrg org = orgRepository.findAll().getMainOrg();
+			return String.format("[%s]", org.getOrgAbbr());
+		}else{
+			return "[澳加测试]";
+		}
+	}
+	
+	private String buildMailTitle(String titleContent){
+		return getMailTitlePref() + titleContent;
+	}
+
+	public MailMsg buildScheduleTaskErrorMsg(Exception e, String taskName) {
+		String content = "";
+		if(e instanceof BaseException){
+			content = ((BaseException)e).getErrorInfo().toString();
+		}else{
+			content = ExceptionUtils.getStackTrace(e);
+		}
+		String title = String.format("%s定时任务:[%s], 执行失败", getMailTitlePref(), taskName);
+		return new MailMsg(title, content, "spd@1ycloud.net");
+	}
+
+	public MailMsg buildPrepareInformMail(SpdPrepareInformBiz prepareInform) {
+		String mailTitle = buildMailTitle("有新的备货单");
+		String mailContent = "";
+		try {
+			Template template = fmConfiguration.getTemplate("prepareInform.fm");
+			Map<String, Object> model = new HashMap<String, Object>();
+			model.put("prepareInform", prepareInform);
+			mailContent = FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+		} catch (Exception e) {
+			logger.error("邮件内容编译失败", e);
+			mailContent = "邮件内容编译失败";
+		}
+		
+		return new MailMsg(mailTitle, mailContent, "spd@1ycloud.net");
+	}
+
+	public MailMsg buildSyncReturnGoodsFailEmail(SpdReturnGoodsBiz returnGoods, Exception e) {
+		String titleContent = String.format("同步备货退货[%s]失败", returnGoods.getBizCode());
+		String title = buildMailTitle(titleContent);
+		return new MailMsg(title, ExceptionUtils.getFullStackTrace(e.getCause()), "spd@1ycloud.net");
+	}
+
+	public MailMsg buildNotEnoughDepotGoodsStockEmail(PcsDepot depot, YdsGoodss goodss, String email) {
+		String titleContent = String.format("[%s]库存少于下限", depot.getDepotName());
+		String title = buildMailTitle(titleContent);
+		String buffer = new String();
+		buffer += String.format("仓库[%s]以下产品库存少于下限,请及时备货", depot.getDepotName());
+		buffer += "<pre>\n\r";
+		for(YdsGoods goods : goodss){
+			buffer += (String.format("[%s]%s\n\r", goods.getGoodsCode(), goods.getGoodsName()));
+		}
+		buffer+= "</pre>";
+		return new MailMsg(title, buffer, email);
+	}
+	
+}

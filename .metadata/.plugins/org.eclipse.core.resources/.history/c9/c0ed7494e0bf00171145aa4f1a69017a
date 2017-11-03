@@ -1,0 +1,56 @@
+package cn.ak4j.yard.spd.supply.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdDeliveryOrderItems extends ArrayList<SpdDeliveryOrderItem>{
+	private static final long serialVersionUID = 4458174364781280687L;
+
+	public void fillGoods(YdsGoodsRepository goodsRepository, YdsEdsGoodsRepository egRepository) {
+		List<String> edsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", this);
+		YdsEdsGoodss edsGoodss = egRepository.findAll().findByEdsGoodsCodes(edsGoodsCodes);
+		
+		List<String> goodsIds = CollectionUtils.pluck("yardGoodsId", edsGoodss);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds);
+		
+		this.forEach(orderItem->{
+			YdsEdsGoods edsGoods = CollectionUtils.findWhere("edsGoodsCode", orderItem.getEdsGoodsCode(), edsGoodss);
+			orderItem.setEdsGoods(edsGoods);
+			
+			YdsGoods goods = CollectionUtils.findWhere("goodsId", edsGoods.getYardGoodsId(), goodss);
+			orderItem.setGoods(goods);
+		});
+	}
+
+	@JsonIgnore
+	public List<YdsEdsGoodsLot> getAllEdsGoodsLot() {
+		List<YdsEdsGoodsLot>  edsGoodsLotList = new ArrayList<YdsEdsGoodsLot>();
+		this.forEach(item->{
+			edsGoodsLotList.add(item.getEdsGoodsLot());
+		});
+		return edsGoodsLotList;
+	}
+	
+	@JsonIgnore
+	public int getGoodsQtyByPrepareUnit(String goodsId){
+		int qty = 0;
+		for(SpdDeliveryOrderItem item : this){
+			if(item.getGoods().getGoodsId().equals(goodsId)){
+				qty += (item.getQty() * item.getEdsGoods().getEdsYdsUnitRatio());
+			}
+		}
+		return qty;
+	}
+
+}

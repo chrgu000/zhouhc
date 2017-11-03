@@ -1,0 +1,28 @@
+package cn.ak4j.yard.pcs.domain;
+
+import lombok.Getter;
+import lombok.Setter;
+
+public class PcsFunction {
+	
+	@Getter @Setter
+	private String functionId;
+	
+	@Getter @Setter
+	private String functionName;
+	
+	@Getter @Setter
+	private PcsOperations operations = new PcsOperations();
+	
+	public PcsFunction(){}
+	
+	public PcsFunction(String functionId, String functionName){
+		setFunctionId(functionId);
+		setFunctionName(functionName);
+	}
+	
+	public void addOperation(PcsOperation operation){
+		operations.add(operation);
+	}
+	
+}

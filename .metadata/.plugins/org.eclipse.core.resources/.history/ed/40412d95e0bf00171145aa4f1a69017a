@@ -1,0 +1,34 @@
+package cn.ak4j.yard.pcs.to;
+
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import lombok.Data;
+
+@Data
+public class PcsDeptExcelTO {
+
+	private String deptId;
+	private String parentId;
+	private String orgId;
+	private String deptName;
+	private String deptCode;
+	private String deptType;
+	private boolean enabled;
+	private boolean mainFlag;
+	private String defaultUserId;
+	private PcsDept parentDept;
+	
+	public String getEnabledText(){
+		if(isEnabled()){
+			return "是";
+		}
+		return "否";
+	}
+	
+	public String getParentDeptName(){
+		if(getParentDept() == null){
+			return "";
+		}
+		return getParentDept().getDeptName();
+	}
+	
+}

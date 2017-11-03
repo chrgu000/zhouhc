@@ -1,0 +1,10 @@
+--1) 周转箱修改周转箱编码字段，周转箱增加sceneCode、ownerId字段
+ALTER TABLE spd_turnover_box RENAME COLUMN TURNOVER_BOX_ID TO ID;
+ALTER TABLE spd_turnover_box RENAME COLUMN TURNOVER_BOX_CODE TO wrapper_no;
+alter table spd_turnover_box add(scene_code varchar2(32));
+alter table spd_turnover_box add(owner_id varchar2(32));
+
+--2) 所有作业明细字段增加parent_wrapper_id
+alter table spd_logistics_task_item add(parent_wrapper_id varchar2(32));
+alter table spd_on_shelf_task_item add(parent_wrapper_id varchar2(32));
+alter table spd_off_shelf_task_item add(parent_wrapper_id varchar2(32));

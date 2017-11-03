@@ -1,0 +1,231 @@
+package cn.ak4j.yard.datahelper;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+
+@Ignore
+public class ReplenishBizHelper extends BaseTest{
+
+	@Autowired private SpdReplenishBizService rbService;
+	@Autowired private PcsUserRepository userRepository;
+	
+	String fromOrgId = "626";
+	String toOrgId = "626";
+	
+	@Test public void createReplenishs(){
+		addNewCreatedReplenish();
+		addCommitedReplenish();
+	}
+	
+	@Test public void addNewCreatedReplenish(){
+		String fromDepotId = "depot_id_001";
+		String toDepotId = "depot_id_003";
+		String routeId = "depot_route_id_010";
+		String userId = "user_id_002";
+		
+		SpdBizItems items = new SpdBizItems();
+		
+		SpdBizItem item3 = new SpdBizItem();
+		item3.setPlanQty(300);
+		item3.setGoodsId("goods_id_005");
+		item3.setLotId("goods_lot_id_021");
+		item3.setUnitPrice(20.5f);
+		item3.setUnitLv(2);
+		items.add(item3);
+		
+		SpdBizItem item4 = new SpdBizItem();
+		item4.setPlanQty(400);
+		item4.setGoodsId("goods_id_006");
+		item4.setLotId("goods_lot_id_017");
+		item4.setUnitPrice(123.2f);
+		item4.setUnitLv(2);
+		items.add(item4);
+		
+		addReplenish(userId, items, fromOrgId, fromDepotId, toOrgId, toDepotId, routeId, PcsAreaType.normal, "未提交申领业务,类型为库房调拨");
+		wait(2);
+	}
+	
+	@Test public void addCommitedReplenish(){
+		String fromOrgId = "626";
+		String toOrgId = "626";
+		String fromDepotId = "depot_id_001";
+		String toDepotId = "depot_id_003";
+		String routeId = "depot_route_id_010";
+		String userId = "user_id_002";
+		
+		SpdBizItems items = new SpdBizItems();
+		
+		SpdBizItem item3 = new SpdBizItem();
+		item3.setPlanQty(300);
+		item3.setGoodsId("goods_id_005");
+		item3.setLotId("goods_lot_id_021");
+		item3.setUnitPrice(20.5f);
+		item3.setUnitLv(2);
+		items.add(item3);
+		
+		SpdBizItem item4 = new SpdBizItem();
+		item4.setPlanQty(400);
+		item4.setGoodsId("goods_id_006");
+		item4.setLotId("goods_lot_id_017");
+		item4.setUnitPrice(123.2f);
+		item4.setUnitLv(2);
+		items.add(item4);
+
+		addReplenish(userId, items, fromOrgId, fromDepotId, toOrgId, toDepotId, routeId, PcsAreaType.normal, "已提交申领业务,类型为库房调拨");
+		wait(2);
+	}
+	
+	@Test public void addCommitedReplenishWithoutEnoughStock(){
+		String fromOrgId = "626";
+		String toOrgId = "626";
+		String fromDepotId = "depot_id_001";
+		String toDepotId = "depot_id_003";
+		String routeId = "depot_route_id_010";
+		String userId = "user_id_002";
+		
+		SpdBizItems items = new SpdBizItems();
+		
+		SpdBizItem item1 = new SpdBizItem();
+		item1.setPlanQty(30);
+		item1.setGoodsId("goods_id_016");
+		item1.setUnitPrice(10.5f);
+		item1.setUnitLv(2);
+		items.add(item1);
+		
+		SpdBizItem item2 = new SpdBizItem();
+		item2.setPlanQty(100);
+		item2.setGoodsId("goods_id_012");
+		item2.setUnitPrice(23.2f);
+		item2.setUnitLv(2);
+		items.add(item2);
+
+		addReplenish(userId, items, fromOrgId, fromDepotId, toOrgId, toDepotId, routeId, PcsAreaType.normal, "已提交申领业务,类型为库房调拨");
+		wait(2);
+	}
+	
+	
+	@Test public void addOffShelfTaskCreatedReplenish(){
+		String fromDepotId = "depot_id_001";
+		String userId = "user_id_002";
+		
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdReplenishBiz replenish = new SpdReplenishBiz();
+		//待修复，这里的申领规则不一定是只步进到自动创建下架作业
+		replenish.setBizRuleId("rep_rule_id_10");
+		replenish.setMaintenanceInfo(new MaintenanceInfo(user));
+		replenish.setCreatorDepotId(fromDepotId);
+		SpdBizItems items = new SpdBizItems();
+		
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put("goods_id_021", 3638);
+		map.put("goods_id_026", 1);
+		map.put("goods_id_027", 6);
+		map.put("goods_id_004", 95);
+		map.put("goods_id_035", 5772);
+		map.put("goods_id_025", 60);
+		map.put("goods_id_023", 36);
+		
+		map.entrySet().forEach(entry->{
+			SpdBizItem item = new SpdBizItem();
+			item.setPlanQty(entry.getValue());
+			item.setGoodsId(entry.getKey());
+			item.setUnitPrice(32.5f);
+			item.setUnitLv(2);
+			items.add(item);
+		});
+		replenish.setItems(items);
+		
+		replenish = rbService.add(replenish, user);
+		wait(5);
+	}
+	
+	@Test public void addDeliveryTaskCommitedReplenish(){
+		String fromDepotId = "depot_id_001";
+		String userId = "user_id_002";
+		
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdReplenishBiz replenish = new SpdReplenishBiz();
+		//待修复，设置合适的业务规则
+		replenish.setMaintenanceInfo(new MaintenanceInfo(user));
+		replenish.setCreatorDepotId(fromDepotId);
+		SpdBizItems items = new SpdBizItems();
+		
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put("goods_id_005", 111);
+		map.put("goods_id_007", 161);
+		map.put("goods_id_010", 143);
+		map.put("goods_id_015", 121);
+		map.put("goods_id_002", 33);
+		
+		map.entrySet().forEach(entry->{
+			SpdBizItem item = new SpdBizItem();
+			item.setPlanQty(entry.getValue());
+			item.setGoodsId(entry.getKey());
+			item.setUnitPrice(32.5f);
+			item.setUnitLv(2);
+			items.add(item);
+		});
+		replenish.setItems(items);
+		
+		replenish = rbService.add(replenish, user);
+		wait(5);
+	}
+	
+	@Test public void addDeliveryTaskReviewedReplenish(){
+		String fromDepotId = "depot_id_001";
+		String userId = "user_id_002";
+		
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdReplenishBiz replenish = new SpdReplenishBiz();
+		//待修复，设置合适的业务规则
+		replenish.setMaintenanceInfo(new MaintenanceInfo(user));
+		replenish.setCreatorDepotId(fromDepotId);
+		SpdBizItems items = new SpdBizItems();
+		
+		Map<String, Integer> map = new HashMap<String, Integer>();
+//		map.put("goods_id_001", 33);
+//		map.put("goods_id_005", 61);
+//		map.put("goods_id_006", 28);
+		map.put("goods_id_014", 5);
+		
+		map.entrySet().forEach(entry->{
+			SpdBizItem item = new SpdBizItem();
+			item.setPlanQty(entry.getValue());
+			item.setGoodsId(entry.getKey());
+			item.setUnitPrice(12.5f);
+			item.setUnitLv(2);
+			items.add(item);
+		});
+		replenish.setItems(items);
+		
+		replenish = rbService.add(replenish, user);
+		wait(5);
+	}
+	
+	private void addReplenish(String userId, SpdBizItems items, String fromOrgId, String fromDepotId, String toOrgId, String toDepotId, String routeId, PcsAreaType areaType, String describe){
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdReplenishBiz replenish = new SpdReplenishBiz();
+		MaintenanceInfo maintanceInfo = new MaintenanceInfo(user);
+		maintanceInfo.setDescribe(describe);
+		replenish.setMaintenanceInfo(maintanceInfo);
+		replenish.setCreatorDepotId(fromDepotId);
+		replenish.setItems(items);
+		
+		replenish = rbService.add(replenish, user);
+	}
+	
+}

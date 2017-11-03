@@ -1,0 +1,3 @@
+
+update spd_fin_rec_rule set SUPPLIER_DEPT_ID='ff8080815e523e63015e54b1b2650000' where id ='ff8080815f1fdb83015f1ff5ac060008';
+update spd_fin_rec_rule set INTIGRATION_COMPONENT = 'zsySupplierProxy';

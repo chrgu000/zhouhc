@@ -1,0 +1,1 @@
+Insert into SYS_GLOBAL_INFO (KEY,NAME,VALUE,DESCRIPTION,CREATE_TIME,LAST_UPDATE_TIME,EDITABLE) values ('biz_unit_setting','业务单位设置','[4,2,1]','配置当前实施环境下业务所使用到的单位级别',sysDate,sysDate,'0');

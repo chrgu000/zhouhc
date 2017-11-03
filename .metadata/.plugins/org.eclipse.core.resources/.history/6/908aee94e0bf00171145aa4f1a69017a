@@ -1,0 +1,264 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUserToken;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAllBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+
+
+@RestController
+public class SpdReplenishBizResource {
+	
+	private Logger logger = LoggerFactory.getLogger(SpdReplenishBizResource.class);
+	
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdReplenishBizService rbService;
+	@Autowired private SpdAllBizSteps allBizSteps;
+	
+	@RequestMapping(value="/yard/spd/repenishBizSteps")
+	public SpdBizSteps bizSteps(){
+		return allBizSteps.get(SpdBizType.replenish_biz);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReplenishs", method = RequestMethod.GET)
+	public SpdReplenishBizs findAll(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, 
+			HttpServletRequest request){
+		SpdReplenishBizParams params = SpdReplenishBizParams.buildParamsFromJson(paramsStr, SpdReplenishBizParams.class);
+		if(params == null){
+			params = new SpdReplenishBizParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = OrderParam.getDefaultOrder();
+		}
+		
+		return rbRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReplenishs/count", method = RequestMethod.GET)
+	public int findAllCount(@RequestParam(value = "params", required = false) String paramsStr, HttpServletRequest request){
+		SpdReplenishBizParams params = SpdReplenishBizParams.buildParamsFromJson(paramsStr, SpdReplenishBizParams.class);
+		if(params == null){
+			params = new SpdReplenishBizParams();
+		}
+		
+		return rbRepository.count(params);
+	}
+
+	@RequestMapping(value = "/yard/spd/spdReplenishs/mine", method = RequestMethod.GET)
+	public SpdReplenishBizs findUnProcessedReplenish(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, 
+			HttpServletRequest request){
+		
+		//查找出隶属部门所管理的仓库
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		
+		SpdReplenishBizParams params = SpdReplenishBizParams.buildParamsFromJson(paramsStr, SpdReplenishBizParams.class);
+		if(params == null){
+			params = new SpdReplenishBizParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = OrderParam.getDefaultOrder();
+		}
+		
+		SpdReplenishBizs unProcessedReplenish = rbService.findWaitingProcessReplenish(user, params);
+		
+		return new SpdReplenishBizs(unProcessedReplenish.findByPage(params, order, currentPage-1, pageSize));
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdReplenishs/mine/count", method = RequestMethod.GET)
+	public int countUnProcessedReplenish(
+			@RequestParam(value = "params", required = false) String paramsStr,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		
+		SpdReplenishBizParams params = SpdReplenishBizParams.buildParamsFromJson(paramsStr, SpdReplenishBizParams.class);
+		if(params == null){
+			params = new SpdReplenishBizParams();
+		}
+		
+		SpdReplenishBizs unProcessedReplenish = rbService.findWaitingProcessReplenish(user, params);
+		return unProcessedReplenish.find(params).size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReplenishs/depotCorrelation", method = RequestMethod.GET)
+	public List<SpdReplenishBiz> findByDepotCorrelation(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, 
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdReplenishBizParams params = SpdReplenishBizParams.buildParamsFromJson(paramsStr, SpdReplenishBizParams.class);
+		if(params == null){
+			params = new SpdReplenishBizParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = OrderParam.getDefaultOrder();
+		}
+		
+		SpdReplenishBizs replenishs = rbService.findByDepotCorrelation(params, user);
+		return new SpdReplenishBizs(replenishs.findByPage(params, order, currentPage-1, pageSize));
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReplenishs/depotCorrelation/count", method = RequestMethod.GET)
+	public int findByDepotCorrelation(@RequestParam(value = "params", required = false) String paramsStr, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdReplenishBizParams params = SpdReplenishBizParams.buildParamsFromJson(paramsStr, SpdReplenishBizParams.class);
+		if(params == null){
+			params = new SpdReplenishBizParams();
+		}
+		return rbService.findByDepotCorrelation(params, user).size();
+	}
+		
+	@RequestMapping(value = "/yard/spd/spdReplenishs/ids,{ids}", method = RequestMethod.GET)
+	public SpdReplenishBizs getByIds(@PathVariable("ids") String ids) {
+		return rbRepository.getByIds(ids);
+	}
+	 
+	@RequestMapping(value="/yard/spd/spdReplenishs", method = RequestMethod.POST)
+	public SpdReplenishBiz add(@RequestBody SpdReplenishBiz replenish, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		String accessToken = request.getAttribute(Constant.access_token_attr_name).toString();
+		String clientType = PcsUserToken.getClientTypeFromAccessToken(accessToken);
+		if(replenish.getMaintenanceInfo() == null || StringUtils.isEmpty(replenish.getMaintenanceInfo().getCreateUserId())){
+			replenish.setMaintenanceInfo(new MaintenanceInfo(user));
+		}
+		replenish.setChannelTypeCode(clientType);
+		replenish = rbService.add(replenish, user);
+
+		return replenish;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReplenishs/{bizId}", method = RequestMethod.PUT)
+	public SpdReplenishBiz modify(@RequestBody SpdReplenishBiz replenishBiz, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		replenishBiz = rbService.modify(replenishBiz, user);
+		return replenishBiz;
+	}
+
+	@RequestMapping(value="/yard/spd/spdReplenishs/{bizId}/bizRuleId", method = RequestMethod.PUT)
+	public Map<String, Object> updateBizRuleId(@PathVariable("bizId")String bizId, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		String bizRuleType = request.getParameter("bizRuleType"); 
+		SpdReplenishBiz replenish = rbService.updateBizRuleId(bizId, bizRuleType, user);
+		Map<String, Object> result = new HashMap<String, Object>();
+		result.put("bizRuleId", replenish.getBizRuleId());
+		result.put("lastUpdateTime", replenish.getMaintenanceInfo().getLastDate().getTime());
+		return result;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReplenishs/modifyQuickMode", method = RequestMethod.PUT)
+	public SpdReplenishBiz modifyAttributeQuickMode(@RequestBody SpdReplenishBiz replenish,HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdReplenishBiz replenishPo = rbRepository.findOne(replenish.getBizId());
+		Date orginDate = replenishPo.getMaintenanceInfo().getLastDate();
+		Date targetDate = replenish.getMaintenanceInfo().getLastDate();
+		if(targetDate.getTime()-orginDate.getTime() != 0){
+			throw new InvalidDataException(YardExceptionType.invalid_inconsistent_timestamp, orginDate.getTime(), targetDate.getTime());
+		}
+		try{
+			int checkStateCode = replenishPo.getCheckStateCode();
+			BeanUtils.copyProperties(replenishPo, replenish);
+			replenishPo.setCheckStateCode(checkStateCode);
+			replenishPo.getMaintenanceInfo().updateByUser(user.getOrgId(), user.getUserId());
+		}catch(Exception e){
+			logger.error(ExceptionUtils.getStackTrace(e));
+		}
+		replenishPo = rbRepository.save(replenishPo);
+		return replenishPo;
+	}
+
+
+	@RequestMapping(value="/yard/spd/spdReplenishs/{bizId}", method = RequestMethod.DELETE)
+	public String delete(@PathVariable("bizId") String bizId, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		rbService.delete(bizId, user);
+		
+		return "SUCCESS";
+	}
+	
+	
+	@RequestMapping(value={"/yard/spd/spdReplenishs/{bizId}/checkState/commited",
+			"/yard/spd/spdReplenishs/{bizId}/checkState/reviewed"}, method = RequestMethod.PUT)
+	public CheckStateTO updateCheckStatCode(
+			@PathVariable("bizId") String bizId,
+			@RequestBody CheckStateTO checkStateTo,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		SpdReplenishBiz replenishBiz =  rbService.updateCheckState(bizId, checkStateTo.getCheckStateCode(), checkStateTo.getLastDate(), user);
+		return new CheckStateTO(replenishBiz.getCheckStateCode(), replenishBiz.getLastUpdateTime());
+	}
+	
+	
+	/**
+	 * 查询当前调度所关联的申领业务
+	 *
+	 */
+	@RequestMapping(value = "/yard/spd/dispatchers/{dispatcherId}/relationReplenishs", method = RequestMethod.GET)
+	public SpdReplenishBizs findDispatcherRelationReplenishs(@PathVariable(value = "dispatcherId")String dispatcherId){
+		return rbService.findDispatcherRelationReplenishs(dispatcherId);
+	}
+	
+	@RequestMapping(value = "/yard/spd/dispatchers/{dispatcherId}/relationReplenishs/count", method = RequestMethod.GET)
+	public int countDispatcherRelationReplenishs(@PathVariable(value = "dispatcherId")String dispatcherId){
+		return rbService.findDispatcherRelationReplenishs(dispatcherId).size();
+	}
+	
+	
+	/**
+	 * 查询当前调度可调度的申领业务
+	 */
+	@RequestMapping(value = "/yard/spd/dispatchers/{dispatcherId}/dispatchableReplenishs", method = RequestMethod.GET)
+	public SpdReplenishBizs findDispatchableReplenishs(@PathVariable(value = "dispatcherId")String dispatcherId){
+		return rbService.findDispatcherableReplenishs(dispatcherId);
+	}
+	
+	@RequestMapping(value = "/yard/spd/dispatchers/{dispatcherId}/dispatchableReplenishs/count", method = RequestMethod.GET)
+	public int countDispatchableReplenishs(@PathVariable(value = "dispatcherId")String dispatcherId){
+		return rbService.findDispatcherableReplenishs(dispatcherId).size();
+	}
+	
+}
+
+

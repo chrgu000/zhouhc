@@ -1,0 +1,39 @@
+package cn.ak4j.yard.web.request;
+
+import javax.servlet.http.HttpServletRequest;
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 请求基类
+* @author zhengyf
+* @date 2016年11月28日 下午7:06:24
+* @version V1.0.0
+*/
+@Data
+@NoArgsConstructor
+@EqualsAndHashCode(callSuper=false)
+public abstract class YardRequest {
+
+	private String moduleName;
+	private String subModuleName;
+	private String resourceName;
+	private String domainName;
+	private String methodName;
+	
+	private String[] uriArr;
+	
+	public YardRequest(HttpServletRequest request){
+		this.methodName = request.getMethod();
+		String uri = request.getRequestURI();
+		this.uriArr = uri.split("/");
+		
+		setModuleName(uriArr[2]);
+		String resourceName = uriArr[3].replace(getModuleName(), "");
+		this.resourceName = resourceName.substring(0, resourceName.length()-1);		
+	}
+
+	
+}

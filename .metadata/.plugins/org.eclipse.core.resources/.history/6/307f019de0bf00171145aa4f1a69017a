@@ -1,0 +1,2 @@
+insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback)
+  values ('rep_fb_id_14','申领半自动反馈08','1','1','0','1','1','0','1','1','0','0',sysDate,sysDate,'replenish','1');

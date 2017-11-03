@@ -1,0 +1,7 @@
+package cn.ak4j.yard.extend;
+
+public interface ICustomComponent {
+	
+	CustomComponentDoc getDoc();
+	
+}

@@ -1,0 +1,109 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.enums.PcsAreaType;
+
+public class SpdReturnGoodsRuleTest {
+
+	@Test public void testEqualsRule(){
+		SpdReturnGoodsRule rule01 = createReturnGoodsRule();
+		SpdReturnGoodsRule rule02 = createReturnGoodsRule();
+		
+		assertTrue(rule01.equalsRule(rule02));
+		
+		rule02 = createReturnGoodsRule();
+		rule02.setOriginRuleId("ret_rule_id_05");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createReturnGoodsRule();
+		rule02.setManualReturnGoods(false);;
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createReturnGoodsRule();
+		rule02.setReturnGoodsComponent("通知组件");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createReturnGoodsRule();
+		rule02.setFeedbackRuleId("ret_fb_id_17");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createReturnGoodsRule();
+		rule02.getDirectionRule().setFromDepotId("depot_id_006");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createReturnGoodsRule();
+		rule02.getDirectionRule().setFromAreaType(PcsAreaType.isolation.getCode());;
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createReturnGoodsRule();
+		rule02.getDirectionRule().setToOrgId("org_id_003");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createReturnGoodsRule();
+		rule02.getDirectionRule().setToDeptId("dept_id_001");;
+		assertFalse(rule01.equalsRule(rule02));
+	}
+	
+	@Test public void testUpdate(){
+		SpdReturnGoodsRule rule01 = createReturnGoodsRule();
+		SpdReturnGoodsRule rule02 = createReturnGoodsRule();
+		SpdReturnGoodsRule rule03 = createReturnGoodsRule();
+		
+		rule01.setName("备货退货测试");
+		rule01.setPrior(100);
+		rule01.setEnabled(false);
+		rule01.setCanBeOriginRule(false);
+		rule01.setManualReturnGoods(false);
+		rule01.setReturnGoodsComponent("通知组件测试");
+		rule01.setFeedbackRuleId("ret_fb_id_17");
+		rule01.setOriginRuleId("ret_rule_id_05");
+		rule01.setManualApply(false);
+		rule01.getDirectionRule().setFromDepotId("depot_id_001");
+		rule01.getDirectionRule().setFromAreaType(PcsAreaType.unqualified.getCode());
+		rule01.getDirectionRule().setToDeptId("dept_id_005");
+		rule01.getDirectionRule().setToOrgId("org_id_001");
+		
+		rule02.update(rule01);
+		
+		assertTrue(rule02.getName()!=rule03.getName());
+		assertTrue(rule02.getPrior()!=rule03.getPrior());
+		assertTrue(rule02.getEnabled()!=rule03.getEnabled());
+		assertTrue(rule02.getCanBeOriginRule()!=rule03.getCanBeOriginRule());
+		assertTrue(rule02.getManualReturnGoods()!=rule03.getManualReturnGoods());
+		assertTrue(rule02.getReturnGoodsComponent()!=rule03.getReturnGoodsComponent());
+		assertTrue(rule02.getManualApply()!=rule03.getManualApply());
+		
+		assertTrue(rule02.getFeedbackRuleId() == rule03.getFeedbackRuleId());
+		assertTrue(rule02.getDirectionRule().getToOrgId()==rule03.getDirectionRule().getToOrgId());
+		assertTrue(rule02.getDirectionRule().getToDeptId()==rule03.getDirectionRule().getToDeptId());
+		assertTrue(rule02.getDirectionRule().getFromDepotId()==rule03.getDirectionRule().getFromDepotId());
+		assertTrue(rule02.getDirectionRule().getFromAreaType()==rule03.getDirectionRule().getFromAreaType());
+	}
+	
+	private SpdReturnGoodsRule createReturnGoodsRule(){
+		SpdReturnGoodsRule rule = new SpdReturnGoodsRule();
+		
+		rule.setName("备货退货");
+		rule.setPrior(99);
+		rule.setEnabled(true);
+		rule.setCanBeOriginRule(true);
+		rule.setAutoAssignReceive(false);
+		rule.setManualReturnGoods(true);
+		rule.setReturnGoodsComponent("");
+		rule.setFeedbackRuleId("ret_fb_id_16");
+		rule.setOriginRuleId("");
+		SpdReturnGoodsDirectionRule directionRule = new SpdReturnGoodsDirectionRule();
+		directionRule.setFromDepotId("depot_id_001");
+		directionRule.setFromAreaType(PcsAreaType.unqualified.getCode());
+		directionRule.setToDeptId("dept_id_005");
+		directionRule.setToOrgId("org_id_001");
+		rule.setDirectionRule(directionRule);
+		return rule;
+	}
+}

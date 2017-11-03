@@ -1,0 +1,58 @@
+package cn.ak4j.yard.pcs.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="PCS_USER_ROLE")
+@JsonIgnoreProperties(value={"hibernateLazyInitializer","handler"})
+@SuppressWarnings({"serial"})
+public class PcsUserRole  extends YardMaintenceEntity{
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Id
+	@GeneratedValue(strategy=GenerationType.AUTO,generator="uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String id;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @Getter @Setter
+	private PcsRole role;
+	
+	@Getter @Setter
+	private String userId;
+	
+	@Getter @Setter
+	private String roleId;
+	
+	@Transient @Getter @Setter
+	private PcsUser pcsUser;
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+
+
+
+}

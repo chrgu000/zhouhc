@@ -1,0 +1,7 @@
+update sys_code_sequence set sort_code = '210' where sort_code_name = '申领规则编码';
+update sys_code_sequence set sort_code = '211' where sort_code_name = '消耗规则编码';
+update sys_code_sequence set sort_code = '212' where sort_code_name = '通知规则编码';
+
+update spd_replenish_rule set rule_code = replace(rule_code,'200','210');
+update spd_consume_rule set rule_code = replace(rule_code,'201','211');
+update spd_prepare_inform_rule set rule_code = replace(rule_code,'202','212');

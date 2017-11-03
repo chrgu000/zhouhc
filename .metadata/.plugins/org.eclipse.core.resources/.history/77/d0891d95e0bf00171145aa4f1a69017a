@@ -1,0 +1,215 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRules;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 收货业务
+* @author zhengyf
+* @date 2017年3月29日 下午2:18:06
+* @version V1.0.0
+*/
+
+
+@Entity
+@Table(name="spd_receive_biz")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SpdReceiveBiz extends SpdGoodsBizPlan<SpdReceiveRule> implements IToDepotTask{
+
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_c_r_f;
+	
+	@Getter @Setter
+	private String fromOrgId;//发货机构
+	
+	@Getter @Setter
+	private String fromDeptId;//发货部门
+	
+	@Getter @Setter
+	private String fromDepotId;//发货仓库
+	
+	@Getter @Setter
+	private String toOrgId;//入库机构
+	
+	@Getter @Setter
+	private String toDeptId;//入库部门
+	
+	@Getter @Setter
+	private String toDepotId;//入库仓库
+	
+	@Getter @Setter
+	private String finalDepotId;
+	
+	@Getter @Setter
+	private String finalAreaType;
+	
+	@Getter @Setter
+	private String prepareInformBizId; //备货通知业务Id
+	
+	@NotNull(message="货区类型不能为空") @Getter @Setter
+	private String toAreaType;
+	
+	@Getter @Setter
+	private String sendCode;//送货单码
+	
+	@Getter @Setter
+	private String sendId;//送货单ID
+	
+	@Getter @Setter
+	private Boolean recorded = false;//是否入账
+	
+	@Getter @Setter
+	private Boolean saleCompleted = false;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot toDepot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot finalDepot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDept fromDept;
+	
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotTasks onShelfTasks;
+
+	public SpdBizType getBizType() {
+		return SpdBizType.receive_biz;
+	}
+	
+	public Date getCfmReceiveDate(){
+		if(getLogs() == null){
+			return null;
+		}
+		return getLogs().findByStatusCode(SpdReceiveBizSteps.review_receive.getStatusCode()).getCreateTime();
+	}
+
+	@JsonIgnore @Transient
+	public PcsDepot getStockChangeDepot() {
+		return getToDepot();
+	}
+	
+	@JsonIgnore @Transient
+	public String getTargetAreaType(){
+		return getToAreaType();
+	}
+	
+	@Transient public float getConfirmAmount(){
+		float amount = 0;
+		for(SpdBizItem item : getItems()){
+			amount += item.getConfirmAmount() >= 0 ? item.getConfirmAmount() : 0;
+		}
+		return amount;
+	}
+	
+	public void setItems(SpdReceiveItems receiveItems){
+		this.getItems().clear();
+		this.getItems().addAll(receiveItems);
+	}
+	
+	public void autoFillBizRule(SpdReceiveRules rules){
+		SpdReceiveRule defaultRule = rules.getDefaultRule(getFromOrgId(), getToDepotId());
+		setBizRule(defaultRule);
+	}
+	
+	public void setBizRule(SpdReceiveRule rule){
+		if(rule == null){
+			return ;
+		}
+		setBizRuleId(rule.getId());
+		super.setBizRule(rule);
+		setFromDept(rule.getDirectionRule().getFromDept());
+		setToDepot(rule.getDirectionRule().getToDepot());
+		setFinalDepot(rule.getDirectionRule().getFinalDepot());
+	}
+
+	@Override
+	public void applyRule(SpdReceiveRule bizRule, PcsUser user) {
+		setBizRuleId(bizRule.getId());
+		setFromOrgId(bizRule.getDirectionRule().getFromOrgId());
+		setFromDeptId(bizRule.getDirectionRule().getFromDeptId());
+		setToOrgId(bizRule.getDirectionRule().getToDepot().getManageDept().getOrg().getOrgId());
+		setToDepotId(bizRule.getDirectionRule().getToDepotId());
+		setToDeptId(bizRule.getDirectionRule().getToDepot().getManageDeptId());
+		setToAreaType(bizRule.getDirectionRule().getToAreaType());
+		setFinalDepotId(bizRule.getDirectionRule().getFinalDepotId());
+		setFinalAreaType(bizRule.getDirectionRule().getFinalAreaType());
+		setFinalDepot(bizRule.getDirectionRule().getFinalDepot());
+		setCreatorDepotId(bizRule.getDirectionRule().getToDepotId());		
+	}
+
+	public void verifyPrepareInform(SpdPrepareInformBizRepository pibRepository, RabbitProxy rabbitProxy, String userId) {
+		if(!getBizRule().getMustPrepare()){
+			return ;
+		}
+		
+		boolean hasPrepareInform = true;
+		
+		if(StringUtils.isNotEmpty(this.getPrepareInformBizId())){
+		    SpdPrepareInformBiz prepareInform = pibRepository.findOne(this.getPrepareInformBizId());
+		    if(prepareInform == null){
+		    	hasPrepareInform = false;
+		    }
+		}else{
+			hasPrepareInform = false;
+		}
+		
+		if(!hasPrepareInform){
+			try {
+				String receiveJson = Global.defaultObjectMapper.writeValueAsString(this);
+				rabbitProxy.sendCreatePrepareInformMsg(receiveJson, userId);
+			} catch (JsonProcessingException e) {
+				e.printStackTrace();
+			}
+			throw new NotFoundException("收货业务缺乏相关备货业务", YardExceptionType.not_found_receive_relation_prepare_inform, this.getFromOrgId(), this.getToDepotId());
+		}
+	}
+
+	public void recorded() {
+		setRecorded(true);
+	}
+
+
+	public boolean updateSaleComplete() {
+		boolean allSaled = new SpdReceiveItems(getItems()).isAllSaled();
+		if(allSaled != getSaleCompleted().booleanValue()){
+			setSaleCompleted(allSaled);
+			updateLastUpdateTime();
+			return true;
+		}
+		
+		return false;
+	}
+	
+}
+
+

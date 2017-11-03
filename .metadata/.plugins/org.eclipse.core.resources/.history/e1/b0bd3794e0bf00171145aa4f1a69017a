@@ -1,0 +1,37 @@
+package cn.ak4j.yard.sys.datacheck.web;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckType;
+import cn.ak4j.yard.sys.datacheck.params.SysDataCheckTypeParams;
+import cn.ak4j.yard.sys.datacheck.repository.SysDataCheckTypeRepository;
+
+@RestController
+public class SysDataCheckTypeResource {
+	
+	@Autowired SysDataCheckTypeRepository sysDataCheckTypeRepository;
+	
+	@RequestMapping(value = "/yard/dataCheckTypes", method = RequestMethod.GET)
+	public List<SysDataCheckType> findDataCheckTypesByPage(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		SysDataCheckTypeParams params = SysDataCheckTypeParams.buildParamsFromJson(paramsStr, SysDataCheckTypeParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return sysDataCheckTypeRepository.find(params, order, currentPage-1, pageSize);
+	}
+
+	@RequestMapping(value = "/yard/dataCheckTypes/count", method = RequestMethod.GET)
+	public long findDataCheckTypesByPageCount(@RequestParam(value = "params", required = false) String paramsStr) {
+		SysDataCheckTypeParams params = SysDataCheckTypeParams.buildParamsFromJson(paramsStr, SysDataCheckTypeParams.class);
+		return sysDataCheckTypeRepository.count(params);
+	}
+}

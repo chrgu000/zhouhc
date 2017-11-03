@@ -1,0 +1,121 @@
+package cn.ak4j.yard.spd.factory;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.SpdInventoryWay;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventoryItem;
+import cn.ak4j.yard.spd.domain.SpdInventoryItems;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+
+@Component
+@SuppressWarnings({"unchecked"})
+public class SpdInventoryFactory {
+
+	@Autowired private SpdDepotCardRepository dcRepository;
+	
+	
+	public SpdInventoryItems buildInventoryItemsFromShelfStocks(SpdInventory inventory, SpdShelfStocks shelfStocks, PcsUser user) {
+		SpdDepotCards depotCards = dcRepository.findAll().findByDepotAndGoodsIds(inventory.getDepotId(), shelfStocks.pluck("goodsId"));
+		SpdInventoryItems items = new SpdInventoryItems();
+	
+		shelfStocks.forEach(shelfStock->{
+			SpdDepotCard depotCard = depotCards.findEnableCardByGoodsId(shelfStock.getGoodsId());
+			SpdInventoryItem item = buildInventoryItem(inventory.getInventoryType(), shelfStock, depotCard, new MaintenanceInfo(user));
+			items.add(item);
+		});
+		
+		return items;
+	}
+	
+//	public SpdInventorys buildInventoryFromShelfStocks(SpdInventory originInvetory, SpdShelfStocks shelfStocks, IUser user) {
+//		SpdDepotCards depotCards = dcRepository.findAll().findByDepotAndGoodsIds(shelfStocks.get(0).getDepotId(), shelfStocks.pluck("goodsId"));
+//		
+//		Map<Integer, List<String>> goodsIdsMap = splitInventoryItemByPropName(shelfStocks, "goodsId", SpdInventory.inventory_batch_goods_size);
+//		
+//		MaintenanceInfo maintenanceInfo = new MaintenanceInfo(user);
+//		SpdInventorys inventorys = new SpdInventorys();
+//		for(List<String> goodsIds : goodsIdsMap.values()){
+//			
+//			SpdShelfStocks theShelfStocks = shelfStocks.findByGoodsIds(goodsIds);
+//			SpdInventoryItems items = new SpdInventoryItems();
+//			theShelfStocks.forEach(theShelfStock->{
+//				SpdDepotCard depotCard = depotCards.findEnableCardByGoodsId(theShelfStock.getGoodsId());
+//				SpdInventoryItem item = buildInventoryItem(originInvetory.getInventoryType(), theShelfStock, depotCard, maintenanceInfo);
+//				items.add(item);
+//			});
+//			
+//			if(CollectionUtils.isEmpty(originInvetory.getItems())){
+//				originInvetory.setItems(items);
+//				inventorys.add(originInvetory);
+//			}else{
+//				SpdInventory newInventory = buildInventory(originInvetory, maintenanceInfo);
+//				newInventory.setItems(items);
+//				inventorys.add(newInventory);
+//			}
+//		}
+//		return inventorys;
+//	}
+//	
+//	private Map<Integer, List<String>> splitInventoryItemByPropName(SpdShelfStocks shelfStocks, String propName, int batchSize){
+//		Map<Integer, List<String>> objsMap = new HashMap<Integer, List<String>>();
+//		List<String> objs = shelfStocks.pluck(propName);
+//		int size = (int)Math.ceil((double)objs.size()/batchSize);
+//		for(int i=0; i<size; i++){
+//			int startInx = batchSize*i;
+//			int endInx = batchSize*(i+1)<objs.size()?batchSize*(i+1):objs.size();
+//			List<String> subList = objs.subList(startInx, endInx);
+//			objsMap.put(i, subList);
+//		}
+//		return objsMap;
+//	}
+//	
+//	private SpdInventory buildInventory(SpdInventory originInvetory, MaintenanceInfo maintenanceInfo){
+//		SpdInventory newInventory = new SpdInventory();
+//		newInventory.setOrgId(originInvetory.getOrgId());
+//		newInventory.setDeptId(originInvetory.getDeptId());
+//		newInventory.setDepotId(originInvetory.getDepotId());
+//		newInventory.setAreaId(originInvetory.getAreaId());
+//		newInventory.setInventoryType(originInvetory.getInventoryType());
+//		newInventory.setInventoryUser(originInvetory.getInventoryUser());
+//		newInventory.setFixed(originInvetory.getFixed());
+//		newInventory.setMaintenanceInfo(maintenanceInfo);
+//		return newInventory;
+//	}
+
+	private SpdInventoryItem buildInventoryItem(String inventoryTypeCode, SpdShelfStock shelfStock, SpdDepotCard depotCard, MaintenanceInfo maintenanceInfo){
+		SpdInventoryItem item = new SpdInventoryItem();
+		item.setDepotId(shelfStock.getDepotId());
+		item.setGoodsId(shelfStock.getGoodsId());
+		item.setPlanQty(shelfStock.getQtyByStoreUnit());
+		item.setStockGoodsLotId(shelfStock.getLotId());
+		item.setMaintenanceInfo(maintenanceInfo);
+		
+		if(shelfStock.getShelfType().equals(PcsAreaType.normal.getCode())){
+			item.setShelfId(depotCard.getShelfId());
+		}else if(shelfStock.getShelfType().equals(PcsAreaType.isolation.getCode())){
+			item.setShelfId(depotCard.getIsolationShelfId());
+		}else if(shelfStock.getShelfType().equals(PcsAreaType.unqualified.getCode())){
+			item.setShelfId(depotCard.getUnqualifiedShelfId());
+		}
+		
+		if(inventoryTypeCode.equals(SpdInventoryWay.static_disc.getCode())){
+//			item.setCheckQty(shelfStock.getQtyByStoreUnit());
+			item.setShowQty(shelfStock.getQtyByStoreUnit());
+		}else{
+			item.setShowQty(null);
+		}
+		
+		return item;
+	}
+
+	
+}

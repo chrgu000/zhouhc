@@ -1,0 +1,150 @@
+package cn.ak4j.yard.extend.zsy;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.zsy.domain.B2BOrderBill;
+import cn.ak4j.yard.extend.zsy.domain.B2BOrderBillItem;
+import cn.ak4j.yard.extend.zsy.domain.SpdZsyIntegrationParams;
+import cn.ak4j.yard.extend.zsy.domain.ZsyIntigrationParams;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+
+@Component
+public class SpdZsyReturnGoodsAssember {
+	
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private SpdReceiveBizRepository receiveRepository;
+	
+	private final String integrationParams = "zsy_" + YardGlobalInfo.integration_params;
+
+	public B2BOrderBill build(SpdReturnGoodsBiz returnGoods) throws JsonParseException, JsonMappingException, IOException{
+		String intigrationParamsStr = Conf.getAllGlobalInfos().findByKey(integrationParams).getValue();
+		List<SpdZsyIntegrationParams> intigrationParamsList = Global.defaultObjectMapper.readValue(intigrationParamsStr, new TypeReference<List<SpdZsyIntegrationParams>>() {});
+		
+		String depotId = returnGoods.getFromDepotId();
+		ZsyIntigrationParams instigrationParams = findInstigrationParamsByDepotId(intigrationParamsList, depotId);
+		
+		B2BOrderBill orderBill = new B2BOrderBill();
+		orderBill.setOutOrderId(returnGoods.getBizCode());
+		orderBill.setOutOrderNo(returnGoods.getBizCode());
+		orderBill.setOutClientId(instigrationParams.getOutClientId());
+		orderBill.setOutClientNo(instigrationParams.getOutClientId());
+		orderBill.setOutClientName(instigrationParams.getOutClientName());
+		orderBill.setOutAddressId(instigrationParams.getOutAddressId());
+		orderBill.setOutAddressName(instigrationParams.getOutAddressName());
+		orderBill.setOutOrderType("STOCK_UP_RETRUN");
+		orderBill.setOutOrderCredate(Global.sdfYMDHms.format(returnGoods.getCreateTime()));
+		
+		orderBill.setOutOrderPickDate(Global.sdfYMDHms.format(returnGoods.getCreateTime()));
+		
+		orderBill.setItems(buildItems(returnGoods.getItems(), returnGoods.getToOrgId()));
+		return orderBill;
+	}
+
+	private ZsyIntigrationParams findInstigrationParamsByDepotId(List<SpdZsyIntegrationParams> intigrationParamsList, String depotId) {
+		for(SpdZsyIntegrationParams intigrationParams : intigrationParamsList){
+			if(intigrationParams.getDepotId().equals(depotId)){
+				return intigrationParams.getParams();
+			}
+		}
+		return null;
+	}
+
+	private List<B2BOrderBillItem> buildItems(SpdBizItems items, String orgId) {
+		YdsGoodss goodsList = items.getAllGoods();
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", goodsList);
+		YdsEdsGoodss edsGoodsList = egRepository.findAll().findSupplierUseabledWithGoodsIds(goodsIds, orgId);
+		
+		List<B2BOrderBillItem> billItems = new ArrayList<B2BOrderBillItem>();
+		
+		if(!allHaveOriginDatas(items)){
+			throw new InvalidDataException(YardExceptionType.invalid_biz_item_not_found_origin_data);
+		}
+		
+		String receiveId = items.get(0).getOriginId();
+		SpdReceiveBiz receive = receiveRepository.getWithItems(receiveId);
+		SpdReceiveItems receiveItems = new SpdReceiveItems(receive.getItems());
+		
+		for(SpdBizItem item : items){
+			if(item.getConfirmQty() <=0 ){
+				continue;
+			}
+			
+			B2BOrderBillItem billItem = new B2BOrderBillItem();
+			
+			YdsEdsGoodss edsGoodss = new YdsEdsGoodss(CollectionUtils.find("yardGoodsId", item.getGoods().getGoodsId(), edsGoodsList));
+			if(CollectionUtils.isEmpty(edsGoodss)){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_without_butting_code, item.getGoods().getFormatName());
+			}else if(edsGoodss.size() > 1){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_relation_many_usable_eds_goods,item.getGoods().getFormatName());
+			}
+			YdsEdsGoods edsGoods = edsGoodss.get(0);
+			
+			float outGdsQty = item.getConfirmQty()/edsGoods.getEdsYdsUnitRatio();
+			if(outGdsQty != (int)outGdsQty){
+				throw new InvalidDataException(YardExceptionType.invalid_integration_supplier_qty_error, item.getGoods().getGoodsCode(), item.getConfirmQty(), edsGoods.getEdsGoodsCode(), edsGoods.getEdsYdsUnitRatio());
+			}
+			
+			YdsGoodsLot goodsLot = item.getSpecialGoodsLot();
+			SpdReceiveItem receiveItem = CollectionUtils.findWhere("bizItemId", item.getOriginItemId(), receiveItems);
+			
+			float price = item.getGoods().getPreparePrice() * edsGoods.getEdsYdsUnitRatio();
+			
+			billItem.setOutGdsFormatName(edsGoods.getEdsGoodsFormatName());
+			billItem.setOutGdsId(edsGoods.getEdsGoodsCode());
+			
+			billItem.setOutGdsQty((int)outGdsQty);
+			billItem.setOutGdsPacksize(1);
+			billItem.setOutGdsUnit(edsGoods.getDeliveryUnitName());
+			billItem.setOutGdsUnitprice(price);
+			billItem.setOutOrderItemId(item.getBizItemId());
+			
+			billItem.setOutLotNo(goodsLot.getLotNo());
+			billItem.setOutLotProDate(Global.sdfYMD.format(goodsLot.getProduceDate()));
+			billItem.setOutLotExpDate(Global.sdfYMD.format(goodsLot.getLotValidity()));
+			
+			billItem.setOutOrlordId(receive.getSendId());
+			billItem.setOutOrlordItemId(receiveItem.getSendItemCode());
+			billItem.setOutOrlordType("STOCK_UP");
+			
+			billItems.add(billItem);
+		};
+		return billItems;
+	}
+	
+
+	private boolean allHaveOriginDatas(SpdBizItems bizItems) {
+		for(SpdBizItem bizItem : bizItems){
+			if(StringUtils.isEmpty(bizItem.getOriginId()) || StringUtils.isEmpty(bizItem.getOriginItemId())){
+				return false;
+			} 
+		}
+		return true;
+	}
+}

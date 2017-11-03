@@ -1,0 +1,57 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizplan.factory;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+
+@Component
+public class SpdReplenishFactory {
+	
+    @Autowired private SpdBizRuleRepository brRepository;
+	
+	public SpdReplenishBiz buildReturnReplenishFromApply(SpdReplenishRule rule, SpdLogisticsTaskItems taskItems, PcsUser user){
+		SpdReplenishRules theRules = brRepository.findAllWithRelations().getAllEnabledReplenishRules().findRelateReturnRule(rule);
+		if(theRules.size() == 1){
+	    	SpdReplenishBiz theReplenish = new SpdReplenishBiz();
+	    	theReplenish.setBizRuleId(theRules.get(0).getId());
+	    	theReplenish.setItems(createReplenishItems(taskItems));
+	    	
+	    	return theReplenish;
+	    }else{
+	    	//TODO 当未找到满足条件或者找到多个申领退货规则时是否抛出异常，暂时按返回null处理
+	    	return null;
+	    }
+	}
+
+
+	private SpdBizItems createReplenishItems(SpdLogisticsTaskItems items) {
+		SpdBizItems theItems = new SpdBizItems();
+		
+		items.forEach(item->{
+			SpdBizItem theItem = new SpdBizItem();
+			theItem.setGoodsId(item.getGoodsId());
+			theItem.setLotId(item.getLotId());
+			theItem.setUnitLv(item.getUnitLv());
+			theItem.setUnitPrice(item.getUnitPrice());
+			theItem.setPlanQty(item.getConfirmQty() - item.getReceiveQty());
+			//这里直接设置确认数量的原因，因为这是由于收货产生的退货，上架是按照收货的确认数量上的，所有退货的库存必定是有的，这里特殊处理
+			theItem.setConfirmQty(item.getConfirmQty() - item.getReceiveQty());
+			theItem.setOriginId(item.getTaskId());
+			theItem.setOriginItemId(item.getTaskItemId());
+			
+			theItems.add(theItem);
+		});
+		
+		return theItems;
+	}
+}

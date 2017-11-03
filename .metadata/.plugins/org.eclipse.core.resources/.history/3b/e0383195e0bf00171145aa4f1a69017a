@@ -1,0 +1,101 @@
+package cn.ak4j.yard.pcs.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.factory.PcsDepotFactory;
+import cn.ak4j.yard.pcs.repository.PcsDepotAreaRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+@Service
+public class PcsDepotAreaService extends IYardService<PcsDepotArea>{
+
+	@Autowired private PcsDepotAreaRepository daRepository;
+	@Autowired private PcsDepotShelfService dsService;
+	@Autowired private YardCodeService ycService;
+	@Autowired private PcsDepotFactory depotFactory;
+	@Autowired private PcsDepotRepository depotRepository;
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotAreas\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\"")})
+	public PcsDepotArea add (@Valid PcsDepotArea depotArea, IUser user){
+		YardArbitraryCode sysCode = ycService.publishCode(CodeSort.huoqu, depotArea.getAreaCode());
+		depotArea.setAreaCode(sysCode.getCode());
+		
+		// 判断货区编码是否存在
+		PcsDepotArea area = depotRepository.findAllWithRelations().findById(depotArea.getDepotId()).getAreas().findByAreaCode(depotArea.getAreaCode());
+		if(area != null){
+			throw new InvalidDataException("当前货区编码已存在,请确认后填写！");
+		}
+		
+		depotArea = daRepository.save(depotArea);
+		dsService.add(depotFactory.buildAutoDepotShelf(depotArea, user), user);
+		
+		return depotArea;
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotAreas\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\"")})
+	public void delete(String areaId,IUser user){
+		PcsDepotArea depotAreaPO = daRepository.findAllWithRelation().findById(areaId);
+		if(!depotAreaPO.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, depotAreaPO.getAreaName());
+		}
+		if(depotAreaPO.isPrimary()){
+			throw new OperateForbiddenException(YardExceptionType.forbid_delete_default_depot_area, depotAreaPO.getAreaName());
+		}
+		
+		// 判断是否存在货位
+		PcsDepotShelfs depotShelfs = daRepository.findAllWithRelation().findById(areaId).getShelfs();
+		if(CollectionUtils.isNotEmpty(depotShelfs)){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete_non_empty_depot_area, depotAreaPO.getAreaName());
+		}
+		
+		daRepository.delete(areaId);
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotAreas\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\"")})
+	public PcsDepotArea modify (@Valid PcsDepotArea area,IUser user){
+		YardArbitraryCode sysCode = ycService.publishCode(CodeSort.huoqu, area.getAreaCode());
+		area.setAreaCode(sysCode.getCode());
+		
+		//判断修改的编码是否已经存在
+		PcsDepotAreas theAreas = depotRepository.findAllWithRelations().findById(area.getDepotId()).getAreas();
+		PcsDepotArea theArea = theAreas.findByAreaCode(area.getAreaCode());
+		if(!theArea.getDepotAreaId().equals(area.getDepotAreaId())){
+			throw new InvalidDataException("当前货区编码已存在,请确认后填写！");
+		}
+		PcsDepotArea pcsDepotAreaPO = theAreas.findById(area.getDepotAreaId());
+		pcsDepotAreaPO.update(area, user.getOrgId(), user.getUserId());
+		daRepository.save(pcsDepotAreaPO);
+		
+		return pcsDepotAreaPO;
+	}
+
+	public PcsDepotArea updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException("货区不支持该行为");
+	}
+
+}

@@ -1,0 +1,1 @@
+update sys_global_info set value ='true' where key = 'allow_modify_package_specification';

@@ -1,0 +1,90 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.List;
+
+import org.springframework.beans.BeanUtils;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdFinacialReconciliationItems extends Entities<SpdFinacialReconciliationItem>{
+	
+	public SpdFinacialReconciliationItems(List<SpdFinacialReconciliationItem> entities){
+		super(entities);
+	}
+
+	public void aggregate(SpdFinacialReconciliationItem newReconcilicationItem) {
+		//同价格批次明细的位序
+		int samePriceLotItemInx = this.indexOf(newReconcilicationItem);
+		if(samePriceLotItemInx >= 0){
+			SpdFinacialReconciliationItem reconciliationItem = get(samePriceLotItemInx);
+			
+			int reconciliationQty = reconciliationItem.getReconciliationQty()+newReconcilicationItem.getReconciliationQty();
+			reconciliationItem.setReconciliationQty(reconciliationQty);
+			reconciliationItem.updateSettlementQty();
+		}else{
+			add(newReconcilicationItem);
+		}
+	}
+
+	/**
+	 * 结转：对往期的对账明细做结转
+	 */
+	public void carryOver(SpdFinacialReconciliationItem endingReconciliationItem) {
+		//同价格批次明细的位序
+		int samePriceLotItemInx = this.indexOf(endingReconciliationItem);
+		if(samePriceLotItemInx > 0){
+			SpdFinacialReconciliationItem reconciliationItem = get(samePriceLotItemInx);
+			int beginingQty = reconciliationItem.getBeginningQty()+endingReconciliationItem.getEndingQty();
+			reconciliationItem.setBeginningQty(beginingQty);
+			reconciliationItem.updateSettlementQty();
+		}else{
+			SpdFinacialReconciliationItem newReconcilicationItem = new SpdFinacialReconciliationItem();
+			newReconcilicationItem.setGoods(endingReconciliationItem.getGoods());
+			newReconcilicationItem.setBeginningQty(endingReconciliationItem.getEndingQty());
+			newReconcilicationItem.setGoodsId(endingReconciliationItem.getGoodsId());
+			newReconcilicationItem.setLotId(endingReconciliationItem.getLotId());
+			newReconcilicationItem.setSettlementUnitLv(endingReconciliationItem.getSettlementUnitLv());
+			newReconcilicationItem.setSettlementUnitName(endingReconciliationItem.getSettlementUnitName());
+			newReconcilicationItem.setUnitName(endingReconciliationItem.getUnitName());
+			newReconcilicationItem.setUnitPrice(endingReconciliationItem.getUnitPrice());
+			
+			newReconcilicationItem.initDateInfo();
+			newReconcilicationItem.updateSettlementQty();
+			add(newReconcilicationItem);
+		}
+	}
+
+	public boolean isAllSettlementQtyFilled() {
+		for(SpdFinacialReconciliationItem item : this){
+			if(item.getSettlementQty() < 0){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	@SuppressWarnings("unchecked")
+	public void fillGoods(YdsGoodsRepository goodsRepository) {
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(this.pluck("goodsId"));
+		this.forEach(item->{
+			YdsGoods goods = goodss.findById(item.getGoodsId());
+			item.setGoods(goods);
+		});
+	}
+
+	
+	public void copyProperties(SpdFinacialReconciliationItems target, String... ignoreProperties){
+		this.forEach(reconciliationItem->{
+			SpdFinacialReconciliationItem item = new SpdFinacialReconciliationItem();
+			BeanUtils.copyProperties(reconciliationItem, item, ignoreProperties);
+			target.add(item);
+		});
+	}
+	
+}

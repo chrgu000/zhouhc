@@ -1,0 +1,66 @@
+package cn.ak4j.yard.sys.domain;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@SuppressWarnings("serial")
+public class YardGlobalInfos extends Entities<YardGlobalInfo>{
+	
+	public YardGlobalInfos(){}
+	
+	public YardGlobalInfos(List<YardGlobalInfo> globalInfos){
+		super(globalInfos);
+	}
+	
+	public YardGlobalInfo findByKey(String key){
+		return CollectionUtils.findWhere("key", key, this);
+	}
+
+	public YardGlobalInfos findByKeys(List<String> keys) {
+		YardGlobalInfos result = new YardGlobalInfos();
+		for(YardGlobalInfo globalInfo : this){
+			if(keys.contains(globalInfo.getKey())){
+				result.add(globalInfo);
+			}
+		}
+		return result;
+	}
+	
+	@JsonIgnore public List<Integer> getBizUnitSetting(){
+		String json = findByKey(YardGlobalInfo.biz_unit_setting).getValue();
+		List<Integer> bizUnits = null;
+		try {
+			bizUnits = Global.defaultObjectMapper.readValue(json, new TypeReference<List<Integer>>() {});
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("获取业务单位设置失败", e);
+		}
+		return bizUnits;
+	}
+	
+	@JsonIgnore public List<ReconciliationReportDisplayConfig> getReconciliationReportDisplayConfigs() {
+		String json = findByKey(YardGlobalInfo.reconciliation_report_display_config).getValue();
+		List<ReconciliationReportDisplayConfig> reportDisplayConfigs = null;
+		try{
+			if(StringUtils.isNotEmpty(json)){
+				reportDisplayConfigs = Global.defaultObjectMapper.readValue(json, new TypeReference<List<ReconciliationReportDisplayConfig>>() {});
+			}
+		}catch(Exception e){
+			log.error("获取excel报表的全局配置失败", e);
+		}
+		return reportDisplayConfigs;
+	}
+	
+}
+
+

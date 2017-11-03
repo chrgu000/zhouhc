@@ -1,0 +1,148 @@
+package cn.ak4j.yard.spd.reconciliation.report.hspt_credit_rep_detail;
+
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportQuerier;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Component
+public class SpdHospitalCreditReplenishDetailQuerier extends SpdReconciliationReportQuerier<Report>{
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	
+	@Override
+	public Report query(SpdFinacialReconciliationBiz reconciliation, Map<String, Object> queryParams, OrderParam orderParam) {
+		filteData(reconciliation);
+		
+		SpdPropertyChangeRecordItems changeRecordItems = reconciliation.getDailyCleans().getAllPropertyChangeItems();
+		changeRecordItems.fillGoods(goodsRepository);
+		
+		Report report = buildReport(reconciliation);
+		return report;
+	}
+	
+	private void filteData(SpdFinacialReconciliationBiz reconciliation){
+		for(SpdDailyCleanBiz dailyClean : reconciliation.getDailyCleans()){
+			Iterator<SpdPropertyChangeRecord> recordIt = dailyClean.getPropertyChangeRecords().iterator();
+			
+			while(recordIt.hasNext()){
+				SpdPropertyChangeRecord record = recordIt.next();
+				
+				//过滤掉非申领业务
+				if(!record.getBizTypeCode().equals(SpdBizType.replenish_biz.getCode())){
+					recordIt.remove();
+					continue;
+				}
+				
+				//过滤掉非退货类型的申领业务
+				Iterator<SpdPropertyChangeRecordItem> recordItemsIt = record.getItems().iterator();
+				while(recordItemsIt.hasNext()){
+					SpdPropertyChangeRecordItem recordItem = recordItemsIt.next();
+					if(recordItem.getQty() > 0){
+						recordItemsIt.remove();
+					}
+				}
+			}
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private Report buildReport(SpdFinacialReconciliationBiz reconciliation){
+		Report report = new Report();
+		report.setReconciliationCode(reconciliation.getBizCode());
+		report.setStartDate(reconciliation.getStartDate());
+		report.setEndDate(reconciliation.getEndDate());
+		PcsOrg org = reconciliation.getBizRule().getSupplierDept().getOrg();
+		report.setSupplierCode(org.getOrgCode());
+		report.setSupplierName(org.getOrgName());
+		PcsDepots depots = reconciliation.getBizRule().getTargetDepots();
+		report.setTargetDepotNames((String[])depots.pluck("depotName").toArray(new String[depots.size()]));
+		report.setItems(buildItems(reconciliation));
+		report.setGenerateTime(new Date());
+		report.setTotalAmount(report.getItems().getTotalAmount());
+		return report;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private Items buildItems(SpdFinacialReconciliationBiz reconciliation){
+		Items items = new Items();
+		SpdPropertyChangeRecordItems changeRecordItems = reconciliation.getDailyCleans().getAllPropertyChangeItems();
+		
+		SpdPropertyChangeRecords changeRecords = reconciliation.getDailyCleans().getAllPropertyChanges();
+		
+		List<String> bizIds = changeRecords.pluck("bizId");
+		SpdBizItems refundReplenishItems = biRepository.findByBizIds(bizIds);
+		SpdReplenishBizs refundOriginReplenishs = rbRepository.findByIds(refundReplenishItems.pluck("originId"));
+		
+		changeRecordItems.forEach(changeRecordItem->{
+			changeRecordItem.getItems().forEach(relationItem->{
+				Item item = new Item();
+				YdsGoods goods = changeRecordItem.getGoods();
+				item.setFactorName(goods.getFactName());
+				item.setGoodsId(goods.getGoodsId());
+				item.setGoodsCode(goods.getGoodsCode());
+				item.setGoodsName(goods.getFormatName());
+				item.setPackageSpecification(goods.getPackingSpec());
+				item.setQty(changeRecordItem.getQty());
+				item.setUnitName(goods.getBaseName());
+				
+				//设置明细的id以及业务id和业务编码
+				SpdPropertyChangeRecord changeRecord = CollectionUtils.findWhere("id", changeRecordItem.getRecordId(), changeRecords);
+				item.setBizId(changeRecord.getBizId());
+				item.setBizCode(changeRecord.getBizCode());
+				item.setBizItemId(changeRecordItem.getOriginItemId());
+				
+				//设置明细的原单的业务id和业务编码
+				SpdBizItem refundReplensihItem = refundReplenishItems.findById(changeRecordItem.getOriginItemId());
+				if(refundReplensihItem != null && StringUtils.isNotEmpty(refundReplensihItem.getOriginId())){
+					item.setOriginBizId(refundReplensihItem.getOriginId());
+					item.setOriginBizItemId(refundReplensihItem.getOriginItemId());
+					SpdReplenishBiz refundOriginReplenish = refundOriginReplenishs.findById(refundReplensihItem.getOriginId());
+					item.setOriginBizCode(refundOriginReplenish.getBizCode());
+				}
+				
+				//设置申领原单id和明细id
+				item.setUnitPrice(relationItem.getUnitPrice());
+				item.setQty(relationItem.getDealQty());
+				item.setAmount(item.getQty()*item.getUnitPrice());
+				items.add(item);
+			});
+		});
+		
+		return items;
+	}
+	
+	
+	@Override
+	public String getDescription() {
+		return "1)过滤掉所有非申领业务的物权变更; 2)过滤掉非退货类型的申领业务";
+	}
+	
+}

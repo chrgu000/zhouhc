@@ -1,0 +1,23 @@
+package cn.ak4j.yard.web.request;
+
+import javax.servlet.http.HttpServletRequest;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 更新资源审核状态请求
+* @author zhengyf
+* @date 2016年11月29日 上午9:56:40
+* @version V1.0.0
+*/
+public class YardUpdateCheckStateRequest extends YardRequest{
+
+	@Getter @Setter private String resourceId;
+	
+	public YardUpdateCheckStateRequest(HttpServletRequest request){
+		super(request);
+		setResourceId(getUriArr()[4]);
+	}
+	
+}

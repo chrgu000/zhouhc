@@ -1,0 +1,165 @@
+package cn.ak4j.yard.spd.task.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRef;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.factory.ISpdDepotTaskFactory;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRefRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import lombok.Setter;
+
+@Service
+public class SpdDispatcherService extends IYardService<SpdDispatcher>{
+	
+	@Autowired @Qualifier("oneBlockItemPerLot") @Setter
+	private ISpdDepotTaskFactory taskFactory;
+	
+	@Autowired private SpdDispatcherRepository dispRepository;
+	@Autowired private SpdDispatcherRefRepository drRepository;
+	@Autowired private RabbitProxy rabbitProxy;
+	
+	@Autowired private SpdDepotTaskRepository taskRepository;
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	
+	@Transactional
+	public SpdDispatcher add(SpdDispatcher dispatcher, IUser user){
+		if(!dispatcher.isValid()){
+			throw new InvalidDataException(dispatcher.getValidateMsg());
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				for(SpdDispatcherRef ref : dispatcher.getRefs()){
+					String bizId = ref.getRefObjectId();
+					if(ref.getRefObjectType().equals(SpdDispatcherRef.ref_object_type_logistics_task)){
+						bizId = ltRepository.findOne(ref.getRefObjectId()).getBizId();
+					}
+					AmqpMsgType msgType = dispatcher.getDispatcherType().equals(SpdDispatcherType.on_shelf.getCode())?AmqpMsgType.CREATE_ON_SHELF_DISPATCHER:AmqpMsgType.CREATE_OFF_SHELF_DISPATCHER;
+					rabbitProxy.sendBizMsg(bizId, dispatcher.getDispatcherId(), user.getUserId(), msgType);
+				}
+            }
+		});
+		
+		dispatcher.setDispatcherCode(codeService.publishCode(CodeSort.shangjiadiaodudan).getCode());
+		dispRepository.saveWithRefs(dispatcher);
+		return dispatcher;
+	}
+	
+	public void delete(String dispatcherId, IUser user) {
+		SpdDispatcher spdDispatcher = dispRepository.findOne(dispatcherId);
+		if(!spdDispatcher.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, "code:" + spdDispatcher.getDispatcherCode());
+		}
+		if(drRepository.findByDispacherId(dispatcherId).size()>0){
+			throw new OperateForbiddenException("当前单据还存在明显信息，禁止删除当前资源");
+		}
+		dispRepository.delete(spdDispatcher);
+	}
+
+	@Transactional
+	public SpdDispatcher modify(@Valid SpdDispatcher spdDispatcher, IUser user) {
+		SpdDispatcher spdDispatcherPO = dispRepository.findOne(spdDispatcher.getDispatcherId());
+		spdDispatcherPO.update(spdDispatcher, user.getOrgId(), user.getUserId());
+		dispRepository.save(spdDispatcherPO);
+		return spdDispatcherPO;
+	}
+	
+	@Transactional
+	public SpdDispatcher review(SpdDispatcher dispatcher, IUser user) {
+		if(dispatcher.getCheckState() == CheckState.reviewed){
+			return dispatcher;
+		}
+		
+		return review(dispatcher, dispatcher.getMaintenanceInfo().getLastDate(), user);
+	}
+	
+	/**
+	 * 更新调度作业状态，对于审核状态将触发创建作业单据
+	 */
+	@Transactional
+	public SpdDispatcher updateCheckState(String dispatcherId, int checkStateCode, Date lastDate, IUser user) {
+		SpdDispatcher dispatcher = dispRepository.findWithRelationsById(dispatcherId);
+		
+		if(checkStateCode == CheckState.reviewed.getCode()){
+			return review(dispatcher, lastDate, user);
+		}else if(checkStateCode == CheckState.commited.getCode()){
+			dispatcher.updateCheckState(CheckState.reviewed.getCode(), lastDate, user.getOrgId(), user.getUserId());
+			dispRepository.save(dispatcher);
+			return dispatcher;
+		}
+		return null;
+	}
+	
+	private SpdDispatcher review(SpdDispatcher dispatcher, Date lastDate, IUser user){
+		//验证产品在调度仓库是否存在启用帐页
+		dispatcher.getDepot().fillCards(dcRepository);
+		dispatcher.verifyGoodsCard();
+		
+		//发送创建仓库作业消息
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				dispatcher.getRefs().forEach(ref->{
+					AmqpMsgType msgType = dispatcher.getDispatcherType().equals(SpdDispatcherType.on_shelf.getCode())?AmqpMsgType.CREATE_ON_SHELF_TASK:AmqpMsgType.CREATE_OFF_SHELF_TASK;
+					String bizId = ref.getRefObjectId();
+					if(ref.getRefObjectType().equals(SpdDispatcherRef.ref_object_type_logistics_task)){
+						bizId = ltRepository.findOne(ref.getRefObjectId()).getBizId();
+					}
+					rabbitProxy.sendBizMsg(bizId, dispatcher.getDispatcherId(), user.getUserId(), msgType);
+				});
+            }
+		});
+		
+		//创建作业单(上架作业/下架作业)
+		SpdDepotTasks tasks = taskFactory.buildFromDispatcher(dispatcher);
+		taskRepository.saveAll(tasks);
+		dispatcher.setTasks(tasks);
+		
+		//审核并保存调度单
+		dispatcher.review(lastDate, user);
+		dispRepository.save(dispatcher);
+		
+		return dispatcher;
+	}
+	
+	public void deleteRef(String dispatcherRefId, IUser user) {
+		SpdDispatcherRef spdDispatcherRef = drRepository.findOne(dispatcherRefId);
+//		if(!spdDispatcherRef.canDelete()){
+//			throw new OperateForbiddenException(YardExceptionType.forbide_delete);
+//		}
+		drRepository.delete(spdDispatcherRef);
+	}
+
+	public SpdDispatcherRef modifyRef(@Valid SpdDispatcherRef spdDispatcherRef, IUser user) {
+		SpdDispatcherRef spdDispatcherRefPO = drRepository.findOne(spdDispatcherRef.getDispatcherRefId());
+//		spdDispatcherRefPO.update(spdDispatcherRef, user.getOrgId(), user.getUserId());
+		drRepository.save(spdDispatcherRefPO);
+		return spdDispatcherRefPO;
+	}
+}

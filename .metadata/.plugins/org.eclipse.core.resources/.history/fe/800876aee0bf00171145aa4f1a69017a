@@ -1,0 +1,169 @@
+package cn.ak4j.yard.spd.wrapper.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.BeanUtils;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.enums.SpdWrapperType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.params.SpdTurnoverBoxParams;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBoxs;
+import cn.ak4j.yard.spd.wrapper.to.NewSpdTurnoverBoxTO;
+
+public class SpdTurnoverBoxResourceTest extends BaseTest{
+	
+	@Test public void testGetTurnoverBoxPdf() throws Exception{
+		String accessToken = getAccessToken("test");
+		String urlTemplate = getUrlTemplate("/spd/spdTurnoverBoxs/turnoverBoxId,{turnoverBoxId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, "tob_id_001", accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("周转箱标签", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+	}
+	
+	@Test public void testList() throws Exception{
+		testGetTurnoverBoxList();
+		testGetTurnoverBoxByWrapperNo();
+	}
+	
+	private void testGetTurnoverBoxList() throws Exception{
+		SpdTurnoverBoxs turnoverBoxs = mockMvcHelper.findList(SpdTurnoverBoxs.class, testUserCode, null);
+		assertEquals(7, turnoverBoxs.size());
+	}
+	
+	private void testGetTurnoverBoxByWrapperNo() throws Exception{
+		String wrapperNo = "600002";
+		SpdTurnoverBoxParams params = new SpdTurnoverBoxParams();
+		params.setWrapperNo(new ListParam<String>(wrapperNo));
+		SpdTurnoverBoxs turnoverBoxs = mockMvcHelper.findList(SpdTurnoverBoxs.class, testUserCode, params);
+		
+		assertEquals(1, turnoverBoxs.size());
+		assertEquals(wrapperNo, turnoverBoxs.get(0).getWrapperNo());
+	}
+	
+	@Test public void testGet() throws Exception{
+		String id = "tob_id_002";
+		SpdTurnoverBox turnoverBox = mockMvcHelper.findOne(SpdTurnoverBox.class, testUserCode, id);
+		assertNotNull(turnoverBox);
+		assertEquals(id, turnoverBox.getId());
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		List<String> ids = new ArrayList<String>();
+		ids.add("tob_id_001");
+		ids.add("tob_id_002");
+		ids.add("tob_id_004");
+		SpdTurnoverBoxs turnoverBoxs = mockMvcHelper.getByIds(SpdTurnoverBoxs.class, testUserCode, ids);
+		assertEquals(3, turnoverBoxs.size());
+		assertNotNull(CollectionUtils.findWhere("id", "tob_id_001", turnoverBoxs));
+		assertNotNull(CollectionUtils.findWhere("id", "tob_id_002", turnoverBoxs));
+		assertNotNull(CollectionUtils.findWhere("id", "tob_id_004", turnoverBoxs));
+	}
+	
+	@Test public void testCount() throws Exception{
+		Integer count = mockMvcHelper.count(SpdTurnoverBoxs.class, testUserCode, null);
+		assertEquals(7, count.intValue());
+	}
+	
+	@Test public void add() throws Exception{
+		String wrapperNo = "box_09";
+		NewSpdTurnoverBoxTO turnoverBoxTO = new NewSpdTurnoverBoxTO();
+		turnoverBoxTO.setWrapperNo(wrapperNo);
+		SpdTurnoverBox turnoverBox = mockMvcHelper.add(SpdTurnoverBox.class, testUserCode, turnoverBoxTO);
+		assertNotNull(turnoverBox);
+		assertEquals(wrapperNo, turnoverBox.getSysCode().getMeterialCode());
+		assertNotNull(turnoverBox.getId());
+		
+		SpdTurnoverBoxParams params = new SpdTurnoverBoxParams();
+		params.setWrapperNo(new ListParam<String>(turnoverBox.getWrapperNo()));
+		SpdTurnoverBoxs turnoverBoxs = mockMvcHelper.findList(SpdTurnoverBoxs.class, testUserCode, params);
+		assertEquals(1, turnoverBoxs.size());
+		turnoverBox = turnoverBoxs.get(0);
+		assertEquals(CheckState.new_created, turnoverBox.getCheckState());
+		assertEquals(SpdSceneType.idle, turnoverBox.getSceneType());
+		assertEquals(SpdWrapperType.turnover_box, turnoverBox.getWrapperType());
+	}
+	
+	@Test public void testAddWithExistWrapperNo() throws Exception{
+		String wrapperNo = "002";
+		NewSpdTurnoverBoxTO turnoverBoxTO = new NewSpdTurnoverBoxTO();
+		turnoverBoxTO.setWrapperNo(wrapperNo);
+		
+		mockMvcHelper.add(SpdTurnoverBox.class, testUserCode, turnoverBoxTO, status().is4xxClientError(), YardExceptionType.invalid_data);
+	}
+
+	@Test public void testModify() throws Exception{	
+		String id = "tob_id_005";
+		String wrapperNo = "010";
+		
+		SpdTurnoverBox turnoverBox = mockMvcHelper.findOne(SpdTurnoverBox.class, testUserCode, id);
+		assertFalse(turnoverBox.isEnabled());
+		
+		NewSpdTurnoverBoxTO turnoverBoxTO = new NewSpdTurnoverBoxTO();
+		BeanUtils.copyProperties(turnoverBox, turnoverBoxTO);
+		turnoverBoxTO.setWrapperNo(wrapperNo);
+		turnoverBoxTO.setEnabled(true);
+
+		turnoverBox = mockMvcHelper.modify(SpdTurnoverBox.class, testUserCode, id, turnoverBoxTO);
+		assertEquals(wrapperNo, turnoverBox.getSysCode().getMeterialCode());
+		assertTrue(turnoverBox.isEnabled());
+	}
+	
+	@Test public void testModifyToExistWrapperNo() throws Exception{
+		String id = "tob_id_005";
+		SpdTurnoverBox turnoverBox = mockMvcHelper.findOne(SpdTurnoverBox.class, testUserCode, id);
+		assertFalse(turnoverBox.isEnabled());
+		
+		NewSpdTurnoverBoxTO turnoverBoxTO = new NewSpdTurnoverBoxTO();
+		BeanUtils.copyProperties(turnoverBox, turnoverBoxTO);
+		turnoverBoxTO.setWrapperNo("002");
+		
+		mockMvcHelper.modify(SpdTurnoverBox.class, testUserCode, id, turnoverBoxTO, status().is4xxClientError(), YardExceptionType.invalid_data);
+	}
+	
+	@Test public void testCommit() throws Exception{
+		String id = "tob_id_005";
+		
+		SpdTurnoverBox turnoverBoxPO = mockMvcHelper.findOne(SpdTurnoverBox.class, testUserCode, id);
+		CheckStateTO checkStateTO = new CheckStateTO();
+		checkStateTO.setCheckStateCode(CheckState.commited.getCode());
+		checkStateTO.setLastDate(turnoverBoxPO.getMaintenanceInfo().getLastDate());
+		
+		CheckStateTO returnCheckState = mockMvcHelper.updateCheckState(SpdTurnoverBox.class, testUserCode, checkStateTO, id);
+		assertEquals(CheckState.commited.getCode(), returnCheckState.getCheckStateCode().intValue());
+	} 
+	
+	
+	@Test public void testCancelCommitError() throws Exception{
+		String id = "tob_id_001";
+		
+		SpdTurnoverBox turnoverBoxPO = mockMvcHelper.findOne(SpdTurnoverBox.class, testUserCode, id);
+		CheckStateTO checkStateTO = new CheckStateTO();
+		checkStateTO.setCheckStateCode(CheckState.new_created.getCode());
+		checkStateTO.setLastDate(turnoverBoxPO.getMaintenanceInfo().getLastDate());
+		
+		mockMvcHelper.updateCheckState(SpdTurnoverBox.class, testUserCode, checkStateTO, false, id, status().is4xxClientError(), YardExceptionType.forbide_non_idel_turnover_box);
+
+	}
+}

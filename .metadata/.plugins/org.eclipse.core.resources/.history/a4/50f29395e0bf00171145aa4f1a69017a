@@ -1,0 +1,15 @@
+package cn.ak4j.yard.amqp;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.ErrorHandler;
+
+public class YardAMQPErrorHandler implements ErrorHandler{
+
+	private Logger logger = LoggerFactory.getLogger(YardAMQPErrorHandler.class);
+	
+	public void handleError(Throwable t) throws RuntimeException{
+		logger.error("amqp error", t);
+		throw new RuntimeException("amqp error", t);
+	}
+}

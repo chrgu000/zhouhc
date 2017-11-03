@@ -1,0 +1,20 @@
+package cn.ak4j.yard.pcs.params;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class PcsMixedOperationParams extends QueryParams{
+	
+	private ListParam<String> opName;
+	private ListParam<String> opId;
+	private ListParam<String> systemName;
+	private ListParam<String> functionName;
+	private ListParam<String> menuName;
+	private ListParam<String> parentMenuName;
+	
+}

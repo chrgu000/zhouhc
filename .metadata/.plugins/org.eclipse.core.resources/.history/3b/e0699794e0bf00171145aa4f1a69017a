@@ -1,0 +1,99 @@
+package cn.ak4j.yard.spd.reconciliation.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.IntegerRange;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.params.SpdFinacialReconciliationItemParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdFinacialReconciliationItemRepository extends BaseRepository<SpdFinacialReconciliationItem, SpdFinacialReconciliationItems, SpdFinacialReconciliationItemParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+
+	
+	public SpdFinacialReconciliationItems find(SpdFinacialReconciliationItemParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			return new SpdFinacialReconciliationItems(doQuery(params, order, pageNo, pageSize));
+		}
+		
+		return new SpdFinacialReconciliationItems();
+	}
+	
+
+	public int count(SpdFinacialReconciliationItemParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdFinacialReconciliationItemParams params){
+		if(params != null){
+			YdsGoodsParams goodsParams = new YdsGoodsParams();
+			goodsParams.setFormatName(params.getFormatName());
+			goodsParams.setPackingSpec(params.getPackingSpec());
+			if(!goodsParams.isEmpty()){
+				YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams, depotRepository, dcRepository));
+				if(goodss.size() == 0){
+					return false;
+				}
+				params.setGoodsId(new ListParam<String>(goodss.getIds()));
+			}
+			
+			YdsGoodsLotParams lotParams = new YdsGoodsLotParams();
+			lotParams.setLotNo(params.getLotNo());
+			lotParams.setGoodsLotId(params.getLotId());
+			if(!lotParams.isEmpty()){
+				YdsGoodsLots lots = new YdsGoodsLots(glRepository.findAll().find(lotParams));
+				if(lots.size() == 0){
+					return false;
+				}
+				params.setLotId(new ListParam<String>(lots.getIds()));
+			}
+			
+			
+		}
+		return true;	
+	}
+	
+
+
+	public SpdFinacialReconciliationItems findByReconciliationIdsAndEndingQty(List<String> reconciliationIds) {
+		SpdFinacialReconciliationItemParams params = new SpdFinacialReconciliationItemParams();
+		params.setReconciliationId(new ListParam<String>(reconciliationIds));
+		params.setEndingQty(new IntegerRangeParam(new IntegerRange().setStart(1)));
+		return find(params);
+	}
+
+	public SpdFinacialReconciliationItems findByReconciliationId(String reconciliationId) {
+		SpdFinacialReconciliationItemParams params = new SpdFinacialReconciliationItemParams();
+		params.setReconciliationId(new ListParam<String>(reconciliationId));
+		return find(params);
+		
+	}
+	
+}

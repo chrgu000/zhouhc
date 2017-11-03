@@ -1,0 +1,95 @@
+package cn.ak4j.yard.yds.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.yds.domain.YdsWorkBook;
+import cn.ak4j.yard.yds.repository.YdsWorkBookRepository;
+
+@Service
+public class YdsWorkBookService extends IYardService<YdsWorkBook>{
+	@Autowired public YdsWorkBookRepository wbRepository;
+
+	@CacheEvict(value = "longTimeCache", key = "\"allWorkBooks\"")
+	public YdsWorkBook add(@Valid YdsWorkBook workbook, IUser user){
+		if(!workbook.isValid()){
+			throw new InvalidDataException(workbook.getValidateMsg());
+		}
+		
+		if(wbRepository.findAll().findSameSortAndName(workbook).size() > 0){
+			throw new InvalidDataException(YardExceptionType.invalid_exist_same_workbook, workbook.getSortCode(), workbook.getSortName(), workbook.getKeyName());
+		}
+		if(wbRepository.findAll().findSameSortAndInx(workbook).size() > 0){
+			throw new InvalidDataException(YardExceptionType.invalid_exist_same_workbook_2, workbook.getSortCode(), workbook.getSortName(), workbook.getKeyInx());
+		}
+		
+		workbook = wbRepository.save(workbook);
+		return workbook;
+	}
+
+	@CacheEvict(value = "longTimeCache", key = "\"allWorkBooks\"")
+	public void delete(String workbookId, IUser user){
+		YdsWorkBook workBook = wbRepository.findAll().findById(workbookId);
+
+		if(!workBook.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, workBook.getKeyName());
+		}
+
+		wbRepository.delete(workbookId);
+	}
+
+	@CacheEvict(value = "longTimeCache", key = "\"allWorkBooks\"")
+	public YdsWorkBook modify(@Valid YdsWorkBook workbook, IUser user){
+		if(!workbook.isValid()){
+			throw new InvalidDataException(workbook.getValidateMsg());
+		}
+		
+		YdsWorkBook workBookPO = wbRepository.findAll().findById(workbook.getWorkbookId());
+		if(!workBookPO.isEditable()){
+			throw new OperateForbiddenException(YardExceptionType.forbid_edit_uneditable_workbook, workBookPO.getKeyName());
+		}
+		
+		if(wbRepository.findAll().findSameSortAndName(workbook).size() > 0){
+			YdsWorkBook keyNameWorkBook = CollectionUtils.findWhere("workbookId", workbook.getWorkbookId(), wbRepository.findAll().findSameSortAndName(workbook));
+			if(keyNameWorkBook == null){
+				throw new InvalidDataException(YardExceptionType.invalid_exist_same_workbook, workbook.getSortCode(), workbook.getSortName(), workbook.getKeyName());
+			}
+		}
+		
+		if(wbRepository.findAll().findSameSortAndInx(workbook).size() > 0){
+			YdsWorkBook keyInxWorkBook = CollectionUtils.findWhere("workbookId", workbook.getWorkbookId(), wbRepository.findAll().findSameSortAndInx(workbook));
+			if(keyInxWorkBook == null){
+				throw new InvalidDataException(YardExceptionType.invalid_exist_same_workbook_2, workbook.getSortCode(), workbook.getSortName(), workbook.getKeyInx());
+			}
+		}
+
+		workBookPO.update(workbook, user.getOrgId(), user.getUserId());
+		workBookPO = wbRepository.save(workBookPO);
+
+		return workBookPO;
+	}
+
+	@CacheEvict(value = "longTimeCache", key = "\"allWorkBooks\"")
+	public YdsWorkBook updateCheckState(String workbookId, int checkStateCode, Date lastDate, IUser user){
+		YdsWorkBook workBookPO = wbRepository.findAll().findById(workbookId);
+		if(!workBookPO.isEditable()){
+			throw new OperateForbiddenException(YardExceptionType.forbid_edit_uneditable_workbook, workBookPO.getKeyName());
+		}
+		
+		workBookPO.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		workBookPO = wbRepository.save(workBookPO);
+		return workBookPO;
+	}
+
+}

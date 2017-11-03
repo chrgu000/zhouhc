@@ -1,0 +1,17 @@
+package cn.ak4j.yard.spd.domain;
+
+import cn.ak4j.entity.Entities;
+
+@SuppressWarnings({"serial"})
+public class SpdSellerSendTaxs extends Entities<SpdSellerSendTax> {
+
+	
+	public SpdSellerSendTax findSellerSendTaxById(String taxId){
+		for(SpdSellerSendTax sendTax : this){
+			if(sendTax.getTaxId().equals(taxId)){
+				return sendTax;
+			}
+		}
+		return null;
+	}
+}

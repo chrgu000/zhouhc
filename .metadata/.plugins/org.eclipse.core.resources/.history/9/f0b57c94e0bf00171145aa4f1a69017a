@@ -1,0 +1,38 @@
+package cn.ak4j.yard.spd.stock.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdDepotStockParams extends QueryParams{
+	private ListParam<String> stockId;
+	private ListParam<String> cardId;//帐页ID
+	private ListParam<String> goodsId;//产品ID
+	private ListParam<String> goodsLotId;//批号ID
+	private FloatRangeParam stockQty;//可用数量
+	private FloatRangeParam lockQty;//锁定数量
+	private FloatRangeParam taskInQty;//待入库数量
+	private FloatRangeParam taskOutQty;//待出库数量
+	private ListParam<String> depotId;//所在仓库
+	private ListParam<String> shelfId;//货位
+	private ListParam<Integer> checkStateCode;
+	
+	private ListParam<String> formatName;
+	private ListParam<String> storeUnitName;
+	private ListParam<String> lotNo;
+	private ListParam<String> depotName;
+	private ListParam<String> areaName;
+	private DateRangeParam lotValidity;
+	
+	private ListParam<String> shelfName;
+	
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	
+}

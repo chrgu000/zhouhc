@@ -1,0 +1,2 @@
+alter table spd_biz_item add(box_no varchar2(50));
+alter table spd_biz_item add(biz_item_type varchar2(50));

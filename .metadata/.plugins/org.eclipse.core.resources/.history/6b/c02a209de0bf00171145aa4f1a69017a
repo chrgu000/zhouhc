@@ -1,0 +1,1 @@
+Insert into SYS_GLOBAL_INFO (KEY,NAME,VALUE,DESCRIPTION,CREATE_TIME,LAST_UPDATE_TIME,EDITABLE) values ('allow_modify_package_specification','允许修改标准产品包装单位维护','true','允许修改标准产品包装单位维护',sysDate,sysDate,'0');

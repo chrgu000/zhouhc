@@ -1,0 +1,111 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRules;
+
+@SuppressWarnings({"unchecked", "serial", "rawtypes"})
+public class SpdReceiveBizs extends Entities<SpdReceiveBiz>{
+	
+	public SpdReceiveBizs(){
+		super();
+	}
+	
+	public SpdReceiveBizs(List<SpdReceiveBiz> receiveBizs){
+		super(receiveBizs);
+	}
+
+	public SpdReceiveBiz findById(String bizId){
+		for(SpdReceiveBiz receive : this){
+			if(bizId.equals(receive.getBizId())){
+				return receive;
+			}
+		}
+		return null;
+	}
+	
+	public void setItems(SpdBizItems items){
+		for(SpdGoodsBizPlan receive : this){
+			SpdBizItems theItems = new SpdBizItems(CollectionUtils.find("bizId", receive.getBizId(), String.class, items));
+			receive.setItems(theItems);
+		}
+	}
+
+	public SpdBizItems getAllItems() {
+		SpdBizItems allItems = new SpdBizItems();
+		for(SpdReceiveBiz receive : this){
+			allItems.addAll(receive.getItems());
+		}
+		return allItems;
+	}
+
+	public void fillItemsWithGoods(SpdBizItemRepository bizItemRepository) {
+		SpdBizItems items = bizItemRepository.findWithGoodsByBizIds(pluck("bizId"));
+		
+		for(SpdReceiveBiz receive : this){
+			SpdBizItems theItems = new SpdBizItems(CollectionUtils.find("bizId", receive.getBizId(), String.class, items));
+			receive.setItems(theItems);
+		}
+	}
+
+	public SpdReceiveBizs findByIds(List<String> receiveIds) {
+		SpdReceiveBizs result = new SpdReceiveBizs();
+		this.forEach(receive->{
+			if(receiveIds.contains(receive.getBizId())){
+				result.add(receive);
+			}
+		});
+		return result;
+	}
+
+	public void fillLastUser(PcsUserRepository userRepository) {
+		PcsUsers allUsers = userRepository.findAll();
+		this.forEach(receive->{
+			receive.getMaintenanceInfo().setLastUser(CollectionUtils.findWhere("userId", receive.getMaintenanceInfo().getLastUserId(), allUsers));
+		});
+	}
+
+
+	public void fillRule(SpdReceiveRules allReceiveRules) {
+		this.forEach(receive->{
+			SpdReceiveRule rule = allReceiveRules.findById(receive.getBizRuleId());
+			receive.setBizRule(rule);
+		});
+	}
+
+	public SpdReceiveBizs checkAndUpdateSaleCompleted(boolean completedVal) {
+		SpdReceiveBizs result = new SpdReceiveBizs();
+		
+		for(SpdReceiveBiz receive : this){
+			if(receive.getSaleCompleted().booleanValue() == completedVal){
+				continue;
+			}
+			//SpdReceiveItems items = new SpdReceiveItems(CollectionUtils.find("bizId", receive.getBizId(), dealItems));
+			if(CollectionUtils.isEmpty(receive.getItems())){
+				continue;
+			}
+			
+			SpdReceiveItems items = new SpdReceiveItems(receive.getItems());
+			if(completedVal?items.isAllSaled():(!items.isAllSaled())){
+				receive.setSaleCompleted(completedVal);
+				result.add(receive);
+			}
+		}
+		
+		return result;
+	}
+
+	public void fillItems(SpdReceiveItems items) {
+		this.forEach(receive->{
+			receive.getItems().clear();
+			receive.setItems(new SpdReceiveItems(CollectionUtils.find("bizId", receive.getBizId(), items)));
+		});
+	}
+	
+}

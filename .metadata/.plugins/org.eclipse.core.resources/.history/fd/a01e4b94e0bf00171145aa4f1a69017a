@@ -1,0 +1,72 @@
+package cn.ak4j.yard.spd.web;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.assember.SpdInventoryAssember;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventorys;
+import cn.ak4j.yard.spd.params.SpdInventoryParams;
+import cn.ak4j.yard.spd.repository.SpdInventoryRepository;
+import cn.ak4j.yard.spd.service.SpdInventoryService;
+import cn.ak4j.yard.spd.to.NewSpdInventoryTO;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+
+@RestController
+public class SpdInventoryResource {
+	
+	@Autowired private SpdInventoryRepository inventoryRepository;
+	@Autowired private SpdInventoryService inventoryService;
+	@Autowired private SpdInventoryAssember inventoryAssember;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@RequestMapping(value="/yard/spd/spdInventorys",method=RequestMethod.POST)
+	public SpdInventory add(@RequestBody NewSpdInventoryTO newInventoryTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdInventory inventory = inventoryAssember.buildSpdInventory(newInventoryTO, user);
+		return inventoryService.add(inventory, user);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdInventorys", method=RequestMethod.GET)
+	public SpdInventorys findAll(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdInventoryParams params = SpdInventoryParams.buildParamsFromJson(paramsStr, SpdInventoryParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdInventoryParams();
+		}
+		SpdInventorys result = inventoryRepository.find(params, order, currentPage-1, pageSize);
+		return result;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdInventorys/count", method=RequestMethod.GET)
+	public int findAll(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdInventoryParams params = SpdInventoryParams.buildParamsFromJson(paramsStr, SpdInventoryParams.class);
+		if(params == null){
+			params = new SpdInventoryParams();
+		}
+		
+		return inventoryRepository.count(params);
+	}
+
+	
+	@RequestMapping(value="/yard/spd/inventoryCreateTasks", method=RequestMethod.POST)
+	public void inventoryCreateTask(@RequestParam(value = "inventoryId", required = false) String inventoryId, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		int batchGoodsSize = giRepository.findAll().findByKey(YardGlobalInfo.inventory_batch_goods_size).getIntValue();
+		
+		inventoryService.autoCreateInventoryItemsAndSplit(inventoryId, batchGoodsSize, user);
+	}
+}

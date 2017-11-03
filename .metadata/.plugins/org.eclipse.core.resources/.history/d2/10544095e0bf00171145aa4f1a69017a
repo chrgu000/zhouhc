@@ -1,0 +1,25 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.ArrayList;
+
+@SuppressWarnings({"serial"})
+public class PcsFunctions extends ArrayList<PcsFunction>{
+	
+	public PcsOperations getAllOperations(){
+		PcsOperations result = new PcsOperations();
+		for(PcsFunction function : this){
+			result.addAll(function.getOperations());
+		}
+		return result;
+	}
+
+	public PcsFunction findById(String functionId){
+		for(PcsFunction function : this){
+			if(function.getFunctionId().equals(functionId)){
+				return function;
+			}
+		}
+		return null;
+	}
+	
+}

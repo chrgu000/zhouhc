@@ -1,0 +1,18 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import java.util.ArrayList;
+
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class B2BTaskBillAffirms extends ArrayList<B2BTaskBillAffirm>{
+
+	public B2BTaskBillAffirms(SpdDeliveryOrders deliveryOrders) {
+		deliveryOrders.forEach(deliveryOrder->{
+			this.add(new B2BTaskBillAffirm(deliveryOrder.getOrderId()));
+		});
+
+	}
+}

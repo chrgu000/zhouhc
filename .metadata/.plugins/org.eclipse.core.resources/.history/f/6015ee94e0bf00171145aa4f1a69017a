@@ -1,0 +1,100 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUserToken;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdConsumeBizParams;
+import cn.ak4j.yard.spd.bizplan.service.SpdConsumeBizService;
+
+@RestController
+public class SpdConsumeBizResource {
+	
+	@Autowired private SpdConsumeBizService cbService;
+
+//	public SpdConsumeBizs list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+//			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+//			@RequestParam(value = "params", required = false) String paramsStr,
+//			@RequestParam(value = "orders", required = false) String orders,
+//			HttpServletRequest request){
+//		
+//	}
+	
+	@RequestMapping(value = "/yard/spd/spdConsumes/iTakeChargeOfConsumes/uncompleteConsumes", method = RequestMethod.GET)
+	public SpdConsumeBizs findUncompleteConsumes(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdConsumeBizParams params = SpdConsumeBizParams.buildParamsFromJson(paramsStr, SpdConsumeBizParams.class);
+		if(params == null){
+			params = new SpdConsumeBizParams();
+		}
+
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		return cbService.findUncompleteConsumes(user, params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdConsumes/iTakeChargeOfConsumes/uncompleteConsumes/count", method = RequestMethod.GET)
+	public int countUncompleteConsumes(@RequestParam(value = "params", required = false) String paramsStr, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdConsumeBizParams params = SpdConsumeBizParams.buildParamsFromJson(paramsStr, SpdConsumeBizParams.class);
+		if(params == null){
+			params = new SpdConsumeBizParams();
+		}
+		
+		return cbService.findUncompleteConsumes(user, params, null, -1, -1).size();
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdConsumes/iTakeChargeOfConsumes/completedConsumes", method = RequestMethod.GET)
+	public SpdConsumeBizs findCompletedConsumes(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdConsumeBizParams params = SpdConsumeBizParams.buildParamsFromJson(paramsStr, SpdConsumeBizParams.class);
+		if(params == null){
+			params = new SpdConsumeBizParams();
+		}
+
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		return cbService.findCompletedConsumes(user, params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdConsumes/iTakeChargeOfConsumes/completedConsumes/count", method = RequestMethod.GET)
+	public int countCompletedConsumes(@RequestParam(value = "params", required = false) String paramsStr, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdConsumeBizParams params = SpdConsumeBizParams.buildParamsFromJson(paramsStr, SpdConsumeBizParams.class);
+		if(params == null){
+			params = new SpdConsumeBizParams();
+		}
+		
+		return cbService.findCompletedConsumes(user, params, null, -1, -1).size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdConsumes", method=RequestMethod.POST)
+	public SpdConsumeBiz add(@RequestBody SpdConsumeBiz consume, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		String accessToken = request.getAttribute(Constant.access_token_attr_name).toString();
+		String clientType = PcsUserToken.getClientTypeFromAccessToken(accessToken);
+		consume.setMaintenanceInfo(new MaintenanceInfo(user));
+		consume.setChannelTypeCode(clientType);
+		consume = cbService.add(consume, user);
+		return consume;
+	}
+	
+}

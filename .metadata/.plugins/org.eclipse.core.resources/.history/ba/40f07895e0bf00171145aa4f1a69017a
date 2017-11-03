@@ -1,0 +1,36 @@
+/**
+ */
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using = CommonEnumJsonSerializer.class)
+public enum SpdOriginItemCondition implements ITypeEnum{
+
+	any("any", "任意", ""),
+	as_planned("as_planned", "完成计划", ""),
+	not_as_planned("not_as_planned", "未完成计划", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SpdOriginItemCondition (String code,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdOriginItemCondition typeOf(String typeCode){
+		for(SpdOriginItemCondition type : SpdOriginItemCondition.values()){
+			if(type.getCode().equals(typeCode)){
+				return type;
+			}
+		}
+		
+		return null;
+	}
+}

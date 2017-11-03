@@ -1,0 +1,79 @@
+package cn.ak4j.yard.sys.logging.web;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.sys.datacheck.params.SysLoggingEventParams;
+import cn.ak4j.yard.sys.logging.domain.SysLoggingEvent;
+import cn.ak4j.yard.sys.logging.domain.SysLoggingEventProperty;
+import cn.ak4j.yard.sys.logging.repository.SysLoggingEventRepository;
+
+
+@RestController
+public class SysLoggingEventResource {
+	@PersistenceContext
+	@Autowired EntityManager em;
+	@Autowired private SysLoggingEventRepository sysLoggingEventRepository;
+	
+	
+	@RequestMapping(value = "/yard/loggingEvents", method = RequestMethod.GET)
+	public List<SysLoggingEvent> findLoggingEventsByErrorLevel(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request) {
+		SysLoggingEventParams params = SysLoggingEventParams.buildParamsFromJson(paramsStr, SysLoggingEventParams.class);
+//		if(params == null){
+//			params = new SysLoggingEventParams();
+//		}
+//		params.setLevelString(new StringParam("ERROR", QueryParam.operation_equal));
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order=new OrderParam("timestmp","desc");
+		}
+		return sysLoggingEventRepository.find(params, order, currentPage-1, pageSize);
+	}
+
+	@RequestMapping(value = "/yard/loggingEvents/count", method = RequestMethod.GET)
+	public long loggingEventByErrorLevelCount(@RequestParam(value = "params", required = false) String paramsStr) {
+		SysLoggingEventParams params = SysLoggingEventParams.buildParamsFromJson(paramsStr, SysLoggingEventParams.class);
+//		if(params == null){
+//			params = new SysLoggingEventParams();
+//		}
+//		params.setLevelString(new StringParam("ERROR", QueryParam.operation_equal));
+		return sysLoggingEventRepository.count(params);
+	}
+	
+	@RequestMapping(value = "/yard/loggingEvents/{eventId}", method = RequestMethod.GET)
+	public SysLoggingEvent getLoggingEvent(@PathVariable("eventId") Integer eventId) {
+		SysLoggingEvent sysLoggingEvent = sysLoggingEventRepository.findOne(eventId);
+		return sysLoggingEvent;
+	}
+	
+	@RequestMapping(value = "/yard/loggingEvents/{eventId}", method = RequestMethod.DELETE)
+	public String delete(@PathVariable("eventId") Integer eventId, HttpServletRequest request) {
+		SysLoggingEvent sysLoggingEvent = sysLoggingEventRepository.findOne(eventId);
+		StringBuilder hql = new StringBuilder();
+		hql.append("from SysLoggingEventProperty sysLoggingEventProperty where eventId=:eventId");
+		Query query = em.createQuery(hql.toString());
+		query.setParameter("eventId", eventId);
+		SysLoggingEventProperty LoggingEventProperty = (SysLoggingEventProperty)query.getSingleResult();
+		em.remove(LoggingEventProperty);
+		sysLoggingEventRepository.delete(sysLoggingEvent);
+		return "SUCCESS";
+	}
+
+}

@@ -1,0 +1,138 @@
+package cn.ak4j.yard.spd.web;
+
+import java.util.Arrays;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.CycleType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfig;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.params.SpdDepotGoodsConfigParams;
+import cn.ak4j.yard.spd.repository.SpdDepotGoodsConfigRepository;
+import cn.ak4j.yard.spd.service.SpdDepotGoodsConfigService;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@RestController
+public class SpdDepotGoodsConfigResource {
+	
+	@Autowired private SpdDepotGoodsConfigRepository dgcRepository;
+	@Autowired private SpdDepotGoodsConfigService dgcService;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+
+	@RequestMapping(value = "/yard/spd/spdDepotGoodsConfigs", method = RequestMethod.GET)
+	public SpdDepotGoodsConfigs getList(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdDepotGoodsConfigParams params = SpdDepotGoodsConfigParams.buildParamsFromJson(paramsStr, SpdDepotGoodsConfigParams.class);
+		if(params == null){
+			params = new SpdDepotGoodsConfigParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		return dgcRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotGoodsConfigs/count", method = RequestMethod.GET)
+	public int getCount(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdDepotGoodsConfigParams params = SpdDepotGoodsConfigParams.buildParamsFromJson(paramsStr, SpdDepotGoodsConfigParams.class);
+		if(params == null){
+			params = new SpdDepotGoodsConfigParams();
+		}
+		
+		return dgcRepository.count(params);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotGoodsConfigs/{id}", method = RequestMethod.GET)
+	public SpdDepotGoodsConfig getById(@PathVariable(value = "id", required = true) String id){
+		SpdDepotGoodsConfig config = dgcRepository.findOne(id);
+		return config;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotGoodsConfigs/ids,{ids}", method = RequestMethod.GET)
+	public SpdDepotGoodsConfigs getByIds(@PathVariable(value = "ids", required = true) String ids){
+		SpdDepotGoodsConfigs configs = dgcRepository.findByIds(Arrays.asList(ids.split(",")));
+		return configs;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotGoodsConfigs(depotId,{depotId})/goodsIds,{goodsIds}", method = RequestMethod.GET)
+	public SpdDepotGoodsConfigs findByDepotIdAndGoodsIds(@PathVariable(value = "depotId", required = true) String depotId,
+			@PathVariable(value = "goodsIds", required = true) String goodsIds){
+		SpdDepotGoodsConfigParams params = new SpdDepotGoodsConfigParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		params.setGoodsId(new ListParam<String>(Arrays.asList(goodsIds.split(","))));
+		return dgcRepository.find(params);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotGoodsConfigs",method=RequestMethod.POST)
+	public SpdDepotGoodsConfig add(@RequestBody SpdDepotGoodsConfig SpdDepotGoodsConfig, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		return dgcService.add(SpdDepotGoodsConfig, user);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotGoodsConfigs/{id}", method = RequestMethod.PUT)
+	public SpdDepotGoodsConfig update(@RequestBody SpdDepotGoodsConfig config, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		return dgcService.modify(config, user);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotGoodsConfigs/{depotId}/initDepotGoodsConfigTask", method=RequestMethod.POST)
+	public void initialDepotGoodsConfigTask(@PathVariable("depotId") String depotId,
+			HttpServletRequest request){
+		YdsGoodss goodss = goodsRepository.findAll().getEnableGoodss();
+		
+		SpdDepotGoodsConfigParams params = new SpdDepotGoodsConfigParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		SpdDepotGoodsConfigs originConfigs = dgcRepository.find(params);
+		
+		SpdDepotGoodsConfigs configs = new SpdDepotGoodsConfigs();
+		for(YdsGoods goods : goodss){
+			if(CollectionUtils.isNotEmpty(originConfigs)){
+				SpdDepotGoodsConfig theConfig = CollectionUtils.findWhere("goodsId", goods.getGoodsId(), originConfigs);
+				if(theConfig != null){
+					continue;
+				}
+			}
+			SpdDepotGoodsConfig config = new SpdDepotGoodsConfig();
+			config.setDepotId(depotId);
+			config.setGoodsId(goods.getGoodsId());
+			config.setAutoPrepareStratageCode(CycleType.each_month.getCode());
+			config.setUpperLimit(999);
+			config.setLowerLimit(0);
+			config.setQuotaStratageCode(CycleType.each_month.getCode());
+			config.setQuotaQty(0);
+			configs.add(config);
+		}
+		
+		dgcRepository.saveAll(configs);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotGoodsConfigs/mine/notEnoughDepotGoods/count")
+	public int countNotEnoughStocksGoods(HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		int count = 0;
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		for(PcsDepot depot : depots){
+			count += dgcService.getNotEnoughStocksGoods(depot.getDepotId()).size();
+		}
+		return count;
+	}
+}

@@ -1,0 +1,49 @@
+package cn.ak4j.yard.fmtemplates;
+
+import static org.junit.Assert.assertTrue;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateException;
+
+public class ConfirmReceiveTemplateTest extends BaseTest{
+
+	@Autowired @Qualifier("defaultFmConfiguration") private Configuration fmConfiguration;
+	@Autowired private SpdReceiveBizService rbService;
+	
+	@Test public void testBuildConfirmReceiveNotifyEmail() throws IOException, TemplateException{
+		String bizId  = "rece_biz_id_002";
+		SpdReceiveBiz receive = rbService.getFullReceive(bizId);
+		receive.setItems((SpdBizItems)receive.getItems().findByPage(new SpdBizItemParams(), new OrderParam("lastUpdateTime", "desc"), -1, -1));
+		Template template = fmConfiguration.getTemplate("confirmReceive.fm");
+		Map<String, Object> model = new HashMap<String, Object>();
+		model.put("receive", receive);
+		String content = FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+		assertTrue(content.contains(String.format("供应商:%s", receive.getFromDept().getOrg().getOrgName())));
+		assertTrue(content.contains(String.format("入库仓库:%s", receive.getToDepot().getDepotName())));
+		assertTrue(content.contains(String.format("收货单码:%s", receive.getBizCode())));
+		receive.getItems().forEach(item->{
+			assertTrue(content.contains(String.format("产品:[%s]", item.getGoods().getWareName())));
+			assertTrue(content.contains(String.format("批次:批号:%s,有效期:%s", item.getSpecialGoodsLot().getLotNo(), Global.sdfYMD.format(item.getSpecialGoodsLot().getLotValidity()))));
+			assertTrue(content.contains(String.format("单价:[%.1f]",  item.getUnitPrice())));
+			assertTrue(content.contains(String.format("确认数量:[%d%s]", item.getConfirmQty().intValue(), item.getPreparePackageUnitName())));
+			assertTrue(content.contains(String.format("确认金额:[%.0f]", item.getConfirmAmount())));
+		});
+	}
+}

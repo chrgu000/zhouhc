@@ -1,0 +1,66 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.spd.bizrule.params.SpdAdjustStockRuleParams;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdAdjustStockRules extends SpdBizRules<SpdAdjustStockRule>{
+
+	public SpdAdjustStockRules(List<SpdAdjustStockRule> rules){
+		super(rules);
+	}
+
+	
+	public void fillAllRelations(PcsDepots allDepots) {
+		for(SpdAdjustStockRule rule : this){
+			PcsDepot depot = allDepots.findById(rule.getDepotId());
+			rule.setDepot(depot);
+		}
+	}
+
+
+	public PcsDepots getAllDepots() {
+		PcsDepots allToDepots = new PcsDepots();
+		this.forEach(consumeRule->{
+			if(!allToDepots.contains(consumeRule.getDepot())){
+				allToDepots.add(consumeRule.getDepot());
+			}
+		});
+		return allToDepots;
+	}
+	
+	public SpdAdjustStockRule getInitAdjustRule(String depotId, String areaType){
+		for(SpdAdjustStockRule rule : this){
+			if(rule.getDepotId().equals(depotId)
+					&& !rule.getManualApply()
+					&& rule.getInitAdjust()
+					&& rule.getEnabled()
+					&& rule.getAreaType().equals(areaType)
+					&& rule.getFeedbackRule().isAllAutoFeedback()){
+				return rule;
+			}
+		}
+		
+		return null;
+	}
+	
+	public SpdAdjustStockRules find(String depotId, String areaType, String typeCode, String usage){
+		SpdAdjustStockRuleParams params = new SpdAdjustStockRuleParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		params.setAreaType(new ListParam<String>(areaType));
+		params.setTypeCode(new ListParam<String>(typeCode));
+		
+		OrderParam order = new OrderParam("prior", "desc");
+		SpdAdjustStockRules adjustStockRules = new SpdAdjustStockRules(findByPage(params, order, -1, -1));
+		
+		return adjustStockRules;
+	}
+	
+}

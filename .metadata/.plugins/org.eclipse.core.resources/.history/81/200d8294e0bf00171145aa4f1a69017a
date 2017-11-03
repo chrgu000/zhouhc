@@ -1,0 +1,90 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.enums.YardExceptionType;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ * 
+* @Description: 仓库库存，以仓库和产品批次为粒度的库存记录，通常也被叫做业务帐
+* @author zhengyf
+* @date 2017年3月27日 下午7:02:32
+* @version V1.0.0
+ */
+
+@NoArgsConstructor
+@Entity
+@Table(name="SPD_DEPOT_STOCK")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SpdDepotStock extends YardEntity{
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String stockId;
+	
+	@Getter @Setter
+	private String goodsId;//产品ID
+	
+	@Getter @Setter
+	private String goodsLotId;//批号ID
+	
+	@Getter @Setter
+	private Integer minStockQty = 0;//最小单位可用数量
+	
+	@Getter @Setter
+	private String depotId;//所在仓库
+	
+	@Transient @Getter @Setter
+	private boolean selected = false;
+	
+	@Column(name="create_date") @Getter @Setter
+	private Date createTime = new Date();
+	
+	@Column(name="last_date") @Getter @Setter
+	private Date lastUpdateTime;
+	
+	/**
+	 * @param change 库存变更
+	 */
+	public SpdDepotStock(SpdDepotStockChange change) {
+		setGoodsId(change.getGoodsLot().getGoodsId());
+		setGoodsLotId(change.getGoodsLot().getGoodsLotId());
+		setDepotId(change.getDepot().getDepotId());
+		setMinStockQty(change.getQtyByBaseUnit());
+	}
+
+	/**
+	 * @param increment 存储单位的库存增量
+	 * @param baseUnitIncrement 最小单位的库存增量
+	 */
+	public void updateQty(int baseUnitIncrement) {
+		int newMinStockQty = getMinStockQty()+baseUnitIncrement;
+		if(newMinStockQty < 0){
+			throw new OperateFailException(YardExceptionType.forbide_update_stock_to_negative, getMinStockQty(), baseUnitIncrement, depotId, goodsId, goodsLotId);
+		}
+		
+		setMinStockQty(newMinStockQty);
+		updateLastUpdateTime();
+	}
+	
+}

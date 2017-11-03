@@ -1,0 +1,2 @@
+update yds_eds_goods set eds_yds_unit_ratio = 1;
+update yds_eds_goods set eds_yds_unit_ratio=240 where eds_goods_id ='ff8080815d54f613015d54fcb13c0a0e';

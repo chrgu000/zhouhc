@@ -1,0 +1,49 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.report.rep_aggr_by_goods;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItem;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportItems;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+
+
+@SuppressWarnings("serial")
+public class Items extends SpdReconciliationReportItems<Item> {
+
+	public void aggregate(SpdFinacialReconciliationItem reconciliationItem) {
+		Item item = CollectionUtils.findWhere("goodsId", reconciliationItem.getGoods().getGoodsId(), this);
+		if(item == null){
+			item = new Item();
+			YdsGoods goods = reconciliationItem.getGoods();
+			item.setFactorName(goods.getFactName());
+			item.setGoodsId(goods.getGoodsId());
+			item.setGoodsCode(goods.getGoodsCode());
+			item.setGoodsName(goods.getFormatName());
+			item.setPackageSpecification(goods.getPackingSpec());
+			item.setQty(reconciliationItem.getReconciliationQty());
+			item.setUnitName(goods.getBaseName());
+			item.setUnitPrice(reconciliationItem.getUnitPrice());
+			item.setAmount(item.getQty()*item.getUnitPrice());
+			add(item);
+		}else{
+			item.setQty(reconciliationItem.getReconciliationQty()+item.getQty());
+			float unitPrice = (reconciliationItem.getTotalReconciliationAmount()+item.getAmount())/item.getQty();
+			item.setUnitPrice(unitPrice);
+		}
+		
+	}
+
+	
+	public void fillEdsGoodsFormatName(YdsEdsGoodss edsGoodss) {
+		this.forEach(item->{
+			YdsEdsGoods edsGoods = edsGoodss.findUseableByGoodsId(item.getGoodsId());
+			if(edsGoods != null){
+				item.setEdsGoodsFormatName(edsGoods.getEdsGoodsFormatName());
+			}
+		});
+	}
+
+}

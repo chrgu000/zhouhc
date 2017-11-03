@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.3.1.final using JasperReports Library version 6.3.1  -->
+<!-- 2017-08-10T15:02:04 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="allDepotShelfsLable" pageWidth="255" pageHeight="116" orientation="Landscape" columnWidth="251" leftMargin="2" rightMargin="2" topMargin="2" bottomMargin="2" uuid="9672829c-8906-4c77-a0d5-1672f17af3f3">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<field name="type" class="java.lang.String"/>
+	<field name="shelfDs" class="net.sf.jasperreports.engine.data.JRBeanCollectionDataSource"/>
+	<detail>
+		<band height="112">
+			<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+			<subreport>
+				<reportElement x="-2" y="0" width="255" height="112" uuid="69013704-1cb9-4b69-94e4-1717ff9082a6"/>
+				<dataSourceExpression><![CDATA[$F{shelfDs}]]></dataSourceExpression>
+				<subreportExpression><![CDATA[net.sf.jasperreports.engine.util.JRLoader.loadObject(getClass().getResource("/reports/pcs/subreport/all_"+($F{type})+"_shelf_lables_01.jasper"))]]></subreportExpression>
+			</subreport>
+		</band>
+	</detail>
+</jasperReport>

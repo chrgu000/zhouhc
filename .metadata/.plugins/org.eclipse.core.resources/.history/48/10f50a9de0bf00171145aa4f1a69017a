@@ -1,0 +1,18 @@
+--修改产品类型
+--YDS_EDS_GOODS
+--1.在表中加一个临时字段
+alter table yds_eds_goods add(interim varchar2(50));
+--2.将目标字段的值付给临时字段，
+update yds_eds_goods set interim = eds_goods_type, eds_goods_type = null;
+--3.修改目标类型
+alter table yds_eds_goods modify(eds_goods_type varchar2(50));
+--4.将临时字段的值付给目标字段，并将临时字段置空
+update yds_eds_goods set eds_goods_type = interim, interim = null;
+--5.删除临时字段
+alter table yds_eds_goods drop column interim;
+--6.删除目标字段的检查约束
+alter table yds_eds_goods drop constraint CKC_EDS_GOODS_TYPE_YDS_EDS_;
+--7.更新目标字段的值
+update yds_eds_goods eg set eg.eds_goods_type = 'drug' where eg.eds_goods_type = '1';
+update yds_eds_goods eg set eg.eds_goods_type = 'equipment' where eg.eds_goods_type = '2';
+update yds_eds_goods eg set eg.eds_goods_type = 'other' where eg.eds_goods_type = '3';

@@ -1,0 +1,125 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.IntegerRange;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+
+@SuppressWarnings({"unchecked", "rawtypes", "serial"})
+public class YdsGoodss extends Entities<YdsGoods> {
+
+	public YdsGoodss(){}
+	
+	public YdsGoodss(List entities){
+		super(entities);
+	}
+	
+	public YdsGoods findById(String goodsId){
+		return CollectionUtils.findWhere("goodsId", goodsId, this);
+	}
+
+	public void setUseableGoodsLots(YdsGoodsLots lots) {
+		if(CollectionUtils.isEmpty(lots)){
+			return ;
+		}
+		this.forEach(goods->{
+			if(goods != null){
+				YdsGoodsLots theLots = new YdsGoodsLots(CollectionUtils.find("goodsId", goods.getGoodsId(), String.class, lots));
+				goods.setUseableGoodsLots(theLots);
+				theLots.forEach(theLot->theLot.setGoods(goods));
+			}
+		});
+	}
+	
+	public YdsGoodsLots getAllUseableGoodsLots() {
+		YdsGoodsLots result = new YdsGoodsLots();
+		this.forEach(goods->{
+			if(CollectionUtils.isNotEmpty(goods.getUseableGoodsLots())){
+				result.addAll(goods.getUseableGoodsLots());
+			}
+		});
+		return result;
+	}
+
+	public YdsGoodss getEnableGoodss() {
+		return new YdsGoodss(CollectionUtils.find("enabled", true, Boolean.class, this));
+	}
+
+	public YdsGoods findByGoodsCode(String goodsCode){
+		return CollectionUtils.findWhere("goodsCode", goodsCode, this);
+	}
+
+	public YdsGoodss findByIds(List<String> goodsIds) {
+		YdsGoodss result = new YdsGoodss();
+		goodsIds.forEach(goodsId->{
+			YdsGoods goods = CollectionUtils.findWhere("goodsId", goodsId, this);
+			result.add(goods);
+		});
+		return result;
+	}	
+
+	public YdsGoodss fillUsableLots(YdsGoodsLotRepository glRepository, SpdShelfStockRepository ssRepository) {
+		YdsGoodsLotParams lotParams = new YdsGoodsLotParams();
+		lotParams.setGoodsId(new ListParam<String>(this.pluck("goodsId")));
+		lotParams.setStockQty(new IntegerRangeParam(new IntegerRange(1, null)));
+		lotParams.setEnabled(new ListParam<Boolean>(true));
+		YdsGoodsLots lots = glRepository.findAll().findUsableLots(lotParams, ssRepository);
+		setUseableGoodsLots(lots);
+		return this;
+	}
+
+	public void fillGoodsInfos(YdsGoodsInfos infos) {
+		this.forEach(goods->{
+			YdsGoodsInfo goodsInfo = CollectionUtils.findWhere("goodsId", goods.getGoodsId(), infos);
+			goods.setGoodsInfo(goodsInfo);
+		});
+	}
+	
+	@Deprecated
+	public List<YdsGoods> find(YdsGoodsParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException("不支持该方法");
+	}
+	
+	public List<YdsGoods> find(YdsGoodsParams params){
+		return super.find(params);
+	}
+	
+	public YdsGoodss find(YdsGoodsParams params, PcsDepotRepository depotRepository, SpdDepotCardRepository dcRepository){
+		if(params!=null && params.getDepotId() != null && params.getDepotId().getValue() != null){
+			PcsDepot depot = depotRepository.findAllWithRelations().findById(params.getDepotId().getValue().get(0));
+			depot.fillCards(dcRepository);
+			List<String> goodsIds = depot.getCards().getEnableCards().pluck("goodsId");
+			params.setGoodsId(new ListParam<String>(goodsIds));
+		}
+		YdsGoodss result = new YdsGoodss(super.find(params));
+		return result;
+	}
+	
+	public YdsGoodss find(YdsGoodsParams params, OrderParam order, int pageNo, int pageSize, PcsDepotRepository depotRepository, SpdDepotCardRepository dcRepository){
+		if(params!=null && params.getDepotId() != null && params.getDepotId().getValue() != null){
+			PcsDepot depot = depotRepository.findAllWithRelations().findById(params.getDepotId().getValue().get(0));
+			depot.fillCards(dcRepository);
+			List<String> goodsIds = depot.getCards().getEnableCards().pluck("goodsId");
+			params.setGoodsId(new ListParam<String>(goodsIds));
+		}
+		YdsGoodss result = new YdsGoodss(this.findByPage(params, order, pageNo, pageSize));
+		return result;
+	}
+
+	public YdsGoodss findByGoodsType(String goodsType) {
+		return new YdsGoodss(CollectionUtils.find("goodsType", goodsType, this));
+	}
+
+}

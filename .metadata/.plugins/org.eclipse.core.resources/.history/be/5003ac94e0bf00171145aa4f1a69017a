@@ -1,0 +1,32 @@
+package cn.ak4j.yard.spd.reconciliation.params;
+
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdFinacialReconciliationItemParams extends QueryParams{
+
+	private ListParam<String> reconciliationId;
+	private ListParam<String> goodsId;
+	private ListParam<String> lotId;
+	private IntegerRangeParam reconciliationQty;
+	private IntegerRangeParam settlementQty;
+	private IntegerRangeParam beginningQty;
+	private IntegerRangeParam endingQty;
+	private IntegerRangeParam adjustmentQty;
+	private FloatRangeParam unitPrice;
+	private ListParam<String> unitName;
+	private ListParam<String> settlementUnitName;
+	private FloatRangeParam unitPriceBySettlementUnit;
+	
+	private ListParam<String> lotNo;
+	private ListParam<String> formatName;
+	private ListParam<String> packingSpec;
+}

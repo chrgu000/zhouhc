@@ -1,0 +1,11 @@
+package cn.ak4j.yard.spd.service;
+
+import java.util.List;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.extend.ICustomComponent;
+
+public interface ISpdDepotCardEventProcessor extends ICustomComponent{
+
+	public void process(String depotId, List<String> goodsIds, String userId, AmqpMsgType msgType);
+}

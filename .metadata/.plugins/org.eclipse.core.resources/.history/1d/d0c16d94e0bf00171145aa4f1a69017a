@@ -1,0 +1,89 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.Date;
+
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.springframework.beans.BeanUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.domain.SpdGoodsItem;
+import cn.ak4j.yard.spd.wrapper.domain.SpdAbstractWrapper;
+import cn.ak4j.yard.spd.wrapper.domain.SpdIWrappable;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: 任务作业明细的父类，它不能被直接使用，它被
+* 仓库作业和物流作业所继承
+* @author zhengyf
+* @date 2017年4月5日 下午5:15:02
+* @version V1.0.0
+*/
+@Slf4j
+@NoArgsConstructor
+@MappedSuperclass
+@SuppressWarnings({"serial"})
+public abstract class SpdTaskItem extends SpdGoodsItem implements SpdIWrappable{
+
+	public static final String item_type_normal = "normal";
+	public static final String item_type_turnover_box = "turnover_box"; 
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String taskItemId;
+	
+	@NotNull(message="作业id不能为空") @Getter @Setter
+	private String taskId;
+	
+	@Getter @Setter
+	private String itemCode;
+	
+	@Getter @Setter
+	private Date createTime = new Date();
+	
+	@Getter @Setter
+	private Date lastUpdateTime = new Date();
+	
+	@Getter @Setter
+	private String parentWrapperId;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdAbstractWrapper parentWrapper;
+	
+	public void update(SpdTaskItem taskItem){
+		if(checkTimeStamp(taskItem.getLastUpdateTime()) != 0){
+			throw new InvalidDataException(YardExceptionType.invalid_inconsistent_timestamp, getLastUpdateTime().getTime(), taskItem.getLastUpdateTime().getTime());
+		}
+		try{
+			BeanUtils.copyProperties(taskItem, this, "goods");
+			updateLastUpdateTime();
+		}catch(Exception e){
+			log.error(ExceptionUtils.getStackTrace(e));
+		}
+	}
+	
+	@Override
+	public void wrapped(SpdAbstractWrapper wrapper) {
+	}
+
+	@Override
+	public void unwrap() {
+		setParentWrapperId(Constant.none);
+	}
+}

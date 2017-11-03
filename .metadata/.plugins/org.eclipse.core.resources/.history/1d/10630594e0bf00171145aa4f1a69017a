@@ -1,0 +1,32 @@
+package cn.ak4j.yard.yds.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class YdsGoodsLotParams extends QueryParams {
+	private static final long serialVersionUID = -5378756572363988721L;
+	
+	private ListParam<String> goodsLotId;
+	private ListParam<String> goodsId;
+	private ListParam<String> lotNo;
+	private DateRangeParam lotValidity;
+	private ListParam<String> sterilizeLotNo;
+	private DateRangeParam sterilizeTime;
+	private DateRangeParam produceDate;
+	private ListParam<Boolean> enabled;
+	private ListParam<String> formatName;
+	private IntegerRangeParam stockQty;
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	private ListParam<String> goodsType;
+	
+	public void setStockQty(IntegerRangeParam stockQty){
+		this.stockQty = stockQty;
+	}
+	
+}

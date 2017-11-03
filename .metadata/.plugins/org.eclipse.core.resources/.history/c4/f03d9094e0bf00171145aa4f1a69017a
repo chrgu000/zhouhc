@@ -1,0 +1,90 @@
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import java.util.Arrays;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRuleParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.service.SpdPropertyChangeRuleService;
+
+@RestController
+public class SpdPropertyChangeRuleResource {
+
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private SpdPropertyChangeRuleService pcrService;
+	@Autowired @Qualifier("propertyChangePoints")
+	private Map<SpdBizType, SpdBizStep[]> propertyChangePoints; 
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRules", method=RequestMethod.GET)
+	public SpdPropertyChangeRules list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdPropertyChangeRuleParams params = QueryParams.buildParamsFromJson(paramsStr, SpdPropertyChangeRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdPropertyChangeRules rules = pcrRepository.find(params, order, currentPage-1, pageSize);
+		rules.fillTriggerStepName(propertyChangePoints);
+		return rules;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRules/count", method=RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdPropertyChangeRuleParams params = QueryParams.buildParamsFromJson(paramsStr, SpdPropertyChangeRuleParams.class);
+		return pcrRepository.count(params);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRules/ids,{ids}", method=RequestMethod.GET)
+	public SpdPropertyChangeRules findByIds(@PathVariable(value = "ids", required = false) String ids){
+		SpdPropertyChangeRules rules = pcrRepository.findAllWithRelations().findByIds(Arrays.asList(ids.split(",")));
+		rules.fillTriggerStepName(propertyChangePoints);
+		return rules;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRules/{id}", method=RequestMethod.GET)
+	public SpdPropertyChangeRule get(@PathVariable("id")String id){
+		return pcrRepository.findAllWithRelations().findById(id);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRules", method=RequestMethod.POST)
+	public SpdPropertyChangeRule add(@RequestBody SpdPropertyChangeRule rule, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		rule = pcrService.add(rule, user);
+		
+		rule.fillTriggerStepName(propertyChangePoints.get(rule.getBizType()));
+		return pcrRepository.findAllWithRelations().findById(rule.getId());
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRules/{id}", method=RequestMethod.PUT)
+	public SpdPropertyChangeRule modify(@RequestBody SpdPropertyChangeRule rule, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		rule = pcrService.modify(rule, user);
+		rule.fillTriggerStepName(propertyChangePoints.get(rule.getBizType()));
+		return rule;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRules/propertyChangePoints", method=RequestMethod.GET)
+	public Map<SpdBizType, SpdBizStep[]> findPropertyChangePoints(){
+		return propertyChangePoints;
+	}
+	 
+	
+}

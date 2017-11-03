@@ -1,0 +1,29 @@
+package cn.ak4j.yard.pcs.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsRoleApi;
+import cn.ak4j.yard.pcs.domain.PcsRoleApis;
+import cn.ak4j.yard.pcs.params.PcsRoleApiParams;
+import lombok.Getter;
+
+@Repository
+public class PcsRoleApiRepository extends BaseRepository<PcsRoleApi, PcsRoleApis, PcsRoleApiParams, String>{
+	
+	@Autowired @Getter 
+	private EntityManager entityManager;
+	
+	public boolean verifyDataReplication(PcsRoleApi roleApi){
+		PcsRoleApiParams params = new PcsRoleApiParams();
+		params.setRoleId(new ListParam<String>(roleApi.getRoleId()));
+		params.setUri(new ListParam<String>(roleApi.getUri()));
+		params.setRequestMethod(new ListParam<String>(roleApi.getRequestMethod()));
+		return CollectionUtils.isNotEmpty(find(params));
+	}
+}

@@ -1,0 +1,78 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+
+public class PcsDepotAreas extends Entities<PcsDepotArea> {
+	private static final long serialVersionUID = -2364536271722683015L;
+
+	public PcsDepotAreas(){}
+	
+	public PcsDepotAreas(List<PcsDepotArea> areas){
+		super(areas);
+	}
+	
+	public PcsDepotAreas findByIds(List<String> ids){
+		PcsDepotAreas result = new PcsDepotAreas();
+		for(PcsDepotArea area : this){
+			if(ids.contains(area.getDepotAreaId())){
+				result.add(area);
+			}
+		}
+		return result;
+	}
+	
+	public PcsDepotShelfs findShelfsByShelfId(List<String> shelfIds){
+		PcsDepotShelfs result = new PcsDepotShelfs();
+		
+		for(PcsDepotArea area : this){
+			PcsDepotShelfs theShelfs = area.getShelfs().findByIds(shelfIds);
+			result.addAll(theShelfs);
+		}
+		
+		return result;
+	}
+
+	public void fillShelfs(PcsDepotShelfRepository dsRepository) {
+		PcsDepotShelfs shelfs = dsRepository.findAll();
+		for(PcsDepotArea area : this){
+			PcsDepotShelfs theShelfs = new PcsDepotShelfs(CollectionUtils.find("areaId", area.getDepotAreaId(), String.class, shelfs));
+			area.setShelfs(theShelfs);
+		}
+	}
+
+	public PcsDepotArea findById(String areaId) {
+		return CollectionUtils.findWhere("depotAreaId", areaId, this);
+	}
+
+	public PcsDepotAreas findByAreaType(PcsAreaType areaType) {
+		return new PcsDepotAreas(CollectionUtils.find("areaType", areaType.getCode(), this));
+	}
+	
+	public PcsDepotArea findByAreaCode(String areaCode){
+		return CollectionUtils.findWhere("areaCode", areaCode, this);
+	}
+
+	public void fillDepots(PcsDepotRepository depotRepository) {
+		PcsDepots depots = depotRepository.findAll();
+		for(PcsDepotArea area : this){
+			PcsDepot depot = CollectionUtils.findWhere("depotId", area.getDepotId(), depots);
+			area.setDepot(depot);
+		}
+	}
+
+	public PcsDepotShelfs getAllShelfs() {
+		PcsDepotShelfs shelfs = new PcsDepotShelfs();
+		this.forEach(area->{
+			shelfs.addAll(area.getShelfs());
+		});
+		return shelfs;
+	}
+
+	
+}

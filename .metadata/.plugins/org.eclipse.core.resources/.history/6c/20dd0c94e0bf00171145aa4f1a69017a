@@ -1,0 +1,512 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.List;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+import org.hibernate.validator.constraints.ScriptAssert;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name="yds_goods")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@ScriptAssert.List(value={
+	@ScriptAssert(script="_this.prepareUnitLv>=_this.settleUnitLv", lang = "javascript", alias = "_this", message="备货单位级别要大于等于结算单位级别"),
+	@ScriptAssert(script="_this.settleUnitLv>=_this.storeUnitLv", lang = "javascript", alias = "_this", message="结算单位级别要大于等于存储单位级别"),	
+	@ScriptAssert(script="_this.storeUnitLv>=_this.consumeUnitLv", lang = "javascript", alias = "_this", message="存储单位级别要大于等于消耗单位级别"),
+})
+public class YdsGoods extends YardMaintenceEntity {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String goodsId;
+	
+	@NotEmpty(message = "商品类型不能为空") @Getter @Setter
+	private String goodsType;//产品类型
+	
+	@NotEmpty(message = "商品名称不能为空") @Getter @Setter
+	private String wareName;//商品名
+	
+	@NotEmpty(message = "通用名称不能为空") @Getter @Setter
+	private String goodsName;//通用名
+	
+	@NotEmpty(message = "产品编码不能为空") @Getter @Setter
+	private String goodsCode;//产品编码
+	
+	@Getter @Setter
+	private String goodsSpec;//规格/型号
+	
+	@Getter @Setter
+	private String goodsModel;//剂型
+	
+	@NotEmpty(message = "包装规格不能为空") @Getter @Setter
+	private String packingSpec;//包装规格
+	
+	@NotEmpty(message = "生产企业不能为空") @Getter @Setter
+	private String factName;//生产企业
+	
+	@NotNull(message = "产品单价不能为空")
+	@DecimalMin(value = "0",message = "产品单价是无效数据")
+	@Getter @Setter
+	private float unitPrice;//市场价，本质上就是大包装价格
+	
+	@Column(name="unit_big_name")
+	@Getter @Setter
+	private String bigName;//大包装单位
+	
+	@Column(name="unit_big_sum")
+	@NotNull(message = "大包装转换比不能为空")
+	@Getter @Setter
+	private Integer bigSum;//大包装转换比
+	
+	@Column(name="unit_mid_name")
+	@Getter @Setter
+	private String midName;//中包装单位
+	
+	@Column(name="unit_mid_sum")
+	@NotNull(message = "中包装转换比不能为空")
+	@Getter @Setter
+	private Integer midSum;//中包装转换比
+	
+	@Column(name="unit_min_name")
+	
+	@Getter @Setter
+	private String minName;//小包装单位
+	
+	@Column(name="unit_min_sum")
+	@NotNull(message = "小包装转换比不能为空")
+	@Getter @Setter
+	private Integer minSum;//小包转换比
+	
+    @Column(name="unit_base_name")
+    @Getter @Setter
+	private String baseName;//最小基本单位
+    
+	@NotNull(message = "备货单位级别不能为空")
+	@Getter @Setter
+	private Integer prepareUnitLv;//备货单位级别
+
+	@NotNull(message = "结算单位级别不能为空")
+	@Getter @Setter
+	private Integer settleUnitLv;//结算单位级别，结算和备货单位级别通常相同
+	
+	@NotNull(message = "存储单位级别不能为空")
+	@Getter @Setter
+	private Integer storeUnitLv;//存储单位级别
+	
+	@NotNull(message = "消耗单位级别不能为空")
+	@Getter @Setter
+	private Integer consumeUnitLv;//消耗(使用)单位级别
+	
+	@Column(name="goods_format_name")
+	@Getter @Setter
+	private String formatName;//格式化名称
+	
+	@Getter @Setter
+	private String goodsDesc;//产品描述
+	
+	@Getter @Setter
+	private Boolean enabled;//禁用标记
+	
+	@Getter @Setter
+	private String regDoc;//注册证号码
+	
+	@Getter @Setter
+	private String athDoc;//批准文号
+	
+	@Getter @Setter
+	private String storeType;//存储类型
+	
+	@Getter @Setter
+	private String mCode;//助记码
+	
+	@Getter @Setter
+	private String channelType;//产品来源
+	
+	@Getter @Setter
+	private String equipmentSortName;//器械分类
+	
+	@Getter @Setter
+	private String equipmentLevel;//器械类别
+	
+	@Setter private Boolean checkValidity;//是否检查批次
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_c;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+
+	@Transient @JsonIgnore @Getter @Setter
+	private YdsGoodsLots useableGoodsLots;
+	
+	@Transient @JsonIgnore @Setter
+	private YdsGoodsIndexName indexName;
+	
+	@Transient @JsonIgnore @Setter
+	private YdsGoodsInfo goodsInfo;
+	
+	@Transient 
+	public Integer getPrepareToStoreRatio(){
+		return (int) SpdUnitUtils.computeUnitExchangeRatio(this, YdsUnitLv.big.getLv(), getStoreUnitLv());
+	}
+	
+	public void calculateFormatName(){
+		if (getGoodsName() != null && getGoodsName().equals(getWareName())) {
+			setFormatName("[" + getGoodsCode() + "] " + getGoodsName() + " "
+					+ getGoodsSpec() + " " + getGoodsModel() + "  " + getFactName());
+		} else {
+			setFormatName("[" + getGoodsCode() + "] " + getGoodsName() + " " + getWareName() + " "
+							+ getGoodsSpec() + " " + getGoodsModel() + "  " + getFactName());
+		}
+	}
+	
+	/**
+	 * 校验产品编码的唯一性
+	 */
+	public void verifyCodeUnique(YdsGoodsRepository goodsRepository){
+		YdsGoods theGoods = goodsRepository.findAll().findByGoodsCode(getGoodsCode());
+		if(theGoods == null){
+			return ;
+		}
+		//新增的情况
+		if(StringUtils.isEmpty(getGoodsId())){
+			throw new InvalidDataException(YardExceptionType.invalid_resource_exist, getGoodsCode());
+		}
+		//编辑的情况
+		else{
+			if(!getGoodsId().equals(theGoods.getGoodsId())){
+				throw new InvalidDataException(YardExceptionType.invalid_resource_exist, getGoodsCode());
+			}
+		}
+	}
+	
+	public void updateBaseInfo(YdsGoods goods, PcsUser user){
+		checkUpdate(goods);
+		this.setGoodsCode(goods.getGoodsCode());
+		this.setAthDoc(goods.getAthDoc());
+		this.setCheckValidity(goods.getCheckValidity());
+		this.setEnabled(goods.getEnabled());
+		this.setEquipmentLevel(goods.getEquipmentLevel());
+		this.setEquipmentSortName(goods.getEquipmentSortName());
+		this.setFactName(goods.getFactName());
+		this.setGoodsDesc(goods.getGoodsDesc());
+		this.setGoodsModel(goods.getGoodsModel());
+		this.setGoodsName(goods.getGoodsName());
+		this.setGoodsSpec(goods.getGoodsSpec());
+		this.setMCode(goods.getMCode());
+		this.setPackingSpec(goods.getPackingSpec());
+		this.setRegDoc(goods.getRegDoc());
+		this.setStoreType(goods.getStoreType());
+		this.setWareName(goods.getWareName());
+		this.setUnitPrice(goods.getUnitPrice());
+		this.getMaintenanceInfo().updateByUser(user);
+	}
+	
+	/**
+	 * 更新包装规格信息有两种情况：
+	 * 1）修改：修改是发生在任意情况下，只要满足必要的条件，例如从粒修改成盒再修改成箱
+	 * 2）设置：设置的意思是指未设置的情况下可以设置一次，此后不能再次设置或修改
+	 * 这两种策略由全局配置来决定，如果全局配置指定了允许修改那就是修改模式，否则就是设置模式
+	 * 业务单位级别比必须遵循，备货 >= 结算 >= 存储 >= 消耗
+	 */
+	public void updatePackageSpecifications(YdsGoods goods, PcsUser user){
+		checkUpdate(goods);
+		
+		List<Integer> bizUnits = Conf.getAllGlobalInfos().getBizUnitSetting();
+		
+		/**
+		 * 全局配置设置了允许修改的情况下，需要满足三个条件才能修改：
+		 * 1）全局设置了允许修改
+		 * 2）当前的单位级别是可用单位级别
+		 * 3）新的单位信息不能为空
+		 */
+		if(Conf.getAllGlobalInfos().findByKey(YardGlobalInfo.allow_modify_package_specification).getBooleanValue()){
+			if(StringUtils.isNotEmpty(goods.getBaseName()) && bizUnits.contains(YdsUnitLv.base.getLv())){
+				this.setBaseName(goods.getBaseName());
+			}
+			
+			if(StringUtils.isNotEmpty(goods.getBigName()) && bizUnits.contains(YdsUnitLv.big.getLv())){
+				this.setBigName(goods.getBigName());
+			}
+			
+			if(StringUtils.isNotEmpty(goods.getMidName()) && bizUnits.contains(YdsUnitLv.mid.getLv())){
+				this.setMidName(goods.getMidName());
+			}
+	
+			if(StringUtils.isNotEmpty(goods.getMinName()) && bizUnits.contains(YdsUnitLv.min.getLv())){
+				this.setMinName(goods.getMinName());
+			}
+	
+			if(goods.getBigSum() >= 1 && bizUnits.contains(YdsUnitLv.big.getLv())){
+				this.setBigSum(goods.getBigSum());
+			}else{
+				if(getBigSum() != goods.getBigSum()){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "大包装转换比");
+				}
+			}
+			
+			if(goods.getMidSum() >= 1 && bizUnits.contains(YdsUnitLv.mid.getLv())){
+				this.setMidSum(goods.getMidSum());
+			}else{
+				if(getMidSum() != goods.getMidSum()){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "中包装转换比");
+				}
+			}
+			
+			if(goods.getMinSum() >= 1 && bizUnits.contains(YdsUnitLv.min.getLv())){
+				this.setMinSum(goods.getMinSum());
+			}else{
+				if(getMinSum() != goods.getMinSum()){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "小包装转换比");
+				}
+			}
+		}else{
+			if(StringUtils.isEmpty(getBaseName()) && bizUnits.contains(YdsUnitLv.base.getLv())){
+				this.setBaseName(goods.getBaseName());
+				this.setMinName(goods.getMinName());
+			}else{
+				if(getBaseName() != null && !getBaseName().equals(goods.getBaseName())){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "最小包装单位名称");
+				}
+			}
+			
+			if(StringUtils.isEmpty(getBigName()) && bizUnits.contains(YdsUnitLv.big.getLv())){
+				this.setBigName(goods.getBigName());
+			}else{
+				if(getBigName() != null && !getBigName().equals(goods.getBigName())){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "大包装单位名称");
+				}
+			}
+			
+			if(StringUtils.isEmpty(getMidName()) && bizUnits.contains(YdsUnitLv.mid.getLv())){
+				this.setMidName(goods.getMidName());
+			}else{
+				if(getMidName() != null && !getMidName().equals(goods.getMidName())){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "中包装单位名称");
+				}
+			}
+	
+			if(StringUtils.isEmpty(getMinName()) && bizUnits.contains(YdsUnitLv.min.getLv())){
+				this.setMinName(goods.getMinName());
+			}else{
+				if(getMinName() != null && !getMinName().equals(goods.getMinName())){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "小包装单位名称");
+				}
+			}
+	
+			if(getBigSum() <= 1 && goods.getBigSum() >= 1 && bizUnits.contains(YdsUnitLv.big.getLv())){
+				this.setBigSum(goods.getBigSum());
+			}else{
+				if(getBigSum() != goods.getBigSum()){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "大包装转换比");
+				}
+			}
+			
+			if(getMidSum() <= 1 && goods.getMidSum() >= 1 && bizUnits.contains(YdsUnitLv.mid.getLv())){
+				this.setMidSum(goods.getMidSum());
+			}else{
+				if(getMidSum() != goods.getMidSum()){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "中包装转换比");
+				}
+			}
+			
+			if(getMinSum() <= 1 && goods.getMinSum() >= 1 && bizUnits.contains(YdsUnitLv.min.getLv())){
+				this.setMinSum(goods.getMinSum());
+			}else{
+				if(getMinSum() != goods.getMinSum()){
+					throw new OperateForbiddenException(YardExceptionType.forbid_modify_goods_package_specifications, goods.getGoodsId(), goods.getGoodsCode(), "小包装转换比");
+				}
+			}
+		}
+		
+		goods.checkBizUnitLv();
+		
+		this.setPrepareUnitLv(goods.getPrepareUnitLv());
+		this.setSettleUnitLv(goods.getSettleUnitLv());
+		this.setStoreUnitLv(goods.getStoreUnitLv());
+		this.setConsumeUnitLv(goods.getConsumeUnitLv());
+		
+		this.getMaintenanceInfo().updateByUser(user);
+	}
+	
+	@JsonIgnore @Transient
+	public boolean isPackageSpecificationComplete() {
+		List<Integer> bizUnits = Conf.getAllGlobalInfos().getBizUnitSetting();
+		
+		if(StringUtils.isEmpty(getBaseName()) && bizUnits.contains(YdsUnitLv.base.getLv())){
+			return false;
+		}
+		
+		if(StringUtils.isEmpty(getBigName()) && bizUnits.contains(YdsUnitLv.big.getLv())){
+			return false;
+		}
+		
+		if(StringUtils.isEmpty(getMidName()) && bizUnits.contains(YdsUnitLv.mid.getLv())){
+			return false;
+		}
+
+		if(StringUtils.isEmpty(getMinName()) && bizUnits.contains(YdsUnitLv.min.getLv())){
+			return false;
+		}
+		
+		return true;
+	}
+	
+	private void checkBizUnitLv(){
+		if(getPrepareUnitLv() < getSettleUnitLv()
+				|| getSettleUnitLv() < getStoreUnitLv()
+				|| getStoreUnitLv() < getConsumeUnitLv()){
+				throw new InvalidDataException(YardExceptionType.invalid_biz_unit_lv, 
+												getGoodsId(), 
+												getGoodsCode(), 
+												getPrepareUnitLv(),
+												getSettleUnitLv(),
+												getStoreUnitLv(),
+												getConsumeUnitLv());
+		}
+	}
+	
+	@JsonIgnore
+	public float getPrice(Integer targetUnitLv){
+		int currentPriceUnit = Conf.getAllGlobalInfos().findByKey(YardGlobalInfo.yds_goods_price_unit_lv).getIntValue();
+		float sum = SpdUnitUtils.computeUnitExchangeRatio(this, currentPriceUnit, targetUnitLv);
+		float price = getUnitPrice()/sum;
+//		price = (float)(Math.round(price*100))/100;
+		return price;
+	}
+	
+	public float getPreparePrice(){
+		return goodsInfo.getPreparePrice();
+	}
+	
+	
+	public float getConsumePrice(){
+		return goodsInfo.getConsumePrice();
+	}
+	
+	
+	@Deprecated
+	public float getStorePrice(){
+		return getPrice(getStoreUnitLv());
+	}
+	
+	public YdsGoodsIndexName getIndexName(){
+		if(indexName == null){
+			indexName = new YdsGoodsIndexName(this);
+		}
+		return indexName;
+	}
+	
+	//返回数值对应的类型名称
+	@Transient
+	public String getYdsGoodsTypeName(){
+		return YdsGoodsType.typeOf(getGoodsType()).getName();
+	}
+	
+	public String getYdsGoodsEnabled(){
+		return this.enabled?"是":"否";
+	}
+	
+	@Transient @JsonIgnore
+	public String getBlockQtyInStoreLvUnitName(){
+		float bigStoreRatio = SpdUnitUtils.computeUnitExchangeRatio(this, YdsUnitLv.big.getLv(), getStoreUnitLv());
+		
+		return (int)(1*bigStoreRatio)+""+SpdUnitUtils.computeGoodsUnitName(this, getStoreUnitLv())+"/"+SpdUnitUtils.computeGoodsUnitName(this, YdsUnitLv.big.getLv());
+	}
+	
+	@Transient @JsonIgnore
+	public String getStorePackageUnitLvName(){
+		return SpdUnitUtils.computeGoodsUnitName(this, getStoreUnitLv());
+	}
+	
+	@Transient @JsonIgnore
+	public String getSettlementUnitName(){
+		return SpdUnitUtils.computeGoodsUnitName(this, getSettleUnitLv());
+	}
+
+	public void checkData() {
+		String invalidMsg = getInvalidMsg();
+		
+		if(StringUtils.isNotEmpty(invalidMsg)){
+			throw new InvalidDataException(invalidMsg);
+		}
+	}
+	
+	@JsonProperty
+	public String getInvalidMsg(){
+		StringBuffer msg = new StringBuffer();
+		String validateMsg = getValidateMsg();
+		msg.append(validateMsg)
+			.append(StringUtils.isEmpty(validateMsg)?"":";");
+		
+		if(StringUtils.isEmpty(getGoodsType())){
+			msg.append("类型不能为空;");
+		}else{
+			if(getGoodsType().equals(YdsGoodsType.drug.getCode())){
+				if(StringUtils.isEmpty(getGoodsSpec())){
+					msg.append("规格不能为空;");
+				}
+				if(StringUtils.isEmpty(getGoodsModel())){
+					msg.append("剂型不能为空;");
+				}
+			}else if(getGoodsType().equals(YdsGoodsType.equipment.getCode())){
+				if(StringUtils.isEmpty(getGoodsSpec())){
+					msg.append("型号不能为空;");
+				}
+				if(StringUtils.isEmpty(getEquipmentLevel())){
+					msg.append("器械类别不能为空;");
+				}
+				if(StringUtils.isEmpty(getEquipmentSortName())){
+					msg.append("器械分类不能为空;");
+				}
+			}
+		}
+		
+		return msg.toString();
+	}
+	
+	public Boolean getCheckValidity(){
+		return checkValidity==null?false:checkValidity;
+	}
+	
+}

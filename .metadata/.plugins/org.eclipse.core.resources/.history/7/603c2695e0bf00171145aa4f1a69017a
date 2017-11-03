@@ -1,0 +1,29 @@
+package cn.ak4j.yard.pcs.web;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.yard.pcs.domain.PcsUserRoles;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRoleRepository;
+import cn.ak4j.yard.pcs.service.PcsUserService;
+
+@RestController
+public class PcsUserRoleResource {
+	@Autowired PcsUserService pcsUserService;
+	@Autowired PcsUserRepository pcsUserRepository;
+	
+	@Autowired private PcsUserRoleRepository urRepository;
+	
+	@RequestMapping(value = "/yard/pcs/pcsUserRoles/userId,{userId}", method = RequestMethod.GET)
+	public PcsUserRoles findByUserId(@PathVariable("userId") String userId) {
+		PcsUserRoles allUserRoles = urRepository.findAll();
+		PcsUserRoles userRoles = allUserRoles.findByUserId(userId);
+		
+		return userRoles;
+	}
+	
+}

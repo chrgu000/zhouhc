@@ -1,0 +1,115 @@
+package cn.ak4j.yard.amqp;
+
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+
+import com.rabbitmq.client.Channel;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.bizplan.domain.SpdGoodsBizPlan;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizPlanRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRuleParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.service.SpdGeneralLedgerService;
+import cn.ak4j.yard.spd.reconciliation.service.SpdPropertyChangeService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class LedgerAMQPMsgListener extends AbstractAMQPMsgListener implements ChannelAwareMessageListener{
+
+	@Autowired private MGProxy mgProxy;
+	@Autowired private SpdBizPlanRepository bpRepository;
+	@Autowired private SpdGeneralLedgerService glService;
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private SpdPropertyChangeService pcService;
+	@Autowired @Qualifier("propertyChangePoints") Map<SpdBizType, SpdBizStep[]> propertyChangePoints;
+	private Set<SpdBizStep> propertyChangeSteps;
+	
+	public void onMessage(Message message, Channel channel) throws Exception {
+		String json = "";
+		String msgType = "";
+		try{
+			json = new String(message.getBody(), Global.defaultCharset);
+			msgType = (String)message.getMessageProperties().getHeaders().get(Constant.AMQP_MSG_TYPE);
+			AmqpMsgType amqpMsgType = AmqpMsgType.typeOf(msgType);
+			if(amqpMsgType.equals(AmqpMsgType.COMPLETE_RECEIVE_BIZ)){
+				String bizId = (String)getResourceId(json, "bizId");
+				glService.debit(bizId);
+			}
+			
+			SpdBizStep bizStep = getBizStepFromPropertyChangeMsg(amqpMsgType);
+			if(bizStep != null){
+				String bizId = (String)getResourceId(json, "bizId");
+				String taskId = (String)getResourceId(json, "taskId");
+				@SuppressWarnings("rawtypes")
+				SpdGoodsBizPlan biz = bpRepository.findOne(bizId);
+				
+				//根据业务的业务规则id以及当前的业务步骤查询是否有对应的物权变更规则
+				SpdPropertyChangeRuleParams params = new SpdPropertyChangeRuleParams();
+				params.setBizRuleId(new ListParam<String>(biz.getBizRuleId()));
+				params.setTriggerStepCode(new ListParam<String>(bizStep.getStatusCode()));
+				Entities<SpdPropertyChangeRule> rules = pcrRepository.findAllWithRelations().find(params);
+				if(rules.size() == 0){
+					return ;
+				}
+				if(rules.size() > 1){
+					throw new OperateFailException(YardExceptionType.property_change_rules_conflict, biz.getBizType().getCode(), biz.getBizRuleId(), biz.getBizStatusCode());
+				}
+
+				SpdPropertyChangeRule propertyChangeRule = rules.get(0);
+				//if(bizStep != null && propertyChangeRule.getTriggerStepCode().equals(bizStep.getAction())){
+					log.info("property change occur:{}, msgType:{}", json, msgType);
+					pcService.change(propertyChangeRule, biz, taskId);
+				//}
+			}
+		}catch(Exception e){
+			if(Conf.isSendExceptionMail()){
+				log.info("ledger amqp msg listener fault with msg:{}, msgType:{}", json, msgType);
+				mgProxy.sendMail(getErrorMailTitle(), ExceptionUtils.getStackTrace(e), "spd@1ycloud.net");
+			}
+			throw e;
+		}finally{
+			channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);	
+		}
+	}
+	
+	private SpdBizStep getBizStepFromPropertyChangeMsg(AmqpMsgType amqpMsgType){
+		if(propertyChangeSteps == null){
+			propertyChangeSteps = new HashSet<SpdBizStep>();
+			Iterator<SpdBizStep[]> allSteps = propertyChangePoints.values().iterator();	
+			while(allSteps.hasNext()){
+				SpdBizStep[] stepArray = allSteps.next();
+				for(SpdBizStep bizStep : stepArray){
+					propertyChangeSteps.add(bizStep);
+				}
+			}
+		}
+		
+		for(SpdBizStep bizStep : propertyChangeSteps){
+			if(bizStep.getAction().equals(amqpMsgType.getCode())){
+				return bizStep;
+			}
+		}
+		return null;
+	}
+	
+}

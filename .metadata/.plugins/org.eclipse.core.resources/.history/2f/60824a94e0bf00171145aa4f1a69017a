@@ -1,0 +1,109 @@
+package cn.ak4j.yard.spd.web;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.enums.SpdInventoryWay;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventoryItems;
+import cn.ak4j.yard.spd.params.SpdInventoryItemParams;
+import cn.ak4j.yard.spd.repository.SpdInventoryItemRepository;
+import cn.ak4j.yard.spd.repository.SpdInventoryRepository;
+import cn.ak4j.yard.spd.service.SpdInventoryService;
+import cn.ak4j.yard.sys.domain.ReportConfig;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.web.PdfExportHelper;
+
+@RestController
+public class SpdInventoryItemResource {
+	
+	@Autowired private SpdInventoryItemRepository iiRepository;
+	@Autowired private SpdInventoryRepository irRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdInventoryService siService;
+	@Autowired private PdfExportHelper pdfExportHelper;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@RequestMapping(value="/yard/spd/spdInventoryItems/inventoryId,{inventoryId}", method = RequestMethod.GET)
+	public SpdInventoryItems findItemId(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "10") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			@PathVariable("inventoryId")String inventoryId){
+		SpdInventoryItemParams params = SpdInventoryItemParams.buildParamsFromJson(paramsStr, SpdInventoryItemParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdInventoryItemParams();
+		}
+		params.setInventoryId(new ListParam<String>(inventoryId));
+		SpdInventoryItems inventoryItems = iiRepository.find(params, order, currentPage-1, pageSize);
+		if(order == null){
+			String depotId = irRepository.findOne(inventoryId).getDepotId();
+			PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+			inventoryItems.orderByDepotShelf(depot);
+		}
+		
+		return inventoryItems;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdInventoryItems/inventoryId,{inventoryId}/count", method = RequestMethod.GET)
+	public long getCount(@RequestParam(value = "params", required = false) String paramsStr,
+						 @PathVariable("inventoryId")String inventoryId) {
+		SpdInventoryItemParams params = SpdInventoryItemParams.buildParamsFromJson(paramsStr, SpdInventoryItemParams.class);
+		if(params == null){
+			params = new SpdInventoryItemParams();
+		}
+		params.setInventoryId(new ListParam<String>(inventoryId));
+		return iiRepository.count(params);
+	}
+	
+	
+	 /***>>>>>>>>>>>>>>>>>>>打印物资盘点单<<<<<<<<<<<<<<<<<<<<<<
+	  * @param inventoryId
+	  * @param request
+	  * @param response
+	  * @throws Exception
+	  */
+	 @ResponseBody
+     @RequestMapping(value = "/yard/spd/spdInventoryItems/inventoryId,{inventoryId}/pdf", method = RequestMethod.GET)
+     public void downloadpdf(@PathVariable("inventoryId")String inventoryId, HttpServletRequest request,HttpServletResponse response)throws Exception{
+		
+		SpdInventory inventory = siService.getInventoryForReport(inventoryId);
+		
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		parameters.put("inventoryCode", inventory.getInventoryCode());
+		parameters.put("wayNm", inventory.getInventoryWayName());
+		parameters.put("orgNm", inventory.getOrg().getOrgName());
+		parameters.put("deptNm", inventory.getDept().getDeptName());
+		parameters.put("depotNm", inventory.getDepot().getDepotName());
+		parameters.put("areaNm", inventory.getDepotArea().getAreaName());
+		parameters.put("userNm", inventory.getUser().getUserName());
+		parameters.put("createTime", inventory.getMaintenanceInfo().getCreateDate());
+		
+		if(inventory.getInventoryType().equals(SpdInventoryWay.static_disc.getCode())){
+			ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.inventory_report).getConfig();
+			pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, inventory.getItems(), "inline", response);
+		}else{
+			ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.blind_inventory_report).getConfig();
+			pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, inventory.getItems(), "inline", response);
+		}
+    }
+
+}

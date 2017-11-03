@@ -1,0 +1,122 @@
+package cn.ak4j.yard.spd.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfig;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+
+public class SpdDepotGoodsConfigResourceTest extends BaseTest{
+
+	@Test public void testGetList() throws Exception{
+		SpdDepotGoodsConfigs configs = mockMvcHelper.findList(SpdDepotGoodsConfigs.class, testUserCode, null);
+		assertEquals(49, configs.size());
+	}
+	
+	@Test public void testGetCount() throws Exception{
+		int count = mockMvcHelper.count(SpdDepotGoodsConfigs.class, testUserCode, null);
+		assertEquals(49, count);
+	}
+	
+	@Test public void testGet() throws Exception{
+		String id = "dgconfig_id_001";
+		SpdDepotGoodsConfig config = mockMvcHelper.findOne(SpdDepotGoodsConfig.class, testUserCode, id);
+		assertEquals(id, config.getId());
+	}
+	
+	@Test public void testGetByKeys() throws Exception{
+		List<String> ids = new ArrayList<String>();
+		ids.add("dgconfig_id_001");
+		ids.add("dgconfig_id_002");
+
+		SpdDepotGoodsConfigs configs = mockMvcHelper.getByIds(SpdDepotGoodsConfigs.class, testUserCode, ids);
+		assertEquals(2, configs.size());
+		configs.forEach(config->{
+			ids.contains(config.getId());
+		});
+	}
+	
+	@Test public void testAdd() throws Exception{
+		//正常数据
+		SpdDepotGoodsConfig config = createDepotGoodsConfig();
+		SpdDepotGoodsConfig newConfig = mockMvcHelper.add(SpdDepotGoodsConfig.class, testUserCode, config);
+//				Global.defaultObjectMapper.readValue(json, SpdDepotGoodsConfig.class);
+		assertNotNull(newConfig.getId());
+		assertEquals(config.getDepotId(), newConfig.getDepotId());
+		assertEquals(config.getGoodsId(), newConfig.getGoodsId());
+		assertEquals(config.getAutoPrepareStratageCode(), newConfig.getAutoPrepareStratageCode());
+		assertEquals(config.getLastPrepareTime(), newConfig.getLastPrepareTime());
+		assertEquals(config.getUpperLimit(), newConfig.getUpperLimit());
+		assertEquals(config.getLowerLimit(), newConfig.getLowerLimit());
+		assertEquals(config.getReplenishUpperLimit(), newConfig.getReplenishUpperLimit());
+		assertEquals(config.getReplenishLowerLimit(), newConfig.getReplenishLowerLimit());
+		assertEquals(config.getQuotaQty(), newConfig.getQuotaQty());
+		assertEquals(config.getQuotaStratageCode(), newConfig.getQuotaStratageCode());
+		
+		//已存在的配置
+
+		mockMvcHelper.add(SpdDepotGoodsConfig.class, testUserCode, config, status().is4xxClientError(), YardExceptionType.invalid_exist_same_depot_goods_config);
+		
+		//产品未启用
+		YdsGoods goods = mockMvcHelper.findOne(YdsGoods.class, testUserCode, config.getGoodsId());
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.new_created.getCode(), goods.getMaintenanceInfo().getLastDate());
+		mockMvcHelper.updateCheckState(YdsGoods.class, testUserCode, checkStateTO, false, goods.getGoodsId());
+		wait(2);
+
+		mockMvcHelper.add(SpdDepotGoodsConfig.class, testUserCode, config, status().is4xxClientError(), YardExceptionType.invalid_useless_goods);
+		
+		//备货上限小于下限
+		config.setGoodsId("goods_id_004");
+		config.setLowerLimit(9032);
+		config.setUpperLimit(32);
+		mockMvcHelper.add(SpdDepotGoodsConfig.class, testUserCode, config, status().is4xxClientError(), YardExceptionType.invalid_data);
+		
+		config.setGoodsId("goods_id_004");
+		config.setReplenishLowerLimit(9032);
+		config.setReplenishUpperLimit(32);
+		mockMvcHelper.add(SpdDepotGoodsConfig.class, testUserCode, config, status().is4xxClientError(), YardExceptionType.invalid_data);
+		
+	}
+	
+	@Test public void testUpdate() throws Exception{
+		String id = "dgconfig_id_001";
+		SpdDepotGoodsConfig config = mockMvcHelper.findOne(SpdDepotGoodsConfig.class, testUserCode, id);
+		
+		config.setLowerLimit(100);
+		config = mockMvcHelper.modify(SpdDepotGoodsConfig.class, testUserCode, id, config);
+		assertEquals(100, config.getLowerLimit().intValue());
+		
+		//存在相同仓库产品配置
+		config.setGoodsId("goods_id_002");
+		mockMvcHelper.modify(SpdDepotGoodsConfig.class, testUserCode, id, config, status().is4xxClientError(), YardExceptionType.invalid_exist_same_depot_goods_config);
+	}
+	
+	private SpdDepotGoodsConfig createDepotGoodsConfig() {
+		SpdDepotGoodsConfig config = new SpdDepotGoodsConfig();
+		config.setDepotId("depot_id_003");
+		config.setGoodsId("goods_id_003");
+		config.setAutoPrepareStratageCode("APSC875654");
+		config.setLastPrepareTime(new Date());
+		config.setUpperLimit(99999);
+		config.setLowerLimit(200);
+		config.setReplenishUpperLimit(99999);
+		config.setReplenishLowerLimit(200);
+		config.setQuotaQty(200);
+		config.setQuotaStratageCode("QSC5468745");
+		
+		return config;
+	}
+
+}

@@ -1,0 +1,34 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.Collections;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+
+/**
+* @Description: 收货业务步骤
+* @author zhengyf
+* @date 2017年4月2日 下午4:29:26
+* @version V1.0.0
+*/
+@SuppressWarnings({"serial"})
+public class SpdReceiveBizSteps extends SpdBizSteps{
+
+	public static SpdBizStep create_receive = new SpdBizStep(1, AmqpMsgType.CREATE_RECEIVE_BIZ.getCode(), "作业步骤模板", "receive_created", "收货已创建");
+	public static SpdBizStep commite_receive = new SpdBizStep(2, AmqpMsgType.COMMIT_RECEIVE_BIZ.getCode(), "作业步骤模板", "receive_commited", "收货待审核");
+	public static SpdBizStep review_receive = new SpdBizStep(3, AmqpMsgType.CONFIRM_RECEIVE_BIZ.getCode(), "作业步骤模板", "receive_confirmed", "已确认收货");
+	public static SpdBizStep create_dispatcher = new SpdBizStep(4, "创建调度作业", "作业步骤模板", "dispatcher_created", "调度待审核");
+	public static SpdBizStep create_on_shelf_task = new SpdBizStep(5, AmqpMsgType.CREATE_ON_SHELF_TASK.getCode(), "作业步骤模板", "on_shelf_task_created", "上架待审核");
+	public static SpdBizStep complete_on_shelf_task = new SpdBizStep(6, AmqpMsgType.CONFIRM_ON_SHELF_TASK.getCode(), "作业步骤模板", "on_shelf_task_completed", "上架完成");
+	
+	public SpdReceiveBizSteps(){
+		this.add(create_receive);
+		this.add(commite_receive);
+		this.add(review_receive);
+		this.add(create_dispatcher);
+		this.add(create_on_shelf_task);
+		this.add(complete_on_shelf_task);
+		
+		Collections.sort(this, comparator);
+	}
+	
+}

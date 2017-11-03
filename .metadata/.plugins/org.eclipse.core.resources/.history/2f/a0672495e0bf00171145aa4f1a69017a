@@ -1,0 +1,24 @@
+package cn.ak4j.yard.pcs.web;
+
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import lombok.Data;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+
+@Data
+public class PcsDepotShelfReport{
+	
+	public static final String type_mixGoods_report = "mixed";
+	public static final String type_singleGoods_report = "simple";
+	
+	private String type;
+	private JRBeanCollectionDataSource shelfDs;
+	
+	public PcsDepotShelfReport(String type, PcsDepotShelf shelf){
+		setType(type);
+		PcsDepotShelfs shelfs = new PcsDepotShelfs();
+		shelfs.add(shelf);
+		setShelfDs(new JRBeanCollectionDataSource(shelfs));
+	}
+	
+}

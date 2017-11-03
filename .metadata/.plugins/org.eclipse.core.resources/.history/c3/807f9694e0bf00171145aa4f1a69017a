@@ -1,0 +1,169 @@
+package cn.ak4j.yard.spd.reconciliation.repository;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.DateRange;
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.params.SpdDailyCleanBizParams;
+import lombok.Getter;
+
+@Repository
+public class SpdDailyCleanBizRepository extends BaseRepository<SpdDailyCleanBiz, SpdDailyCleanBizs, SpdDailyCleanBizParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private SpdPropertyChangeRecordRepository pcrRepository;
+
+	public SpdDailyCleanBizs find(SpdDailyCleanBizParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			return new SpdDailyCleanBizs(doQuery(params, order, pageNo, pageSize));
+		}
+		
+		return new SpdDailyCleanBizs();
+	}
+	
+	public int count(SpdDailyCleanBizParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public SpdDailyCleanBizs findByUnreconciliation(SpdDailyCleanBizParams params, OrderParam order, int pageNo, int pageSize){
+		String reconciliationId = null;
+		if(params.getFinacialReconciliationId() != null && !params.getFinacialReconciliationId().isEmpty()){
+			reconciliationId = params.getFinacialReconciliationId().getValue().get(0);
+		}
+		String hql = "from SpdDailyCleanBiz spdDailyCleanBiz where ";
+		if(StringUtils.isEmpty(reconciliationId)){
+			hql += "spdDailyCleanBiz.finacialReconciliationId is null";
+		}else{
+			hql += String.format("(spdDailyCleanBiz.finacialReconciliationId is null or spdDailyCleanBiz.finacialReconciliationId='%s')", reconciliationId);
+			params.setFinacialReconciliationId(null);
+		}
+		//SpdDailyCleanBizParams params = new SpdDailyCleanBizParams();
+		//params.setDepotId(new ListParam<String>(depotIds));
+		SpdDailyCleanBizs result = find(hql, params, order, pageNo, pageSize);
+		return result;
+	}
+	
+	public SpdDailyCleanBizs findByTargetDatesAndDepotAndUnreconciliation(List<Date> targetDates, List<String> targetDepotIds) {
+		String hql = "from SpdDailyCleanBiz spdDailyCleanBiz where spdDailyCleanBiz.finacialReconciliationId is null";
+		SpdDailyCleanBizParams params = new SpdDailyCleanBizParams();
+		params.setDepotId(new ListParam<String>(targetDepotIds));
+		params.setTargetDate(new DateRangeParam(new DateRange(targetDates.get(0), targetDates.get(targetDates.size()-1))));
+		
+		SpdDailyCleanBizs dailyCleans = find(hql, params, new OrderParam(), -1, -1);
+		SpdDailyCleanBizs result = new SpdDailyCleanBizs();
+		
+		dailyCleans.forEach(dailyClean->{
+			targetDates.forEach(targetDate->{
+				if(targetDate.compareTo(dailyClean.getTargetDate()) == 0){
+					result.add(dailyClean);
+				}
+			});
+		});
+
+		return result;
+	}
+	
+	public SpdDailyCleanBizs findByTargetDateAndDepot(Date targetDate, String targetDepotId){
+		List<Date> targetDates = new ArrayList<Date>();
+		targetDates.add(targetDate);
+		targetDates.add(targetDate);
+		List<String> targetDepotIds = new ArrayList<String>();
+		targetDepotIds.add(targetDepotId);
+		return findByTargetDatesAndDepot(targetDates, targetDepotIds);
+	}
+	
+	public SpdDailyCleanBizs findByTargetDatesAndDepot(List<Date> targetDates, List<String> targetDepotIds) {
+		SpdDailyCleanBizParams params = new SpdDailyCleanBizParams();
+		params.setDepotId(new ListParam<String>(targetDepotIds));
+		params.setTargetDate(new DateRangeParam(new DateRange(targetDates.get(0), targetDates.get(targetDates.size()-1))));
+		
+		SpdDailyCleanBizs dailyCleans = find(params, new OrderParam(), -1, -1);
+		SpdDailyCleanBizs result = new SpdDailyCleanBizs();
+		
+		dailyCleans.forEach(dailyClean->{
+			targetDates.forEach(targetDate->{
+				if(targetDate.compareTo(dailyClean.getTargetDate()) == 0){
+					result.add(dailyClean);
+				}
+			});
+		});
+
+		return result;
+	}
+	
+	/**
+	 * 
+	 */
+	public SpdDailyCleanBizs findByFinacialConciliationId(String finacialConciliationId){
+		SpdDailyCleanBizParams params = new SpdDailyCleanBizParams();
+		params.setFinacialReconciliationId(new ListParam<String>(finacialConciliationId));
+		return find(params);
+	}
+	
+	public SpdDailyCleanBiz findByWithPropertyChangeRecords(String bizId){
+		SpdDailyCleanBiz dailyClean = findOne(bizId);
+		List<String> ids = new ArrayList<String>();
+		ids.add(bizId);
+		SpdPropertyChangeRecords propertyChangeRecords = pcrRepository.findWithRelationItemsByDailyCleanIds(ids);
+		dailyClean.setPropertyChangeRecords(propertyChangeRecords);
+		
+		return dailyClean;
+	}
+	
+	private boolean setRelationParams(SpdDailyCleanBizParams params) {
+		if(params != null){
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			if(depotParams.isNotEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				
+				if(params.getDepotId().isEmpty()){
+					params.setDepotId(new ListParam<String>(depots.getIds()));
+				}else{
+					PcsDepots theDepots = new PcsDepots();
+					depots.forEach(depot->{
+						if(params.getDepotId().getValue().contains(depot.getDepotId())){
+							theDepots.add(depot);
+						}
+					});
+					if(CollectionUtils.isEmpty(theDepots)){
+						return false;
+					}
+					params.setDepotId(new ListParam<String>(theDepots.getIds()));
+				}
+				
+			}
+		}
+		return true;
+	}
+
+}

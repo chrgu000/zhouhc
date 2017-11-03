@@ -1,0 +1,122 @@
+package cn.ak4j.yard.sys.service.taskprocessor;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.service.SpdFinacialReconciliationBizService;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.to.InitialEndingImportTO;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class ImportInitialEndingTaskProcessor implements IBatchTaskProcessor{
+
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdFinacialReconciliationBizService frbService;
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public void process(YardBatchTask batchTask, PcsUser user, MailMsg hisMail, MailMsg supplyMail) throws Exception{
+		String json = batchTask.getJson();
+		YardBatchTaskTO<List<InitialEndingImportTO>> importInitialEndingTO = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTaskTO<List<InitialEndingImportTO>>>(){});
+		batchTask.setData(importInitialEndingTO.getData());
+		
+		List<InitialEndingImportTO> initialEndingTOs = (List<InitialEndingImportTO>)batchTask.getData();
+		List<InitialEndingImportTO> withoutInitialEndingTOs = new ArrayList<InitialEndingImportTO>();
+		
+		PcsDept dept = deptRepository.findAll().findByDeptCode(initialEndingTOs.get(0).getDeptCode());
+		
+		if(dept == null){
+			NotFoundException ex = new NotFoundException(YardExceptionType.not_found_dept, String.format("编码为:%s", initialEndingTOs.get(0).getDeptCode()));
+			log.error("导入失败", ex);
+			throw ex;
+		}
+		
+		SpdFinacialReconciliationRule rule = brRepository.findAllWithRelations().getAllFinacialReconciliationRules().findByRuleCode(initialEndingTOs.get(0).getRuleCode());
+		if(rule == null){
+			NotFoundException ex = new NotFoundException(YardExceptionType.not_found_fin_rec_rule, String.format("编码为:[%s]", initialEndingTOs.get(0).getRuleCode()));
+			log.error("导入失败", ex);
+			throw ex;
+		}
+		
+		//获取产品信息
+		List<String> goodsCodes = CollectionUtils.pluck("goodsCode", initialEndingTOs);
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsCode(new ListParam<String>(goodsCodes));
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(params));
+		//获取批次信息
+		YdsGoodsLots goodsLots = glRepository.findAll();
+				
+		for(InitialEndingImportTO initialEnding : initialEndingTOs){
+			YdsGoods goods = goodss.findByGoodsCode(initialEnding.getGoodsCode());
+			if(goods == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_goods, String.format("产品编码:%s", initialEnding.getGoodsCode()));
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			YdsGoodsLot goodsLot = goodsLots.getByGoodsLotNoAndGoodsId(initialEnding.getLotNo(), goods.getGoodsId());
+			if(goodsLot == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_goods_lot, initialEnding.getGoodsCode(), initialEnding.getLotNo());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			withoutInitialEndingTOs.add(initialEnding);
+		}
+		
+		log.info("处理导入初始期末，共{}个", withoutInitialEndingTOs.size());
+		
+		SpdFinacialReconciliationItems items = new SpdFinacialReconciliationItems();
+		int i = 0;
+		for(InitialEndingImportTO initialEnding : withoutInitialEndingTOs){
+			log.info("{}]导入初始期末，产品编码:{}，批号:{}，单价:{}，期末数量:{}", i, initialEnding.getGoodsCode(), initialEnding.getLotNo(), initialEnding.getStorePrice(), initialEnding.getEndingQty());
+			YdsGoods goods = goodss.findByGoodsCode(initialEnding.getGoodsCode());
+			YdsGoodsLot goodsLot = goodsLots.findByGoodsLotNoAndGoodsId(initialEnding.getLotNo(), goods.getGoodsId());
+			float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), YdsUnitLv.base.getLv());
+			String unitName = SpdUnitUtils.computeGoodsUnitName(goods, YdsUnitLv.base.getLv());
+			SpdFinacialReconciliationItem item = new SpdFinacialReconciliationItem(goods.getGoodsId(), 
+																					goodsLot.getGoodsLotId(), 
+																					initialEnding.getStorePrice()/unitRatio, 
+																					unitName,
+																					goods.getSettleUnitLv(), 
+																					goods.getSettlementUnitName(), 
+																					(int)(initialEnding.getEndingQty()*unitRatio));
+			item.setSettlementQty(0);
+			items.add(item);
+			i++;
+		}
+		frbService.createInitReconciliation(rule.getId(), items, rule.getApplyDept().getDefaultUser());
+	}
+}

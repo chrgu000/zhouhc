@@ -1,0 +1,42 @@
+package cn.ak4j.yard.extend.zhjw;
+
+import static org.junit.Assert.assertEquals;
+
+import javax.annotation.PostConstruct;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.ApplicationContext;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.IScheduleTask;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdDailyCleanBizRepository;
+
+public class ZhjwAutoCreateDailyCleanTaskTest extends BaseTest{
+
+	@Autowired private ApplicationContext context;
+	private IScheduleTask dailyCleanTask;
+	@Autowired private SpdDailyCleanBizRepository dcbRepository;
+	
+	@PostConstruct
+	public void init(){
+		DefaultListableBeanFactory defaultListableBeanFactory = (DefaultListableBeanFactory) context.getAutowireCapableBeanFactory();
+		
+		BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder.genericBeanDefinition(ZhjwAutoCreateDailyCleanBizTask.class);
+
+		//动态注册bean.
+		defaultListableBeanFactory.registerBeanDefinition("zhjwDailyCleanTask", beanDefinitionBuilder.getBeanDefinition());
+
+		//获取动态注册的bean.
+		dailyCleanTask = context.getBean(ZhjwAutoCreateDailyCleanBizTask.class);
+	}
+	
+	@Test public void testTaskRun(){
+		assertEquals(0, dcbRepository.getAll().size());
+		dailyCleanTask.run();
+		assertEquals(2, dcbRepository.getAll().size());
+	}
+	
+}

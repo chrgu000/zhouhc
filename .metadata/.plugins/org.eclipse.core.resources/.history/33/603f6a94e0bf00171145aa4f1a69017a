@@ -1,0 +1,212 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.Date;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.IStockChangeable;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChange;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskItemRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdAbstractWrapper;
+import cn.ak4j.yard.spd.wrapper.domain.SpdWrappers;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+
+@EqualsAndHashCode(callSuper=false)
+@Entity
+@Table(name="SPD_DEPOT_TASK")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"unchecked", "rawtypes", "serial"})
+public class SpdDepotTask extends YardMaintenceEntity implements IStockChangeable<SpdShelfStockChanges>{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid") @Getter @Setter
+	private String taskId;//作业ID
+	
+	@Getter @Setter
+	private String dispatcherId;//调度ID
+	
+	@Getter @Setter
+	private String bizId;
+	
+	@Getter @Setter
+	private String taskCode;//作业编码
+	
+	@Getter @Setter
+	private String taskType;//作业类型
+	
+	@Getter @Setter
+	private String taskOrgId;//作业机构
+	
+	@Getter @Setter
+	private String taskDeptId;//作业部门
+	
+	@Getter @Setter
+	private String taskDepotId;//作业仓库
+	
+	@Getter @Setter
+	private String taskAreaId;//作业货区
+	
+	@Getter @Setter
+	private String taskUser;//作业人
+	
+	@Getter @Setter
+	private Date startTime;//开始时间
+	
+	@Getter @Setter
+	private Date finishTime;//完成时间
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_r;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepotArea depotArea;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsUser user;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot depot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDept dept;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotTaskItems<SpdDepotTaskItem> items;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdWrappers wrappers;
+
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @JsonIgnore
+	public String getTaskTypeName(){
+		return SpdDepotTaskType.typeOf(getTaskType()).getName();
+	}
+
+	public void addItem(SpdDepotTaskItem item){
+		if(items == null){
+			items = new SpdDepotTaskItems();
+		}
+		items.add(item);
+	}
+
+	public void updateItemsId() {
+		for(SpdDepotTaskItem item : items){
+			item.setTaskId(getTaskId());
+		}
+	}
+	
+	@Transient @JsonIgnore
+	public String getTargetAreaType(){
+		return getDepotArea().getAreaType();
+	}
+	
+	public void fillDepotArea(PcsDepotArea depotArea){
+		this.depotArea = depotArea;
+		this.taskAreaId = depotArea.getDepotAreaId();
+	}
+	
+	public void fillDepotArea(PcsDepotRepository depotRepository){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(taskDepotId);
+		PcsDepotArea area = CollectionUtils.findWhere("depotAreaId", getTaskAreaId(), depot.getAreas());
+		fillDepotArea(area);
+	}
+
+	public void fillItems(SpdDepotTaskItemRepository tiRepository) {
+		SpdDepotTaskItems items = tiRepository.findByTaskId(getTaskId());
+		setItems(items);
+	}
+
+	public void review(Date lastDate, IUser user){
+		getItems().forEach((item)->{
+			item.verifyQty();
+		});
+		setFinishTime(new Date());
+		setTaskUser(user.getUserId());
+		super.review(lastDate, user);
+	}
+	
+	public boolean isOnShelfTask(){
+		return getTaskType().equals(SpdDepotTaskType.on_shelf_task.getCode());
+	}
+	
+	public boolean isOffShelfTask(){
+		return getTaskType().equals(SpdDepotTaskType.off_shelf_task.getCode());
+	}
+	
+	@Transient @JsonIgnore
+	public PcsDepot getStockChangeDepot() {
+		return getDepotArea().getDepot();
+	}
+
+	@JsonIgnore @Transient
+	public SpdShelfStockChanges getStockChanges() {
+		String areaType = getDepotArea().getAreaType();
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges();
+		
+		this.getItems().forEach(item->{
+			SpdShelfStockChange stockChange = new SpdShelfStockChange(item.getSpecialGoodsLot(), getDepotArea().getDepot(), areaType);
+			stockChange.setQtyByStoreUnit(item.getConfirmQty());
+			stockChange.setPlanQtyByStoreUnit(item.getPlanQty());
+			stockChange.setShelfId(item.getShelfId());
+			stockChanges.add(stockChange);
+		});
+		
+		return stockChanges;
+	}
+
+	public SpdDepotTask removeNoneItems() {
+		SpdDepotTaskItems result = new SpdDepotTaskItems();
+		for(SpdDepotTaskItem taskItem : this.getItems()){
+			if(taskItem instanceof SpdOffShelfTaskItem){
+				SpdOffShelfTaskItem offShelfTaskItem = (SpdOffShelfTaskItem) taskItem;
+				if(offShelfTaskItem.getPlanQty() != 0){
+					result.add(taskItem);
+				}
+			}else{
+				result.add(taskItem);
+			}
+		}
+		this.setItems(result);
+		
+		return this;
+	}
+
+	public void removeWrapper(SpdAbstractWrapper wrapper) {
+		SpdAbstractWrapper theWrapper = getWrappers().findById(wrapper.getId());
+		getWrappers().remove(theWrapper);
+		wrapper.clean();
+	}
+	
+}

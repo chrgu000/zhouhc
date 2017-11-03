@@ -1,0 +1,717 @@
+package cn.ak4j.yard.sys.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardBatchTaskStatus;
+import cn.ak4j.yard.enums.YardBatchTaskType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.repository.YardBatchTaskRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdPrepareInformBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrder;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItem;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItems;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.domain.YardBatchTasks;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsLotParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@SuppressWarnings({"rawtypes"})
+@Slf4j
+public class YardBatchTaskResourceTest extends BaseTest{
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	@Autowired private YardBatchTaskRepository btRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	private Date validDate;
+	private static String postUri = "/sys/batchCreateDeliveryOrderTasks?accessToken={accessToken}";
+	private Date produceDate;
+
+	private String sendInputCode;
+	
+	private SpdDeliveryOrder deliveryOrderTO1 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO2 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO3 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO4 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO5 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO6 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO7 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO8 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO9 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO10 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO11 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO12 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO13 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO14 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO15 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO16 = new SpdDeliveryOrder();
+	private SpdDeliveryOrder deliveryOrderTO17 = new SpdDeliveryOrder();
+
+	private YardBatchTaskTO<SpdDeliveryOrders> taskTO = new YardBatchTaskTO<SpdDeliveryOrders>();
+	private YardBatchTasks tasks;
+	
+	@Before
+	public void setUp() throws Exception{
+		File sqlDir = new File(BaseTest.class.getResource("/data/").toURI());
+		
+		Iterator<File> files = FileUtils.iterateFiles(sqlDir, new String[]{"json"}, false);
+		btRepository.deleteAll();
+		while(files.hasNext()){
+			File jsonFile = files.next();
+			if(jsonFile.getName().equals("sys_batch_task.json")){
+				String json = FileUtils.readFileToString(jsonFile);
+				tasks = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTasks>() {});
+				
+				btRepository.saveAll(tasks);
+			}
+		}
+		
+		sendInputCode = RandomStringUtils.random(8, false, true);
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+		validDate = format.parse("2037-9-30");
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.DAY_OF_YEAR, -30);
+		produceDate = cal.getTime();
+		
+		initData();
+	}
+
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate ="/sys/yardBatchTasks?accessToken={accessToken}";
+		YardBatchTasks tasks = mockMvcHelper.mockGet(YardBatchTasks.class, urlTemplate, accessToken);
+		assertEquals(2, tasks.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/sys/yardBatchTasks/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, accessToken);
+		assertEquals(2, count);
+	}
+	
+	@Test public void testGetOne() throws Exception{
+		assertEquals(2, tasks.size());
+		YardBatchTask task = tasks.get(0);
+		
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/sys/yardBatchTasks/{taskId}?accessToken={accessToken}";
+		YardBatchTask returnTask = mockMvcHelper.mockGet(YardBatchTask.class, urlTemplate, task.getId(), accessToken);
+
+		assertEquals(task.getId(), returnTask.getId());
+		assertEquals(task.getData(), returnTask.getData());
+	}
+	
+	@Test public void testGetData() throws Exception{
+		assertEquals(2, tasks.size());
+		YardBatchTask task = tasks.get(0);
+		
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/sys/yardBatchTasks/{taskId}/data?accessToken={accessToken}";
+		SpdDeliveryOrders deliveryOrders = mockMvcHelper.mockGet(SpdDeliveryOrders.class, urlTemplate, task.getId(), accessToken);
+		assertNotNull(deliveryOrders);
+	}
+
+	@Test public void testProcess() throws Exception{
+		assertEquals(2, tasks.size());
+		YardBatchTask task = tasks.get(0);
+		assertEquals(YardBatchTaskStatus.task_status_created.getCode(), task.getTaskStatus());
+		
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/sys/yardBatchTasks/{taskId}?accessToken={accessToken}";
+		
+		mockMvcHelper.mockPost(String.class, null, urlTemplate, task.getId(), accessToken);
+		
+		wait(4);
+		YardBatchTask taskPO = btRepository.findOne(task.getId());
+		assertEquals(YardBatchTaskStatus.task_status_success.getCode(), taskPO.getTaskStatus());
+	}
+
+	@Test public void testPost() throws Exception {
+		//设置url
+		String accessToken = getAccessToken(zsyUserCode);
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO1);
+		taskTO.setData(deliveryOrderTOs);
+
+		//请求接口获取返回结果
+		YardBatchTask task = mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, accessToken);
+
+	    //断言接口返回的批处理任务
+		assertNotNull(task.getId());
+		assertEquals(YardBatchTaskType.batch_create_delivery_order_task.getCode(), task.getTaskType());
+		log.debug("wait service process delivery order batch task....");
+		wait(20);
+		log.debug("service process delivery order batch task order");
+		
+		//断言持久化的批处理任务
+		YardBatchTask batchTaskPO = btRepository.findOne(task.getId());
+		assertNotNull(batchTaskPO);
+		assertEquals(YardBatchTaskType.batch_create_delivery_order_task.getCode(), batchTaskPO.getTaskType());
+		assertEquals(YardBatchTaskStatus.task_status_success.getCode(), batchTaskPO.getTaskStatus());
+	}
+	
+	//不允许多次送货，不允许超额送货
+	@Test public void testExcessPost() throws Exception {
+		String accessToken = getAccessToken(zsyUserCode);
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO1);
+		
+		//设置超额值(计划值30)
+		deliveryOrderTO1.getItems().forEach(item->{
+			if(item.getEdsGoodsCode().equals("zsy_1701001")){
+				item.setQty(45);
+			}
+		});
+		taskTO.setData(deliveryOrderTOs);
+
+		//第一次超额送货
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, status().is4xxClientError(), YardExceptionType.forbid_excess_delivery, accessToken);
+	}
+	
+	//不允许多次送货，不允许超额送货
+	@Test public void testMultiPost() throws Exception {
+		String accessToken = getAccessToken(zsyUserCode);
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO1);
+;
+		taskTO.setData(deliveryOrderTOs);
+
+		//第一次送货
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, accessToken);
+		
+		wait(4);
+		deliveryOrderTO1.setOrderNo(RandomStringUtils.random(8, false, true));
+		
+		//第二次送货，不允许多次送货
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, status().is4xxClientError(), YardExceptionType.forbid_delivery_prepare_inform, accessToken);
+	}
+	
+	//允许多次送货，不允许超额送货
+	/**
+	 * to be continue
+	 * 
+	 */
+	@Test public void testMultiPostButExcess() throws Exception {
+		//设置url
+		String accessToken = getAccessToken(zsyUserCode);
+		
+		String prepareInformBizId = findPrepareInformByBizCode(deliveryOrderTO14.getPrepareInformBizCode()).getBizId();
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO14);
+		taskTO.setData(deliveryOrderTOs);
+
+		//第一次送货
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, accessToken);
+		
+		wait(4);
+		
+		//第二次超额送货失败
+		deliveryOrderTO14.setOrderNo(RandomStringUtils.random(8, false, true));
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, status().is4xxClientError(), YardExceptionType.forbid_excess_delivery, accessToken);
+
+		wait(4);
+		
+		//提交第一次的收货
+		SpdReceiveBiz receive = getReceiveByPrepareInformBizId(prepareInformBizId).get(0);
+		
+		SpdReceiveItems receiveItems = getReceiveItemsByBizId(receive.getBizId());
+		receive.setItems(receiveItems);
+		CheckStateTO checkState = new CheckStateTO(CheckState.commited.getCode(), receive.getLastUpdateTime());
+		mockMvcHelper.mockPut(CheckStateTO.class, checkState, "/spd/spdReceives/{id}/checkState/commited?accessToken={accessToken}", receive.getBizId(), getAccessToken(xykUserCode));
+		
+		wait(2);
+		
+		//对第一次收货按0确认收货
+		for(SpdReceiveItem receiveItem : receiveItems){
+			receiveItem.setConfirmQty(0);
+			mockMvcHelper.modify(SpdBizItem.class, xykUserCode, receiveItem.getBizItemId(), receiveItem);
+		}
+		receive = getReceiveByPrepareInformBizId(prepareInformBizId).get(0);
+		receiveItems = getReceiveItemsByBizId(receive.getBizId());
+		receive.setItems(receiveItems);
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), receive.getLastUpdateTime());
+		mockMvcHelper.mockPut(CheckStateTO.class, checkState, "/spd/spdReceives/{id}/checkState/reviewed?accessToken={accessToken}", receive.getBizId(), getAccessToken(xykUserCode));
+
+		wait(4);
+		
+		//第三次送货成功
+		deliveryOrderTO14.setOrderNo(RandomStringUtils.random(8, false, true));
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, accessToken);
+		wait(4);
+	
+		//第四次送货失败
+		deliveryOrderTO14.setOrderNo(RandomStringUtils.random(8, false, true));
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, status().is4xxClientError(), YardExceptionType.forbid_excess_delivery, accessToken);
+
+		wait(4);
+	}
+
+	//允许多次送货，不允许超额送货
+	@Test public void testMultiPostButExcess2() throws Exception {
+		//设置url
+		String accessToken = getAccessToken(zsyUserCode);
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO17);
+		taskTO.setData(deliveryOrderTOs);
+
+		//第一次送货
+		mockMvcHelper.mockPost(YardBatchTaskTO.class, taskTO, postUri, accessToken);
+		
+		wait(4);
+		
+		//第二次送货
+		deliveryOrderTO17.setOrderNo(RandomStringUtils.random(8, false, true));
+		mockMvcHelper.mockPost(YardBatchTaskTO.class, taskTO, postUri, accessToken);
+
+		wait(4);
+		
+		//第三次送货失败超额
+		deliveryOrderTO17.setOrderNo(RandomStringUtils.random(8, false, true));
+		mockMvcHelper.mockPost(YardBatchTaskTO.class, taskTO, postUri, status().is4xxClientError(), YardExceptionType.forbid_excess_delivery, accessToken);
+		wait(4);
+
+	}
+	
+	//不允许多次送货，允许超额送货
+	@Test public void testExcessPostButMulti() throws Exception {
+		String accessToken = getAccessToken(zsyUserCode);
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO15);
+		taskTO.setData(deliveryOrderTOs);
+
+		//第一次超额送货
+		mockMvcHelper.mockPost(YardBatchTaskTO.class, taskTO, postUri, accessToken);
+		
+		wait(4);
+		
+		//第二次送货
+		deliveryOrderTO15.setOrderNo(RandomStringUtils.random(8, false, true));
+		mockMvcHelper.mockPost(YardBatchTaskTO.class, taskTO, postUri, status().is4xxClientError(), YardExceptionType.forbid_delivery_prepare_inform, accessToken);
+		
+		wait(4);
+	}
+	
+	//允许多次送货，允许超额送货
+	@Test public void testExcessPostAndMulti() throws Exception {
+		String accessToken = getAccessToken(zsyUserCode);
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO16);
+		taskTO.setData(deliveryOrderTOs);
+
+		//第一次超额送货
+		mockMvcHelper.mockPost(YardBatchTaskTO.class, taskTO, postUri, accessToken);
+		
+		wait(4);
+		
+		//第二次超额送货
+		deliveryOrderTO16.setOrderNo(RandomStringUtils.random(8, false, true));
+		mockMvcHelper.mockPost(YardBatchTaskTO.class, taskTO, postUri, accessToken);
+		
+		wait(4);
+		
+		SpdPrepareInformBiz prepareInfo = findPrepareInformByBizCode(deliveryOrderTO16.getPrepareInformBizCode());
+		SpdBizItems items = getBizItemsByBizId(prepareInfo.getBizId());
+		SpdDeliveryOrderItems orderItems = deliveryOrderTO16.getItems();
+		orderItems.fillGoods(goodsRepository, egRepository);
+		
+		items.forEach(item->{
+			int deliveryQty = orderItems.getGoodsQtyByPrepareUnit(item.getGoodsId()) * 2;
+			assertTrue(deliveryQty > item.getConfirmQty());
+		});
+	   
+	}
+	
+	//批号不存在
+	@Test public void testPostWithCreateNewEdsLot() throws Exception {
+		String accessToken = getAccessToken(zsyUserCode);
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO7);
+		taskTO.setData(deliveryOrderTOs);
+
+		//断言接口返回的批处理任务
+		YardBatchTask task = mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, accessToken);
+		
+		wait(4);
+		
+		//断言持久化的批处理任务
+		YardBatchTask batchTaskPO = mockMvcHelper.mockGet(YardBatchTask.class, "/sys/yardBatchTasks/{taskId}?accessToken={accessToken}", task.getId(), getAccessToken(testUserCode));
+		assertNotNull(batchTaskPO);
+		assertEquals(YardBatchTaskType.batch_create_delivery_order_task.getCode(), batchTaskPO.getTaskType());
+		assertEquals(YardBatchTaskStatus.task_status_success.getCode(), batchTaskPO.getTaskStatus());
+		
+		List<String> edsLotNos = CollectionUtils.pluck("edsLotNo", deliveryOrderTOs.getAllItems());
+		YdsEdsGoodsLotParams eglParams = new YdsEdsGoodsLotParams();
+		eglParams.setEdsLotNo(new ListParam<String>(edsLotNos));
+		YdsEdsGoodsLots edsGoodsLots = mockMvcHelper.findList(YdsEdsGoodsLots.class, testUserCode, eglParams);
+		assertEquals(edsLotNos.size(), edsGoodsLots.size());
+	}
+	
+	
+	//测试重复提交错误
+	@Test public void testPostFail1() throws Exception {
+		String accessToken = getAccessToken(zsyUserCode);
+
+		//构造请求数据
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTOs.add(deliveryOrderTO1);
+		taskTO.setData(deliveryOrderTOs);
+		//第一次提交成功
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, accessToken);
+		
+		wait(4);
+		//第二次提交失败
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, status().is4xxClientError(), YardExceptionType.invalid_batch_task_exist, accessToken);
+		
+	}
+	
+	@Test public void testPostFail() throws Exception{
+		//测试企业产品编码不存在
+		error4xxTest(deliveryOrderTO2);
+		
+		// 企业产品编码为空(null)
+		error4xxTest(deliveryOrderTO3);
+		
+		// 企业产品编码为空(空字符串)
+		error4xxTest(deliveryOrderTO4);
+		
+		// 批号为空(null)
+		//error4xxTest(deliveryOrderTO5);
+		
+		// 批号为空(空字符串)
+		//error4xxTest(deliveryOrderTO6);
+		
+		//生产日期为空
+		//error4xxTest(deliveryOrderTO8);
+		
+		//确认数量为空
+		error4xxTest(deliveryOrderTO9);
+		
+		//送货单号为空
+		error4xxTest(deliveryOrderTO10);
+		
+		//仓库编码为空
+		error4xxTest(deliveryOrderTO11);
+		
+		//仓库编码不存在
+		error4xxTest(deliveryOrderTO12);
+		
+		//企业产品单位不一致
+		error4xxTest(deliveryOrderTO13);
+	}
+
+	private void error4xxTest(SpdDeliveryOrder errorDeliveryOrder) throws Exception{
+		String accessToken = getAccessToken(zsyUserCode);
+
+		SpdDeliveryOrders deliveryOrderTOs = new SpdDeliveryOrders();
+		deliveryOrderTO1.setDepotId(errorDeliveryOrder.getDepotId());
+		deliveryOrderTOs.add(deliveryOrderTO1);
+		deliveryOrderTOs.add(errorDeliveryOrder);
+		taskTO.setData(deliveryOrderTOs);
+		mockMvcHelper.mockPost(YardBatchTask.class, taskTO, postUri, status().is4xxClientError(), YardExceptionType.invalid_delivery_order, accessToken);
+	}
+	
+	private void initData(){
+		taskTO.setTaskType(YardBatchTaskType.batch_create_delivery_order_task.getCode());
+		taskTO.setNotifyUrl("http://www.aoka.net");
+		
+		String depotId = "depot_id_001";
+		// 正常数据
+		deliveryOrderTO1.setOrderNo(RandomStringUtils.random(8, false, true));
+		deliveryOrderTO1.setOrderId("deli_order_id_001");
+		deliveryOrderTO1.setDepotId(depotId);
+		deliveryOrderTO1.setPrepareInformBizCode("1121708031");
+		
+		SpdDeliveryOrderItem item1 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", 41.34f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		item1.setItemId("deli_order_item_id_001");
+		item1.setOrderId("deli_order_id_001");
+		deliveryOrderTO1.getItems().add(item1);
+		
+		// 企业产品编码不存在
+		deliveryOrderTO2.setOrderNo(sendInputCode);
+		deliveryOrderTO2.setDepotId(depotId);
+		SpdDeliveryOrderItem item2 = new SpdDeliveryOrderItem("NO1", "test_eds_goods", 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO2.getItems().add(item2);
+		
+		// 企业产品编码为空
+		deliveryOrderTO3.setOrderNo(sendInputCode);
+		deliveryOrderTO3.setDepotId(depotId);
+		SpdDeliveryOrderItem item3 = new SpdDeliveryOrderItem("NO1", null, 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO3.getItems().add(item3);
+		
+		deliveryOrderTO4.setOrderNo(sendInputCode);
+		deliveryOrderTO4.setDepotId(depotId);
+		SpdDeliveryOrderItem item4 = new SpdDeliveryOrderItem("NO1", "", 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO4.getItems().add(item4);
+		
+		//企业产品批号为空
+		deliveryOrderTO5.setOrderNo(sendInputCode);
+		deliveryOrderTO5.setDepotId(depotId);
+		SpdDeliveryOrderItem item5 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				null, validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO5.getItems().add(item5);
+		
+		deliveryOrderTO6.setOrderNo(sendInputCode);
+		deliveryOrderTO6.setDepotId(depotId);
+		SpdDeliveryOrderItem item6 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO6.getItems().add(item6);
+		
+		//企业产品批号不存在
+		deliveryOrderTO7.setOrderNo(sendInputCode);
+		deliveryOrderTO7.setDepotId(depotId);
+		deliveryOrderTO7.setPrepareInformBizCode("1121709111");
+		SpdDeliveryOrderItem item7_1 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_9999999", validDate, produceDate, 30, "盒", 12.5f, "fax90345", 375f, YdsGoodsType.equipment.getCode());
+
+		SpdDeliveryOrderItem item7_2 = new SpdDeliveryOrderItem("NO2", "zsy_1701007", 
+				"ln_77854520", validDate, produceDate, 40, "盒", 15.8f, "fax90346", 632f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_3 = new SpdDeliveryOrderItem("NO3", "zsy_1701013", 
+				"ln_221202352", validDate, produceDate, 35, "盒", 17.6f, "fax90347", 616f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_4 = new SpdDeliveryOrderItem("NO4", "zsy_1701009", 
+				"ln_RT78855", validDate, produceDate, 28, "盒", 13.2f, "fax90348", 369.6f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_5 = new SpdDeliveryOrderItem("NO5", "zsy_1701010", 
+				"ln_484532", validDate, produceDate, 62, "盒", 23.8f, "fax90349", 1475.6f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_6 = new SpdDeliveryOrderItem("NO6", "zsy_1701011", 
+				"ln_8778FD54", validDate, produceDate, 53, "盒", 42.5f, "fax90350", 2252.5f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_7 = new SpdDeliveryOrderItem("NO7", "zsy_1701012", 
+				"ln_794FGGQ34", validDate, produceDate, 80, "盒", 8.5f, "fax90351", 680f, YdsGoodsType.equipment.getCode());
+
+		SpdDeliveryOrderItem item7_8 = new SpdDeliveryOrderItem("NO8", "zsy_1701002", 
+				"ln_2536525", validDate, produceDate, 20, "盒", 52.8f, "fax90352", 1056f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_9 = new SpdDeliveryOrderItem("NO8", "zsy_1701003", 
+				"ln_11022020", validDate, produceDate, 15, "盒", 57.6f, "fax90353", 864f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_10 = new SpdDeliveryOrderItem("NO8", "zsy_1701004", 
+				"ln_566025", validDate, produceDate, 36, "盒", 34.2f, "fax90354", 1231.2f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_11 = new SpdDeliveryOrderItem("NO9", "zsy_1701005", 
+				"ln_745855", validDate, produceDate, 26, "盒", 16.8f, "fax90355", 436.2f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_12 = new SpdDeliveryOrderItem("NO9", "zsy_1701006", 
+				"ln_20RT8966", validDate, produceDate, 24, "盒", 16.5f, "fax90356", 396f, YdsGoodsType.equipment.getCode());
+		
+		SpdDeliveryOrderItem item7_13 = new SpdDeliveryOrderItem("NO9", "zsy_1701006", 
+				null, null, null, 24, "盒", 16.5f, "fax90356", 396f, YdsGoodsType.equipment.getCode());
+		
+		deliveryOrderTO7.getItems().add(item7_1);
+		deliveryOrderTO7.getItems().add(item7_2);
+		deliveryOrderTO7.getItems().add(item7_3);
+		deliveryOrderTO7.getItems().add(item7_4);
+		deliveryOrderTO7.getItems().add(item7_5);
+		deliveryOrderTO7.getItems().add(item7_6);
+		deliveryOrderTO7.getItems().add(item7_7);
+		deliveryOrderTO7.getItems().add(item7_8);
+		deliveryOrderTO7.getItems().add(item7_9);
+		deliveryOrderTO7.getItems().add(item7_10);
+		deliveryOrderTO7.getItems().add(item7_11);
+		deliveryOrderTO7.getItems().add(item7_12);
+		deliveryOrderTO7.getItems().add(item7_13);
+		
+		// 生产日期为空
+		deliveryOrderTO8.setOrderNo(sendInputCode);
+		deliveryOrderTO8.setOrderId("deli_order_id_008");
+		deliveryOrderTO8.setDepotId(depotId);
+		SpdDeliveryOrderItem item8 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, null, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO8.getItems().add(item8);
+		
+		// 确认数量为空
+		deliveryOrderTO9.setOrderNo(sendInputCode);
+		deliveryOrderTO9.setDepotId(depotId);
+		SpdDeliveryOrderItem item9 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, null, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO9.getItems().add(item9);
+		
+		//送货单号为空
+		deliveryOrderTO10.setOrderNo(null);
+		deliveryOrderTO10.setDepotId(depotId);
+		SpdDeliveryOrderItem item10 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO10.getItems().add(item10);
+		
+		//仓库编码为空
+		deliveryOrderTO11.setOrderNo(sendInputCode);
+		deliveryOrderTO11.setDepotId(null);
+		SpdDeliveryOrderItem item11 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO11.getItems().add(item11);
+		
+		//仓库编码不存在
+		deliveryOrderTO12.setOrderNo(sendInputCode);
+		deliveryOrderTO12.setDepotId("fsfsrfegv");
+		SpdDeliveryOrderItem item12 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO12.getItems().add(item12);
+		
+		//企业产品单位不一致
+		deliveryOrderTO13.setOrderNo(sendInputCode);
+		deliveryOrderTO13.setDepotId(depotId);
+		SpdDeliveryOrderItem item13 = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "包", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO13.getItems().add(item13);
+		
+		//允许多次发货，不允许超额
+		deliveryOrderTO14.setOrderNo(sendInputCode);
+		deliveryOrderTO14.setDepotId(depotId);
+		deliveryOrderTO14.setPrepareInformBizCode("1121708221");
+		SpdDeliveryOrderItem item14_1 = new SpdDeliveryOrderItem("NO1", "zsy_1701025", 
+				"ln_585622", validDate, produceDate, 100, "盒", 3.48f, "fax90324", 375f, YdsGoodsType.equipment.getCode());	
+		SpdDeliveryOrderItem item14_2 = new SpdDeliveryOrderItem("NO1", "zsy_1701026", 
+				"ln_585623", validDate, produceDate, 300, "盒", 36.76f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		SpdDeliveryOrderItem item14_3 = new SpdDeliveryOrderItem("NO1", "zsy_1701027", 
+				"ln_585624", validDate, produceDate, 200, "包", 1.0f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO14.getItems().add(item14_1);
+		deliveryOrderTO14.getItems().add(item14_2);
+		deliveryOrderTO14.getItems().add(item14_3);
+		
+		//不允许多次发货，允许超额
+		deliveryOrderTO15.setOrderNo(sendInputCode);
+		deliveryOrderTO15.setDepotId(depotId);
+		deliveryOrderTO15.setPrepareInformBizCode("1121708222");
+		//计划数量200，实际送货数量240
+		SpdDeliveryOrderItem item15_1 = new SpdDeliveryOrderItem("NO1", "zsy_1701035", 
+				"ln_585622", validDate, produceDate, 240, "盒", 12.16f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		//计划数量200，实际送货数量150
+		SpdDeliveryOrderItem item15_2 = new SpdDeliveryOrderItem("NO1", "zsy_1701036", 
+				"ln_585623", validDate, produceDate, 150, "盒", 22.64f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		//计划数量200，实际送货数量250
+		SpdDeliveryOrderItem item15_3 = new SpdDeliveryOrderItem("NO1", "zsy_1701037", 
+				"ln_585624", validDate, produceDate, 250, "盒", 6.48f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO15.getItems().add(item15_1);
+		deliveryOrderTO15.getItems().add(item15_2);
+		deliveryOrderTO15.getItems().add(item15_3);
+		
+		//不允许多次发货，允许超额
+		deliveryOrderTO16.setOrderNo(sendInputCode);
+		deliveryOrderTO16.setDepotId(depotId);
+		deliveryOrderTO16.setPrepareInformBizCode("1121708223");
+		//计划数量400，实际送货数量440
+		SpdDeliveryOrderItem item16_1 = new SpdDeliveryOrderItem("NO1", "zsy_1701019", 
+				"ln_585622", validDate, produceDate, 440, "盒", 6.0f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		//计划数量500，实际送货数量400
+		SpdDeliveryOrderItem item16_2 = new SpdDeliveryOrderItem("NO1", "zsy_1701032", 
+				"ln_585623", validDate, produceDate, 400, "瓶", 8.4f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		//计划数量600，实际送货数量700
+		SpdDeliveryOrderItem item16_3 = new SpdDeliveryOrderItem("NO1", "zsy_1701030", 
+				"ln_585624", validDate, produceDate, 700, "盒", 37.17f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		deliveryOrderTO16.getItems().add(item16_1);
+		deliveryOrderTO16.getItems().add(item16_2);
+		deliveryOrderTO16.getItems().add(item16_3);
+		
+		//允许多次发货，不允许超额
+		deliveryOrderTO17.setOrderNo(sendInputCode);
+		deliveryOrderTO17.setDepotId(depotId);
+		deliveryOrderTO17.setPrepareInformBizCode("1121709211");
+		//备货数量40，送货备货转换比20
+		SpdDeliveryOrderItem item17_1 = new SpdDeliveryOrderItem("NO1", "zsy_1701029", 
+				"ln_170902101", validDate, produceDate, 1, "箱", 372f, "fax90324", 375f, YdsGoodsType.drug.getCode());
+		//备货数量42，送货备货转换比21
+		SpdDeliveryOrderItem item17_2 = new SpdDeliveryOrderItem("NO1", "zsy_1701031", 
+				"ln_170902102", validDate, produceDate, 1, "箱", 210.0f, "fax90324", 375f, YdsGoodsType.drug.getCode());
+		deliveryOrderTO17.getItems().add(item17_1);
+		deliveryOrderTO17.getItems().add(item17_2);
+	}
+	
+	private SpdPrepareInformBiz findPrepareInformByBizCode(String bizCode) throws JsonProcessingException, Exception{
+		SpdPrepareInformBizParams params = new SpdPrepareInformBizParams();
+		String url = "/spd/spdPrepareInforms?params={params}&accessToken={accessToken}";
+		params.setBizCode(new ListParam<String>(bizCode));
+		SpdPrepareInformBiz prepareInform = mockMvcHelper.mockGet(SpdPrepareInformBizs.class, url, Global.defaultObjectMapper.writeValueAsString(params), getAccessToken(testUserCode)).get(0);
+		return prepareInform;
+	}
+	
+	private SpdReceiveBizs getReceiveByPrepareInformBizId(String prepareInformBizId) throws JsonProcessingException, Exception {
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setPrepareInformBizId(new ListParam<String>(prepareInformBizId));
+		String url = "/spd/spdReceives?params={params}&accessToken={accessToken}";
+		SpdReceiveBizs receives = mockMvcHelper.mockGet(SpdReceiveBizs.class, url,  Global.defaultObjectMapper.writeValueAsString(params), getAccessToken(testUserCode));
+		return receives;
+	}
+	
+	private SpdBizItems getBizItemsByBizId(String bizId) throws JsonProcessingException, Exception{
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(bizId));
+		String url = "/spd/spdBizItems?params={params}&accessToken={accessToken}";
+		SpdBizItems items = mockMvcHelper.mockGet(SpdBizItems.class, url,  Global.defaultObjectMapper.writeValueAsString(params), getAccessToken(testUserCode));
+		return items;
+	}
+	
+	private SpdReceiveItems getReceiveItemsByBizId(String bizId) throws JsonProcessingException, Exception{
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(bizId));
+		String url = "/spd/spdBizItems?params={params}&accessToken={accessToken}";
+		SpdReceiveItems items = mockMvcHelper.mockGet(SpdReceiveItems.class, url,  Global.defaultObjectMapper.writeValueAsString(params), getAccessToken(testUserCode));
+		return items;
+	}
+	
+}

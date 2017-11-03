@@ -1,0 +1,273 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAllBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLogs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdAdjustStockBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.repository.SpdAdjustStockBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizLogRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStock;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdDepotStockRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@SuppressWarnings({"unchecked"})
+public class SpdAdjustStockBizServiceTest extends BaseTest{
+
+	@Autowired private SpdAdjustStockBizService asbService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdAdjustStockBizRepository asbRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdBizLogRepository blRepository;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private SpdDepotStockRepository dsRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdAllBizSteps allBizSteps;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+
+	String depotId = "depot_id_001";
+	
+	@Test public void addAdjustStockBiz(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		SpdAdjustStockBiz adjustStock = new SpdAdjustStockBiz();
+		adjustStock.setBizRuleId("as_rule_id_01");
+		adjustStock.setMaintenanceInfo(new MaintenanceInfo(user));
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item1 = new SpdBizItem("goods_id_003", "goods_lot_id_018", 2, 300, null, 20.5f);
+		items.add(item1);
+		
+		SpdBizItem item2 = new SpdBizItem("goods_id_004", "goods_lot_id_011", 2, 400, null, 123.2f);
+		items.add(item2);
+		
+		adjustStock.setItems(items);
+		
+		adjustStock = asbService.add(adjustStock, user);
+		wait(2);
+		
+		adjustStock = asbRepository.findOne(adjustStock.getBizId());
+		assertNotNull(adjustStock.getBizId());
+		assertEquals(depotId, adjustStock.getDepotId());
+		assertEquals(CheckState.new_created, adjustStock.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.kucuntiaojiedan);
+		assertEquals(CodeSort.kucuntiaojiedan.getCode()+getCurrentDateCode()+sequenceCode, adjustStock.getBizCode());
+		assertEquals(SpdAdjustStockBizSteps.create_adjust_stock, adjustStock.getCurrentBizStep());
+		
+		SpdBizItems bizItems = biRepository.findWithGoodsByBizId(adjustStock.getBizId());
+		assertEquals(items.size(), bizItems.size());
+		bizItems.forEach(bizItem->{
+			SpdBizItem theItem = CollectionUtils.findWhere("lotId", bizItem.getLotId(), items);
+			assertEquals(theItem.getGoodsId(), bizItem.getGoodsId());
+			assertEquals(theItem.getPlanQty(), bizItem.getPlanQty());
+		});
+	}
+	
+	@Test public void testCommit(){
+		String adjustStockId = "adju_biz_id_001";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdAdjustStockBiz adjustStock = asbRepository.findOne(adjustStockId);
+		adjustStock = asbService.updateCheckState(adjustStockId, CheckState.commited.getCode(), adjustStock.getMaintenanceInfo().getLastDate(), user);
+		
+		assertEquals(CheckState.commited, adjustStock.getCheckState());
+		wait(2);
+		adjustStock = asbRepository.findOne(adjustStockId);
+		assertEquals(SpdAdjustStockBizSteps.complete_depot_task, adjustStock.getCurrentBizStep());
+	}
+	
+	@Test public void testReview(){
+		String adjustStockId = "adju_biz_id_002";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdAdjustStockBiz adjustStock = asbRepository.findOne(adjustStockId);
+		adjustStock.setBizRuleId("as_rule_id_01");
+		asbRepository.save(adjustStock);
+		
+		adjustStock.setItems(biRepository.findWithGoodsByBizId(adjustStock.getBizId()));
+		
+		adjustStock.getItems().forEach(item->item.setConfirmQty(300));
+		
+		biRepository.saveAll(adjustStock.getItems());
+		adjustStock = asbService.updateCheckState(adjustStockId, CheckState.reviewed.getCode(), adjustStock.getMaintenanceInfo().getLastDate(), user);
+		
+		assertEquals(CheckState.reviewed, adjustStock.getCheckState());
+		wait(2);
+		adjustStock = asbRepository.findOne(adjustStockId);
+		assertEquals(SpdAdjustStockBizSteps.confirm_adjust_stock, adjustStock.getCurrentBizStep());
+		
+		SpdBizItems items = biRepository.findByBizId(adjustStockId);
+		items.forEach(item->{
+			if(item.getPlanQty() > item.getConfirmQty()){
+				assertFalse(item.getAsPlanned());
+			}else{
+				assertTrue(item.getAsPlanned());
+			}
+		});
+	}
+	
+	
+	@Test public void testReviewAutoCompleteOnShelfTask(){
+		String adjustStockId = "adju_biz_id_002";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdAdjustStockBiz adjustStock = asbRepository.findOne(adjustStockId);
+		adjustStock.setItems(biRepository.findWithGoodsByBizId(adjustStock.getBizId()));
+		
+		adjustStock.getItems().forEach(item->item.setConfirmQty(300));
+		
+		biRepository.saveAll(adjustStock.getItems());
+		adjustStock = asbService.updateCheckState(adjustStockId, CheckState.reviewed.getCode(), adjustStock.getMaintenanceInfo().getLastDate(), user);
+		
+		assertEquals(CheckState.reviewed, adjustStock.getCheckState());
+		wait(2);
+		adjustStock = asbRepository.findOne(adjustStockId);
+		
+		assertEquals(SpdAdjustStockBizSteps.complete_depot_task, adjustStock.getCurrentBizStep());
+		
+		SpdBizLogs bizLogs = blRepository.findByBizId(adjustStockId);
+		assertEquals(allBizSteps.get(SpdBizType.adjust_stock_biz).size(), bizLogs.size());
+		
+		SpdDepotTasks depotTasks = dtRepository.findWithItemsByBizId(adjustStockId);
+		assertEquals(1, depotTasks.size());
+	}
+	
+	@Test public void testAddAndReviewAutoCompleteOffShelfTaskWithError(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		//准备数据，调用库存调节服务添加服务
+		SpdAdjustStockBiz adjustStock = new SpdAdjustStockBiz();
+		adjustStock.setMaintenanceInfo(new MaintenanceInfo(user));
+		adjustStock.setBizRuleId("as_rule_id_03");
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item1 = new SpdBizItem("goods_id_012", "goods_lot_id_031", 2, 200, null, 25.5f);
+		items.add(item1);
+		
+		SpdBizItem item2 = new SpdBizItem("goods_id_010", "goods_lot_id_033", 2, 300, null, 120.2f);
+		items.add(item2);
+		
+		SpdBizItem item3 = new SpdBizItem("goods_id_018", "goods_lot_id_040", 2, 400, null, 220.2f);
+		items.add(item3);
+		
+		adjustStock.setItems(items);
+		
+		adjustStock = asbService.add(adjustStock, user);
+		wait(3);
+		
+		adjustStock = asbRepository.findOne(adjustStock.getBizId());
+		assertNotNull(adjustStock.getBizId());
+		assertEquals(depotId, adjustStock.getDepotId());
+		assertEquals(CheckState.new_created, adjustStock.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.kucuntiaojiedan);
+		assertEquals(CodeSort.kucuntiaojiedan.getCode()+getCurrentDateCode()+sequenceCode, adjustStock.getBizCode());
+		assertEquals(SpdAdjustStockBizSteps.create_adjust_stock, adjustStock.getCurrentBizStep());
+		
+		//提交库存调节
+		adjustStock = asbService.updateCheckState(adjustStock.getBizId(), CheckState.commited.getCode(), adjustStock.getMaintenanceInfo().getLastDate(), user);
+		
+		assertEquals(CheckState.commited, adjustStock.getCheckState());
+		wait(2);
+		adjustStock = asbRepository.findOne(adjustStock.getBizId());
+		assertEquals(SpdAdjustStockBizSteps.commit_adjust_stock, adjustStock.getCurrentBizStep());
+		
+		
+		adjustStock.setItems(biRepository.findWithGoodsByBizId(adjustStock.getBizId()));
+		
+		adjustStock.getItems().forEach(item->item.setConfirmQty(5000));
+		
+		biRepository.saveAll(adjustStock.getItems());
+		
+		//声明异常
+		thrown.expect(InvalidDataException.class);
+		adjustStock = asbService.updateCheckState(adjustStock.getBizId(), CheckState.reviewed.getCode(), adjustStock.getMaintenanceInfo().getLastDate(), user);
+		
+		assertEquals(CheckState.reviewed, adjustStock.getCheckState());
+	}
+	
+	@Test public void testAddWithAutoCompleteOffShelfTask(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		//准备数据，调用库存调节服务添加服务
+		SpdAdjustStockBiz adjustStock = new SpdAdjustStockBiz();
+		adjustStock.setMaintenanceInfo(new MaintenanceInfo(user));
+		adjustStock.setBizRuleId("as_rule_id_04");
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item1 = new SpdBizItem("goods_id_011", "goods_lot_id_030", 2, 200, null, 25.5f);
+		items.add(item1);
+		
+		SpdBizItem item2 = new SpdBizItem("goods_id_013", "goods_lot_id_057", 2, 100, null, 120.2f);
+		items.add(item2);
+		items.fillGoodsLot(glRepository);
+		items.fillGoods(goodsRepository);
+		adjustStock.setItems(items);
+		
+		//新增库存调节
+		adjustStock = asbService.add(adjustStock, user);
+		
+		//查询出审核前的库存
+		SpdShelfStocks originShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, adjustStock.getAreaType(), items.pluck("lotId"));
+		SpdDepotStocks originDepotStocks = dsRepository.findByDepotAndGoodsLots(depotId, items.pluck("lotId"));
+		
+		wait(4);
+		
+		adjustStock = asbRepository.findOne(adjustStock.getBizId());
+		assertEquals(SpdAdjustStockBizSteps.complete_depot_task, adjustStock.getCurrentBizStep());
+		
+		SpdBizLogs bizLogs = blRepository.findByBizId(adjustStock.getBizId());
+		assertEquals(allBizSteps.get(SpdBizType.adjust_stock_biz).size(), bizLogs.size());
+		
+		SpdDepotTasks depotTasks = dtRepository.findWithItemsByBizId(adjustStock.getBizId());
+		assertEquals(1, depotTasks.size());
+		
+		SpdShelfStocks newShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, adjustStock.getAreaType(), items.pluck("lotId"));
+		SpdDepotStocks newDepotStocks = dsRepository.findByDepotAndGoodsLots(depotId, items.pluck("lotId"));
+		
+		//检查货位库存
+		newShelfStocks.forEach(newShelfStock->{
+			SpdShelfStock originShelfStock = CollectionUtils.findWhere("lotId", newShelfStock.getLotId(), originShelfStocks);
+			SpdBizItem bizItem = CollectionUtils.findWhere("lotId", newShelfStock.getLotId(), items);
+			int expectedShelfStockQty = originShelfStock.getQtyByMinUnit() - bizItem.getPlanQtyByBaseUnit();
+			assertNotNull(newShelfStock.getShelfId());
+			assertEquals(expectedShelfStockQty, newShelfStock.getQtyByMinUnit().intValue());
+		});
+		
+		//检查仓库库存
+		newDepotStocks.forEach(newDepotStock->{
+			SpdDepotStock originDepotStock = CollectionUtils.findWhere("goodsLotId", newDepotStock.getGoodsLotId(), originDepotStocks);
+			SpdBizItem bizItem = CollectionUtils.findWhere("lotId", newDepotStock.getGoodsLotId(), items);
+			int expectedDepotStockQty = originDepotStock.getMinStockQty() - bizItem.getPlanQtyByBaseUnit();
+			assertEquals(expectedDepotStockQty, newDepotStock.getMinStockQty().intValue());
+		});
+	}
+	
+}

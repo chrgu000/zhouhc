@@ -1,0 +1,48 @@
+package cn.ak4j.yard.extend.zsy;
+
+import java.io.IOException;
+import java.util.Map;
+
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.web.client.DefaultResponseErrorHandler;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.enums.YardExceptionType;
+
+public class ZsyResponseErrorHandler extends DefaultResponseErrorHandler{
+	
+	private Logger logger = LoggerFactory.getLogger(ZsyResponseErrorHandler.class);
+
+	private static final int access_token_invalid = 40102;
+	private SpdZsyProxy zsyProxy;
+	
+	public ZsyResponseErrorHandler(SpdZsyProxy zsyProxy){
+		this.zsyProxy = zsyProxy;
+	}
+	
+	public boolean hasError(ClientHttpResponse response) throws IOException {
+		return super.hasError(response);
+	}
+	
+	public void handleError(ClientHttpResponse response) throws IOException {
+		String body = IOUtils.toString(response.getBody(), Global.defaultCharset);
+		logger.warn("resource access error info: {}", body);
+		if(response.getStatusCode().value() == 401){
+			Map<String, Object> error = Global.defaultObjectMapper.readValue(body, new TypeReference<Map<String, Object>>() {});
+			int errorCode = Integer.parseInt(error.get("code").toString());
+			if(errorCode == access_token_invalid){
+				String accessToken = zsyProxy.fetchAccessToken();
+				logger.info("重新获取访问凭证:{}", accessToken);
+			}
+		}else{
+			throw new OperateFailException(YardExceptionType.zsy_api_request_fail, body);
+		}
+	}
+	
+}

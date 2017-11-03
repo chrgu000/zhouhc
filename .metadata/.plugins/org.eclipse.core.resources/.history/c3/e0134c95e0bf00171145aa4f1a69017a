@@ -1,0 +1,51 @@
+package cn.ak4j.yard.pcs.domain;
+
+public class PcsAuthorityAssets {
+
+	private PcsMenus allMenus;
+	private PcsMenus allSimpleMenus;
+	private PcsFunctions allFunctions;
+	private PcsOperations allOperations;
+	private PcsMixedOperations allMixedOperations;
+	private PcsWebApis allWebApis;
+	
+	public PcsMenus getAllMenus() {
+		return allMenus;
+	}
+	public void setAllMenus(PcsMenus allMenus) {
+		this.allMenus = allMenus;
+	}
+	public PcsMenus getAllSimpleMenus() {
+		return allSimpleMenus;
+	}
+	public void setAllSimpleMenus(PcsMenus allSimpleMenus) {
+		this.allSimpleMenus = allSimpleMenus;
+	}
+	public PcsFunctions getAllFunctions() {
+		return allFunctions;
+	}
+	public void setAllFunctions(PcsFunctions allFunctions) {
+		this.allFunctions = allFunctions;
+	}
+	public PcsOperations getAllOperations() {
+		return allOperations;
+	}
+	public void setAllOperations(PcsOperations allOperations) {
+		this.allOperations = allOperations;
+	}
+	public PcsWebApis getAllWebApis() {
+		return allWebApis;
+	}
+	public void setAllWebApis(PcsWebApis allWebApis) {
+		this.allWebApis = allWebApis;
+	}
+	public PcsMixedOperations getAllMixedOperations() {
+		return allMixedOperations;
+	}
+	public void setAllMixedOperations(PcsMixedOperations allMixedOperations) {
+		this.allMixedOperations = allMixedOperations;
+	}
+
+	
+}
+

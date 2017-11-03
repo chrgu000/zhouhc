@@ -1,0 +1,12 @@
+delete from spd_return_goods_biz where biz_id in('ff8080815f48ac3c015f4c7da02701ba','ff8080815f48ac3c015f4c7da04f01be');
+delete from spd_biz_log where biz_id in('ff8080815f48ac3c015f4c7da02701ba','ff8080815f48ac3c015f4c7da04f01be');
+delete from spd_biz_item where biz_id in('ff8080815f48ac3c015f4c7da02701ba', 'ff8080815f48ac3c015f4c7da04f01be');
+
+update spd_shelf_stock set min_unit_lock_qty=0 where depot_id='ff8080815e371d0c015e3762abe80e06' and goods_lot_id in('ff8080815f33e225015f391510ac0b8b', 'ff8080815f33e225015f38a73ebb08f8');
+
+delete from spd_shelf_lock_stock where shelf_stock_id in('ff8080815f43cdba015f471cd76e03ac', 'ff8080815f43cdba015f472082d304d2');
+
+
+delete from spd_dispatcher where dispatcher_id in(select dispatcher_id from spd_dispatcher_ref where ref_sheet_id in('ff8080815f48ac3c015f4c7da02701ba', 'ff8080815f48ac3c015f4c7da04f01be'));
+
+delete from spd_dispatcher_ref where ref_sheet_id in('ff8080815f48ac3c015f4c7da02701ba', 'ff8080815f48ac3c015f4c7da04f01be');

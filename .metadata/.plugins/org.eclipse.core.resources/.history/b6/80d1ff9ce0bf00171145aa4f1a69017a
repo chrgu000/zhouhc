@@ -1,0 +1,14 @@
+
+-- 修改sort_code_name的长度
+alter table sys_code_sequence modify  sort_code_name varchar2(50);
+
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('200','申领规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('201','消耗规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('202','通知规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('203','收货规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('204','退货规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('205','调节规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('206','移仓规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('207','物权变更规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('208','日清对账规则编码',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('209','财务对账规则编码',0,null);

@@ -1,0 +1,1 @@
+update yds_goods set fact_name=(select eds_fact_name from yds_eds_goods where yds_goods.goods_id=yds_eds_goods.yard_goods_id) where exists (select 1 from yds_eds_goods where yds_goods.goods_id=yds_eds_goods.yard_goods_id);

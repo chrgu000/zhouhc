@@ -1,0 +1,5 @@
+--2017-6-29
+--1） 更新申领业务和收货业务的来源渠道
+update spd_receive_biz set channel_type_code='eis';
+update spd_replenish_biz set channel_type_code='eis';
+

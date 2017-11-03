@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.3.1.final using JasperReports Library version 6.3.1  -->
+<!-- 2017-06-01T21:00:07 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="spdTurnoverBox" pageWidth="170" pageHeight="113" orientation="Landscape" columnWidth="162" leftMargin="4" rightMargin="4" topMargin="4" bottomMargin="4" whenResourceMissingType="Error" uuid="6da82dac-eb01-494f-aca5-f2c82b6df1a3">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<property name="com.jaspersoft.studio.unit." value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.topMargin" value="mm"/>
+	<property name="com.jaspersoft.studio.unit.bottomMargin" value="mm"/>
+	<property name="com.jaspersoft.studio.unit.leftMargin" value="mm"/>
+	<property name="com.jaspersoft.studio.unit.rightMargin" value="mm"/>
+	<property name="com.jaspersoft.studio.unit.columnWidth" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.columnSpacing" value="pixel"/>
+	<parameter name="turnoverBoxCode" class="java.lang.String"/>
+	<parameter name="sysCode" class="java.lang.String"/>
+	<pageHeader>
+		<band height="105">
+			<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+			<textField pattern="" isBlankWhenNull="false">
+				<reportElement key="" positionType="FixRelativeToBottom" x="0" y="0" width="156" height="35" uuid="295c54fe-7090-4223-bd25-703f7167336f"/>
+				<box>
+					<pen lineWidth="0.0"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle" markup="none">
+					<font fontName="微软雅黑" size="24" isBold="false"/>
+					<paragraph lineSpacing="Fixed"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{sysCode}]]></textFieldExpression>
+			</textField>
+			<componentElement>
+				<reportElement key="" x="0" y="35" width="156" height="66" isPrintWhenDetailOverflows="true" uuid="4145e039-f501-47df-a2c1-4904cf8c3b65">
+					<property name="com.jaspersoft.studio.unit.barHeight" value="pixel"/>
+				</reportElement>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="Code128" drawText="false" checksumRequired="false" barWidth="8" barHeight="300">
+					<jr:codeExpression><![CDATA[$P{turnoverBoxCode}]]></jr:codeExpression>
+				</jr:barbecue>
+			</componentElement>
+		</band>
+	</pageHeader>
+</jasperReport>

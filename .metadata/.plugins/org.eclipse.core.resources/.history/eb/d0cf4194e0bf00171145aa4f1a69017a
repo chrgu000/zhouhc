@@ -1,0 +1,8 @@
+package cn.ak4j.yard.sys.datacheck.domain;
+
+import cn.ak4j.entity.Entities;
+
+@SuppressWarnings({"serial"})
+public class SysDataCheckTasks extends Entities<SysDataCheckTask>{
+
+}

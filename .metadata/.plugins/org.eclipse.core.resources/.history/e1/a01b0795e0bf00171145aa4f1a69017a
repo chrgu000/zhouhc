@@ -1,0 +1,27 @@
+package cn.ak4j.yard.spd.bizplan.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdAdjustStockBizParams extends QueryParams{
+
+	private ListParam<String> bizId;
+	private ListParam<String> depotId;
+	private ListParam<String> adjustTypeCode;
+	private ListParam<String> bizStatusCode;
+	private ListParam<Integer> checkStateCode;
+	private ListParam<String> reason;
+	private ListParam<String> areaType;
+	
+	private ListParam<String> depotName;//关联查询
+	
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	
+	private ListParam<String> bizRuleId;
+}

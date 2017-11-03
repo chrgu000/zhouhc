@@ -1,0 +1,98 @@
+package cn.ak4j.yard.spd.domain;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@SuppressWarnings({"rawtypes", "serial", "unchecked"})
+public class SpdInventoryItems extends Entities<SpdInventoryItem>{
+
+	public SpdInventoryItems(){}
+
+	public SpdInventoryItems(List entities){
+		super(entities);
+	}
+	
+	public boolean isCompletelyInventory(){
+		for(SpdInventoryItem item : this){
+			if(item.getCheckQty() == null || item.getCheckQty()<0){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public void fillGoodsLots(YdsGoodsLots goodsLots) {
+		for(SpdInventoryItem item : this){
+			YdsGoodsLot goodsLot = CollectionUtils.findWhere("goodsLotId", item.getStockGoodsLotId(), goodsLots);
+			item.setGoodsLot(goodsLot);
+		}
+	}
+
+	public void fillShelfs(PcsDepotShelfs shelfs) {
+		for(SpdInventoryItem item : this){
+			PcsDepotShelf shelf = CollectionUtils.findWhere("depotShelfId", item.getShelfId(), shelfs);
+			item.setShelf(shelf);
+		}
+	}
+
+	public void fillGoods(YdsGoodsRepository goodsRepository) {
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", this);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds);
+		for(SpdInventoryItem item : this){
+			YdsGoods goods = CollectionUtils.findWhere("goodsId", item.getGoodsId(), goodss);
+			item.setGoods(goods);
+		}
+	}
+
+	public void orderByDepotShelf(PcsDepot depot) {
+		fillShelfs(depot.getAreas().findShelfsByShelfId(CollectionUtils.pluck("shelfId", this)));
+		Collections.sort(this, new Comparator<SpdInventoryItem>() {
+			public int compare(SpdInventoryItem item1, SpdInventoryItem item2) {
+				PcsDepotShelf shelf1 = item1.getShelf();
+				PcsDepotShelf shelf2 = item2.getShelf();
+				String shelfCode1 = shelf1==null?"":shelf1.getShelfCode();
+				String shelfCode2 = shelf2==null?"":shelf2.getShelfCode();
+				return shelfCode1.compareTo(shelfCode2);
+			}
+		});
+	}
+
+	
+	public SpdInventoryItem getGoodsIdAndLotId(String goodsId, String stockGoodsLotId) {
+		
+		for(SpdInventoryItem item : this){
+			if(item.getGoodsId().equals(goodsId) && item.getStockGoodsLotId().equals(stockGoodsLotId)){
+				return item;
+			}
+		}
+		
+		return null;
+	}
+
+	
+	public SpdInventoryItems findByGoodsIds(List<String> subGoodsIds) {
+		SpdInventoryItems items = new SpdInventoryItems();
+		
+		for(SpdInventoryItem theItem : this){
+			for(String goodsId : subGoodsIds){
+				if(theItem.getGoodsId().equals(goodsId)){
+					items.add(theItem);
+				}
+			}
+		}
+		
+		return items;
+	}
+}

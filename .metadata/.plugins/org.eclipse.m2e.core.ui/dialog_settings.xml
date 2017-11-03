@@ -70,16 +70,24 @@
 	</section>
 	<section name="Maven2ProjectWizardArchifactPage">
 		<list key="package">
+			<item value="manager.zhou"/>
+			<item value="manager.ter"/>
+			<item value="manager.zhc"/>
+			<item value="com.id.zhou"/>
 			<item value="test.test_zhc"/>
 			<item value="zhc.zhc"/>
 		</list>
 		<list key="groupId">
+			<item value="manager"/>
+			<item value="com.id"/>
 			<item value="test"/>
 			<item value="zhc"/>
 		</list>
 		<list key="artifactId">
-			<item value="test_zhc"/>
+			<item value="zhou"/>
+			<item value="ter"/>
 			<item value="zhc"/>
+			<item value="test_zhc"/>
 		</list>
 		<list key="projectNameTemplate">
 			<item value="[artifactId]"/>

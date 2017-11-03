@@ -1,0 +1,28 @@
+declare 
+var_count number;
+var_sql VARCHAR2(800);
+type column_array is table of varchar2(100);
+type table_array is table of varchar2(100);
+column_names column_array:=column_array('CREATE_YARD','LAST_YARD');
+table_names table_array:=table_array('EIS_APPLY_SYNC_RESOURCE', 'EIS_DEPOT_SYNC_RESOURCE', 'EIS_DEPT_SYNC_RESOURCE', 'EIS_GOODS_LOT_SYNC_RESOURCE',
+'EIS_GOODS_SYNC_RESOURCE', 'EIS_RECEIVE_SYNC_RESOURCE', 'EIS_SUPPLIER_SYNC_RESOURCE', 'EIS_SYNC_REPORT', 'EIS_USED_SYNC_RESOURCE', 'EIS_USED_TYPE_SYNC_RESOURCE', 
+'EIS_WORKBOOK_SYNC_RESOURCE', 'LOGGING_EVENT_EXCEPTION', 'LOGGING_EVENT_PROPERTY', 'LOGGING_EVENT', 'PCS_DEPOT', 'PCS_DEPOT_AREA', 
+'PCS_DEPOT_SHELF', 'PCS_DEPT', 'PCS_ORG', 'PCS_ROLE', 'PCS_ROLE_OP', 'PCS_USER', 'PCS_USER_ROLE', 'PCS_USER_TOKEN', 'SYS_BATCH_TASK', 'SYS_CODE_SEQUENCE', 
+'SYS_DATA_CHECK_TASK', 'SYS_DATA_CHECK_TASK_ITEM', 'SYS_DATA_CHECK_TASK_REPORT', 'SYS_DATA_CHECK_TYPE', 'YDS_EDS_GOODS', 'YDS_EDS_GOODS_LOT', 'YDS_GOODS', 
+'YDS_GOODS_INFO', 'YDS_GOODS_LOT', 'YDS_WORKBOOK', 'SPD_ADJUST_STOCK_BIZ', 'SPD_BIZ_EXAMPLE', 'SPD_BIZ_EXAMPLE_ITEM', 'SPD_BIZ_ITEM', 'SPD_BIZ_LOG', 'SPD_DEPOT_CARD', 
+'SPD_DEPOT_ROUTE', 'SPD_DEPOT_STOCK', 'SPD_DEPOT_TASK', 'SPD_DISPATCHER', 'SPD_DISPATCHER_REF', 'SPD_LOGISTICS_TASK', 'SPD_LOGISTICS_TASK_ITEM', 'SPD_MOVE_AREA_BIZ', 
+'SPD_OFF_SHELF_TASK_ITEM', 'SPD_ON_SHELF_TASK_ITEM', 'SPD_RECEIVE_BIZ', 'SPD_REPLENISH_BIZ', 'SPD_SHELF_STOCK', 'SPD_TURNOVER_BOX', 'SPD_INVENTORY', 'SPD_INVENTORY_ITEM', 'SPD_PURCHASE',
+'EIS_BLOCK_SYNC_RESOURCE', 'EIS_SHELF_SYNC_RESOURCE', 'EIS_DEPOT_CARD_SYNC_RESOURCE', 'SPD_SHELF_LOCK_STOCK');
+begin
+  for t in 1 .. column_names.count loop
+     for i in 1 .. table_names.count loop
+       var_sql := 'select count(*) from user_tab_columns t where t.table_name = upper('''||table_names(i)||''') and t.column_name = upper('''||column_names(t)||''')';
+       execute immediate var_sql INTO var_count;
+       if var_count > 0 then
+          var_sql := 'alter table ' || table_names(i) || ' drop column '||column_names(t) ;
+          Dbms_Output.put_line(var_sql);
+       execute immediate var_sql;
+      end if;
+     end loop;
+  end loop;
+end;

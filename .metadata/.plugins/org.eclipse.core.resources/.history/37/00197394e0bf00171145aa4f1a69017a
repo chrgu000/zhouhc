@@ -1,0 +1,52 @@
+package cn.ak4j.yard.spd.supply.factory;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrder;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItem;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItems;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+
+@Component
+public class SpdDeliveryOrderFactory {
+	
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+
+	public SpdDeliveryOrder buildDeliveryOrder(SpdPrepareInformBiz prepareInform){
+		String depotId = prepareInform.hasCollectDepot() ? prepareInform.getCollectDepotId() : prepareInform.getToDepotId();
+		PcsDepot depot = depotRepository.findAll().findById(depotId);
+		SpdDeliveryOrder deliveryOrder = new SpdDeliveryOrder(depot.getDepotId(), prepareInform.getBizCode());
+		deliveryOrder.setItems(buildDeliveryOrderItems(deliveryOrder.getOrderId(), prepareInform.getItems(), prepareInform.getFromOrgId()));
+		return deliveryOrder;
+	}
+	
+	public SpdDeliveryOrderItems buildDeliveryOrderItems(String orderId, SpdBizItems bizItems, String orgId){
+		SpdDeliveryOrderItems items = new SpdDeliveryOrderItems();
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", bizItems);
+		YdsEdsGoodsParams edsGoodsParams = new YdsEdsGoodsParams();
+		edsGoodsParams.setOwnerOrgId(new ListParam<String>(orgId));
+		edsGoodsParams.setYardGoodsId(new ListParam<String>(goodsIds));
+		YdsEdsGoodss edsGoodsList = new YdsEdsGoodss(egRepository.findAll().find(edsGoodsParams));
+		bizItems.forEach(bizItem->{
+			YdsEdsGoods edsGoods = CollectionUtils.findWhere("yardGoodsId", bizItem.getGoodsId(), edsGoodsList);
+			SpdDeliveryOrderItem item = new SpdDeliveryOrderItem(bizItem, edsGoods);
+			item.setOrderId(orderId);
+			items.add(item);
+		});
+		return items;
+	}
+	
+}

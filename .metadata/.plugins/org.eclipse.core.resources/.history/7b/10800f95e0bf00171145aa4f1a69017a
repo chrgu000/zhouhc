@@ -1,0 +1,33 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.Collections;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+
+/**
+* @Description: 财务对账业务步骤
+* @author zhengyf
+* @date 2017年8月15日 上午11:16:02
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+public class SpdFinancialReconciliationBizSteps extends SpdBizSteps{
+
+	public static SpdBizStep create_financial_reconciliation = new SpdBizStep(1, AmqpMsgType.CREATE_FINACIAL_RECONCILIATION_BIZ.getCode(), "作业步骤模板", "financial_reconciliation_created", "财务对账已创建");
+	public static SpdBizStep commit_financial_reconciliation = new SpdBizStep(2, AmqpMsgType.COMMIT_FINACIAL_RECONCILIATION_BIZ.getCode(), "作业步骤模板", "financial_reconciliation_commited", "财务对账已确认");
+	public static SpdBizStep review_financial_reconciliation = new SpdBizStep(3, AmqpMsgType.REVIEW_FINACIAL_RECONCILIATION_BIZ.getCode(), "作业步骤模板", "financial_reconciliation_reviewed", "财务对账已确认");
+	public static SpdBizStep sync_to_supplier = new SpdBizStep(4, AmqpMsgType.SYNC_FINACIAL_RECONCILIATION_TO_SUPPLIER.getCode(), "同步给供应商", "sync_to_supplier_over", "财务对账已同步给供应商");
+	public static SpdBizStep complete_financial_reconciliation = new SpdBizStep(5, AmqpMsgType.COMPLETE_FINACIAL_RECONCILIATION_BIZ.getCode(), "作业步骤模板", "financial_reconciliation_completed", "财务对账已完成");
+	
+	public SpdFinancialReconciliationBizSteps(){
+		this.add(create_financial_reconciliation);
+		this.add(commit_financial_reconciliation);
+		this.add(review_financial_reconciliation);
+		this.add(sync_to_supplier);
+		this.add(complete_financial_reconciliation);
+		
+		Collections.sort(this, comparator);
+	}
+	
+}

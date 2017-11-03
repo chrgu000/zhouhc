@@ -1,0 +1,187 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.params.PcsDepotAreaParams;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotAreaRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdPrepareInformBizParams;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdPrepareInformRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdPrepareInformBizRepository extends BaseRepository<SpdPrepareInformBiz, SpdPrepareInformBizs, SpdPrepareInformBizParams, String> {
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private PcsDepotAreaRepository daRepository;
+	
+	public SpdPrepareInformBizs find(SpdPrepareInformBizParams params, OrderParam order, int pageNo, int pageSize) {
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			return new SpdPrepareInformBizs(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdPrepareInformBizs();
+	}
+	
+	public int count(SpdPrepareInformBizParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	@Transactional
+	public SpdPrepareInformBiz saveWithItems(SpdPrepareInformBiz purchase){
+		purchase = save(purchase);
+		//TODO 修改计划金额
+//		purchase.updatePlanAmount();
+		purchase.updateItemsBizIdAndTime();
+		biRepository.saveAll(purchase.getItems());
+		return purchase;
+	}
+	
+	public SpdPrepareInformBiz getWithItems(String purchaseId) {
+		SpdPrepareInformBiz prepareInform = findOne(purchaseId);
+		SpdBizItems items = biRepository.findWithGoodsByBizId(purchaseId);
+		prepareInform.setItems(items);
+		return prepareInform;
+	}
+
+	public SpdPrepareInformBizs findUnreviewedByDepotId(String depotId) {
+		SpdPrepareInformBizParams params = new SpdPrepareInformBizParams();
+		params.setToDepotId(new ListParam<String>(depotId));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		return find(params);
+	}
+
+	public SpdPrepareInformBiz findByBizCode(String bizCode) {
+		SpdPrepareInformBizParams params = new SpdPrepareInformBizParams();
+		params.setBizCode(new ListParam<String>(bizCode));
+		SpdPrepareInformBizs prepareInformBizs = find(params);
+		if(CollectionUtils.isNotEmpty(prepareInformBizs)){
+			return prepareInformBizs.get(0);
+		}
+		return null;
+	}
+	
+
+	public SpdPrepareInformBizs findITakeChargeOfCompletedPrepares(PcsUser user, SpdPrepareInformBizParams params, OrderParam order,
+			int pageNo, int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		
+		StringBuilder toDepotIds = new StringBuilder();
+		depots.forEach(depot->{
+			toDepotIds.append(String.format("'%s',", depot.getDepotId()));
+		});
+		
+		StringBuilder hql = new StringBuilder();
+		hql.append(String.format("from SpdPrepareInformBiz spdPrepareInformBiz where (spdPrepareInformBiz.toDepotId in(%s)", CollectionUtils.isNotEmpty(depots)?toDepotIds.substring(0, toDepotIds.length()-1):"''"));
+		hql.append(String.format(" or spdPrepareInformBiz.confirmDeptId in('%s'))", user.getDeptId()));
+		hql.append(String.format(" and spdPrepareInformBiz.checkStateCode in('%s')", CheckState.completed.getCode()));
+				
+		return find(hql.toString(), params, order, pageNo, pageSize);
+	}
+	
+
+	private boolean setRelationParams(SpdPrepareInformBizParams params) {
+		if(params == null){
+			return true;
+		}
+		
+		PcsOrgParams orgParams = new PcsOrgParams();
+		orgParams.setOrgName(params.getFromOrgName());
+		if(orgParams.isNotEmpty()){
+			PcsOrgs orgs = new PcsOrgs(orgRepository.findAll().find(orgParams));
+			if(CollectionUtils.isEmpty(orgs)){
+				return false;
+			}
+			
+			params.setFromOrgId(new ListParam<String>(orgs.getIds()));
+		}
+		
+		PcsDeptParams deptParams = new PcsDeptParams();
+		deptParams.setDeptName(params.getFromDeptName());
+		if(deptParams.isNotEmpty()){
+			PcsDepts depts = new PcsDepts(deptRepository.findAll().find(deptParams));
+			if(CollectionUtils.isEmpty(depts)){
+				return false;
+			}
+			params.setFromDeptId(new ListParam<String>(depts.getIds()));
+		}
+		
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setDepotName(params.getToDepotName());
+		if(depotParams.isNotEmpty()){
+			PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+			if(CollectionUtils.isEmpty(depots)){
+				return false;
+			}
+			params.setToDepotId(new ListParam<String>(depots.getIds()));
+		}
+		
+		PcsDepotParams collectDepotParams = new PcsDepotParams();
+		collectDepotParams.setDepotName(params.getCollectDepotName());
+		if(collectDepotParams.isNotEmpty()){
+			PcsDepots depots = depotRepository.findAll().find(collectDepotParams, orgRepository, deptRepository);
+			if(CollectionUtils.isEmpty(depots)){
+				return false;
+			}
+			params.setCollectDepotId(new ListParam<String>(depots.getIds()));
+		}
+		
+		PcsDepotAreaParams areaParams = new PcsDepotAreaParams();
+		areaParams.setAreaName(params.getToAreaName());
+		if(areaParams.isNotEmpty()){
+			PcsDepotAreas areas = new PcsDepotAreas(daRepository.findAllWithRelation().find(areaParams));
+			if(CollectionUtils.isEmpty(areas)){
+				return false;
+			}
+			params.setToAreaId(new ListParam<String>(areas.getIds()));
+		}
+		
+		SpdPrepareInformRuleParams ruleParams = new SpdPrepareInformRuleParams();
+		ruleParams.setDisplayName(params.getDisplayName());
+		if(ruleParams.isNotEmpty()){
+			SpdPrepareInformRules rules = new SpdPrepareInformRules(brRepository.findAllWithRelations().getAllPrepareInformRules().find(ruleParams));
+			if(CollectionUtils.isEmpty(rules)){
+				return false;
+			}
+			
+			params.setBizRuleId(new ListParam<String>(rules.getIds()));
+		}
+		
+		return true;
+	}
+
+}

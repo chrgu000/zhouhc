@@ -1,0 +1,72 @@
+package cn.ak4j.yard.extend.zhjw;
+
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.domain.AbstractScheduleTask;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.service.SpdDailyCleanBizService;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@NoArgsConstructor
+public class ZhjwAutoCreateDailyCleanBizTask extends AbstractScheduleTask{
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdDailyCleanBizService dcbService;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsUserRepository userRepository;
+	
+	@Getter @Setter private String name;
+	
+	public ZhjwAutoCreateDailyCleanBizTask(String name){
+		this.name = name;
+	}
+	
+	@Override
+	public void executeTask() throws Exception{
+		log.info("开始生成日清对账...");
+		//查找所有的日清对账规则
+		SpdDailyCleanRules rules = brRepository.findAllWithRelations().getAllDailyCleanRules();
+		
+		//遍历日清对账规则并查找相应的待日清日期
+		for(SpdDailyCleanRule rule : rules){
+			String depotId = rule.getDepotId();
+			List<Date> cleanDays = dcbService.findCleanDays(depotId);
+			PcsDepot depot = depotRepository.findAll().findById(depotId);
+			PcsDept dept = deptRepository.findAll().findById(depot.getManageDeptId());
+			PcsUser user = userRepository.findAll().findById(dept.getDefaultUserId());
+			
+			for(Date cleanDay : cleanDays){
+				log.info("生成日清对账: {}, {}", rule.getDepot().getDepotName(), Global.sdfYMD.format(cleanDay));
+				SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz(rule.getId(), cleanDay);
+				dcbService.add(dailyClean, user);
+			}
+		}
+		log.info("生成日清对账完成");
+	}
+
+	@Override
+	public String getDescription() {
+		String description = "查找待日清日期:首先查询最新的日清对账业务，然后倒推15天(作为一个缓冲期)，得到一个起始日期，"
+				+ "查询从起始日期到现在的所有物权变更记录，然后从物权变更记录中获得待日清的日期，根据日清日期生成日清对账。";
+		return description;
+	}	
+	
+}

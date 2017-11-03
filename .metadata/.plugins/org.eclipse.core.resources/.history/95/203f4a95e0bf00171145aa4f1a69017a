@@ -1,0 +1,138 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.Future;
+import javax.validation.constraints.Past;
+import javax.validation.constraints.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+
+@Entity
+@Table(name="PCS_ORG")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@JsonAutoDetect(getterVisibility=Visibility.ANY)
+@SuppressWarnings({"serial"})
+public class PcsOrg extends YardMaintenceEntity{
+
+	public static final String default_org_code = "000000";
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String orgId;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Getter @Setter
+	private int userCount = 0;
+	
+	@Getter @Setter
+	private boolean enabled;
+	
+	@Pattern(message = "机构编码应为纯数字、字母或数字加字母，不能为空或含有特殊符号", regexp = "[0-9A-Za-z]{1,}")
+	@Getter @Setter
+	private String orgCode = default_org_code;
+	
+	@NotEmpty(message="机构名不能为空") @Getter @Setter
+	private String orgName;
+	
+	@NotEmpty(message="简称不能为空") @Getter @Setter
+	private String orgAbbr;
+	
+	@Pattern(message = "营业执照注册号应为纯数字、字母或数字加字母，不能为空或含有特殊符号", regexp = "[0-9A-Za-z]{1,}")
+	@Getter @Setter
+	private String orgBusNo;
+	
+	@Pattern(message = "组织机构代码号应为纯数字、字母或数字加字母，不能为空或含有特殊符号", regexp = "[0-9A-Za-z]{1,}")
+	@Getter @Setter
+	private String orgRegNo;
+	
+	@Pattern(message = "税务登记号应为纯数字、字母或数字加字母，不能为空或含有特殊符号", regexp = "[0-9A-Za-z]{1,}")
+	@Getter @Setter
+	private String orgTaxNo;
+	
+	@Column(name="org_c_address") @NotEmpty(message="注册地址不能为空") 
+	@Getter @Setter
+	private String orgCAddress;
+	
+	@Column(name="org_o_address") @NotEmpty(message="办公地址不能为空")
+	@Getter @Setter
+	private String orgOAddress;
+	
+	@NotEmpty(message="企业类型不能为空") @Getter @Setter
+	private String orgTypeName;
+	
+	@NotEmpty(message="法人代表不能为空") @Getter @Setter
+	private String orgLegal;
+	
+	@NotEmpty(message="经营范围不能为空") @Getter @Setter
+	private String orgScope;
+	
+	@Past(message="机构创建时间不能为空且必须是一个过去的日期") @Getter @Setter
+	private Date orgCreateDate;
+	
+	@Future(message="机构有效期不能为空且必须是一个将来的日期") @Getter @Setter
+	private Date orgExpDate;
+	
+	@Column(name="IS_SALER_FLAG") @Getter @Setter
+	private boolean saler;//经销商
+	
+	@Column(name="IS_BUYER_FLAG") @Getter @Setter
+	private boolean buyer;//采购商
+	
+	@Column(name="IS_STORAGE_FLAG") @Getter @Setter
+	private boolean storage;//仓库
+	
+	@Column(name="IS_TRANS_FLAG") @Getter @Setter
+	private boolean trans;//配送企业
+	
+	@Column(name="IS_AGENT_FLAG") @Getter @Setter
+	private boolean agent;//代理商
+	
+	@Column(name="IS_GOV_FLAG") @Getter @Setter
+	private boolean gov;//政府
+	
+	@Column(name="IS_BANK_FLAG") @Getter @Setter
+	private boolean bank;//银行
+	
+	@Column(name="IS_MAIN_FLAG") @Getter @Setter
+	private boolean main;//主机构
+
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepts depts;
+	
+	public void fillDefaultValue(){
+		if(StringUtils.isEmpty(getOrgCode())){
+			setOrgCode(default_org_code);
+		}
+	}
+	
+}

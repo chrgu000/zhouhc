@@ -1,0 +1,34 @@
+package cn.ak4j.yard.pcs.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import lombok.Getter;
+
+@Repository
+public class PcsUserRepository extends BaseRepository<PcsUser, PcsUsers, PcsUserParams, String>{
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Cacheable(value="longTimeCache", key="\"allPcsUsers\"")
+	public PcsUsers findAll(){
+		return getAll();
+	}
+	
+	@Deprecated
+	public int count(PcsUserParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+	@Deprecated
+	public PcsUser findOne(String id){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+}

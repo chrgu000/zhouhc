@@ -1,0 +1,12 @@
+create table SPD_SHELF_LOCK_STOCK
+(
+  ID               VARCHAR2(50) not null,
+  SHELFSTOCKID     VARCHAR2(50),
+  BIZID            VARCHAR2(50),
+  QTYBYMINUNIT     NUMBER(10,2),
+  CREATE_TIME      DATE,
+  LAST_UPDATE_TIME DATE,
+  DESCRIBE         VARCHAR2(500)
+);
+alter table SPD_SHELF_LOCK_STOCK
+  add constraint PK_SPD_SHELF_LOCK_STOCK primary key (ID);

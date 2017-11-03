@@ -1,0 +1,229 @@
+package cn.ak4j.yard.web;
+
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Date;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.ReflectionUtils;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.IEntity;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.web.request.CommonResourceHelper;
+import cn.ak4j.yard.web.request.YardAddRequest;
+import cn.ak4j.yard.web.request.YardDeleteRequest;
+import cn.ak4j.yard.web.request.YardGetByIdsRequest;
+import cn.ak4j.yard.web.request.YardGetCountRequest;
+import cn.ak4j.yard.web.request.YardGetRequest;
+import cn.ak4j.yard.web.request.YardListRequest;
+import cn.ak4j.yard.web.request.YardModifyRequest;
+import cn.ak4j.yard.web.request.YardUpdateCheckStateRequest;
+
+public class CommonResource{
+
+	private Logger logger = LoggerFactory.getLogger(CommonResource.class);
+	
+	@Autowired private ApplicationContext applicationContext;
+	@Autowired private CommonResourceHelper helper;
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public ResponseEntity<Entities<?>> list(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsJson,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request) throws ClassNotFoundException {
+		YardListRequest listRequest = new YardListRequest(request);
+		ResourceDefine resource = ResourceDefines.getAllResources().findResource(listRequest.getModuleName(), listRequest.getSubModuleName(), listRequest.getResourceName(), listRequest.getDomainName());
+		listRequest.setDomainName(resource.getDomainName());
+		listRequest.setSubModuleName(resource.getSubModuleName());
+		
+		QueryParams queryParams = helper.getQueryParams(paramsJson, listRequest);
+		
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		BaseRepository repository = helper.getYardRepository(listRequest, applicationContext);
+		
+		Entities entities = (Entities)repository.find(queryParams, order, currentPage-1, pageSize);
+		return new ResponseEntity(entities, HttpStatus.OK);
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public long count(@RequestParam(value = "params", required = false) String paramsJson,
+						HttpServletRequest request) throws ClassNotFoundException {
+		YardGetCountRequest getCountRequest = new YardGetCountRequest(request);
+		ResourceDefine resource = ResourceDefines.getAllResources().findResource(getCountRequest.getModuleName(), getCountRequest.getSubModuleName(), getCountRequest.getResourceName(), getCountRequest.getDomainName());
+		getCountRequest.setDomainName(resource.getDomainName());
+		getCountRequest.setSubModuleName(resource.getSubModuleName());
+		
+		QueryParams queryParams = helper.getQueryParams(paramsJson, getCountRequest);
+		BaseRepository repository = helper.getYardRepository(getCountRequest, applicationContext);
+		return repository.count(queryParams);
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public IEntity get(HttpServletRequest request) throws ClassNotFoundException {
+		YardGetRequest getRequest = new YardGetRequest(request);
+		ResourceDefine resource = ResourceDefines.getAllResources().findResource(getRequest.getModuleName(), getRequest.getSubModuleName(), getRequest.getResourceName(), getRequest.getDomainName());
+		getRequest.setDomainName(resource.getDomainName());
+		getRequest.setSubModuleName(resource.getSubModuleName());
+		
+		BaseRepository repository = helper.getYardRepository(getRequest, applicationContext);
+		return repository.findOne(getRequest.getResourceId());
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public Entities<IEntity> getByIds(HttpServletRequest request) throws ClassNotFoundException, InstantiationException, IllegalAccessException {
+		YardGetByIdsRequest getByIdsRequest = new YardGetByIdsRequest(request);
+		ResourceDefine resource = ResourceDefines.getAllResources().findResource(getByIdsRequest.getModuleName(), getByIdsRequest.getSubModuleName(), getByIdsRequest.getResourceName(), getByIdsRequest.getDomainName());
+		getByIdsRequest.setDomainName(resource.getDomainName());
+		getByIdsRequest.setSubModuleName(resource.getSubModuleName());
+		
+		Class paramsType = helper.getQueryParamsType(getByIdsRequest);
+		QueryParams params = (QueryParams)paramsType.newInstance();
+		
+		String fieldName = getByIdsRequest.getResourceName().substring(0, 1).toLowerCase() + getByIdsRequest.getResourceName().substring(1)+"Id";
+		Field idField = ReflectionUtils.findField(paramsType, fieldName);
+	    idField.setAccessible(true);
+	    idField.set(params, new ListParam<String>(getByIdsRequest.getIds()));
+	    
+	    BaseRepository repository = helper.getYardRepository(getByIdsRequest, applicationContext);
+		return repository.find(params);
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public IEntity add(HttpServletRequest request) throws ClassNotFoundException, JsonParseException, JsonMappingException, IOException, NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, InstantiationException {
+		YardAddRequest addRequest = new YardAddRequest(request);
+		ResourceDefine resource = ResourceDefines.getAllResources().findResource(addRequest.getModuleName(), addRequest.getSubModuleName(), addRequest.getResourceName(), addRequest.getDomainName());
+		addRequest.setDomainName(resource.getDomainName());
+		addRequest.setSubModuleName(resource.getSubModuleName());
+		
+		IUser user = (IUser) request.getAttribute("user");
+		
+		Class toType = helper.getNewResourceTOType(addRequest);
+		Class domainType = helper.getDomainType(addRequest);
+		Object to = Global.defaultObjectMapper.readValue(IOUtils.toString(request.getInputStream(), Global.defaultCharset), toType);
+		
+		Method buildMethod = helper.getBuildMethod(addRequest);
+		IEntity domain = null;
+		if(buildMethod != null){
+			domain = (IEntity)buildMethod.invoke(null, to, user);
+		}else{
+			domain = (IEntity)domainType.newInstance();
+			try{
+				BeanUtils.copyProperties(domain, to);
+			}catch(Exception e){
+				logger.error(ExceptionUtils.getStackTrace(e));
+			}
+			if(domain instanceof YardMaintenceEntity){
+				((YardMaintenceEntity)domain).setMaintenanceInfo(new MaintenanceInfo(user));
+			}
+			Field createDateField = ReflectionUtils.findField(toType, "createDate");
+			if(createDateField != null){
+				Date createDate = (Date)createDateField.get(to);
+				if(createDate != null){
+					((YardMaintenceEntity)domain).getMaintenanceInfo().setCreateDate(createDate);	
+				}
+			}
+		}
+	
+		IYardService service = helper.getService(addRequest, resource, applicationContext);
+		//logger.debug("service class:{}", service.getClass().getName());
+		/**
+		 * 如果资源定义中定义了serviceName通常意味着其没有自身所对应的service组件，它所对应的业务方法在名为serviceName的业务组件中，
+		 * 例如添加角色操作的业务方法在角色业务组件中，而不是在角色操作业务组件中
+		 */
+		if(resource.getServiceType() != null){
+			Method addMethod = helper.getAddMethod(addRequest, resource, applicationContext);
+			return (IEntity)addMethod.invoke(service, domain, user);
+		}else{
+			IEntity entity = service.add(domain, user);
+			return entity;
+		}
+	}
+
+	@SuppressWarnings("rawtypes")
+	public String delete(HttpServletRequest request) throws ClassNotFoundException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+		IUser user = (IUser) request.getAttribute("user");
+		YardDeleteRequest deleteRequest = new YardDeleteRequest(request);
+		ResourceDefine resource = ResourceDefines.getAllResources().findResource(deleteRequest.getModuleName(), deleteRequest.getSubModuleName(), deleteRequest.getResourceName(), deleteRequest.getDomainName());
+		deleteRequest.setDomainName(resource.getDomainName());
+		deleteRequest.setSubModuleName(resource.getSubModuleName());
+		
+		IYardService service = helper.getService(deleteRequest, resource, applicationContext);
+		
+		/**
+		 * 如果资源定义中定义了serviceName通常意味着其没有自身所对应的service组件，它所对应的业务方法在名为serviceName的业务组件中，
+		 * 例如添加角色操作的业务方法在角色业务组件中，而不是在角色操作业务组件中
+		 */
+		if(resource.getServiceType() != null){
+			Method deleteMethod = helper.getDeleteMethod(deleteRequest, resource, applicationContext);
+//			logger.debug("deleteMethod:{}, service:{},resource Id:{}", deleteMethod, service, deleteRequest.getResourceId());
+			deleteMethod.invoke(service, deleteRequest.getResourceId(), user);
+		}else{
+			service.delete(deleteRequest.getResourceId(), user);
+		}
+
+		return "SUCCESS";
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public IEntity modify(HttpServletRequest request) throws ClassNotFoundException, JsonParseException, JsonMappingException, IOException {
+		IUser user = (IUser) request.getAttribute("user");
+		YardModifyRequest modifyRequest = new YardModifyRequest(request);
+		ResourceDefine resource = ResourceDefines.getAllResources().findResource(modifyRequest.getModuleName(), modifyRequest.getSubModuleName(), modifyRequest.getResourceName(), modifyRequest.getDomainName());
+		modifyRequest.setDomainName(resource.getDomainName());
+		modifyRequest.setSubModuleName(resource.getSubModuleName());
+		IYardService service = helper.getService(modifyRequest, resource, applicationContext);
+		
+		Class domainType = helper.getDomainType(modifyRequest);
+		IEntity entity = (IEntity)Global.defaultObjectMapper.readValue(IOUtils.toString(request.getInputStream(), Global.defaultCharset), domainType);
+		
+		entity = service.modify(entity, user);
+		return entity;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public CheckStateTO updateCheckState(HttpServletRequest request) throws ClassNotFoundException, JsonParseException, JsonMappingException, IOException {
+		IUser user = (IUser) request.getAttribute("user");
+		YardUpdateCheckStateRequest updateCheckStateRequest = new YardUpdateCheckStateRequest(request);
+		ResourceDefine resource = ResourceDefines.getAllResources().findResource(updateCheckStateRequest.getModuleName(), updateCheckStateRequest.getSubModuleName(), updateCheckStateRequest.getResourceName(), updateCheckStateRequest.getDomainName());
+		updateCheckStateRequest.setDomainName(resource.getDomainName());
+		updateCheckStateRequest.setSubModuleName(resource.getSubModuleName());
+		
+		IYardService service = helper.getService(updateCheckStateRequest, resource, applicationContext);
+		
+		CheckStateTO to = Global.defaultObjectMapper.readValue(IOUtils.toString(request.getInputStream()), CheckStateTO.class);
+		
+		YardMaintenceEntity entity = (YardMaintenceEntity)service.updateCheckState(updateCheckStateRequest.getResourceId(), to.getCheckStateCode(),
+				to.getLastDate(), user);
+		return new CheckStateTO(entity.getCheckStateCode(), entity.getMaintenanceInfo().getLastDate());
+	}
+		
+}

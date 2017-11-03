@@ -1,0 +1,175 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRuleParams;
+
+@SuppressWarnings("serial")
+public class SpdPropertyChangeRules extends Entities<SpdPropertyChangeRule>{
+
+	public SpdPropertyChangeRules(){}
+	
+	public SpdPropertyChangeRules(List<SpdPropertyChangeRule> rules) {
+		super(rules);
+	}
+
+	public void fillRelations(PcsDepts allDepts, PcsDepots allDepots, PcsOrgs allOrgs) {
+		this.forEach(rule->{
+			PcsDept debitDept = allDepts.findById(rule.getDebitDeptId());
+			PcsDept creditDept = allDepts.findById(rule.getCreditDeptId());
+			rule.setDebitDept(debitDept);
+			rule.setCreditDept(creditDept);
+			
+			PcsOrg debitOrg = allOrgs.findById(rule.getDebitOrgId());
+			PcsOrg creditOrg = allOrgs.findById(rule.getCreditOrgId());
+			rule.setDebitOrg(debitOrg);
+			rule.setCreditOrg(creditOrg);
+			
+			PcsDepot debitDepot = allDepots.findById(rule.getDebitDepotId());
+			PcsDepot creditDepot = allDepots.findById(rule.getCreditDepotId());
+			rule.setDebitDepot(debitDepot);
+			rule.setCreditDepot(creditDepot);
+		});
+	}
+
+	public boolean containsRule(SpdPropertyChangeRule rule) {
+		for(SpdPropertyChangeRule theRule : this){
+			if(theRule.equalsRule(rule)){
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public SpdPropertyChangeRules findByIds(List<String> ids) {
+		if(CollectionUtils.isEmpty(ids)){
+			return new SpdPropertyChangeRules();
+		}
+		SpdPropertyChangeRules rules = new SpdPropertyChangeRules();
+		this.forEach(rule->{
+			if(ids.contains(rule.getId())){
+				rules.add(rule);
+			}
+		});
+		return rules;
+	}
+
+	public SpdPropertyChangeRule findWithSameRuleProps(SpdPropertyChangeRule theRule) {
+		for(SpdPropertyChangeRule rule : this){
+			if(theRule.equalsRule(rule)){
+				return rule;
+			}
+		}
+		return null;
+	}
+
+
+	public void fillTriggerStepName(Map<SpdBizType, SpdBizStep[]> allBizStep) {
+		this.forEach(rule->{
+			rule.fillTriggerStepName(allBizStep.get(rule.getBizType()));
+		});
+	}
+
+	public SpdPropertyChangeRules getEnabledRules() {
+		List<SpdPropertyChangeRule> rules = CollectionUtils.find("enabled", new Boolean(true), Boolean.class, this);
+		return new SpdPropertyChangeRules(rules);
+	}
+
+	public SpdPropertyChangeRules findByDepotIdAndBizType(String toDepotId, SpdBizType bizType) {
+		SpdPropertyChangeRuleParams params = new SpdPropertyChangeRuleParams();
+		params.setDebitDepotId(new ListParam<String>(toDepotId));
+		params.setBizTypeCode(new ListParam<String>(bizType.getCode()));
+		return new SpdPropertyChangeRules(find(params));
+	}
+
+	public SpdPropertyChangeRules findByDepotIds(List<String> depotIds) {
+		SpdPropertyChangeRules rules = new SpdPropertyChangeRules();
+		this.forEach(rule->{
+			if(depotIds.contains(rule.getCreditDepotId()) || depotIds.contains(rule.getDebitDepotId())){
+				rules.add(rule);
+			}
+		});
+		return rules;
+	}
+	
+	public SpdPropertyChangeRules findByDepotId(String depotId){
+		SpdPropertyChangeRules rules = new SpdPropertyChangeRules();
+		this.forEach(rule->{
+			if(depotId.equals(rule.getCreditDepotId()) || depotId.equals(rule.getDebitDepotId())){
+				rules.add(rule);
+			}
+		});
+		return rules;
+	}
+	
+	public SpdPropertyChangeRules findByDebitDepotIds(List<String> depotIds) {
+		SpdPropertyChangeRules rules = new SpdPropertyChangeRules();
+		this.forEach(rule->{
+			if(depotIds.contains(rule.getDebitDepotId())){
+				rules.add(rule);
+			}
+		});
+		return rules;
+	}
+
+	/**
+	 * 查找一个仓库的物属供应商部门
+	 */
+	public PcsDept findOwnerSupplierDept(PcsDepot fromDepot) {
+		for(SpdPropertyChangeRule rule : this){
+			if(StringUtils.isNotEmpty(rule.getDebitDepotId()) && rule.getDebitDepotId().equals(fromDepot.getDepotId())){
+				return rule.getCreditDept();
+			}
+		}
+		return null;
+	}
+
+//	/**
+//	 * 根据一个物权变更规则查询其反向规则，只针对已启用的进行查询
+//	 */
+//	public SpdPropertyChangeRule findReverseRule(SpdPropertyChangeRule rule){
+//		SpdPropertyChangeRules enabledRules = getEnabledRules();
+//		SpdPropertyChangeRule result = null;
+//		if(StringUtils.isNotEmpty(rule.getCreditDepotId())){
+//			 
+//		}
+//	}
+	
+	public boolean isAllTriggerBy(SpdBizStep bizStep){
+		for(SpdPropertyChangeRule rule : this){
+			if(!rule.getTriggerStepCode().equals(bizStep.getStatusCode())){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * 根据物权变更规则以及申领规则查询机构物属的仓库
+	 * @param orgId
+	 * @param allReplenishRules
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public PcsDepots findSupplierOwnedDepot(String orgId, SpdReplenishRules allReplenishRules) {
+		SpdPropertyChangeRules propertyChangeRules = new SpdPropertyChangeRules(CollectionUtils.find("creditOrgId", orgId, this));
+		SpdReplenishRules replenishRules = new SpdReplenishRules(allReplenishRules.findByIds(propertyChangeRules.pluck("bizRuleId")));
+		return replenishRules.getFromDepots();
+	}
+
+}

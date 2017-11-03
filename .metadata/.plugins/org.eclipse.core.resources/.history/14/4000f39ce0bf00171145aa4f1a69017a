@@ -1,0 +1,2 @@
+alter table spd_property_change_rule add (debit_depot_id varchar2(32));
+alter table spd_property_change_rule add (credit_depot_id varchar2(32));

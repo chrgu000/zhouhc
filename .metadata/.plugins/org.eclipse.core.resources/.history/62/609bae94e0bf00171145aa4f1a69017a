@@ -1,0 +1,111 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.factory;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.web.SpdDailyCleanBizReport;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+@Component
+public class SpdDailyCleanBizReportFactory {
+
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	
+	@SuppressWarnings("unchecked")
+	public List<SpdDailyCleanBizReport> buildDailyCleanReportsFromDailyClean(SpdDailyCleanBiz dailyClean){
+		List<SpdDailyCleanBizReport> dailyCleanBizReports = new ArrayList<SpdDailyCleanBizReport>();
+		SpdPropertyChangeRecords propertyChangeRecords = dailyClean.getPropertyChangeRecords();
+		SpdPropertyChangeRules rules = pcrRepository.findAllWithRelations();
+		SpdPropertyChangeRelationItems relationItems = propertyChangeRecords.getAllItems().getRelationItems();
+		SpdReceiveBizs receives =  rbRepository.findByIds(relationItems.pluck("receiveId"));
+		
+		for(SpdPropertyChangeRecord propertyChangeRecord : propertyChangeRecords){
+			SpdPropertyChangeRule rule = rules.findById(propertyChangeRecord.getPropertyChangeRuleId());
+			SpdPropertyChangeRecordItems items = propertyChangeRecord.getItems();
+			items.fillGoodsAndGoodsLot(glRepository);
+			dailyCleanBizReports.addAll(createDailyCleanReports(items, rule, receives));
+		}
+		
+		return dailyCleanBizReports;
+	}
+	
+	private List<SpdDailyCleanBizReport> createDailyCleanReports(SpdPropertyChangeRecordItems items, SpdPropertyChangeRule rule, SpdReceiveBizs receives){
+		List<SpdDailyCleanBizReport> dailyCleanBizReports = new ArrayList<SpdDailyCleanBizReport>();
+		for(SpdPropertyChangeRecordItem item : items){
+			//获取物权变更明细的所有关联明细信息
+			SpdPropertyChangeRelationItems relationItems = item.getItems();
+			
+			//获取关联明细的价格信息
+			List<Float> unitPrices = CollectionUtils.pluck("unitPrice", relationItems, Float.class);
+			for(Float unitPrice : unitPrices){
+				//获取相同价格的关联明细信息
+				SpdPropertyChangeRelationItems theRelationItems = new SpdPropertyChangeRelationItems(CollectionUtils.find("unitPrice", unitPrice, Float.class, relationItems));
+				
+				//构造报表对象
+				SpdDailyCleanBizReport dailyCleanReport = new SpdDailyCleanBizReport();
+				dailyCleanReport.setGoodsId(item.getGoodsId());
+				dailyCleanReport.setGoodsName(item.getGoods().getFormatName());
+				dailyCleanReport.setPackingSpec(item.getGoods().getPackingSpec());
+				dailyCleanReport.setUnitName(item.getUnitName());
+				dailyCleanReport.setLotId(item.getLotId());
+				dailyCleanReport.setLotNo(item.getGoodsLot().getLotNo());
+				
+				float newUnitPrice = theRelationItems.get(0).getPriceByUnitLv(item.getGoods(), item.getUnitLv());
+				dailyCleanReport.setPrice(newUnitPrice);
+				
+				int dealQty = 0;
+				//合并交易数量
+				for(SpdPropertyChangeRelationItem theRelationItem :theRelationItems){
+					dealQty += theRelationItem.getQtyByUnitLv(item.getGoods(), item.getUnitLv());
+				};
+				dailyCleanReport.setQty(dealQty);
+				dailyCleanReport.setKey(String.format("%s,%s,%s", item.getGoodsId(), item.getLotId(), newUnitPrice));
+				dailyCleanReport.setRule(rule);
+				dailyCleanBizReports.add(dailyCleanReport);
+			}
+		}
+		
+		//合并相同的记录
+		dailyCleanBizReports = mergeDailyCleanBizReport(dailyCleanBizReports);
+		
+		return dailyCleanBizReports;
+	}
+
+	
+	private List<SpdDailyCleanBizReport> mergeDailyCleanBizReport(List<SpdDailyCleanBizReport> dailyCleanBizReports) {
+		List<SpdDailyCleanBizReport> result = new ArrayList<SpdDailyCleanBizReport>();
+		
+		List<String> keys = CollectionUtils.pluck("key", dailyCleanBizReports);
+		keys.forEach(key->{
+			List<SpdDailyCleanBizReport> theDailyCleanReports = CollectionUtils.find("key", key, dailyCleanBizReports);
+			int qty = 0;
+			for(SpdDailyCleanBizReport dailyCleanReport : theDailyCleanReports){
+				qty += dailyCleanReport.getQty();
+			}
+			theDailyCleanReports.get(0).setQty(qty);
+			result.add(theDailyCleanReports.get(0));
+		});
+		
+		return result;
+	} 
+}

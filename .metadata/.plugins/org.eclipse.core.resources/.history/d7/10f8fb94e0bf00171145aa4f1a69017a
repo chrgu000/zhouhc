@@ -1,0 +1,200 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import java.util.Date;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdMoveAreaBiz;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdMoveAreaBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdMoveAreaRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+@Service
+public class SpdMoveAreaBizService extends IYardService<SpdMoveAreaBiz>{
+
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdMoveAreaBizRepository mabRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private RabbitProxy rabbitProxy;
+	
+	@Transactional public SpdMoveAreaBiz add(SpdMoveAreaBiz moveArea, IUser user) {
+		//设置业务规则
+		if(StringUtils.isEmpty(moveArea.getBizRuleId())){
+			moveArea.autoFillBizRule(brRepository.findAllWithRelations());
+		}else{
+			SpdMoveAreaRule rule = brRepository.findAllWithRelations().getAllMoveAreaRules().findById(moveArea.getBizRuleId());
+			if(rule == null){
+				throw new NotFoundException(YardExceptionType.not_found_move_area_rule, moveArea.getBizRuleId());
+			}
+			moveArea.setBizRule(rule);
+		}
+		
+		//应用业务规则
+		moveArea.applyRule(moveArea.getBizRule(), (PcsUser)user);
+		
+		if(!moveArea.isValid()){
+			throw new InvalidDataException(moveArea.getValidateMsg());
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(moveArea.getBizId(), null, user.getUserId(), AmqpMsgType.CREATE_MOVE_AREA_BIZ);
+            }
+		});
+		
+		moveArea.setBizCode(codeService.publishCode(CodeSort.yicangdan).getCode());
+		
+		mabRepository.saveWithItems(moveArea);
+		
+		return moveArea;
+	}
+
+	@Transactional public void delete(String bizId, IUser user) {
+		SpdMoveAreaBiz moveArea = mabRepository.findOne(bizId);
+		if(!moveArea.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, moveArea.getBizCode());
+		}
+		biRepository.deleteByBizId(bizId);
+		mabRepository.delete(moveArea);
+	}
+
+	@Override
+	public SpdMoveAreaBiz modify(SpdMoveAreaBiz t, IUser user) {
+		return null;
+	} 
+
+	@Transactional public SpdMoveAreaBiz updateCheckState(String bizId, int checkStateCode, Date lastUpdateDate, IUser user) {
+		SpdMoveAreaBiz moveArea = mabRepository.findOne(bizId);
+		fillAllRelations(moveArea);
+		if(checkStateCode == CheckState.commited.getCode()){
+			return commit(moveArea, lastUpdateDate, user);
+		}else if(checkStateCode == CheckState.reviewed.getCode()){
+			return review(moveArea, lastUpdateDate, user);
+		}
+		return null;
+	}
+	
+	@Transactional public SpdMoveAreaBiz commit(SpdMoveAreaBiz moveArea, Date lastUpdateDate, IUser user) {
+		if(!moveArea.hasItems()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("移仓业务[%s]", moveArea.getBizCode()));
+		}
+		
+		//检查库存调节明细是否已确认
+		if(!moveArea.getItems().isAllPlaned()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("移仓业务[%s]", moveArea.getBizCode()));
+		}
+		
+		moveArea.verifyDepotCard(rabbitProxy, moveArea.getDepot(), (PcsUser)user);
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(moveArea.getBizId(), null, user.getUserId(), AmqpMsgType.COMMIT_MOVE_AREA_BIZ);
+            }
+		});
+		
+		moveArea.commit(lastUpdateDate, user);
+		mabRepository.save(moveArea);
+		
+		return moveArea;
+	}
+
+	@Transactional public SpdMoveAreaBiz review(SpdMoveAreaBiz moveArea, Date lastUpdateDate, IUser user) {
+		if(!moveArea.hasItems()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("移仓业务[%s]", moveArea.getBizCode()));
+		}
+		//检查库存调节明细是否已确认
+		if(!moveArea.getItems().isAllConfirmed()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("移仓业务[%s]", moveArea.getBizCode()));
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(moveArea.getBizId(), null, user.getUserId(), AmqpMsgType.REVIEW_MOVE_AREA_BIZ);
+            }
+		});
+		
+		SpdGoodsQtys planQtyByStoreUnit = new SpdGoodsQtys(moveArea.getItems().getPlanGoodsQtysByStoreUnit());
+		SpdGoodsQtys realQtyByStoreUnit = new SpdGoodsQtys(dsService.findRealShelfStoreUnitStocks(moveArea.getDepotId(), moveArea.getFromAreaType(), planQtyByStoreUnit));
+		if(!planQtyByStoreUnit.isQtyEquals(realQtyByStoreUnit)){
+			throw new InvalidDataException(YardExceptionType.invalid_shelf_stocks_not_enough, moveArea.getDepot().getDepotName(), planQtyByStoreUnit.diff(realQtyByStoreUnit)+"库存不足,隔离失败!");
+		}
+		
+		moveArea.getDepot().fillCards(dcRepository);
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges(moveArea.getDepot(), moveArea.getFromAreaType(), realQtyByStoreUnit);
+		dsService.scheduleDecrementShelfStocks(stockChanges ,moveArea.getBizId());
+		
+		//根据实际可用产品数量更新申领明细的确认数量
+		moveArea.getItems().verifyConfirmQtyWithRealQty(realQtyByStoreUnit);
+		
+		moveArea.updateCheckState(CheckState.reviewed.getCode(), lastUpdateDate, user.getOrgId(), user.getUserId());;
+		mabRepository.save(moveArea);
+			
+		return moveArea;
+	}
+
+	public void fillAllRelations(SpdMoveAreaBiz moveArea) {
+		moveArea.setItems(biRepository.findWithGoodsByBizId(moveArea.getBizId()));
+		
+		//关联帐页和货位
+		SpdDepotCards depotCards = dcRepository.findAll().findByDepotAndGoodsIds(moveArea.getDepotId(), CollectionUtils.pluck("goodsId", moveArea.getItems()));
+		depotCards.fillDepotShelf(dsRepository);
+		moveArea.getItems().fillDepotCard(moveArea.getDepotId(), depotCards);
+		
+		SpdDepotTasks depotTasks = dtRepository.findWithItemsByBizId(moveArea.getBizId());
+		SpdDepotTasks offShelfTasks = new SpdDepotTasks(CollectionUtils.find("taskType", SpdDepotTaskType.off_shelf_task.getCode(), String.class, depotTasks));
+		moveArea.setOffShelfTasks(offShelfTasks);
+		
+		SpdDepotTasks onShelfTasks = new SpdDepotTasks(CollectionUtils.find("taskType", SpdDepotTaskType.on_shelf_task.getCode(), String.class, depotTasks));
+		moveArea.setOnShelfTasks(onShelfTasks);
+
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(moveArea.getDepotId());
+		depot.fillCards(dcRepository);
+		moveArea.setDepot(depot);
+		
+		SpdMoveAreaRule rule = (SpdMoveAreaRule)(brRepository.findAllWithRelations().findById(moveArea.getBizRuleId()));
+		moveArea.setBizRule(rule);
+	}
+
+	public SpdMoveAreaBiz getFullMoveAreaBiz(String bizId) {
+		SpdMoveAreaBiz moveAreaBiz = mabRepository.getWithItems(bizId);
+		fillAllRelations(moveAreaBiz);
+		return moveAreaBiz;
+	}
+	
+}

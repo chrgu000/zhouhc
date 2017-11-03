@@ -1,0 +1,103 @@
+package cn.ak4j.yard.spd.task.web;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItems;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskItemParams;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdOnShelfTaskItemRepository;
+import cn.ak4j.yard.spd.task.service.SpdDepotTaskService;
+import cn.ak4j.yard.sys.domain.ReportConfig;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.web.PdfExportHelper;
+
+@RestController
+public class SpdOnShelfTaskItemResource {
+
+	@Autowired private SpdOnShelfTaskItemRepository ostiRepository;
+	@Autowired private SpdDepotTaskService dtService;
+	@Autowired private PdfExportHelper pdfExportHelper;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@RequestMapping(value = "/yard/spd/spdOnShelfTaskItems/taskId,{taskId}", method = RequestMethod.GET)
+	public SpdOnShelfTaskItems findByTask(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			@PathVariable("taskId")String taskId){
+		SpdDepotTaskItemParams params = SpdDepotTaskItemParams.buildParamsFromJson(paramsStr, SpdDepotTaskItemParams.class);
+		if(params == null){
+			params = new SpdDepotTaskItemParams();
+		}
+		params.setTaskId(new ListParam<String>(taskId));
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdOnShelfTaskItems taskItems = ostiRepository.find(params, order, currentPage-1, pageSize);
+		if(order == null){
+			String depotId = dtRepository.findOne(taskId).getTaskDepotId();
+			PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+			taskItems.orderByDepotShelfInx(depot);
+		}
+		return taskItems;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdOnShelfTaskItems/taskId,{taskId}/count", method = RequestMethod.GET)
+	public int countByTaskId(
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@PathVariable("taskId")String taskId){
+		SpdDepotTaskItemParams params = SpdDepotTaskItemParams.buildParamsFromJson(paramsStr, SpdDepotTaskItemParams.class);
+		if(params == null){
+			params = new SpdDepotTaskItemParams();
+		}
+		params.setTaskId(new ListParam<String>(taskId));
+		return ostiRepository.count(params);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdOnShelfTaskItems/{taskItemId}", method = RequestMethod.PUT)
+	public SpdOnShelfTaskItem update(@Valid @RequestBody SpdOnShelfTaskItem onShelfTaskItem, HttpServletRequest request) {
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		onShelfTaskItem = dtService.modifyOnShelfItem(onShelfTaskItem, user);
+		return onShelfTaskItem;
+	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/yard/spd/spdOnShelfTaskItems/taskId,{taskId}/pdf", method = RequestMethod.GET)
+	public void downloadpdf(@PathVariable("taskId")String taskId,HttpServletRequest request,HttpServletResponse response)throws Exception{
+		SpdDepotTask task = dtService.getTaskForReport(taskId);
+		
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		parameters.put("taskCode", task.getTaskCode());
+		parameters.put("orgNm", task.getDepotArea().getDepot().getManageDept().getOrg().getOrgName());
+		parameters.put("deptNm", task.getDepotArea().getDepot().getManageDept().getDeptName());
+		parameters.put("depotNm", task.getDepotArea().getDepot().getDepotName());
+		parameters.put("areaNm", task.getDepotArea().getAreaName());
+		
+		ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.on_shelf_task_report).getConfig();
+		pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, task.getItems(), "inline", response);
+	}
+	
+}

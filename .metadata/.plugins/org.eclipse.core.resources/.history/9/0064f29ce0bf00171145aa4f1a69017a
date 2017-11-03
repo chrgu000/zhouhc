@@ -1,0 +1,1 @@
+update spd_feedback_rule set auto_review_off_shelf_task = '0' where id = 'rep_fb_id_13';

@@ -1,0 +1,63 @@
+package cn.ak4j.yard.sys.datacheck.repository;
+
+import javax.persistence.EntityManager;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskReport;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskReports;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTasks;
+import cn.ak4j.yard.sys.datacheck.params.SysDataCheckTaskParams;
+import cn.ak4j.yard.sys.datacheck.params.SysDataCheckTaskReportParams;
+import lombok.Getter;
+
+@Repository
+public class SysDataCheckTaskReportRepository extends BaseRepository<SysDataCheckTaskReport, SysDataCheckTaskReports, SysDataCheckTaskReportParams, String>{
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired SysDataCheckTaskRepository sysDataCheckTaskRepository;
+	@Autowired PcsUserRepository pcsUserRepository;
+	
+	public SysDataCheckTaskReports find(SysDataCheckTaskReportParams params, OrderParam order, int pageNo,
+			int pageSize) {
+		params = setRelateParams(params);
+		return super.find(params, order, pageNo, pageSize);
+	}
+
+	private SysDataCheckTaskReportParams setRelateParams(SysDataCheckTaskReportParams params) {
+		if(params != null){
+			if(params.getStartTime() !=null && !StringUtils.isEmpty(params.getStartTime().getValue().toString())
+					||params.getEndTime() != null && !StringUtils.isEmpty(params.getEndTime().getValue().toString())
+					||params.getStatus() != null && CollectionUtils.isNotEmpty(params.getStatus().getValue())
+					||params.getOperatorName() != null && CollectionUtils.isNotEmpty(params.getOperatorName().getValue())){
+				SysDataCheckTaskParams sysDataCheckTaskParams = new SysDataCheckTaskParams();
+				sysDataCheckTaskParams.setStartTime(params.getStartTime());
+				sysDataCheckTaskParams.setEndTime(params.getEndTime());
+				sysDataCheckTaskParams.setStatus(params.getStatus());
+				if(params.getOperatorName() != null && CollectionUtils.isNotEmpty(params.getOperatorName().getValue())){
+					PcsUserParams pcsUserParams = new PcsUserParams();
+					pcsUserParams.setUserName(params.getOperatorName());
+					PcsUsers pcsUsers = pcsUserRepository.find(pcsUserParams);
+					if(pcsUsers.size() > 0){
+						sysDataCheckTaskParams.setOperatorId(new ListParam<String>(pcsUsers.getIds()));
+					}
+				}
+				SysDataCheckTasks sysDataCheckTasks = sysDataCheckTaskRepository.find(sysDataCheckTaskParams);
+				if(sysDataCheckTasks.size() > 0){
+					params.setTaskId(new ListParam<String>(sysDataCheckTasks.getIds()));
+				}else{
+					params.setTaskId(new ListParam<String>(""));
+				}
+			}
+		}
+		return params;
+	}
+}

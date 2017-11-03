@@ -1,0 +1,106 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class SpdShelfStockChanges extends SpdStockChanges<SpdShelfStockChange>{
+
+	public SpdShelfStockChanges(PcsDepot depot, String areaTypeCode, List<SpdGoodsQty> goodsQtys){
+		List<String> goodsIds = new ArrayList<String>();
+		goodsQtys.forEach(goodsQty->{
+			goodsIds.add(goodsQty.getGoods().getGoodsId());
+		});
+		SpdDepotCards cards = depot.getCards().findEnableCardByGoodsIds(goodsIds);
+		PcsAreaType areaType = PcsAreaType.typeOf(areaTypeCode);
+		for(SpdGoodsQty qty : goodsQtys){
+			SpdDepotCard depotCard = CollectionUtils.findWhere("goodsId", qty.getGoods().getGoodsId(), cards);
+			this.add(new SpdShelfStockChange(qty.getSpecialGoodsLot(), depot, areaTypeCode, depotCard.getShelfId(areaType), qty.getQtyByStoreUnit()));
+		}
+	}
+	
+	public boolean isSameDepotAndShelfType() {
+		if(this.size() == 0){
+			return true;
+		}
+		
+		PcsDepot depot = get(0).getDepot();
+		String shelfType = get(0).getShelfType();
+		for(SpdShelfStockChange change : this){
+			if(!change.getDepot().getDepotId().equals(depot.getDepotId())
+				|| !shelfType.equals(change.getShelfType())){
+				return false;
+			}
+		}
+		
+		return true;
+	}
+
+	/**
+	 * 判断是否都是库存增加的变更
+	 */
+	public boolean isIncrementChange() {
+		for(SpdShelfStockChange change : this){
+			if(change.getQtyByStoreUnit() < 0){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * 自动去除无效变更集
+	 */
+	public void removeInvalid() {
+		SpdShelfStockChanges validChanges = new SpdShelfStockChanges();
+		for(SpdShelfStockChange change : this){
+			if(change.isInvalid()){
+				continue;
+			}
+			validChanges.add(change);
+		}
+		this.clear();
+		this.addAll(validChanges);
+	}
+	
+	public SpdShelfStockChanges sumByLot(){
+		List<String> lotIds = new ArrayList<String>();
+		this.forEach(stockChange->{
+			if(!lotIds.contains(stockChange.getGoodsLot().getGoodsLotId())){
+				lotIds.add(stockChange.getGoodsLot().getGoodsLotId());
+			}
+		});
+		
+		SpdShelfStockChanges result = new SpdShelfStockChanges();
+		for(String lotId : lotIds){
+			SpdShelfStockChange stockChangeSumByLot = new SpdShelfStockChange();
+			int planQtyByStoreUnitTotal = 0;
+			int qtyByStoreUnitTotal = 0;
+			for(SpdShelfStockChange stockChange : this){
+				if(lotId.equals(stockChange.getGoodsLot().getGoodsLotId())){
+					planQtyByStoreUnitTotal += stockChange.getPlanQtyByStoreUnit();
+					qtyByStoreUnitTotal += stockChange.getQtyByStoreUnit();
+					stockChangeSumByLot.setGoodsLot(stockChange.getGoodsLot());
+					stockChangeSumByLot.setDepot(stockChange.getDepot());
+					stockChangeSumByLot.setShelfType(stockChange.getShelfType());
+					stockChangeSumByLot.setShelfId(stockChange.getShelfId());
+				}
+			}
+			stockChangeSumByLot.setPlanQtyByStoreUnit(planQtyByStoreUnitTotal);
+			stockChangeSumByLot.setQtyByStoreUnit(qtyByStoreUnitTotal);
+			result.add(stockChangeSumByLot);
+		}
+		
+		return result;
+	}
+	
+}

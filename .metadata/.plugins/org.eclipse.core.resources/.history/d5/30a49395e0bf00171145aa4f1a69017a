@@ -1,0 +1,83 @@
+package cn.ak4j.yard.amqp;
+
+import java.io.IOException;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+
+public abstract class AbstractAMQPMsgListener {
+
+	@Autowired private PcsOrgRepository orgRepository;
+	
+	Object getResourceId(String json, String idName) throws JsonParseException, JsonMappingException, IOException{
+		Map<String, Object> data = Global.defaultObjectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+		return data.get(idName);
+	}
+	
+	String getErrorMailTitle(){
+		if(Conf.getEnv().equals("prod")){
+			PcsOrg org = orgRepository.findAll().getMainOrg();
+			return String.format("[%s]YARD_SERVICE故障", org.getOrgAbbr());
+		}else{
+			return "[澳加测试]YARD_SERVICE故障";
+		}
+	}
+	
+	boolean isReconciliationBizMsg(AmqpMsgType msgType){
+		return msgType.equals(AmqpMsgType.CREATE_DAILY_CLEAN_BIZ)
+				|| msgType.equals(AmqpMsgType.REVIEW_DAILY_CLEAN_BIZ)
+				|| msgType.equals(AmqpMsgType.CREATE_FINACIAL_RECONCILIATION_BIZ)
+				|| msgType.equals(AmqpMsgType.COMMIT_FINACIAL_RECONCILIATION_BIZ)
+				|| msgType.equals(AmqpMsgType.REVIEW_FINACIAL_RECONCILIATION_BIZ)
+				|| msgType.equals(AmqpMsgType.SYNC_FINACIAL_RECONCILIATION_TO_SUPPLIER)
+				|| msgType.equals(AmqpMsgType.COMPLETE_FINACIAL_RECONCILIATION_BIZ)
+				|| msgType.equals(AmqpMsgType.GENERATE_FINACIAL_RECONCILIATION_ITEMS);
+	}
+	
+	boolean isGoodsBizMsg(AmqpMsgType msgType){
+		return msgType.equals(AmqpMsgType.CREATE_RECEIVE_BIZ)
+				|| msgType.equals(AmqpMsgType.COMMIT_RECEIVE_BIZ)
+				|| msgType.equals(AmqpMsgType.CONFIRM_RECEIVE_BIZ)
+				|| msgType.equals(AmqpMsgType.CREATE_ON_SHELF_DISPATCHER)
+				|| msgType.equals(AmqpMsgType.CREATE_ON_SHELF_TASK)
+				|| msgType.equals(AmqpMsgType.CONFIRM_ON_SHELF_TASK)
+				|| msgType.equals(AmqpMsgType.CREATE_REPLENISH_BIZ)
+				|| msgType.equals(AmqpMsgType.COMMIT_REPLENISH_BIZ)
+				|| msgType.equals(AmqpMsgType.REVIEW_REPLENISH_BIZ)
+				|| msgType.equals(AmqpMsgType.CREATE_OFF_SHELF_DISPATCHER)
+				|| msgType.equals(AmqpMsgType.CREATE_OFF_SHELF_TASK)
+				|| msgType.equals(AmqpMsgType.CONFIRM_OFF_SHELF_TASK)
+				|| msgType.equals(AmqpMsgType.CREATE_DELIVERY_TASK)
+				|| msgType.equals(AmqpMsgType.COMMIT_DELIVERY_TASK)
+				|| msgType.equals(AmqpMsgType.CONFIRM_DELIVERY_TASK)
+				|| msgType.equals(AmqpMsgType.CREATE_ADJUST_STOCK_BIZ)
+				|| msgType.equals(AmqpMsgType.COMMIT_ADJUST_STOCK_BIZ)
+				|| msgType.equals(AmqpMsgType.REVIEW_ADJUST_STOCK_BIZ)
+				|| msgType.equals(AmqpMsgType.CREATE_MOVE_AREA_BIZ)
+				|| msgType.equals(AmqpMsgType.COMMIT_MOVE_AREA_BIZ)
+				|| msgType.equals(AmqpMsgType.REVIEW_MOVE_AREA_BIZ)
+				|| msgType.equals(AmqpMsgType.CREATE_PREPARE_INFORM_BIZ)
+				|| msgType.equals(AmqpMsgType.COMMIT_PREPARE_INFORM_BIZ)
+				|| msgType.equals(AmqpMsgType.REVIEW_PREPARE_INFORM_BIZ)
+				|| msgType.equals(AmqpMsgType.INFORM_SUPPLIER_INFORM_BIZ)
+				|| msgType.equals(AmqpMsgType.COMPLETE_PREPARE_INFORM_BIZ)
+				|| msgType.equals(AmqpMsgType.CREATE_CONSUME_BIZ)
+				|| msgType.equals(AmqpMsgType.REVIEW_CONSUME_BIZ)
+				|| msgType.equals(AmqpMsgType.COMPLETE_CONSUME_BIZ)
+				|| msgType.equals(AmqpMsgType.CREATE_RETURN_GOODS_BIZ)
+				|| msgType.equals(AmqpMsgType.REVIEW_RETURN_GOODS_BIZ)
+				|| msgType.equals(AmqpMsgType.SYNC_RETURN_GOODS_BIZ_TO_SUPPLIER)
+				|| msgType.equals(AmqpMsgType.COMPLETE_RETURN_GOODS_BIZ);
+	}
+	
+}

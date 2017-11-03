@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<bindings xmlns="http://java.sun.com/xml/ns/jaxb" if-exists="true" version="2.1">
+  <!--
+
+此文件是由 JavaTM Architecture for XML Binding (JAXB) 引用实现 v2.2.11 生成的
+请访问 <a href="http://java.sun.com/xml/jaxb">http://java.sun.com/xml/jaxb</a> 
+在重新编译源模式时, 对此文件的所有修改都将丢失。
+生成时间: 2017.08.29 时间 06:12:49 PM CST 
+
+  -->
+  <bindings xmlns:tns="http://tempuri.org/" if-exists="true" scd="x-schema::tns">
+    <schemaBindings map="false">
+      <package name="cn.ak4j.yard.extend.zhjw.wsdl"/>
+    </schemaBindings>
+    <bindings if-exists="true" scd="tns:UserLogin">
+      <class ref="cn.ak4j.yard.extend.zhjw.wsdl.UserLogin"/>
+    </bindings>
+    <bindings if-exists="true" scd="tns:UserLoginResponse">
+      <class ref="cn.ak4j.yard.extend.zhjw.wsdl.UserLoginResponse"/>
+    </bindings>
+    <bindings if-exists="true" scd="tns:AddInmAllotNotice">
+      <class ref="cn.ak4j.yard.extend.zhjw.wsdl.AddInmAllotNotice"/>
+    </bindings>
+    <bindings if-exists="true" scd="tns:AddInmAllotNoticeResponse">
+      <class ref="cn.ak4j.yard.extend.zhjw.wsdl.AddInmAllotNoticeResponse"/>
+    </bindings>
+    <bindings if-exists="true" scd="tns:AddSmsInventoryOut">
+      <class ref="cn.ak4j.yard.extend.zhjw.wsdl.AddSmsInventoryOut"/>
+    </bindings>
+    <bindings if-exists="true" scd="tns:AddSmsInventoryOutResponse">
+      <class ref="cn.ak4j.yard.extend.zhjw.wsdl.AddSmsInventoryOutResponse"/>
+    </bindings>
+    <bindings if-exists="true" scd="tns:UpdateAlloBills">
+      <class ref="cn.ak4j.yard.extend.zhjw.wsdl.UpdateAlloBills"/>
+    </bindings>
+    <bindings if-exists="true" scd="tns:UpdateAlloBillsResponse">
+      <class ref="cn.ak4j.yard.extend.zhjw.wsdl.UpdateAlloBillsResponse"/>
+    </bindings>
+  </bindings>
+</bindings>

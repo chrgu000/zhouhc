@@ -1,0 +1,15 @@
+package cn.ak4j.yard.domain;
+
+public interface IScheduleTask extends Runnable, IDescribable{
+
+	public String getName();
+	
+	public void executeTask() throws Exception;
+
+	public void setActive(boolean active);
+	
+	public String getBeanName();
+	
+	public boolean isRunning();
+	
+}

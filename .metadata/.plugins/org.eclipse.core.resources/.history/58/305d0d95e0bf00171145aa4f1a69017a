@@ -1,0 +1,41 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.Collections;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+
+/**
+* @Description: 移仓业务步骤
+* @author zhengyf
+* @date 2017年4月2日 下午4:33:33
+* @version V1.0.0
+*/
+@SuppressWarnings({"serial"})
+public class SpdMoveAreaBizSteps extends SpdBizSteps{
+
+	public static SpdBizStep create_move_area = new SpdBizStep(1, AmqpMsgType.CREATE_MOVE_AREA_BIZ.getCode(), "作业步骤模板", "move_area_created", "移仓业务已创建");
+	public static SpdBizStep commit_move_area = new SpdBizStep(2, AmqpMsgType.COMMIT_MOVE_AREA_BIZ.getCode(), "作业步骤模板", "move_area_commited", "移仓业务已提交");
+	public static SpdBizStep confirm_move_area = new SpdBizStep(3, AmqpMsgType.REVIEW_MOVE_AREA_BIZ.getCode(), "作业步骤模板", "move_area_confirmed", "移仓业务已审核");
+	public static SpdBizStep create_off_shelf_dispatcher = new SpdBizStep(4, AmqpMsgType.CREATE_OFF_SHELF_DISPATCHER.getCode(), "作业步骤模板", "off_shelf_dispatcher_created", "下架调度已创建");
+	public static SpdBizStep create_off_shelf_task = new SpdBizStep(5, AmqpMsgType.CREATE_OFF_SHELF_TASK.getCode(), "作业步骤模板", "off_shelf_task_created", "下架作业已创建");
+	public static SpdBizStep complete_off_shelf_task = new SpdBizStep(6, AmqpMsgType.CONFIRM_OFF_SHELF_TASK.getCode(), "作业步骤模板", "off_shelf_task_completed", "下架作业已完成");
+	public static SpdBizStep create_on_shelf_dispatcher = new SpdBizStep(7, AmqpMsgType.CREATE_ON_SHELF_DISPATCHER.getCode(), "作业步骤模板", "on_shelf_dispatcher_created", "上架调度已创建");
+	public static SpdBizStep create_on_shelf_task = new SpdBizStep(8, AmqpMsgType.CREATE_ON_SHELF_TASK.getCode(), "作业步骤模板", "on_shelf_task_created", "上架作业已创建");
+	public static SpdBizStep complete_on_shelf_task = new SpdBizStep(9, AmqpMsgType.CONFIRM_ON_SHELF_TASK.getCode(), "作业步骤模板", "on_shelf_task_completed", "上架作业已完成");
+	
+	
+	public SpdMoveAreaBizSteps() {
+		this.add(create_move_area);
+		this.add(commit_move_area);
+		this.add(confirm_move_area);
+		this.add(create_off_shelf_dispatcher);
+		this.add(create_off_shelf_task);
+		this.add(complete_off_shelf_task);
+		this.add(create_on_shelf_dispatcher);
+		this.add(create_on_shelf_task);
+		this.add(complete_on_shelf_task);
+		
+		Collections.sort(this, comparator);
+	}
+	
+}

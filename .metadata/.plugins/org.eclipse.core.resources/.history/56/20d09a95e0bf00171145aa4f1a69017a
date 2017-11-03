@@ -1,0 +1,66 @@
+package cn.ak4j.yard;
+
+//@Component
+//@EnableScheduling
+public class ScheduleTasks {
+	
+	public static final String BASIC = "basic";
+	public static final String STREAM = "stream";
+	
+	public static final String WARN = "WARN";
+	public static final String ERROR = "ERROR";
+	
+//	private static final String SUCCESS ="执行成功";
+//	private static final String FAILED ="执行失败";
+//	
+//	private static final String NOTNULL = "notNull";	
+	
+	
+//	@Autowired private SysDataCheckTaskItemRepository sysDataCheckTaskItemRepository;
+//	@Autowired private SysDataCheckTaskRepository sysDataCheckTaskRepository;
+//	@Autowired private SysDataCheckTaskReportRepository sysDataCheckTaskReportRepository;
+//	@Autowired private SysDataCheckTypeRepository sysDataCheckTypeRepository;
+//	@Autowired private YdsGoodsTask ydsGoodsTask;
+//	@Autowired private SpdSellerSendTask spdSellerSendTask;
+//	@Autowired private SpdSellerSendItemTask spdSellerSendItemTask;
+
+//	@Autowired private Conf conf;
+	
+//	private final String cron = conf.getWeixinUrl();
+	
+	
+//	public void manualCheckDatas(String operatorId){
+//		SysDataCheckTask sysDataCheckTask = createDataCheckTask(operatorId);
+//		checkDatas(sysDataCheckTask);
+//	}
+	
+	
+	/**
+	 * cron = "[秒][分][时][日][月][周]"
+	 */
+//	@Scheduled(cron = "0 0 0 * 9 ? ")
+//	public void autoCheckDatas(){
+//		SysDataCheckTask sysDataCheckTask = createDataCheckTask(null);
+//		checkDatas(sysDataCheckTask);
+//	}
+//	
+//	
+//	public void checkDatas(SysDataCheckTask sysDataCheckTask){
+//	}
+	
+//	private SysDataCheckTask createDataCheckTask(String operatorId){
+//		Calendar c = new GregorianCalendar();
+//		
+//		OrderParam	order= new OrderParam("endTime","desc");
+//		SysDataCheckTasks allDataCheckTask = sysDataCheckTaskRepository.find(null, order, 1, -1);
+//		SysDataCheckTask sysDataCheckTask = null;
+//		
+//		if(allDataCheckTask.size() > 0){
+//			sysDataCheckTask = new SysDataCheckTask(operatorId, allDataCheckTask.get(0).getEndTime(), c.getTime());
+//		}else{
+//			sysDataCheckTask = new SysDataCheckTask(operatorId, null, c.getTime());
+//		}
+//		return sysDataCheckTask;
+//	}
+	
+}

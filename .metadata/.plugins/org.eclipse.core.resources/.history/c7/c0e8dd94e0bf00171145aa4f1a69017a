@@ -1,0 +1,97 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.spd.bizrule.params.SpdReceiveRuleParams;
+import lombok.NoArgsConstructor;
+
+/**
+ * @Description:
+ * @date 2017年7月6日上午11:22:21
+ *
+ */
+@SuppressWarnings({"rawtypes", "serial"})
+@NoArgsConstructor
+public class SpdReceiveRules extends SpdBizRules<SpdReceiveRule>{
+	
+	public SpdReceiveRules(List<SpdReceiveRule> rules){
+		super(rules);
+	}
+
+	public void fillAllRelations(PcsDepts allSuppliery, PcsDepots allDepots, SpdAbstractBizRules rules) {
+		for(SpdReceiveRule rule : this){
+			PcsDept fromDept = allSuppliery.findById(rule.getDirectionRule().getFromDeptId());
+			PcsDepot toDepot = allDepots.findById(rule.getDirectionRule().getToDepotId());
+			PcsDepot finalDepot = allDepots.findById(rule.getDirectionRule().getFinalDepotId());
+			
+			rule.getDirectionRule().setFromDept(fromDept);
+			rule.getDirectionRule().setToDepot(toDepot);
+			rule.getDirectionRule().setFinalDepot(finalDepot);
+			
+			if(StringUtils.isNotEmpty(rule.getOriginRuleId())){
+				SpdAbstractBizRule originRule = rules.findById(rule.getId());
+				rule.setOriginRule(originRule);
+			}
+		}
+	}
+
+	public SpdReceiveRule getDefaultRule(String fromOrgId, String toDepotId) {
+		SpdReceiveRuleParams params = new SpdReceiveRuleParams();
+		params.setDirectionRule_fromOrgId(new ListParam<String>(fromOrgId));
+		params.setDirectionRule_toDepotId(new ListParam<String>(toDepotId));
+		OrderParam order = new OrderParam("prior", "desc");
+		
+		Entities<SpdReceiveRule> rules = findByPage(params, order, -1, -1);
+		//TODO 校验如果同一个机构对同一个收货仓库有多个启用的收货规则则抛出异常
+		
+		if(CollectionUtils.isEmpty(rules)){
+			throw new NotFoundException(YardExceptionType.not_found_default_receive_rule, fromOrgId, toDepotId);
+		}
+		
+		return rules.get(0);
+	}
+
+	/**
+	 * 根据发货部门和收货仓库查找收货规则
+	 */
+	public SpdReceiveRule find(String fromDeptId, String toDepotId) {
+		SpdReceiveRuleParams params = new SpdReceiveRuleParams();
+		params.setDirectionRule_fromDeptId(new ListParam<String>(fromDeptId));
+		params.setDirectionRule_toDepotId(new ListParam<String>(toDepotId));
+		Entities<SpdReceiveRule> rules = find(params);
+		
+		if(CollectionUtils.isEmpty(rules)){
+			return null;
+		}
+		
+		return rules.get(0); 
+	}
+
+	public PcsDepots getAllDepots() {
+		PcsDepots allToDepots = new PcsDepots();
+		this.forEach(receiveRule->{
+			if(!allToDepots.contains(receiveRule.getDirectionRule().getToDepot())){
+				allToDepots.add(receiveRule.getDirectionRule().getToDepot());
+			}
+			if(!allToDepots.contains(receiveRule.getDirectionRule().getFinalDepot())){
+				allToDepots.add(receiveRule.getDirectionRule().getFinalDepot());
+			}
+		});
+		return allToDepots;
+	}
+
+}

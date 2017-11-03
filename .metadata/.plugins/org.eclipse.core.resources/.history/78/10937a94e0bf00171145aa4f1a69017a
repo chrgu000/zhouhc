@@ -1,0 +1,37 @@
+package cn.ak4j.yard.spd.stock.repository;
+
+import java.util.Date;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.DateRange;
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStocks;
+import cn.ak4j.yard.spd.stock.params.SpdShelfLockStockParams;
+import lombok.Getter;
+
+@Repository
+public class SpdShelfLockStockRepository extends BaseRepository<SpdShelfLockStock, SpdShelfLockStocks, SpdShelfLockStockParams, String>{
+	
+	@Autowired @Getter private EntityManager entityManager;
+
+	public SpdShelfLockStocks findByBizId(String bizId) {
+		SpdShelfLockStockParams params = new SpdShelfLockStockParams();
+		params.setBizId(new ListParam<String>(bizId));
+		return find(params);
+	}
+	
+	public SpdShelfLockStocks findCompletedByDate(Date startDate, Date endDate){
+		SpdShelfLockStockParams params = new SpdShelfLockStockParams();
+		params.setLastUpdateTime(new DateRangeParam(new DateRange(startDate, endDate)));
+		params.setLocked(new ListParam<Boolean>(false));
+		return find(params);
+	}
+
+}

@@ -1,0 +1,59 @@
+package cn.ak4j.yard.pcs.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.Pattern;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="PCS_ROLE")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class PcsRole  extends YardMaintenceEntity{
+
+	@Id
+	@GeneratedValue(strategy=GenerationType.AUTO,generator="uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String roleId;
+	
+	@NotEmpty(message="角色名称不能为空")
+	@Getter @Setter
+	private String roleName;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Getter @Setter
+	private String icon;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+	@Pattern(message="角色编码应为纯数字或字母或字母加数字，不能为空",regexp = "[0-9A-Za-z]{1,}$")
+	@Getter @Setter
+	private String roleCode;
+	
+	@Getter @Setter
+	private Integer sort;
+	
+}

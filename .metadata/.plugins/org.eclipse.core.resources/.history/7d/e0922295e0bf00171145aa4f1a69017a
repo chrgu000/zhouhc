@@ -1,0 +1,18 @@
+package cn.ak4j.yard.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.domain.YardBatchTasks;
+import cn.ak4j.yard.sys.params.YardBatchTaskParams;
+import lombok.Getter;
+
+@Repository
+@SuppressWarnings({"rawtypes"})
+public class YardBatchTaskRepository extends BaseRepository<YardBatchTask, YardBatchTasks, YardBatchTaskParams, String>{
+	@Autowired @Getter private EntityManager entityManager;
+}

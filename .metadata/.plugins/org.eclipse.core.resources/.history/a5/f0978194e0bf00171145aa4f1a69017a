@@ -1,0 +1,37 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdGoodsFreeStock {
+
+	@Getter @Setter
+	private String depotId;
+	
+	@Getter @Setter
+	private String goodsId;
+	
+	@Getter @Setter
+	private String lotId;
+	
+	@Getter @Setter
+	private Integer lowerLimit;//下限
+	
+	@Getter @Setter
+	private Integer upperLimit;//上限
+	
+	@Getter @Setter
+	private Integer qtyByStoreUnit;
+	
+	@Getter @Setter
+	private Integer qtyByMinUnit;
+	
+	@Getter @Setter
+	private Integer lockQtyByStoreUnit;
+	
+	@Getter @Setter
+	private Integer lockQtyByMinUnit;
+}

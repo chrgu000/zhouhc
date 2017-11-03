@@ -1,0 +1,28 @@
+package cn.ak4j.yard.spd.utils;
+
+@SuppressWarnings({"rawtypes"})
+public class ProcedureParam {
+	private String paramName;
+	private Class classz;
+	private Object value;
+
+	public String getParamName() {
+		return paramName;
+	}
+	public void setParamName(String paramName) {
+		this.paramName = paramName;
+	}
+	public Object getValue() {
+		return value;
+	}
+	public void setValue(Object value) {
+		this.value = value;
+	}
+	public Class getClassz() {
+		return classz;
+	}
+	public void setClassz(Class classz) {
+		this.classz = classz;
+	}
+
+}

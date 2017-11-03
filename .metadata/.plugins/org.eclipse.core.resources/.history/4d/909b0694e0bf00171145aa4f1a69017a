@@ -1,0 +1,50 @@
+package cn.ak4j.yard.yds.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class YdsGoodsParams extends QueryParams{
+	private static final long serialVersionUID = 943776626797043804L;
+
+	private ListParam<String> goodsId;//产品ID
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	private ListParam<Integer> checkStateCode;
+	private ListParam<String> goodsCode;//产品编码
+	private ListParam<String> goodsType;//商品类型
+	private ListParam<String> wareName;//商品名称
+	private ListParam<String> goodsName;//通用名称
+	private ListParam<String> goodsSpec;//产品规格
+	private ListParam<String> goodsModel;//型号/剂型
+	private ListParam<String> packingSpec;//包装规格
+	private ListParam<String> storeType;
+
+	private FloatRangeParam unitPrice;//单位价格
+	private ListParam<String> factName;//生产企业
+	private ListParam<String> regDoc;//注册证号
+	private ListParam<String> athDoc;//批准文号
+	private ListParam<String> formatName;//格式化名称
+	private ListParam<String> minName;
+	private ListParam<Boolean> enabled;//禁用标记
+	
+	private ListParam<String> equipmentSortName;//器械分类
+	private ListParam<String> equipmentLevel;//器械类别
+	private ListParam<Boolean> checkValidity;//是否检查批次
+	
+	
+	private ListParam<Integer> purch;
+	private ListParam<Integer> store;
+	private ListParam<Integer> sale;
+	
+	private IntegerRangeParam bigSum;
+	private IntegerRangeParam midSum;
+	private IntegerRangeParam minSum;
+	private ListParam<String> depotId;
+	
+}

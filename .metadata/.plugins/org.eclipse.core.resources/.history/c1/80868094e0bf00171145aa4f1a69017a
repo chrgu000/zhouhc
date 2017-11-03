@@ -1,0 +1,43 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+
+@SuppressWarnings({"unchecked", "rawtypes", "serial"})
+public class SpdDepotStocks extends Entities<SpdDepotStock>{
+
+	public SpdDepotStocks(){}
+
+	public SpdDepotStocks(List entities){
+		super(entities);
+	}
+	
+	public SpdDepotStock findByGoodsLot(String goodsLotId){
+		return CollectionUtils.findWhere("goodsLotId", goodsLotId, this);
+	}
+
+	public void update(SpdDepotStockChanges stockChanges) {
+		SpdDepotStocks newStocks = new SpdDepotStocks();
+		stockChanges.forEach(change->{
+			SpdDepotStock stock = findByDepotAndGoodsLot(change.getDepot().getDepotId(), change.getGoodsLot().getGoodsLotId());
+			if(stock == null){
+				SpdDepotStock newStock = new SpdDepotStock(change);
+				newStocks.add(newStock);
+			}else{
+				stock.updateQty(change.getQtyByBaseUnit());
+			}
+		});
+		this.addAll(newStocks);
+	}
+	
+	public SpdDepotStock findByDepotAndGoodsLot(String depotId, String lotId){
+		for(SpdDepotStock stock : this){
+			if(stock.getDepotId().equals(depotId) && stock.getGoodsLotId().equals(lotId)){
+				return stock;
+			}
+		}
+		return null;
+	}
+}

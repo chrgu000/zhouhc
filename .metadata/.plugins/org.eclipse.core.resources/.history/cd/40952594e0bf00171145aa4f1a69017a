@@ -1,0 +1,272 @@
+package cn.ak4j.yard.sys.service;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardBatchTaskType;
+import cn.ak4j.yard.enums.YardDataType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.to.InitialStockImportTO;
+import cn.ak4j.yard.sys.to.SpdDepotCardImportTO;
+import cn.ak4j.yard.sys.to.SpdPrepareInformItemImportTO;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.sys.to.YdsEdsGoodsLotImportTO;
+import cn.ak4j.yard.sys.to.YdsGoodsLotImportTO;
+import cn.ak4j.yard.sys.to.InitialEndingImportTO;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class YardDataImportService {
+	
+	@Autowired private YardExcelTranslator excelTranslator;
+	@Autowired private YardBatchTaskService btService;
+
+	@SuppressWarnings({ "rawtypes", "unchecked"})
+	public YardBatchTask<List> createDataImportBatchTask(PcsUser user, byte[] data, String dataTypeStr) throws JsonProcessingException{
+		YardDataType dataType = YardDataType.typeOf(dataTypeStr);
+		if(dataType == null){
+			throw new NotFoundException(YardExceptionType.not_found_data_type, dataTypeStr);
+		}
+		
+		YardBatchTask<List> batchTask = new YardBatchTask<List>();
+		YardBatchTaskTO<List> batchTaskTO = new YardBatchTaskTO<List>();
+		switch (dataType) {
+			case depot_card:
+				List<SpdDepotCardImportTO> depotCards = excelTranslator.translateToDepotCards(data);
+				checkDepotCards(depotCards);
+				log.info("解析到批量导入 {} 个帐页", depotCards.size());
+				
+				batchTaskTO.setTaskType(dataTypeStr);
+				batchTaskTO.setData(depotCards);
+				
+				String json = Global.defaultObjectMapper.writeValueAsString(batchTaskTO);
+				
+				batchTask.setTaskType(YardBatchTaskType.batch_import_depot_cards_task.getCode());
+				batchTask.setData(depotCards);
+				batchTask.setJson(json);
+				break;
+				
+			case goods_lot:
+				List<YdsGoodsLotImportTO> goodsLots = excelTranslator.translateToGoodLots(data);
+				checkGoodsLots(goodsLots);
+				log.info("解析到批量导入 {} 个标准产品批次", goodsLots.size());
+				
+				batchTaskTO.setTaskType(dataTypeStr);
+				batchTaskTO.setData(goodsLots);
+				
+				String goodsLotJson = Global.defaultObjectMapper.writeValueAsString(batchTaskTO);
+				
+				batchTask.setTaskType(YardBatchTaskType.batch_import_goods_lot_task.getCode());
+				batchTask.setData(goodsLots);
+				batchTask.setJson(goodsLotJson);
+				break;
+				
+			case eds_goods_lot:
+				List<YdsEdsGoodsLotImportTO> edsGoodsLots = excelTranslator.translateToEdsGoodsLots(data);
+				checkEdsGoodsLots(edsGoodsLots);
+				log.info("解析到批量导入{} 个企业产品批次", edsGoodsLots.size());
+				
+				batchTaskTO.setTaskType(dataTypeStr);
+				batchTaskTO.setData(edsGoodsLots);
+				
+				String edsGoodsLotJson = Global.defaultObjectMapper.writeValueAsString(batchTaskTO);
+				
+				batchTask.setTaskType(YardBatchTaskType.batch_import_eds_goods_lot_task.getCode());
+				batchTask.setData(edsGoodsLots);
+				batchTask.setJson(edsGoodsLotJson);
+				break;
+				
+			case initial_stock:
+				List<InitialStockImportTO> initialStocks = excelTranslator.translateToInitialStocks(data);
+				checkInitialStocks(initialStocks);
+				log.info("解析到批量导入{}个产品初始库存", initialStocks.size());
+				batchTaskTO.setTaskType(dataTypeStr);
+				batchTaskTO.setData(initialStocks);
+				
+				String initialStockJson = Global.defaultObjectMapper.writeValueAsString(batchTaskTO);
+				batchTask.setTaskType(YardBatchTaskType.batch_import_initial_stock_task.getCode());
+				batchTask.setData(initialStocks);
+				batchTask.setJson(initialStockJson);
+				break;
+			case initial_ending:
+				 List<InitialEndingImportTO> initialEndings = excelTranslator.translateToInitialEndings(data);
+				 checkInitialEndings(initialEndings);
+				 log.info("解析到批量导入{}个初始期末", initialEndings.size());
+				 batchTaskTO.setTaskType(dataTypeStr);
+				 batchTaskTO.setData(initialEndings);
+				 
+				 String initialEndingJson = Global.defaultObjectMapper.writeValueAsString(batchTaskTO);
+				 batchTask.setTaskType(YardBatchTaskType.batch_import_initial_ending_task.getCode());
+				 batchTask.setData(initialEndings);
+				 batchTask.setJson(initialEndingJson);
+				break;
+			case prepare_inform_item:
+				List<SpdPrepareInformItemImportTO> prepareInformItems = excelTranslator.translateToPrepares(data);
+				checkPrepareInforms(prepareInformItems);
+				log.info("解析到批量导入{}个备货通知明细", prepareInformItems.size());
+				batchTaskTO.setTaskType(dataTypeStr);
+				batchTaskTO.setData(prepareInformItems);
+				
+				String prepareInformItemJson = Global.defaultObjectMapper.writeValueAsString(batchTaskTO);
+				batchTask.setTaskType(YardBatchTaskType.batch_import_prepare_inform_item_task.getCode());
+				batchTask.setData(prepareInformItems);
+				batchTask.setJson(prepareInformItemJson);
+				break;
+			default:
+				break;
+		}
+		batchTask = btService.createBatchTask(user, batchTask);
+		return batchTask;
+	}
+
+	private void checkDepotCards(List<SpdDepotCardImportTO> depotCards){
+		if(CollectionUtils.isEmpty(depotCards)){
+			throw new InvalidDataException("无效的数据文件，内容不能为空");
+		}
+		List<String> depotCodes = CollectionUtils.pluck("depotCode", depotCards);
+		if(depotCodes.size() != 1){
+			throw new InvalidDataException("无效的数据文件，目前只支持一次导入同一个仓库的账页，所以仓库编码必须相同");
+		}
+		List<String> goodsCodeList = CollectionUtils.pluck("goodsCode", depotCards);
+		Set<String> goodsCodeSet = new HashSet<String>(goodsCodeList);
+		if(goodsCodeList.size() > goodsCodeSet.size()){
+			throw new InvalidDataException("产品编码不允许重复");
+		}
+	}
+	
+	private void checkGoodsLots(List<YdsGoodsLotImportTO> goodsLots){
+		if(CollectionUtils.isEmpty(goodsLots)){
+			throw new InvalidDataException("无效的数据文件，内容不能为空");
+		}
+		List<String> goodsCodes = CollectionUtils.pluck("goodsCode", goodsLots);
+		List<String> lotNos = CollectionUtils.pluck("lotNo", goodsLots);
+		goodsCodes.forEach(goodsCode->{
+			lotNos.forEach(lotNo->{
+				List<YdsGoodsLotImportTO> duplicateGoodsLots = CollectionUtils.find("goodsCode", goodsCode, goodsLots);
+				duplicateGoodsLots = CollectionUtils.find("lotNo", lotNo, duplicateGoodsLots);
+				if(duplicateGoodsLots.size() > 1){
+					throw new InvalidDataException(String.format("同种标准产品[%s]不能有相同批号[%s]", goodsCode, lotNo));
+				}
+			});
+		});
+		goodsLots.forEach(goodsLot->{
+			boolean hasDateInfo =  goodsLot.getLotValidity() != null && goodsLot.getProduceDate() != null;
+			if(hasDateInfo && goodsLot.getLotValidity().before(goodsLot.getProduceDate())){
+				throw new InvalidDataException(String.format("标准产品批次[%s:%s]生产日期要小于批次有效期", goodsLot.getGoodsCode(), goodsLot.getGoodsName()));
+			}
+		});
+	}
+	
+	private void checkEdsGoodsLots(List<YdsEdsGoodsLotImportTO> edsGoodsLots) {
+		if(CollectionUtils.isEmpty(edsGoodsLots)){
+			throw new InvalidDataException("无效的数据文件，内容不能为空");
+		}
+		List<String> edsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", edsGoodsLots);
+		List<String> edsLotNos = CollectionUtils.pluck("edsLotNo", edsGoodsLots);
+		List<String> ownerOrgCodes = CollectionUtils.pluck("ownerOrgCode", edsGoodsLots);
+		edsGoodsCodes.forEach(edsGoodsCode->{
+			edsLotNos.forEach(edsLotNo->{
+				ownerOrgCodes.forEach(orgCode->{
+					List<YdsEdsGoodsLotImportTO> duplicateEdsGoodsLots = CollectionUtils.find("edsGoodsCode", edsGoodsCode, edsGoodsLots);
+					duplicateEdsGoodsLots = CollectionUtils.find("edsLotNo", edsLotNo, duplicateEdsGoodsLots);
+					duplicateEdsGoodsLots = CollectionUtils.find("ownerOrgCode", orgCode, duplicateEdsGoodsLots);
+					if(duplicateEdsGoodsLots.size() > 1){
+						throw new InvalidDataException(String.format("同种企业产品批次[%s]同机构[%s]不能有相同批号[%s]", edsGoodsCode, orgCode, edsLotNo));
+					}
+				});
+			});
+		});
+		edsGoodsLots.forEach(edsGoodsLot->{
+			boolean hasDateInfo =  edsGoodsLot.getEdsLotValidity() != null && edsGoodsLot.getProduceDate() != null;
+			if(hasDateInfo && edsGoodsLot.getEdsLotValidity().before(edsGoodsLot.getProduceDate())){
+				throw new InvalidDataException(String.format("企业产品批次[%s:%s]生产日期要小于批次有效期", edsGoodsLot.getEdsGoodsCode(), edsGoodsLot.getEdsGoodsName()));
+			}
+		});
+	}
+
+	private void checkInitialStocks(List<InitialStockImportTO> initialStocks) {
+		if(CollectionUtils.isEmpty(initialStocks)){
+			throw new InvalidDataException("无效的数据文件，内容不能为空");
+		}
+		
+		List<String> depotCodes = CollectionUtils.pluck("depotCode", initialStocks);
+		if(depotCodes.size() != 1){
+			throw new InvalidDataException("无效的数据文件，目前只支持一次导入同一个仓库的库存，所以仓库编码必须相同");
+		}
+		
+		List<String> areaCodes = CollectionUtils.pluck("areaCode", initialStocks);
+		if(areaCodes.size() != 1){
+			throw new InvalidDataException("无效的数据文件，目前只支持一次导入同一个货区的库存，所以货区编码必须相同");
+		}
+		
+		
+		List<String> goodsCodes = CollectionUtils.pluck("goodsCode", initialStocks);
+		
+		goodsCodes.forEach(goodsCode->{
+			List<InitialStockImportTO> sameGoodsCodeInitialStocks = CollectionUtils.find("goodsCode", goodsCode, initialStocks);
+			if(sameGoodsCodeInitialStocks.size() != 1){
+				List<String> lotNos = CollectionUtils.pluck("lotNo", sameGoodsCodeInitialStocks);
+				if(lotNos.size() != sameGoodsCodeInitialStocks.size()){
+					throw new InvalidDataException(String.format("无效的数据文件，产品编码为：[%s]，存在相同的批号信息，请检查", goodsCode));
+				}	
+			}
+		});
+	}
+	
+	
+	private void checkInitialEndings(List<InitialEndingImportTO> initialEndings) {
+		if(CollectionUtils.isEmpty(initialEndings)){
+			throw new InvalidDataException("无效的数据文件，内容不能为空");
+		}
+		
+		List<String> ruleCodes = CollectionUtils.pluck("ruleCode", initialEndings);
+		if(ruleCodes.size() != 1){
+			throw new InvalidDataException("无效的数据文件，目前只支持一次导入同一个财务对账规则的期末，所以规则编码必须相同");
+		}
+		
+		List<String> depotCodes = CollectionUtils.pluck("deptCode", initialEndings);
+		if(depotCodes.size() != 1){
+			throw new InvalidDataException("无效的数据文件，目前只支持一次导入同一个部门的期末，所以部门编码必须相同");
+		}
+		
+		List<String> goodsCodes = CollectionUtils.pluck("goodsCode", initialEndings);
+		goodsCodes.forEach(goodsCode->{
+			List<InitialEndingImportTO> sameGoodsCodeInitialEndings = CollectionUtils.find("goodsCode", goodsCode, initialEndings);
+			if(sameGoodsCodeInitialEndings.size() != 1){
+				List<String> lotNos = CollectionUtils.pluck("lotNo", sameGoodsCodeInitialEndings);
+				if(lotNos.size() != sameGoodsCodeInitialEndings.size()){
+					throw new InvalidDataException(String.format("无效的数据文件，产品编码为：[%s]，存在相同的批号信息，请检查", goodsCode));
+				}	
+			}
+		});
+	}
+	
+	private void checkPrepareInforms(List<SpdPrepareInformItemImportTO> prepareInformItems) {
+		if(CollectionUtils.isEmpty(prepareInformItems)){
+			throw new InvalidDataException("无效的数据文件，内容不能为空");
+		}
+		
+		List<String> depotCodes = CollectionUtils.pluck("depotCode", prepareInformItems);
+		if(depotCodes.size() != 1){
+			throw new InvalidDataException("无效的数据文件，目前只支持一次导入同一个仓库的备货信息，所以仓库编码必须相同");
+		}
+		
+		List<String> supplierCodes = CollectionUtils.pluck("supplierCode", prepareInformItems);
+		if(supplierCodes.size() != 1){
+			throw new InvalidDataException("无效的数据文件，目前只支持一次导入同一个供应商的备货信息，所以供应商编码必须相同");
+		}
+	}
+}

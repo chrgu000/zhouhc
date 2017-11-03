@@ -1,0 +1,146 @@
+package cn.ak4j.yard.spd.task.factory;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStocks;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRef;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+
+/**
+* @Description: 下架算法名为：单批次整件单明细
+* 同一个批次尝试拆分整件
+* @author zhengyf
+* @date 2017年5月25日 下午5:38:42
+* @version V1.0.0
+*/
+
+@Component("oneBlockItemPerLot")
+public class SpdDepotTaskFactoryOneBlockItemPerLot extends SpdAbstractDepotTaskFactory implements ISpdDepotTaskFactory{
+
+	@Autowired private SpdDepotStockService dsService;
+
+	protected void buildOffShelfTaskItems(SpdDispatcherRef ref, SpdDepotTask task) {
+		SpdDepotTaskItems<SpdDepotTaskItem> taskItems = new SpdDepotTaskItems<SpdDepotTaskItem>();
+		task.setItems(taskItems);
+		
+		/**
+		 * 查询锁库存，即预备库存，接下来就可以‘照单取货’，
+		 * 单即业务明细，货即锁库存
+		 */
+		SpdShelfLockStocks lockStocks = dsService.getLockStockByBizId(task.getBizId());
+		
+		for(SpdBizItem bizItem : (SpdBizItems)ref.getGoodsItems()){
+			int planQtyByMinUnit = bizItem.getConfirmQtyByBaseUnit();
+			
+			/**
+			 * 分两种情况校验:
+			 * 1）产品级明细根据产品id查询
+			 * 2）批次级明细根据批次id查询
+			 */
+			SpdShelfLockStocks preparedStocks = null;
+			if(bizItem.getSpecialGoodsLot() == null){
+				preparedStocks = lockStocks.findByGoodsId(bizItem.getGoodsId());
+			}else{
+				preparedStocks = lockStocks.findByLotId(bizItem.getLotId());
+			}
+			/**
+			 * 当业务明细确认数量不为0时，当前明细所对应的预备库存应当等于明细的确认数量，
+			 * 如果不等则意味着库存数据有问题，这里抛出异常，停止作业
+			 */
+			if(planQtyByMinUnit != 0){
+				if(CollectionUtils.isEmpty(preparedStocks) || planQtyByMinUnit != preparedStocks.getTotalQtyByMinUnit()){
+					throw new InvalidDataException(YardExceptionType.invalid_shelf_lock_stock, 
+							task.getBizId(), bizItem.getGoodsId(), bizItem.getBizItemId(), preparedStocks.getTotalQtyByMinUnit(), planQtyByMinUnit);
+				}
+			}
+			
+			/**
+			 * 两种特殊情况的处理：
+			 * 1）当没有预备库存时增加一个数量为0的作业明细
+			 * 2）当前业务明细的确认数量为0，即作业明细计划数量为0
+			 * 处理逻辑是：用第一个货位库存对应的产品批次作为明细的产品批次，如果没有货位库存则选择任意一个该产品的产品批次，并且不再尝试
+			 * 根据批次库存集合构建作业明细。
+			 */
+			boolean hasNotPreparedStock = CollectionUtils.isEmpty(preparedStocks) || preparedStocks.getTotalQtyByMinUnit() == 0;
+			boolean isZeroItem = planQtyByMinUnit == 0;
+			if(hasNotPreparedStock || isZeroItem){
+				YdsGoodsLot goodsLot = null;
+				if(CollectionUtils.isEmpty(preparedStocks)){
+					YdsGoodsLots lots = glRepository.findAll().findByGoodsId(bizItem.getGoodsId());
+					if(CollectionUtils.isEmpty(lots)){
+						throw new InvalidDataException(YardExceptionType.invalid_data_goods_without_lot, bizItem.getGoods().getFormatName());
+					}
+					goodsLot = lots.get(0);
+					goodsLot.setGoods(bizItem.getGoods());
+				}else{
+					goodsLot = preparedStocks.get(0).getShelfStock().getGoodsLot();
+				}
+				SpdDepotCard depotCard = task.getDepotArea().getDepot().getCards().findEnableCardByGoodsId(goodsLot.getGoodsId());
+				SpdOffShelfTaskItem taskItem = buildTaskItem(depotCard, goodsLot, task.getMaintenanceInfo(), SpdOffShelfTaskItem.class);
+				taskItem.setPlanQty(0);
+				taskItem.setConfirmQty(0);
+				taskItems.add(taskItem);
+				continue;
+			}
+			
+			for(SpdShelfLockStock prepareStock : preparedStocks){
+				if(!task.getDepotArea().isStocking(prepareStock.getShelfStock().getGoodsId())){
+					continue;
+				}
+				YdsGoodsLot goodsLot = prepareStock.getShelfStock().getGoodsLot();
+				SpdDepotCard depotCard = task.getDepotArea().getDepot().getCards().findEnableCardByGoodsId(goodsLot.getGoodsId());
+				
+				//根据计划数量拆分成若干个整件(按大包装单位来拆分)和一个散件作业明细
+				int specialLotQtyByMinUnit = prepareStock.getQtyByMinUnit();
+				//restQtyByMinUnit = restQtyByMinUnit - specialLotQtyByMinUnit;
+				
+				//大包装到最小包装的转换比
+				float bigBaseRatio = SpdUnitUtils.computeUnitExchangeRatio(goodsLot.getGoods(), YdsUnitLv.big.getLv(), YdsUnitLv.base.getLv());
+				//如果大包装为箱，最小包装为片，这里的1代表一箱，blockMinUnitQty表示一箱有多少片
+				int blockMinUnitQty = (int)(1*bigBaseRatio);
+				//blockCount为整件数量
+				int blockCount = (int)Math.ceil((specialLotQtyByMinUnit/blockMinUnitQty));
+				//散件个数
+				int pieceQtyInMinUnit = specialLotQtyByMinUnit - blockCount*blockMinUnitQty;
+				
+				if(blockCount > 0){
+					SpdOffShelfTaskItem taskItem = buildTaskItem(depotCard, goodsLot, task.getMaintenanceInfo(), SpdOffShelfTaskItem.class);
+					//大包装到存储级别单位的转换比
+					float bigStoreRatio = SpdUnitUtils.computeUnitExchangeRatio(goodsLot.getGoods(), YdsUnitLv.big.getLv(), goodsLot.getGoods().getStoreUnitLv());
+					//log.debug("lot:{}, ratio:{}", goodsLot.getGoodsLotId(), bigStoreRatio);
+					//存储级别的整件的药品数量，例如大包装为箱，存储单位级别为盒，一箱有50盒，这里blockQtyInStoreLvUnit即为50
+					int blockQtyInStoreLvUnit = (int)(1*bigStoreRatio*blockCount);
+					taskItem.setPlanQty(blockQtyInStoreLvUnit);
+					taskItems.add(taskItem);
+				}
+				
+				if(pieceQtyInMinUnit > 0){
+					SpdOffShelfTaskItem taskItem = buildTaskItem(depotCard, goodsLot, task.getMaintenanceInfo(), SpdOffShelfTaskItem.class);
+					float minStoreRatio = SpdUnitUtils.computeUnitExchangeRatio(goodsLot.getGoods(), YdsUnitLv.base.getLv(), goodsLot.getGoods().getStoreUnitLv());
+					int pieceQtyInStoreUnit = (int)(pieceQtyInMinUnit*minStoreRatio);
+					taskItem.setPlanQty(pieceQtyInStoreUnit);
+					taskItems.add(taskItem);
+				}
+			}
+		}
+	}
+
+	
+	
+}

@@ -1,0 +1,69 @@
+package cn.ak4j.yard.sys.domain;
+
+import java.util.Calendar;
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.IEntity;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: SPD编码序列
+* @author zhengyf
+* @date 2017年3月16日 下午2:31:16
+* @version V1.0.0
+*/
+@Data
+@NoArgsConstructor
+@Entity
+@Table(name="SYS_CODE_SEQUENCE")
+@SuppressWarnings({"serial"})
+public class YardCodeSequence implements IEntity{
+
+	@Id
+	private String sortCode;
+	private String sortCodeName;
+	private Integer sequence;
+	private Date lastUpdateTime;
+	
+	public YardCodeSequence(CodeSort codeSort){
+		setSortCode(codeSort.getCode());
+		setSortCodeName(codeSort.getName());
+		setSequence(0);
+	}
+
+	/**
+	 * 发布一个编码对象之后将触发序列值自动步进以及更新序列对象的最后更新时间
+	 */
+	public YardTimeSequenceCode publishYardCode() {
+		Calendar lastUpdateCal = Calendar.getInstance();
+		lastUpdateCal.setTime(lastUpdateTime==null?new Date():lastUpdateTime);
+		
+		//日期变更序列值重置
+		if(Global.defaultCalendar.get(Calendar.YEAR) != lastUpdateCal.get(Calendar.YEAR)
+			|| Global.defaultCalendar.get(Calendar.DAY_OF_YEAR) != lastUpdateCal.get(Calendar.DAY_OF_YEAR)){
+			sequence = 1;
+		}
+		//日期没有变更则进行步进
+		else{
+			sequence = sequence+1;
+		}
+		
+		YardTimeSequenceCode yardCode = new YardTimeSequenceCode(CodeSort.sortOf(sortCode));
+		yardCode.setSequenceCode(sequence);
+		
+		Date now = Global.defaultCalendar.getTime();
+		String dateCode = Global.yyMMddDF.format(now);
+		yardCode.setDateCode(dateCode);
+		
+		
+		lastUpdateTime = now;
+		return yardCode;
+	}
+	
+}

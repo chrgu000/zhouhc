@@ -1,0 +1,107 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRules;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdDailyCleanRuleResourceTest extends BaseTest{
+
+	@Autowired private YardCodeService codeService;
+
+	
+	@Test public void testList() throws Exception{
+		SpdDailyCleanRules rules = mockMvcHelper.findList(SpdDailyCleanRules.class, testUserCode, null);
+		assertEquals(3, rules.size());
+	}
+
+	@Test public void testCount() throws Exception{
+		int count = mockMvcHelper.count(SpdDailyCleanRules.class, testUserCode, null);
+		assertEquals(3, count);
+	}
+
+	@Test public void testGetByIds() throws Exception{
+		List<String> ids = new ArrayList<String>();
+		ids.add("daily_clean_rule_01");
+		ids.add("daily_clean_rule_02");
+		
+		SpdDailyCleanRules rules = mockMvcHelper.getByIds(SpdDailyCleanRules.class, testUserCode, ids);
+		assertEquals(2, rules.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("id", id, rules));
+		}
+	}
+	
+	@Test public void testAdd() throws Exception{
+		SpdDailyCleanRule rule = buildRule();
+		SpdDailyCleanRule newRule = mockMvcHelper.add(SpdDailyCleanRule.class, testUserCode, rule);
+		assertTrue(newRule.getId() != null);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.riqingduizhangguize);
+		assertEquals(CodeSort.riqingduizhangguize.getCode()+getCurrentDateCode()+sequenceCode, newRule.getRuleCode());
+		assertEquals(rule.getDepotId(), newRule.getDepotId());
+		assertEquals(rule.getEnabled(), newRule.getEnabled());
+		assertEquals(rule.getFeedbackRuleId(), newRule.getFeedbackRuleId());
+		assertEquals(rule.getName(), newRule.getName());
+		assertEquals(rule.getCustomName(), newRule.getCustomName());
+		assertEquals(rule.getPrior(), newRule.getPrior());
+		
+		rule.setName("日清结算2");
+		mockMvcHelper.add(SpdDailyCleanRule.class, testUserCode, rule, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		rule.setFeedbackRuleId("prp_fb_id_011");
+		mockMvcHelper.add(SpdDailyCleanRule.class, testUserCode, rule, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+	}
+
+	@Test public void testModify() throws Exception{
+		String id = "daily_clean_rule_01";
+		SpdDailyCleanRule rule = mockMvcHelper.findOne(SpdDailyCleanRule.class, testUserCode, id);
+		String newName = "日清结算2";
+		rule.setName(newName);
+		rule.setCustomName("自定义日清结算");
+		rule = mockMvcHelper.modify(SpdDailyCleanRule.class, testUserCode, id, rule);
+		assertTrue(rule.getName().equals(newName));
+		assertEquals("自定义日清结算", rule.getCustomName());
+	}
+	
+	@Ignore public void whichICanApply() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdDailyCleanRules/whichICanApply?accessToken={accessToken}";
+		
+		SpdDailyCleanRules rules = mockMvcHelper.mockGet(SpdDailyCleanRules.class, url, accessToken);
+		assertEquals(0, rules.size());
+		
+		accessToken = getAccessToken(mzmanagerUserCode);
+		rules = mockMvcHelper.mockGet(SpdDailyCleanRules.class, url, accessToken);
+		assertEquals(2, rules.size());
+	}
+	
+	private SpdDailyCleanRule buildRule(){
+		SpdDailyCleanRule rule = new SpdDailyCleanRule();
+		
+		rule.setDepotId("depot_id_002");
+		rule.setEnabled(true);
+		rule.setFeedbackRuleId("daily_clean_fb_id_01");
+		rule.setName("日清对账");
+		rule.setCustomName("自定义日清对账");
+		rule.setPrior(12);
+		rule.setCanBeOriginRule(false);
+		
+		return rule;
+	}
+	
+}

@@ -1,0 +1,25 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.List;
+
+@SuppressWarnings("serial")
+public class SpdOffShelfTaskItems extends SpdDepotTaskItems<SpdOffShelfTaskItem>{
+	public SpdOffShelfTaskItems() {};
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public SpdOffShelfTaskItems(List entities){
+		super(entities);
+	}
+
+	public SpdOffShelfTaskItems whichHasLot(){
+		SpdOffShelfTaskItems result = new SpdOffShelfTaskItems();
+		for(SpdOffShelfTaskItem taskItem : this){
+			if(taskItem.hasNotUseableLot()){
+				continue;
+			}
+			result.add(taskItem);
+		}
+		return result;
+	}
+	
+}

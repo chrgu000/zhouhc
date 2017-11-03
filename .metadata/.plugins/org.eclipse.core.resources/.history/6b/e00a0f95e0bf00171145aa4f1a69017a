@@ -1,0 +1,32 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.Collections;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+
+/**
+* @Description: 
+* @author zhengyf
+* @date 2017年7月21日 上午8:36:26
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+public class SpdPrepareInformBizSteps extends SpdBizSteps{
+
+	public static SpdBizStep create_prepare_inform = new SpdBizStep(1, AmqpMsgType.CREATE_PREPARE_INFORM_BIZ.getCode(), "作业步骤模板", "prepare_inform_created", "备货已创建");
+	public static SpdBizStep commit_prepare_inform = new SpdBizStep(2, AmqpMsgType.COMMIT_PREPARE_INFORM_BIZ.getCode(), "作业步骤模板", "prepare_inform_commited", "已提交备货");
+	public static SpdBizStep review_prepare_inform = new SpdBizStep(3, AmqpMsgType.REVIEW_PREPARE_INFORM_BIZ.getCode(), "作业步骤模板", "prepare_inform_confirmed", "已确认备货");
+	public static SpdBizStep inform_supplier = new SpdBizStep(4, AmqpMsgType.INFORM_SUPPLIER_INFORM_BIZ.getCode(), "作业步骤模板", "informed", "已通知供应商");
+	public static SpdBizStep complete_prepare_inform = new SpdBizStep(5, AmqpMsgType.COMPLETE_PREPARE_INFORM_BIZ.getCode(), "作业步骤模板", "prepare_inform_completed", "备货通知完成");
+	
+	public SpdPrepareInformBizSteps(){
+		this.add(create_prepare_inform);
+		this.add(commit_prepare_inform);
+		this.add(review_prepare_inform);
+		this.add(inform_supplier);
+		this.add(complete_prepare_inform);
+		
+		Collections.sort(this, comparator);
+	}
+	
+}

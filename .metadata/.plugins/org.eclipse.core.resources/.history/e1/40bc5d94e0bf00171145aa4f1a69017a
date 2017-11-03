@@ -1,0 +1,170 @@
+package cn.ak4j.yard.spd.task.repository;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTasks;
+import cn.ak4j.yard.spd.task.params.SpdLogisticsTaskParams;
+import lombok.Getter;
+
+@Repository
+@SuppressWarnings({"unchecked"})
+public class SpdLogisticsTaskRepository extends BaseRepository<SpdLogisticsTask, SpdLogisticsTasks, SpdLogisticsTaskParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdLogisticsTaskItemRepository ltiRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	
+	public SpdLogisticsTasks find(SpdLogisticsTaskParams params,OrderParam order,int pageNo,int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = OrderParam.getDefaultOrder();
+			}
+			return new SpdLogisticsTasks(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdLogisticsTasks();
+	}
+
+	public int count(SpdLogisticsTaskParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdLogisticsTaskParams params){
+		if(params != null){
+			PcsDepotParams toDepotParams = new PcsDepotParams();
+			toDepotParams.setDepotName(params.getToDepotName());
+			toDepotParams.setDepotId(params.getToDepotId());
+			if(!toDepotParams.isEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(toDepotParams, orgRepository, deptRepository);	
+				if(depots.size() == 0){
+					return false;
+				}
+				params.setToDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			PcsDepotParams fromDepotParams = new PcsDepotParams();
+			fromDepotParams.setDepotName(params.getFromDepotName());
+			fromDepotParams.setDepotId(params.getFromDepotId());
+			if(!fromDepotParams.isEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(fromDepotParams, orgRepository, deptRepository);	
+				if(depots.size() == 0){
+					return false;
+				}
+				params.setFromDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			PcsOrgParams fromOrgParams = new PcsOrgParams();
+			fromOrgParams.setOrgName(params.getFromOrgName());
+			fromOrgParams.setOrgId(params.getFromOrgId());
+			if(!fromOrgParams.isEmpty()){
+				PcsOrgs fromOrgs = new PcsOrgs(orgRepository.findAll().find(fromOrgParams));
+				if(fromOrgs.size() == 0){
+					return false;
+				}
+				params.setFromOrgId(new ListParam<String>(fromOrgs.getIds()));
+			}
+			
+			PcsOrgParams toOrgParams = new PcsOrgParams();
+			toOrgParams.setOrgName(params.getToOrgName());
+			toOrgParams.setOrgId(params.getToOrgId());
+			if(!toOrgParams.isEmpty()){
+				PcsOrgs toOrgs = new PcsOrgs(orgRepository.findAll().find(toOrgParams));
+				if(toOrgs.size() == 0){
+					return false;
+				}
+				params.setToOrgId(new ListParam<String>(toOrgs.getIds()));
+			}
+			
+			PcsDeptParams fromDeptParams = new PcsDeptParams();
+			fromDeptParams.setDeptName(params.getFromDeptName());
+			if(!fromDeptParams.isEmpty()){
+				PcsDepts depts = (PcsDepts)deptRepository.findAll().find(fromDeptParams);
+				if(depts.size() == 0){
+					return false;
+				}
+				PcsDepotParams depotParams = new PcsDepotParams();
+				depotParams.setManageDeptId(new ListParam<String>(depts.getIds()));
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+				if(depots.size() == 0){
+					return false;
+				}
+				params.setFromDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			PcsDeptParams toDeptParams = new PcsDeptParams();
+			toDeptParams.setDeptName(params.getToDeptName());
+			if(!toDeptParams.isEmpty()){
+				PcsDepts depts = (PcsDepts)deptRepository.findAll().find(toDeptParams);
+				if(depts.size() == 0){
+					return false;
+				}
+				PcsDepotParams depotParams = new PcsDepotParams();
+				depotParams.setManageDeptId(new ListParam<String>(depts.getIds()));
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+				if(depots.size() == 0){
+					return false;
+				}
+				params.setToDepotId(new ListParam<String>(depots.getIds()));
+			}
+		}
+		return true;	
+	}
+	
+	public SpdLogisticsTask saveWithItems(SpdLogisticsTask task){
+		task = save(task);
+		task.updateAllItemId();
+		ltiRepository.saveAll(task.getItems());
+		return task;
+	}
+
+	public SpdLogisticsTasks findWithItemsByBizId(String bizId) {
+		SpdLogisticsTaskParams params = new SpdLogisticsTaskParams();
+		params.setBizId(new ListParam<String>(bizId));
+		SpdLogisticsTasks logisticsTasks = find(params);
+		if(CollectionUtils.isEmpty(logisticsTasks)){
+			return logisticsTasks;
+		}
+		logisticsTasks.fillItems(ltiRepository.findByTaskIds(logisticsTasks.getIds()));
+		return logisticsTasks;
+	}
+
+	public SpdLogisticsTasks findByCommitedAndToDepotId(String dispatcherDepotId) {
+		SpdLogisticsTaskParams params = new SpdLogisticsTaskParams();
+		params.setToDepotId(new ListParam<String>(dispatcherDepotId));
+		List<Integer> checkStateCode = new ArrayList<Integer>();
+		checkStateCode.add(CheckState.commited.getCode());
+		checkStateCode.add(CheckState.reviewed.getCode());
+		params.setCheckStateCode(new ListParam<Integer>(checkStateCode));
+		SpdLogisticsTasks logisticsTasks = find(params);
+		if(CollectionUtils.isEmpty(logisticsTasks)){
+			return logisticsTasks;
+		}
+		return null;
+	}
+
+}

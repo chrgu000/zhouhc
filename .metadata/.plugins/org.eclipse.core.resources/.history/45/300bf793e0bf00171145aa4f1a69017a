@@ -1,0 +1,54 @@
+package cn.ak4j.yard.yds.web;
+
+import java.util.Arrays;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfo;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfos;
+import cn.ak4j.yard.yds.params.YdsGoodsInfoParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsInfoRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@RestController
+public class YdsGoodsInfoResource {
+	
+	@Autowired private YdsGoodsInfoRepository giRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	
+	@RequestMapping(value="/yard/yds/ydsGoodsInfos/{id}", method=RequestMethod.GET)
+	public YdsGoodsInfo get(@PathVariable("id")String id){
+		return giRepository.findAll().findById(id);
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsGoodsInfos", method = RequestMethod.GET)
+	public YdsGoodsInfos list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		YdsGoodsInfoParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsInfoParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		YdsGoodsInfos result = new YdsGoodsInfos(giRepository.findAll().findByPage(goodsRepository, params, order, currentPage-1, pageSize));
+		return result;
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsGoodsInfos/count", method = RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr) {
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		return giRepository.findAll().find(params).size();
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsGoodsInfos/ids,{ids}", method = RequestMethod.GET)
+	public YdsGoodsInfos getYdsGoodsInfos(@PathVariable("ids") String ids) {
+		return giRepository.findAll().findByIds(Arrays.asList(ids.split(",")));
+	}
+	
+}

@@ -1,0 +1,29 @@
+package cn.ak4j.yard.spd.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdSellerSendTaxItemParams extends QueryParams {
+
+	private ListParam<String> taxId;
+	private ListParam<String> taxItemId;
+	private IntegerRangeParam taxRow;
+	private FloatRangeParam unitPrice;
+	private FloatRangeParam taxRatio;
+	private IntegerRangeParam taxQty;
+	private FloatRangeParam taxAmount;
+	private FloatRangeParam noFeeAmount;
+	private ListParam<String> sendItemId;
+	private ListParam<String> edsGoodsFormatName;
+	private ListParam<String> sendCode;
+	
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+}

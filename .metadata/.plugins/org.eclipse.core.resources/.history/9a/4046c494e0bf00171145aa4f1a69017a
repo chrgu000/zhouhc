@@ -1,0 +1,77 @@
+package cn.ak4j.yard.spd.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="SPD_INVENTORY_ITEM")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@Data
+@EqualsAndHashCode(callSuper=false)
+@SuppressWarnings({"serial"})
+public class SpdInventoryItem extends YardMaintenceEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	private String inventoryItemId;//盘点明细ID
+	private String inventoryId;//盘点单ID
+	private String goodsId;//产品
+	private String stockGoodsLotId;//批号ID
+	private Integer planQty;//目标数量
+	private Integer showQty;//显示数量
+	private Integer checkQty;//盘点数量
+	private String depotId;//所在仓库
+	private String shelfId;//货位ID
+	private Integer unqualifiedQty;//不合格数量
+	
+	
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Embedded
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @Getter @Setter
+	private YdsGoods goods;
+	
+	@Transient @Getter @Setter
+	private YdsGoodsLot goodsLot;
+	
+	@Transient @Getter @Setter
+	private PcsDepotShelf shelf;
+	
+	@Transient @JsonIgnore 
+	public String getStorePackageUnitName(){
+		return SpdUnitUtils.computeGoodsUnitName(getGoods(), getGoods().getStoreUnitLv());
+	}
+
+	
+	public void fillShelf(SpdDepotCards depotCards) {
+		SpdDepotCard depotCard = depotCards.findByDepotAndGoodsId(getDepotId(), getGoodsId());
+		setShelfId(depotCard.getShelfId());
+	}
+
+		
+}

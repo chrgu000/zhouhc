@@ -1,0 +1,10 @@
+package cn.ak4j.yard.spd.task.factory;
+
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+
+public interface ISpdDepotTaskFactory {
+
+	public SpdDepotTasks buildFromDispatcher(SpdDispatcher dispatcher);
+	
+}

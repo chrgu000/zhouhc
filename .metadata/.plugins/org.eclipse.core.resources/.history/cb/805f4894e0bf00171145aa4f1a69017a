@@ -1,0 +1,62 @@
+package cn.ak4j.yard.spd.wrapper.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.params.SpdTurnoverBoxParams;
+
+@SuppressWarnings({"unchecked", "rawtypes", "serial"})
+public class SpdTurnoverBoxs extends Entities<SpdTurnoverBox>{
+
+	public SpdTurnoverBoxs(){};
+	public SpdTurnoverBoxs(List entites){
+		super(entites);
+	}
+	
+	public SpdTurnoverBoxs getByBoxCodes(List<String> boxCodes){
+		SpdTurnoverBoxs turnoverBoxs = new SpdTurnoverBoxs();
+		boxCodes.forEach(boxCode->{
+			SpdTurnoverBox turnoverBox = CollectionUtils.findWhere("turnoverBoxCode", boxCode, this);
+			if(turnoverBox!=null){
+				turnoverBoxs.add(turnoverBox);
+			}
+		});
+		return turnoverBoxs;
+	}
+	
+	public SpdTurnoverBox findByWrapperNo(String wrapperNo) {
+		SpdTurnoverBoxParams params = new SpdTurnoverBoxParams();
+		params.setWrapperNo(new ListParam<>(wrapperNo));
+		Entities<SpdTurnoverBox> boxs = find(params);
+		return CollectionUtils.isEmpty(boxs)?null:boxs.get(0);
+	}
+	
+	public SpdTurnoverBox findById(String id) {
+		return CollectionUtils.findWhere("id", id, this);
+	}
+	
+	public SpdTurnoverBoxs findByIds(List<String> ids) {
+		SpdTurnoverBoxParams params = new SpdTurnoverBoxParams();
+		params.setId(new ListParam<String>(ids));
+		return new SpdTurnoverBoxs(find(params));
+	}
+	
+	public SpdWrappers findByOwnerId(String ownerId) {
+		return new SpdWrappers(CollectionUtils.find("ownerId", ownerId, this));
+	}
+	
+	public SpdWrappers findByOwnerIds(List ids) {
+		SpdTurnoverBoxParams params = new SpdTurnoverBoxParams();
+		params.setOwnerId(new ListParam<String>(ids));
+		return new SpdWrappers(find(params));
+	}
+	
+	public SpdWrappers findByWrapperNos(List<String> wrapperNos) {
+		SpdTurnoverBoxParams params = new SpdTurnoverBoxParams();
+		params.setWrapperNo(new ListParam<String>(wrapperNos));
+		return new SpdWrappers(find(params));
+	}
+	
+}

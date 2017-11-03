@@ -1,0 +1,198 @@
+package cn.ak4j.yard.pcs.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.Email;
+import org.hibernate.validator.constraints.NotEmpty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.MD5Util;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="pcs_user")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class PcsUser extends YardMaintenceEntity implements IUser{
+	
+	private static Logger logger = LoggerFactory.getLogger(PcsUser.class);
+	
+	private static final String passwordMask = "********";
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String userId;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@NotNull(message = "所属部门不能为空") @Getter @Setter
+	private String deptId;//部门ID
+	
+	@NotNull(message = "所属机构不能为空") @Getter @Setter
+	private String orgId;//机构ID
+	
+	@Setter
+	private String password;//密码
+	
+	@Transient @NotEmpty(message="密码不能为空")
+	@Setter
+	private String originPassword;//
+	
+	@NotEmpty(message = "用户名不能为空")
+	@Getter @Setter
+	private String userName;//用户名称
+	
+	@NotEmpty(message = "用户账号不能为空")
+	@Getter @Setter
+	private String userCode;//用户编码
+	
+	@Email(regexp="\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*",message="邮箱格式错误")
+	@Getter @Setter
+	private String email;//用户邮箱
+	
+	@NotEmpty(message="联系电话不能为空")
+	@Pattern(regexp="^((13[0-9])|(15[^4])|(18[0,2,3,5-9])|(17[0-8])|(147))\\d{8}$",message="联系电话格式错误")
+	@Getter @Setter
+	private String linkTel;//联系电话
+	
+	@Getter @Setter
+	private String gender;//性别
+	
+	@Getter @Setter
+	private boolean enabled;
+	
+	@Getter @Setter
+	private boolean primary;
+	
+	@Getter @Setter
+	private String customStyle;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+	public void verify(PcsUserRepository userRepository){
+		PcsUsers allUsers = userRepository.findAll();
+		verifyName(allUsers);
+		verifyCode(allUsers);
+	} 
+	
+	private void verifyCode(PcsUsers allUsers) {
+		PcsUser user = allUsers.findByUserCode(getUserCode());
+	
+		if(user == null){
+			return ;
+		}
+		
+		if(StringUtils.isEmpty(getUserId())){
+			throw new InvalidDataException(YardExceptionType.invalid_resource_exist, getUserCode());
+		}else{
+			if(!getUserId().equals(user.getUserId())){
+				throw new InvalidDataException(YardExceptionType.invalid_resource_exist, getUserCode());
+			}
+		}
+	}
+
+
+	private void verifyName(PcsUsers allUsers) {
+		 PcsUser user = allUsers.findByUserName(getUserName());
+		  
+		 if(user == null){
+			return ;  
+		 }
+		 
+		 if(StringUtils.isEmpty(getUserId())){
+			 throw new InvalidDataException(YardExceptionType.invalid_exist_user_name, getUserName());
+		 }else{
+			 if(!getUserId().equals(user.getUserId())){
+					throw new InvalidDataException(YardExceptionType.invalid_exist_user_name, getUserName());
+			}
+		 }
+	}
+
+	public void update(PcsUser newUser, PcsUser currentUser){
+		checkUpdate(newUser);
+		try{
+			String originPassword = this.getPassword();
+			BeanUtils.copyProperties(this, newUser);
+			if(newUser.getOriginPassword().equals(passwordMask)){
+				this.setPassword(originPassword);
+			}else{
+				this.setPassword(MD5Util.md5(newUser.getOriginPassword()));
+			}
+			this.getMaintenanceInfo().updateByUser(currentUser.getOrgId(), currentUser.getUserId());
+		}catch(Exception e){
+			logger.error(ExceptionUtils.getStackTrace(e));
+		}
+	}
+	
+	public boolean checkPassword(String password){
+		return getPassword().equals(MD5Util.md5(password));
+	}
+	
+	public String buildAccessToken(PcsUserToken userToken){
+		String accessToken = MD5Util.md5(getUserCode()+",aoka_"+getOriginPassword());
+		accessToken = accessToken + "," + getUserId()+","+userToken.getClientType()+","+userToken.getRandomCode();
+		try{
+			accessToken = new String(Base64.encodeBase64(accessToken.getBytes(Global.defaultCharset)));
+		}catch(Exception e){
+			logger.warn(e.getMessage());
+		}
+		return accessToken;
+	}
+	
+	public String getOriginPassword() {
+		if(StringUtils.isEmpty(this.originPassword)){
+			return passwordMask;
+		}
+		return originPassword.equals(passwordMask)?passwordMask:this.originPassword;
+	}
+
+	@JsonIgnore
+	public String getPassword() {
+		return password;
+	}
+	
+	//设置性别的值
+	public String getIsGender(){
+		return "m".equals(this.gender)?"男":"女";
+	}
+	
+	//设置enabled的值
+	public String getPcsUserEnabled(){
+		return this.enabled?"是":"否";
+	}
+	
+}

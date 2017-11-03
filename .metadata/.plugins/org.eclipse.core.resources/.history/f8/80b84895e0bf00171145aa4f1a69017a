@@ -1,0 +1,169 @@
+package cn.ak4j.yard.pcs.domain;
+
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+
+@SuppressWarnings({"serial"})
+public class PcsDepots extends Entities<PcsDepot> {
+
+	public PcsDepots(){}
+	
+	public PcsDepots(List<PcsDepot> entities){
+		super(entities);
+	}
+	
+	public PcsDepots getAllCentralDepots(){
+		return new PcsDepots(CollectionUtils.find("central", true, Boolean.class, this));
+	}
+
+	public PcsDepots getAllNoncentralDepots(){
+		return new PcsDepots(CollectionUtils.find("central", false, Boolean.class, this));
+	}
+	
+	public PcsDepots find(PcsDepotParams params, PcsOrgRepository orgRepository, PcsDeptRepository deptRepository){
+		if(setRelationParams(params, orgRepository, deptRepository)){
+			return new PcsDepots(this.find(params));
+		}else{
+			return new PcsDepots();
+		}
+	}
+	
+	/**
+	 * 查找当前用户所属部门，所管理的仓库 U:user M:manage
+	 */
+	public PcsDepots findByDept(String deptId){
+		PcsDepotParams params = new PcsDepotParams();
+		params.setManageDeptId(new ListParam<String>(deptId));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		params.setEnabled(new ListParam<Boolean>(true));
+		return new PcsDepots(this.findByPage(params, new OrderParam(), -1, -1));
+	}
+	
+	public PcsDepot findById(String depotId){
+		return CollectionUtils.findWhere("depotId", depotId, this);
+	}
+
+	public PcsDepot findByDepotCode(String depotCode){
+		return CollectionUtils.findWhere("depotCode", depotCode, this);
+	}
+	
+	public PcsDepots findByDepotCodes(List<String> depotCodes){
+		PcsDepots depots = new PcsDepots();
+		for(PcsDepot depot : this){
+			if(depotCodes.contains(depot.getDepotCode())){
+				depots.add(depot);
+			}
+		}
+		return depots;
+	}
+
+
+	public void fillManageDepts(PcsDepts depts) {
+		for(PcsDepot depot : this){
+			depot.fillManageDept(depts);
+		}
+	}
+
+	public void fillAreas(PcsDepotAreas areas) {
+		for(PcsDepot depot : this){
+			PcsDepotAreas theAreas = new PcsDepotAreas(CollectionUtils.find("depotId", depot.getDepotId(), String.class, areas));
+			depot.setAreas(theAreas);
+		}
+	}
+
+	public void fillCards(SpdDepotCards cards) {
+		for(PcsDepot depot : this){
+			SpdDepotCards theCards = new SpdDepotCards(CollectionUtils.find("depotId", depot.getDepotId(), String.class, cards));
+			depot.setCards(theCards);
+		}
+	}
+	
+	private boolean setRelationParams(PcsDepotParams params, PcsOrgRepository orgRepository, PcsDeptRepository deptRepository){
+		if(params != null){
+			//查询关联机构，设置管理机构id的查询条件
+			PcsOrgParams manageOrgParams = new PcsOrgParams();
+			manageOrgParams.setOrgId(params.getManageOrgId());
+			manageOrgParams.setOrgName(params.getManageOrgName());
+			if(!manageOrgParams.isEmpty()){
+				PcsOrgs manageOrgs = new PcsOrgs(orgRepository.findAll().find(manageOrgParams));
+				if(manageOrgs.size() == 0){
+					return false;
+				}
+				params.setManageOrgId(new ListParam<String>(manageOrgs.getIds()));
+			}
+			
+			//查询关联机构，设置管理部门id的查询条件
+			PcsDeptParams manageDeptParams = new PcsDeptParams();
+			manageDeptParams.setDeptId(params.getManageDeptId());
+			manageDeptParams.setDeptName(params.getManageDeptName());
+			if(!manageDeptParams.isEmpty()){
+				PcsDepts manageDepts = new PcsDepts(deptRepository.findAll().find(manageDeptParams));
+				if(manageDepts.size() == 0){
+					return false;
+				}
+				params.setManageDeptId(new ListParam<String>(manageDepts.getIds()));	
+			}
+		}
+		return true;
+	}
+
+	public PcsDepots findByIds(List<String> depotIds) {
+		PcsDepotParams params = new PcsDepotParams();
+		params.setDepotId(new ListParam<String>(depotIds));
+		return new PcsDepots(this.find(params));
+	}
+	
+	public PcsDepots getEnabledDepots(){
+		PcsDepotParams params = new PcsDepotParams();
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		return new PcsDepots(find(params));
+	}
+
+	public List<String> findNotExistDepotCodes(List<String> depotCodes) {
+		List<String> notExistDepotCodes = new ArrayList<String>();
+		List<String> allDepotCodes = CollectionUtils.pluck("depotCode", this);
+		depotCodes.forEach(theDepotCode->{
+			if(!allDepotCodes.contains(theDepotCode)){
+				notExistDepotCodes.add(theDepotCode);
+			}
+		});
+		return notExistDepotCodes;
+	}
+
+	public PcsDepts getAllDepts() {
+		PcsDepts result = new PcsDepts();
+		this.forEach(depot->{
+			if(!result.contains(depot.getManageDept())){
+				result.add(depot.getManageDept());
+			}
+		});
+		return result;
+	}
+
+	public PcsDepotAreas getAllAreas() {
+		PcsDepotAreas result = new PcsDepotAreas();
+		this.forEach(depot->{
+			result.addAll(depot.getAreas());
+		});
+		return result;
+	}
+
+//	public PcsDepots findByDeptId(String deptId) {
+//		return new PcsDepots(CollectionUtils.find("manageDeptId", deptId, this));
+//	}
+	
+}

@@ -1,0 +1,56 @@
+package cn.ak4j.yard.yds.service;
+
+import org.junit.Ignore;
+
+import cn.ak4j.yard.BaseTest;
+
+@Ignore
+public class YdsGoodsServiceTest extends BaseTest{
+
+//	@Autowired private YdsGoodsService goodsService;
+//	@Autowired private YdsGoodsRepository goodsRepository;
+//	@Autowired private PcsUserRepository userRepository;
+//	
+//	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+//	@Test public void testModify(){
+//		PcsUser user = userRepository.findAll().findById(xykUserId);
+//		
+//		YdsGoods goods = new YdsGoods();
+//		goods.setGoodsType("1");
+//		goods.setWareName("九九胃泰颗粒");
+//		goods.setGoodsName("九九胃泰颗粒");
+//		goods.setGoodsCode("gc_170306099");
+//		goods.setGoodsSpec("10ml*10支");
+//		goods.setGoodsModel("其他");
+//		goods.setPackingSpec("2.5g*10包");
+//		goods.setFactName("华润三九制药有限公司");
+//		goods.setUnitPrice(13f);
+//		goods.setBigName("盒");
+//		goods.setBigSum(99999999);
+//		goods.setMidName("包");
+//		goods.setMidSum(1);
+//		goods.setMinName("包");
+//		goods.setMinSum(1);
+//		goods.setBaseName("盒");
+//		goods.setPrepareUnitLv(4);
+//		goods.setStoreUnitLv(3);
+//		goods.setConsumeUnitLv(2);
+//		goods.setSettleUnitLv(4);
+//		goods.setEnabled(true);
+//		goods.setAthDoc("国药准字H66358959");
+//		goods.setChannelType("spd_web");
+//		goods.setMaintenanceInfo(new MaintenanceInfo(user));
+//		
+//		goods = goodsService.add(goods, user);
+//		wait(2);
+//		
+//		YdsGoods goodsPO = goodsRepository.findAll().findById(goods.getGoodsId());
+//		goods.setBigSum(100);
+//		goods.setMaintenanceInfo(goodsPO.getMaintenanceInfo());
+//		
+//		thrown.expect(OperateForbiddenException.class);
+//		goodsService.modify(goods, user);
+//	}
+	
+}

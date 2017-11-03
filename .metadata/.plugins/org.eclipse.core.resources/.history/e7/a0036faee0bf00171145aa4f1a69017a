@@ -1,0 +1,30 @@
+package cn.ak4j.yard.yds.repository;
+
+import static org.junit.Assert.*;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+
+public class YdsGoodsLotRepositoryTest extends BaseTest{
+	
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	@Test public void testAdd(){
+		String lotNo = "160527 2C";
+		YdsGoodsLot goodsLot = getGoodsLotWithLotNo(lotNo);
+		goodsLot = glRepository.save(goodsLot);
+		assertEquals(lotNo, goodsLot.getLotNo());
+	}
+
+
+	private YdsGoodsLot getGoodsLotWithLotNo(String lotNo) {
+		YdsGoodsLot goodsLot = new YdsGoodsLot();
+		goodsLot.setGoodsId("132456");
+		goodsLot.setLotNo(lotNo);
+		return goodsLot;
+	}
+
+}

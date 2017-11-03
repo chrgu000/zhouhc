@@ -1,0 +1,190 @@
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.Date;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRecordParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdDailyCleanBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRecordRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.sys.domain.AbstractYardCode;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.domain.YardTimeSequenceCode;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdDailyCleanBizResourceTest extends BaseTest{
+	
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdDailyCleanBizRepository dcbRepository;
+	@Autowired private SpdPropertyChangeRecordRepository pcrRepository;
+	
+	@Test public void testAdd() throws Exception{
+		//对没有物权变更的日期发起日清对账
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-08 11:23:36"));
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		
+		mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().is4xxClientError(), YardExceptionType.not_found_property_change_record);
+	
+		//创建有一个物权变更的日清对账
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		assertNotNull(dailyClean.getBizId());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.riqingdan);
+		AbstractYardCode yardCode = new YardTimeSequenceCode(CodeSort.riqingdan, getCurrentDateCode(), sequenceCode);
+		assertEquals(yardCode.getCode(), dailyClean.getBizCode());
+		
+		//针对同一天创建两个日清对账将返回异常
+		mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().is4xxClientError(), YardExceptionType.invalid_same_day_daily_clean_exist);
+		
+		SpdPropertyChangeRecordParams params = new SpdPropertyChangeRecordParams();
+		params.setDailyCleanId(new ListParam<String>(dailyClean.getBizId()));
+		SpdPropertyChangeRecords records = pcrRepository.find(params);
+		assertEquals(1, records.size());
+		
+		//创建有两个物权变更的日清对账
+		dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		assertNotNull(dailyClean.getBizId());
+		sequenceCode = codeService.findCurrentCodeSequence(CodeSort.riqingdan);
+		yardCode = new YardTimeSequenceCode(CodeSort.riqingdan, getCurrentDateCode(), sequenceCode);
+		assertEquals(yardCode.getCode(), dailyClean.getBizCode());
+		
+		params.setDailyCleanId(new ListParam<String>(dailyClean.getBizId()));
+		records = pcrRepository.find(params);
+		assertEquals(2, records.size());
+	}
+	
+	@Test public void testAddAndAutoReview() throws Exception{
+		//对没有物权变更的日期发起日清对账
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean.setBizRuleId("daily_clean_rule_03");
+		
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		wait(2);
+		
+		dailyClean = dcbRepository.findOne(dailyClean.getBizId());
+		assertEquals(CheckState.reviewed, dailyClean.getCheckState());
+	}
+	
+	@Test public void testGetCleanDays() throws Exception{
+		String url = "/spd/needCleanDays?depotId={depotId}&accessToken={accessToken}";
+		List<Date> cleanDays = mockMvcHelper.mockGet(new TypeReference<List<Date>>() {}, url, "depot_id_002", getAccessToken(mzmanagerUserCode));
+		assertEquals(0, cleanDays.size());
+		
+		cleanDays = mockMvcHelper.mockGet(new TypeReference<List<Date>>() {}, url, "depot_id_003", getAccessToken(mzmanagerUserCode));
+		assertEquals(2, cleanDays.size());
+		
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+	
+		cleanDays = mockMvcHelper.mockGet(new TypeReference<List<Date>>() {}, url, "depot_id_003", getAccessToken(mzmanagerUserCode));
+		assertEquals(1, cleanDays.size());
+		assertEquals(Global.sdfYMD.parse("2017-09-06").getTime(), cleanDays.get(0).getTime());
+		
+		dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		cleanDays = mockMvcHelper.mockGet(new TypeReference<List<Date>>() {}, url, "depot_id_003", getAccessToken(mzmanagerUserCode));
+		assertEquals(0, cleanDays.size());
+	}
+	
+	@Test public void testGet() throws Exception{
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		String dailyCleanId = dailyClean.getBizId();
+		
+		dailyClean = mockMvcHelper.findOne(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean.getBizId(), status().isOk(), null);
+		assertEquals(dailyCleanId, dailyClean.getBizId());
+	}
+	
+	@Test public void testListAndCount() throws Exception{
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		
+		dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		
+		String url = "/spd/spdDailyCleans/myRelated?accessToken={accessToken}";
+		SpdDailyCleanBizs dailyCleans = mockMvcHelper.mockGet(SpdDailyCleanBizs.class, url, getAccessToken(mzmanagerUserCode));
+		assertEquals(2, dailyCleans.size());
+		
+		url = "/spd/spdDailyCleans/myRelated/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, getAccessToken(mzmanagerUserCode));
+		assertEquals(2, count);
+	}
+	
+	@Test public void testFindMyRelated() throws Exception{
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		String url = "/spd/spdDailyCleans/myRelated?accessToken={accessToken}";
+		
+		SpdDailyCleanBizs dailyCleans = mockMvcHelper.mockGet(SpdDailyCleanBizs.class, url, accessToken);
+		assertEquals(0, dailyCleans.size());
+	}
+	
+	@Test public void testCountMyRelated() throws Exception{
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		String url = "/spd/spdDailyCleans/myRelated/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(0, count);
+	}
+	
+	@Test public void testModify() throws Exception{
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		wait(1);
+		
+		String description = "测试描述信息";
+		dailyClean.setDescription(description);
+		
+		dailyClean = mockMvcHelper.modify(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean.getBizId(), dailyClean, status().isOk(), null);
+		assertEquals(description, dailyClean.getDescription());
+		
+		dailyClean = mockMvcHelper.findOne(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean.getBizId(), status().isOk(), null);
+		assertEquals(description, dailyClean.getDescription());
+	}
+	
+	@Test public void testReview() throws Exception{
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz();
+		dailyClean.setBizRuleId("daily_clean_rule_01");
+		dailyClean.setTargetDate(Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		
+		assertEquals(CheckState.new_created, dailyClean.getCheckState());
+		
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		assertEquals(CheckState.reviewed.getCode(), checkState.getCheckStateCode().intValue());
+	}
+}

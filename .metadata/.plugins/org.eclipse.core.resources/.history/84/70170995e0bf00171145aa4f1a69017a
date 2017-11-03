@@ -1,0 +1,142 @@
+package cn.ak4j.yard.spd.bizplan.factory;
+
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRule;
+import cn.ak4j.yard.spd.bizrule.params.SpdReceiveRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrder;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItems;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Component
+public class SpdReceiveFactory {
+
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsLotRepository eglRepository;
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	
+	public SpdReceiveBizs buildReceives(SpdDeliveryOrders orders, PcsUser user) {
+		SpdReceiveBizs receives = new SpdReceiveBizs();
+		MaintenanceInfo maintenanceInfo = new MaintenanceInfo(user);
+		
+		orders.forEach(order->{
+			SpdPrepareInformBiz prepareInform = pibRepository.findByBizCode(order.getPrepareInformBizCode());
+			if(prepareInform == null){
+				throw  new InvalidDataException(YardExceptionType.not_found_prepare_inform, order.getPrepareInformBizCode());
+			}
+			prepareInform.setItems(biRepository.findByBizId(prepareInform.getBizId()));
+			SpdReceiveBiz receive = new SpdReceiveBiz();
+			receive.setSendId(order.getOrderId());
+			receive.setSendCode(order.getOrderNo());
+			receive.setPrepareInformBizId(prepareInform.getBizId());
+			receive.setChannelTypeCode(YardChannelType.supplier_sys.getCode());
+			
+			SpdReceiveRule rule = findReceiveRule(order, prepareInform, user);
+			receive.applyRule(rule, user);
+			receive.setItems(buildReceiveItems(order.getItems(), prepareInform));
+			
+			receive.setMaintenanceInfo(maintenanceInfo);
+			receives.add(receive);
+		});
+		
+		return receives;
+	}
+	
+	/**
+	 * 根据如下条件查询收货业务规则
+	 * 1）根据当前用户的机构id作为供应商id
+	 * 2）根据送货单中的收货仓库编码作为收货仓库编码
+	 * 3）根据送货单中的备货业务编码查询备货业务，检查是否有代收货仓库，如有则2）中的收货仓库即为代收仓库
+	 */
+	private SpdReceiveRule findReceiveRule(SpdDeliveryOrder order, SpdPrepareInformBiz prepareInform, PcsUser user){
+		
+		SpdReceiveRuleParams params = new SpdReceiveRuleParams();
+		params.setOriginRuleId(new ListParam<String>(prepareInform.getBizRuleId()));
+		Entities<SpdReceiveRule> rules = brRepository.findAllWithRelations().getAllReceiveRules().findByPage(params, new OrderParam("prior", "desc"), -1, -1);
+		if(CollectionUtils.isEmpty(rules)){
+			throw new InvalidDataException(YardExceptionType.not_found_receive_rule, prepareInform.getFromDeptId(), prepareInform.getToDepotId());
+		}
+		return rules.get(0);
+	}
+
+	private SpdReceiveItems buildReceiveItems(SpdDeliveryOrderItems items, SpdPrepareInformBiz prepareInform) {
+		SpdReceiveItems receiveItems = new SpdReceiveItems();
+		
+		List<String> edsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", items);
+		YdsEdsGoodss edsGoodss = egRepository.findAll().findByEdsGoodsCodes(edsGoodsCodes);
+		
+		List<String> goodsIds = CollectionUtils.pluck("yardGoodsId", edsGoodss);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds);
+		
+		List<String> edsGoodsLotNos = CollectionUtils.pluck("edsLotNo", items.getAllEdsGoodsLot());
+		
+		YdsEdsGoodsLots edsGoodsLots = eglRepository.findAll().findByEdsLotNos(edsGoodsLotNos);
+		
+		items.forEach(orderItem->{
+			SpdReceiveItem receiveItem = new SpdReceiveItem();
+			YdsEdsGoods edsGoods = CollectionUtils.findWhere("edsGoodsCode", orderItem.getEdsGoodsCode(), edsGoodss);
+			int planQty = (int)(orderItem.getQty()*edsGoods.getEdsYdsUnitRatio());
+			float unitPirce = orderItem.getUnitPrice()/edsGoods.getEdsYdsUnitRatio();
+			receiveItem.setPlanQty(planQty);
+			YdsGoods goods = CollectionUtils.findWhere("goodsId", edsGoods.getYardGoodsId(), goodss);
+			receiveItem.setGoodsId(edsGoods.getYardGoodsId());
+			
+			String strArr[] = {"edsLotNo", "edsGoodsId"};
+			YdsEdsGoodsLot edsGoodsLot = CollectionUtils.findWhere(strArr, edsGoodsLots, orderItem.getEdsGoodsLot().getEdsLotNo(), orderItem.getEdsGoodsLot().getEdsGoodsId());
+			
+			receiveItem.setLotId(edsGoodsLot.getYardGoodsLotId());
+			receiveItem.setSendItemCode(orderItem.getItemId());
+			receiveItem.setUnitPrice(unitPirce);
+			receiveItem.setUnitLv(goods.getPrepareUnitLv());
+			receiveItem.setBoxNo(orderItem.getItemCode());
+			receiveItem.setOriginId(prepareInform.getBizId());
+			
+			SpdBizItems prepareInformItems = prepareInform.getItems().findByGoodsId(receiveItem.getGoodsId());
+			if(CollectionUtils.isEmpty(prepareInformItems)){
+				String msg = String.format("企业产品[%s]批次[%s]没有对应的备货明细,备货[%s]", edsGoods.getEdsGoodsCode(), edsGoodsLot.getEdsLotNo(), prepareInform.getBizCode());
+				throw new InvalidDataException(msg);
+			}
+			receiveItem.setOriginItemId(prepareInformItems.get(0).getBizItemId());
+			receiveItem.setCreateTime(new Date());
+			receiveItem.setLastUpdateTime(new Date());
+			receiveItems.add(receiveItem);
+		});
+		
+		return receiveItems;
+	}
+	
+}

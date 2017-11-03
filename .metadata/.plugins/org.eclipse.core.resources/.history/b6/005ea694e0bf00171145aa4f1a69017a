@@ -1,0 +1,25 @@
+package cn.ak4j.yard.spd.reconciliation.report.base;
+
+import lombok.Data;
+
+/**
+* @Description: 财务报表明细基类
+* @author zhengyf
+* @date 2017年10月14日 下午3:01:19
+* @version V1.0.0
+*/
+
+@Data
+public abstract class SpdReconciliationReportItem {
+
+	private String goodsId;
+	private String goodsCode;
+	private String goodsName;
+	private String packageSpecification;
+	private String factorName;
+	private float unitPrice;
+	private String unitName;
+	private int qty;
+	private float amount;
+	
+}

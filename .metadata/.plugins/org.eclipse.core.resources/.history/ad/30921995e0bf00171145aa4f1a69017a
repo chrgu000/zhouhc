@@ -1,0 +1,179 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.vo.SpdPrepareReceiveQty;
+import cn.ak4j.yard.spd.domain.SpdGoodsItems;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings({"rawtypes", "unchecked", "serial"})
+@NoArgsConstructor
+public class SpdReceiveItems extends SpdGoodsItems<SpdReceiveItem>{
+
+	public SpdReceiveItems(List items) {
+		super(items);
+	}
+
+	public SpdReceiveItem findByGoodsIdAndLotId(String goodsId, String lotId) {
+		for(SpdReceiveItem theItem : this){
+			if(theItem.getGoodsId().equals(goodsId) && theItem.getLotId().equals(lotId)){
+				return theItem;
+			}
+		}
+		return null;
+	}	
+	
+	public int getQtyByGoodsId(SpdReceiveBizs receives, String goodsId){
+		int qty = 0;
+		for(SpdReceiveItem receiveItem : this){
+			if(receiveItem.getGoodsId().equals(goodsId)){
+				SpdReceiveBiz receive = CollectionUtils.findWhere("bizId", receiveItem.getBizId(), receives);
+				boolean confirmed = receiveItem.getConfirmQty() != null && receiveItem.getConfirmQty() >= 0 && receive.getCheckStateCode() >= CheckState.reviewed.getCode();
+				int theQty = confirmed ? receiveItem.getConfirmQty() : receiveItem.getPlanQty();
+				qty += theQty;
+			}
+		}
+		return qty;
+	}
+	
+	/**
+	 * 冲账，扣减交易数量
+	 */
+	public SpdReceiveItems chargeOff(SpdGoodsQtys goodsQtys){
+		SpdReceiveItems result = new SpdReceiveItems();
+		
+		for(SpdGoodsQty goodsQty : goodsQtys){
+			int dealingQty = goodsQty.getQty(YdsUnitLv.base.getLv());
+			for(int i = this.size()-1; i >= 0; i--){
+				SpdReceiveItem item = this.get(i);
+				if(!goodsQty.getGoods().getGoodsId().equals(item.getGoodsId()) 
+						|| !goodsQty.getSpecialGoodsLot().getGoodsLotId().equals(item.getLotId())){
+					continue;
+				}
+				//int confirmQtyByBaseUnit = item.getConfirmQty(YdsUnitLv.base.getLv());
+				if(item.getDealQtyByBaseUnit() == 0){
+					continue;
+				}
+				
+				//当前明细能够完成冲账
+				if(item.getDealQtyByBaseUnit() > dealingQty){
+					item.setDealingQtyByBaseUnit(0-dealingQty);
+					item.setDealQtyByBaseUnit(item.getDealQtyByBaseUnit()-dealingQty);
+					result.add(item);
+					break;
+				}
+				//当前明细不能够完成冲账
+				else{
+					item.setDealingQtyByBaseUnit(0-item.getDealQtyByBaseUnit());
+					item.setDealQtyByBaseUnit(0);
+					dealingQty = dealingQty - item.getDealingQtyByBaseUnit();
+					result.add(item);
+				}
+			}
+			
+		}
+		
+		return result;
+	}
+	
+	/**
+	 * 交易：增加交易数量
+	 */
+	public SpdReceiveItems deal(SpdGoodsQtys goodsQtys){
+		SpdReceiveItems result = new SpdReceiveItems();
+		
+		for(SpdGoodsQty goodsQty : goodsQtys){
+			int dealingQty = goodsQty.getQty(YdsUnitLv.base.getLv());
+			//log.debug("goods:{},{} goodsQty:{} dealingQtyByBaseUnit:{}", goodsQty.getGoods().getGoodsId(), goodsQty.getSpecialGoodsLot().getGoodsLotId(), goodsQty.getQty(), dealingQty);
+			for(SpdReceiveItem item : this){
+				//log.debug("item goods:{},{}", item.getGoodsId(), item.getLotId());
+				if(!goodsQty.getGoods().getGoodsId().equals(item.getGoodsId()) 
+						|| !goodsQty.getSpecialGoodsLot().getGoodsLotId().equals(item.getLotId())){
+					continue;
+				}
+				//log.debug("{},{}", item.getDealQtyByBaseUnit(), item.getConfirmQty(YdsUnitLv.base.getLv()));
+				int dealableQtyByBaseUnit = item.getConfirmQty(YdsUnitLv.base.getLv()) - item.getReturnQty(YdsUnitLv.base.getLv());
+				if(item.getDealQtyByBaseUnit() == dealableQtyByBaseUnit){
+					continue;
+				}
+				if(dealingQty <= 0){
+					break;
+				}
+				boolean undealQtyEnoughForDeal = (dealableQtyByBaseUnit - item.getDealQtyByBaseUnit()) >= dealingQty;
+				//log.debug("enough: {}, {}, {}", undealQtyEnoughForDeal, confirmQtyByBaseUnit, item.getDealQtyByBaseUnit());
+				//当前收货明细足够核销
+				if(undealQtyEnoughForDeal){
+					item.setDealingQtyByBaseUnit(item.getDealingQtyByBaseUnit()+dealingQty);
+					item.setDealQtyByBaseUnit(item.getDealQtyByBaseUnit()+item.getDealingQtyByBaseUnit());
+					if(!result.contains(item)){
+						result.add(item);
+					}
+					break;
+				}
+				//当前明细不足够核销
+				else{
+					int currentDealingQty = dealableQtyByBaseUnit - item.getDealQtyByBaseUnit();
+					item.setDealingQtyByBaseUnit(item.getDealingQtyByBaseUnit()+currentDealingQty);
+					item.setDealQtyByBaseUnit(item.getDealQtyByBaseUnit() + item.getDealingQtyByBaseUnit());
+					dealingQty = dealingQty - currentDealingQty;
+					if(!result.contains(item)){
+						result.add(item);
+					}
+				}
+			}
+			
+//			if(dealingQty > 0){
+//				throw new InvalidDataException(YardExceptionType.invalid_receive_item_without_enough_qty_to_deal, 
+//						goodsQty.getGoods().getGoodsId(), goodsQty.getGoods().getGoodsCode(), 
+//						goodsQty.getSpecialGoodsLot().getGoodsLotId(), goodsQty.getSpecialGoodsLot().getLotNo(), 
+//						goodsQty.getQty(YdsUnitLv.base.getLv()));
+//			}
+			
+		}
+
+		return result;
+	}
+
+	public boolean isAllSaled() {
+		for(SpdReceiveItem item : this){
+			if(item.getDealQtyByBaseUnit() < (item.getConfirmQty(YdsUnitLv.base.getLv()) - item.getReturnQty(YdsUnitLv.base.getLv()))){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public SpdReceiveItems getDealingItems(){
+		SpdReceiveItems result = new SpdReceiveItems();
+		for(SpdReceiveItem dealItem : this){
+			if(dealItem.getDealingQtyByBaseUnit() != 0){
+				result.add(dealItem);
+			}
+		}
+		return result;
+	}
+
+	public List<SpdPrepareReceiveQty> toPrepareReceiveQtys() {
+		List<SpdPrepareReceiveQty> result = new ArrayList<SpdPrepareReceiveQty>();
+		if(CollectionUtils.isEmpty(this)){
+			return result;
+		}
+		List<String> prepareInformItemIds = this.pluck("originItemId");
+		String prepareInformId = this.get(0).getBizId();
+		
+		prepareInformItemIds.forEach(prepareInformItemId->{
+			SpdReceiveItems theItems = new SpdReceiveItems(CollectionUtils.find("originItemId", prepareInformItemId, this));
+			SpdPrepareReceiveQty prepareReceiveQty = new SpdPrepareReceiveQty(prepareInformId, prepareInformItemId, theItems.intSum("confirmQty"));
+			result.add(prepareReceiveQty);
+		});
+		
+		return result;
+	}
+	
+}

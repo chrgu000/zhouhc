@@ -1,0 +1,76 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.YardEntity;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 货位锁库存
+* @author zhengyf
+* @date 2017年5月26日 下午4:49:22
+* @version V1.0.0
+*/
+@NoArgsConstructor
+@Entity
+@Table(name="SPD_SHELF_LOCK_STOCK")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SpdShelfLockStock extends YardEntity{
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String id;
+	
+	@Getter @Setter
+	private String shelfStockId;
+	
+	@Getter @Setter
+	private String bizId;
+	
+	@Getter @Setter
+	private Integer qtyByMinUnit;
+	
+	@Getter @Setter
+	private boolean locked;
+	
+	@Getter @Setter
+	private Date createTime = new Date();
+	
+	@Getter @Setter
+	private Date lastUpdateTime;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdShelfStock shelfStock;
+
+	public SpdShelfLockStock(String shelfStockId, String bizId, int qtyByMinUnit) {
+		this.shelfStockId = shelfStockId;
+		this.bizId = bizId;
+		this.qtyByMinUnit = qtyByMinUnit;
+		this.locked = true;
+		this.createTime = new Date();
+		this.lastUpdateTime = this.createTime;
+	}
+
+	public void releaseLock() {
+		locked = false;
+		lastUpdateTime = new Date();
+	}
+	
+}

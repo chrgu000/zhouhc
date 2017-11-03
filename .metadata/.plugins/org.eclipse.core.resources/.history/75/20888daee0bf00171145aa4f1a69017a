@@ -1,0 +1,131 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizrule.domain.SpdMoveAreaRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdMoveAreaRules;
+import cn.ak4j.yard.spd.bizrule.to.SpdMoveAreaRuleTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdMoveAreaRuleResourceTest extends BaseTest{
+
+	@Autowired private YardCodeService codeService;
+	
+	@Test public void testFind() throws Exception{
+		testFindAll();
+		testCountAll();
+		testFindByIds();
+		testWhichICanApply();
+	}
+	
+
+	private void testWhichICanApply() throws Exception {
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdMoveAreaRules/whichICanApply?accessToken={accessToken}";
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		List<SpdMoveAreaRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdMoveAreaRuleTO>>() {}, url, accessToken);
+		assertEquals(3, rules.size());
+		rules.forEach(rule->{
+			assertEquals(user.getDeptId(), rule.getDepot().getManageDeptId());
+		});
+	}
+
+	private void testFindAll() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdMoveAreaRules?accessToken={accessToken}";
+		List<SpdMoveAreaRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdMoveAreaRuleTO>>() {}, url, accessToken);
+		assertEquals(4, rules.size());
+	}
+	
+	private void testCountAll() throws Exception{
+		int count = mockMvcHelper.count(SpdMoveAreaRules.class, testUserCode, null);
+		assertEquals(4, count);
+	}
+	
+	private void testFindByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdMoveAreaRules/ids,{ids}?accessToken={accessToken}";
+		String ids = "ma_rule_id_01,ma_rule_id_02";
+		List<SpdMoveAreaRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdMoveAreaRuleTO>>() {}, url, ids, accessToken);
+		assertEquals(2, rules.size());
+	}
+	
+	@Test public void testAdd() throws Exception{
+		SpdMoveAreaRuleTO to = createMoveAreaRuleTO();
+		SpdMoveAreaRuleTO newTO = mockMvcHelper.add(SpdMoveAreaRuleTO.class, testUserCode, "spd", "spdMoveAreaRules", to);
+		assertNotNull(newTO.getCustomName());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.yicangguize);
+		assertEquals(CodeSort.yicangguize.getCode()+getCurrentDateCode()+sequenceCode, newTO.getRuleCode());
+		assertEquals(to.getName(), newTO.getName());
+		assertEquals(to.getCustomName(), newTO.getCustomName());
+		assertEquals(to.getPrior(), newTO.getPrior());
+		assertEquals(to.getEnabled(), newTO.getEnabled());
+		assertEquals(to.getCanBeOriginRule(), newTO.getCanBeOriginRule());
+		assertEquals(to.getDepotId(), newTO.getDepotId());
+		assertEquals(to.getFromAreaType(), newTO.getFromAreaType());
+		assertEquals(to.getToAreaType(), newTO.getToAreaType());
+		assertEquals(to.getUsage(), newTO.getUsage());
+		assertEquals(to.getFeedbackRuleId(), newTO.getFeedbackRuleId());
+		assertEquals(to.getManualApply(), newTO.getManualApply());
+		
+		newTO.setFeedbackRuleId("ma_fb_id_05");
+		newTO.setCanBeOriginRule(false);
+		newTO.setDepotId("depot_id_001");
+		newTO.setUsage("隔离");
+		mockMvcHelper.add(SpdMoveAreaRule.class, testUserCode, to, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		to.setFromAreaType(PcsAreaType.normal.getCode());
+		to.setToAreaType(PcsAreaType.normal.getCode());
+		mockMvcHelper.add(SpdMoveAreaRule.class, testUserCode, to, status().is4xxClientError(), null);
+	}
+	
+	@Test public void testModify() throws Exception{
+		String id = "ma_rule_id_01";
+		
+		SpdMoveAreaRuleTO originTO = mockMvcHelper.findOne(SpdMoveAreaRuleTO.class, testUserCode, "spd", "spdMoveAreaRules", id);
+		assertNotNull(originTO);
+		assertEquals(false, originTO.getCanBeOriginRule());
+		
+		originTO.setCanBeOriginRule(true);
+		originTO.setCustomName("自定义隔离规则");
+		
+		SpdMoveAreaRuleTO newTO = mockMvcHelper.modify(SpdMoveAreaRuleTO.class, testUserCode, "spd", "spdMoveAreaRules", id, originTO, status().isOk(), null);
+		assertNotNull(newTO.getCustomName());
+		assertEquals(true, newTO.getCanBeOriginRule());
+		assertEquals("自定义隔离规则", newTO.getCustomName());
+		
+		originTO.setFeedbackRuleId("ma_fb_id_06");
+	}
+	
+	private SpdMoveAreaRuleTO createMoveAreaRuleTO(){
+		SpdMoveAreaRuleTO to = new SpdMoveAreaRuleTO();
+		to.setName("半自动隔离");
+		to.setCustomName("自定义半自动隔离");
+		to.setPrior(99);
+		to.setFeedbackRuleId("ma_fb_id_12");
+		to.setEnabled(true);
+		to.setCanBeOriginRule(true);
+		to.setDepotId("depot_id_003");
+		to.setFromAreaType(PcsAreaType.normal.getCode());
+		to.setToAreaType(PcsAreaType.isolation.getCode());
+		to.setUsage("测试库内移仓规则");
+		to.setManualApply(false);
+		
+		return to;
+	}
+	
+}

@@ -1,0 +1,36 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum YdsWorkbookType implements ITypeEnum{
+	
+	goods_Node("产品剂型", "产品剂型", ""),
+	big_name("包装单位", "包装单位", ""),
+	settle_unit_lv("计量单位", "计量单位", "");
+
+
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+
+	private YdsWorkbookType(String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static YdsWorkbookType typeOf(String code){
+		for(YdsWorkbookType state : YdsWorkbookType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+}
+

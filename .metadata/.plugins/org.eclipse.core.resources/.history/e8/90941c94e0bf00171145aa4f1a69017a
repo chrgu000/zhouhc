@@ -1,0 +1,32 @@
+package cn.ak4j.yard.sys.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class YardBatchTaskTO<T> {
+
+	private String taskType;
+	private T data;
+	private String notifyUrl;
+	
+	public String getTaskType() {
+		return taskType;
+	}
+	public void setTaskType(String taskType) {
+		this.taskType = taskType;
+	}
+	public T getData() {
+		return data;
+	}
+	public void setData(T data) {
+		this.data = data;
+	}
+	public String getNotifyUrl() {
+		return notifyUrl;
+	}
+	public void setNotifyUrl(String notifyUrl) {
+		this.notifyUrl = notifyUrl;
+	}
+	
+	
+}

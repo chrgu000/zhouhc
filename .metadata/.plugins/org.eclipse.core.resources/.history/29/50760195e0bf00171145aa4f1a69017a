@@ -1,0 +1,270 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdPrepareInformBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdReceiveRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRefRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdReceiveBizRepository extends BaseRepository<SpdReceiveBiz, SpdReceiveBizs, SpdReceiveBizParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired @Lazy private SpdBizItemRepository biRepository;
+	@Autowired @Lazy private SpdDispatcherRepository spdDispatcherRepository;
+	@Autowired @Lazy private SpdDispatcherRefRepository spdDispatcherRefRepository;
+	@Autowired @Lazy private PcsDepotRepository depotRepository;
+	@Autowired @Lazy private PcsDeptRepository deptRepository;
+	@Autowired @Lazy private PcsOrgRepository orgRepository;
+	@Autowired @Lazy private PcsUserRepository userRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired @Lazy private SpdPrepareInformBizRepository pibRepository;
+	
+	public SpdReceiveBizs find(SpdReceiveBizParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = OrderParam.getDefaultOrder();
+			}
+			SpdReceiveBizs receives = new SpdReceiveBizs(doQuery(params, order, pageNo, pageSize));
+			boolean orderByOrgName = order != null && order.isNotEmpty() && order.getPropName().indexOf("orgName") > 0;
+			boolean orderByDepotName = order != null && order.isNotEmpty() && order.getPropName().indexOf("depotName") > 0;
+			boolean orderByDeptName = order != null && order.isNotEmpty() && order.getPropName().indexOf("deptName") > 0;
+			
+			if(orderByOrgName || orderByDepotName || orderByDeptName){
+				receives.fillRule(brRepository.getAll().getAllReceiveRules());
+			}
+			
+			return new SpdReceiveBizs(receives.findByPage(params, order, -1, -1));
+		}
+		return new SpdReceiveBizs();
+	}
+
+	public int count(SpdReceiveBizParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdReceiveBizParams params){
+		if(params != null){
+//			if(params.getGeneralCode() != null && !params.getGeneralCode().isEmpty()){
+//				String generalCode = params.getGeneralCode().getValue().get(0);
+//				try{
+//					CodeSort codeSort = YardCodeParser.parseTimeSequenceCode(generalCode).getCodeSort();
+//					if(codeSort == CodeSort.beihuodan){
+//						params.setPrepareInformBizCode(new ListParam<String>().addValue(generalCode));
+//					}else if(codeSort == CodeSort.shouhuodan){
+//						params.setBizCode(new ListParam<String>().addValue(generalCode));
+//					}
+//				}catch(InvalidDataException e){
+//					params.setSendCode(new ListParam<String>().addValue(generalCode));
+//				}
+//				params.setGeneralCode(null);
+//			}
+			
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getToDepotName());
+			depotParams.setDepotId(params.getToDepotId());
+			if(!depotParams.isEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);	
+				if(depots.size() == 0){
+					return false;
+				}
+				params.setToDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			PcsDepotParams finalDepotParams = new PcsDepotParams();
+			finalDepotParams.setDepotName(params.getFinalDepotName());
+			if(finalDepotParams.isNotEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(finalDepotParams, orgRepository, deptRepository);	
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				params.setFinalDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			PcsDeptParams finalDeptParams = new PcsDeptParams();
+			finalDeptParams.setDeptName(params.getFinalDeptName());
+			if(finalDeptParams.isNotEmpty()){
+				PcsDepts depts = new PcsDepts(deptRepository.findAll().find(finalDeptParams));
+				if(CollectionUtils.isEmpty(depts)){
+					return false;
+				}
+				
+				PcsDepotParams fdParams = new PcsDepotParams();
+				fdParams.setManageDeptId(new ListParam<String>(depts.getIds()));
+				PcsDepots depots = depotRepository.findAll().find(fdParams, orgRepository, deptRepository);	
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				params.setFinalDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			PcsDeptParams deptParams = new PcsDeptParams();
+			deptParams.setDeptName(params.getToDeptName());
+			deptParams.setDeptId(params.getToDeptId());
+			if(!deptParams.isEmpty()){
+				PcsDepts depts = new PcsDepts(deptRepository.findAll().find(deptParams));
+				if(depts.size() == 0){
+					return false;
+				}
+				params.setToDeptId(new ListParam<String>(depts.getIds()));
+			}
+			
+			
+			PcsOrgParams fromOrgParams = new PcsOrgParams();
+			fromOrgParams.setOrgName(params.getFromOrgName());
+			fromOrgParams.setOrgId(params.getFromOrgId());
+			if(!fromOrgParams.isEmpty()){
+				PcsOrgs fromOrgs = new PcsOrgs(orgRepository.findAll().find(fromOrgParams));
+				if(fromOrgs.size() == 0){
+					return false;
+				}
+				params.setFromOrgId(new ListParam<String>(fromOrgs.getIds()));
+			}
+			
+			PcsOrgParams toOrgParams = new PcsOrgParams();
+			toOrgParams.setOrgName(params.getToOrgName());
+			toOrgParams.setOrgId(params.getToOrgId());
+			if(!toOrgParams.isEmpty()){
+				PcsOrgs toOrgs = new PcsOrgs(orgRepository.findAll().find(toOrgParams));
+				if(toOrgs.size() == 0){
+					return false;
+				}
+				params.setToOrgId(new ListParam<String>(toOrgs.getIds()));
+			}
+			
+			PcsUserParams lastUserParams = new PcsUserParams();
+			lastUserParams.setUserName(params.getLastUserName());
+			if(lastUserParams.isNotEmpty()){
+				PcsUsers lastUsers = new PcsUsers(userRepository.findAll().find(lastUserParams));
+				if(lastUsers.size() == 0){
+					return false;
+				}
+				params.setMaintenanceInfo_createUserId(new ListParam<String>(lastUsers.getIds()));
+			}
+			
+			SpdReceiveRuleParams receiveRuleParams = new SpdReceiveRuleParams();
+			
+			if(params.getFromDeptName() != null && !params.getFromDeptName().isEmpty()){
+				PcsDeptParams fromDeptParams = new PcsDeptParams();
+				fromDeptParams.setDeptName(params.getFromDeptName());
+				PcsDepts depts = new PcsDepts(deptRepository.findAll().find(fromDeptParams));
+				if(CollectionUtils.isEmpty(depts)){
+					return false;
+				}
+				receiveRuleParams.setDirectionRule_fromDeptId(new ListParam<String>(depts.getIds()));
+			}
+			if(params.getToDepotName() != null && !params.getToDepotName().isEmpty()){
+				PcsDepotParams toDepotParams = new PcsDepotParams();
+				toDepotParams.setDepotName(params.getToDepotName());
+				PcsDepots depots = new PcsDepots(depotRepository.findAll().find(toDepotParams));
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				
+				receiveRuleParams.setDirectionRule_toDepotId(new ListParam<String>(depots.getIds()));
+			}
+			if(params.getCollectDepotName() != null && !params.getCollectDepotName().isEmpty()){
+				PcsDepotParams collectDepotParams = new PcsDepotParams();
+				collectDepotParams.setDepotName(params.getCollectDepotName());
+				PcsDepots depots = new PcsDepots(depotRepository.findAll().find(collectDepotParams));
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				receiveRuleParams.setDirectionRule_toDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			receiveRuleParams.setName(params.getBizRuleName());
+			receiveRuleParams.setName(params.getName());
+			if(receiveRuleParams.isNotEmpty()){
+				SpdReceiveRules receiveRules = new SpdReceiveRules(brRepository.findAllWithRelations().getAllReceiveRules().find(receiveRuleParams));
+				if(CollectionUtils.isEmpty(receiveRules)){
+			    	return false;
+			    }
+			    
+			    params.setBizRuleId(new ListParam<String>(receiveRules.getIds()));
+			}
+			
+			SpdPrepareInformBizParams prepareInformParams = new SpdPrepareInformBizParams();
+			prepareInformParams.setBizCode(params.getPrepareInformBizCode());
+			if(prepareInformParams.isNotEmpty()){
+				SpdPrepareInformBizs prepareInformBizs = pibRepository.find(prepareInformParams);
+				if(CollectionUtils.isEmpty(prepareInformBizs)){
+					return false;
+				}
+				
+				params.setPrepareInformBizId(new ListParam<String>(prepareInformBizs.getIds()));
+			}
+		}
+		return true;	
+	}
+
+	public SpdReceiveBiz saveWithItems(SpdReceiveBiz receiveBiz) {
+		receiveBiz = save(receiveBiz);
+		if(receiveBiz.getItems() != null){
+			receiveBiz.updateItemsBizIdAndTime();
+			biRepository.saveAll(receiveBiz.getItems());
+		}
+		return receiveBiz;
+	}
+
+	public SpdReceiveBiz getWithItems(String bizId) {
+		SpdReceiveBiz receiveBiz = findOne(bizId);
+		SpdBizItems items = biRepository.findWithGoodsByBizId(bizId);
+		receiveBiz.setItems(items);
+		return receiveBiz;
+	}
+
+	public SpdReceiveBizs findByBizStatusCodeAndToDepotId(String statusCode, String toDepotId) {
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setBizStatusCode(new ListParam<String>(statusCode));
+		params.setToDepotId(new ListParam<String>(toDepotId));
+		return find(params);
+	}
+
+	public SpdReceiveBizs findBySendCodes(List<String> sendCodes) {
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setSendCode(new ListParam<String>(sendCodes));
+		return find(params);
+	}
+	
+	public SpdReceiveBizs findByPrepareInformBizId(String prepareInformBizId) {
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setPrepareInformBizId(new ListParam<String>(prepareInformBizId));
+		return find(params);
+	}
+	
+}

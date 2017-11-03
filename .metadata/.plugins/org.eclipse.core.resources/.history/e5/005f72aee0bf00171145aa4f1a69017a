@@ -1,0 +1,72 @@
+package cn.ak4j.yard.sys.web;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.domain.YardGlobalInfos;
+
+public class YardGlobalInfoResourceTest extends BaseTest{
+
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/sys/yardGlobalInfos?pageSize=-1&accessToken={accessToken}";
+		
+		YardGlobalInfos globalInfos = mockMvcHelper.mockGet(YardGlobalInfos.class, urlTemplate, accessToken);
+		assertEquals(33, globalInfos.size());
+	}
+	
+	@Test public void testGet() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/sys/yardGlobalInfos/{key}?accessToken={accessToken}";
+		
+		YardGlobalInfo globalInfo = mockMvcHelper.mockGet(YardGlobalInfo.class, urlTemplate, YardGlobalInfo.simple_shelf_lable_report, accessToken);
+		assertEquals(YardGlobalInfo.simple_shelf_lable_report, globalInfo.getKey());
+	}
+	
+	@Test public void testGetByKeys() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/sys/yardGlobalInfos/keys,{keys}?accessToken={accessToken}";
+		
+		List<String> keys = new ArrayList<String>();
+		keys.add("yds_goods_price_unit_lv");
+		keys.add("biz_unit_setting");
+		keys.add("data_version");
+		keys.add("replenish_plan_difference_recent_days");
+		
+		String keysStr = StringUtils.join(keys, ",");
+		
+		YardGlobalInfos globalInfos = mockMvcHelper.mockGet(YardGlobalInfos.class, urlTemplate, keysStr, accessToken);
+		assertEquals(4, globalInfos.size());
+		globalInfos.forEach(globalInfo->{
+			keys.contains(globalInfo.getKey());
+		});
+		
+	}
+	
+	@Test public void testModify() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/sys/yardGlobalInfos/{key}?accessToken={accessToken}";
+
+		YardGlobalInfo globalInfo = mockMvcHelper.mockGet(YardGlobalInfo.class, urlTemplate, YardGlobalInfo.simple_shelf_lable_report, accessToken);
+		
+		String value = "{\"pdfFileName\":\"货位标签\",\"jasperFilePath\":\"/reports/pcs/simple_shelf_lable_02\"}";
+		globalInfo.setValue(value);
+		
+		mockMvcHelper.mockPut(YardGlobalInfo.class, globalInfo, urlTemplate, YardGlobalInfo.simple_shelf_lable_report, accessToken);
+
+		globalInfo = mockMvcHelper.mockGet(YardGlobalInfo.class, urlTemplate, YardGlobalInfo.simple_shelf_lable_report, accessToken);
+		assertEquals(value, globalInfo.getValue());
+		
+		YardGlobalInfo theGlobalInfo = Conf.getAllGlobalInfos().findByKey(YardGlobalInfo.simple_shelf_lable_report);
+		assertEquals(value, theGlobalInfo.getValue());
+	}
+	
+}

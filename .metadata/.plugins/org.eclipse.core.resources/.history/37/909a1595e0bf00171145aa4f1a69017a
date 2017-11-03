@@ -1,0 +1,159 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRule;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="SPD_PREPARE_INFORM_BIZ")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SpdPrepareInformBiz extends SpdGoodsBizPlan<SpdPrepareInformRule>{
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_c_r_f;
+	
+	@Getter @Setter
+	private String fromDeptId;
+	
+	@Getter @Setter
+	private String fromOrgId;
+	
+	@Getter @Setter
+	private String toDepotId;
+	
+	@Getter @Setter
+	private String toAreaType;
+	
+	@Getter @Setter
+	private String confirmDeptId;
+	
+	@Getter @Setter
+	private String collectDepotId;
+	
+	@Getter @Setter
+	private String collectAreaType;
+	
+	@Getter @Setter
+	private Date informTime;
+	
+	@Getter @Setter
+	private String exResourceId;
+	
+	@Getter @Setter
+	private Date estimatedDeliveryTime;
+	
+	@Getter @Setter
+	private Date requestedDeliveryTime;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot toDepot;
+	
+	@Transient @Getter @Setter
+	private PcsDept confirmDept;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot collectDepot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDept fromDept;
+	
+	public void applyRule(SpdPrepareInformRule rule, PcsUser user) {
+		setBizRule(rule);
+		setFromDept(rule.getDirectionRule().getFromDept());
+		setConfirmDept(rule.getConfirmDept());
+		setToDepot(rule.getDirectionRule().getToDepot());
+		setCollectDepot(rule.getDirectionRule().getCollectDepot());
+		
+		setBizRuleId(rule.getId());
+		setFromDeptId(rule.getDirectionRule().getFromDeptId());
+		setFromOrgId(rule.getDirectionRule().getFromOrgId());
+		setConfirmDeptId(rule.getConfirmDeptId());
+		setToDepotId(rule.getDirectionRule().getToDepotId());
+		setToAreaType(rule.getDirectionRule().getToAreaType());
+		setCollectDepotId(rule.getDirectionRule().getCollectDepotId());
+		setCollectAreaType(rule.getDirectionRule().getCollectAreaType());
+		setCreatorDepotId(rule.getDirectionRule().getToDepotId());
+	}
+	
+	public void setBizRule(SpdPrepareInformRule bizRule){
+		super.setBizRule(bizRule);
+		if(bizRule == null){
+			return ;
+		}
+		setFromDept(bizRule.getDirectionRule().getFromDept());
+		setToDepot(bizRule.getDirectionRule().getToDepot());
+		setConfirmDept(bizRule.getConfirmDept());
+		setCollectDepot(bizRule.getDirectionRule().getCollectDepot());
+	}
+	
+	public void addItems(SpdBizItems theItems){
+		getItems().addAll(theItems);
+	}
+	
+	public boolean hasCollectDepot(){
+		return StringUtils.isNotEmpty(collectDepotId);
+	}
+	
+	public boolean hasItems(){
+		return CollectionUtils.isNotEmpty(getItems());
+	}
+
+	public PcsDepot getStockChangeDepot() {
+		return null;
+	}
+
+	@JsonIgnore
+	public String getTargetAreaType() {
+		return PcsAreaType.typeOf(getToAreaType()).getName();
+	}
+
+	public SpdBizType getBizType() {
+		return SpdBizType.prepare_inform_biz;
+	}
+
+	public SpdPrepareInformBizs splitPrepareInform(int batchGoodsSize) {
+		SpdPrepareInformBizs prepareInforms = new SpdPrepareInformBizs();
+		
+		int itemSize = getItems().size();
+		int groupSize = (int)Math.ceil((double)itemSize/batchGoodsSize);
+		for(int i =1; i<groupSize; i++){
+			int startInx = batchGoodsSize*i;
+			int endInx = batchGoodsSize*(i+1)<itemSize?batchGoodsSize*(i+1):itemSize;
+			SpdBizItems theItems = new SpdBizItems(getItems().subList(startInx, endInx));
+			
+			SpdPrepareInformBiz newPrepareInform = new SpdPrepareInformBiz();
+			newPrepareInform.setBizRuleId(getBizRuleId());
+			newPrepareInform.setCreatorDepotId(getCreatorDepotId());
+			newPrepareInform.setMaintenanceInfo(getMaintenanceInfo());
+			newPrepareInform.setRemark(getBizCode());
+			newPrepareInform.setItems(theItems);
+			prepareInforms.add(newPrepareInform);
+		}
+		
+		return prepareInforms;
+	}
+	
+}

@@ -1,0 +1,19 @@
+package cn.ak4j.yard.pcs.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewPcsDeptTO {
+
+	private String parentId;
+	private String orgId;
+	private String deptName;
+	private String deptCode;
+	private String deptType;
+	private boolean enabled;
+	private boolean mainFlag;
+	private String defaultUserId;
+}

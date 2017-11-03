@@ -1,0 +1,37 @@
+package cn.ak4j.yard.spd.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.IntegerParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdInventoryItemParams extends QueryParams{
+
+	private ListParam<String> inventoryItemId;
+	private ListParam<String> inventoryId;
+	private ListParam<String> cardId;
+	private ListParam<String> goodsId;
+	private ListParam<String> stockGoodsLotId;
+	private FloatRangeParam planQty;
+	private FloatRangeParam showQty;
+	private FloatRangeParam unqualifiedQty;
+	
+	private FloatRangeParam checkQty;
+	private ListParam<String> depotId;
+	private ListParam<String> shelfId;
+	private IntegerParam checkStateCode;
+	private ListParam<String> formatName;
+	private ListParam<String> lotNo;
+	private DateRangeParam lotValidityText;
+	private DateRangeParam produceDate;
+	private ListParam<String> sterilizeLotNo;
+	private DateRangeParam sterilizeTime;
+	private ListParam<String> shelfName;
+	private ListParam<String> shelfCode;
+}

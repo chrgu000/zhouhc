@@ -1,0 +1,63 @@
+package cn.ak4j.yard.yds.service;
+
+import static org.junit.Assert.assertNotNull;
+
+import java.util.Calendar;
+import java.util.Date;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsLotRepository;
+
+public class YdsEdsGoodsLotServiceTest extends BaseTest{
+	
+	@Autowired private YdsEdsGoodsLotService eglService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YdsEdsGoodsLotRepository eglRepository;
+	
+	@Test public void testAdd(){
+		String lotNo = "ln_9999992";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		YdsEdsGoodsLot edsGoodsLot = eglService.add(buildEdsGoodsLot(lotNo), user);
+		assertNotNull(edsGoodsLot);
+		
+		YdsEdsGoodsLot edsGoodsLotPO = eglRepository.findAll().findByEdsLotNo(lotNo).get(0);
+		assertNotNull(edsGoodsLotPO);
+		assertNotNull(edsGoodsLotPO.getSterilizeLotNo());
+		assertNotNull(edsGoodsLotPO.getSterilizeTime());
+	}
+	
+	@Test public void testCheckAndCreateNotExistEdsGoodsLots(){
+		String lotNo = "ln_9999999";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		YdsEdsGoodsLots edsGoodsLots = new YdsEdsGoodsLots();
+		edsGoodsLots.add(buildEdsGoodsLot(lotNo));
+		
+		eglService.checkAndCreateNotExistEdsGoodsLots(edsGoodsLots, user);
+		YdsEdsGoodsLot edsGoodsLotPO = eglRepository.findAll().findByEdsLotNo(lotNo).get(0);
+		assertNotNull(edsGoodsLotPO);
+	}
+
+	private YdsEdsGoodsLot buildEdsGoodsLot(String lotNo){
+		YdsEdsGoodsLot edsGoodsLot = new YdsEdsGoodsLot();
+		edsGoodsLot.setEdsGoodsId("eds_goods_id_001");
+		edsGoodsLot.setEdsLotNo(lotNo);
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.DAY_OF_YEAR, 30);
+		edsGoodsLot.setEdsLotValidity(cal.getTime());
+		edsGoodsLot.setProduceDate(new Date());
+		edsGoodsLot.setEnabled(true);
+		edsGoodsLot.setCheckStateCode(CheckState.commited.getCode());
+		edsGoodsLot.setSterilizeLotNo("sterilize_lot_no_001");
+		edsGoodsLot.setSterilizeTime(new Date());
+		return edsGoodsLot;
+	}
+}

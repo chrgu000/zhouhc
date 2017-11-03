@@ -1,0 +1,1 @@
+alter table pcs_depot_shelf rename column sequence to inx;

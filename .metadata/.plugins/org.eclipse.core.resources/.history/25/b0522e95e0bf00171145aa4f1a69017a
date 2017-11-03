@@ -1,0 +1,114 @@
+package cn.ak4j.yard.pcs.service;
+
+import java.util.Date;
+
+import javax.transaction.Transactional;
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsRole;
+import cn.ak4j.yard.pcs.domain.PcsRoleOp;
+import cn.ak4j.yard.pcs.domain.PcsRoles;
+import cn.ak4j.yard.pcs.domain.PcsUserRole;
+import cn.ak4j.yard.pcs.params.PcsRoleParams;
+import cn.ak4j.yard.pcs.repository.PcsRoleOpRepository;
+import cn.ak4j.yard.pcs.repository.PcsRoleRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRoleRepository;
+
+@Service("pcsRoleService")
+public class PcsRoleService extends IYardService<PcsRole>{
+	@Autowired private PcsRoleRepository roleRepository;
+	@Autowired private PcsRoleOpRepository roleOpRepository;
+	@Autowired private PcsUserRoleRepository urRepository;
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allPcsRoles\"")
+	public PcsRole add(@Valid PcsRole role, IUser user){
+		PcsRoleParams params = new PcsRoleParams();
+		params.setRoleCode(new ListParam<String>(role.getRoleCode()));
+		PcsRoles roles = (PcsRoles)roleRepository.findAll().find(params);
+		if(roles.size()>0){
+			throw new InvalidDataException("当前编码已存在,请重新输入");
+		}
+		role = roleRepository.save(role);
+		return role;
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allPcsRoles\"")
+	public PcsRole modify(@Valid PcsRole role, IUser user){
+		PcsRoleParams params = new PcsRoleParams();
+		params.setRoleCode(new ListParam<String>(role.getRoleCode()));
+		params.setRoleId(new ListParam<String>(role.getRoleId(),QueryParam.operation_not_in));
+		PcsRoles roles = roleRepository.find(params);
+		if(roles.size()>0){
+			throw new InvalidDataException("当前编码已存在,请重新输入");
+		}
+		
+		PcsRole rolePO = roleRepository.findOne(role.getRoleId());
+		rolePO.update(role, user.getOrgId(), user.getUserId());
+		roleRepository.save(rolePO);
+		return rolePO;
+	}
+	
+	@Transactional
+	@CacheEvict(value = "longTimeCache", key = "\"allPcsRoles\"")
+	public void delete(String roleId, IUser user){
+		PcsRole role = roleRepository.findOne(roleId);
+		if(!role.canUpdate()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, role.getRoleName());
+		}
+		
+		PcsUserRole userRole = CollectionUtils.findWhere("roleId", roleId, urRepository.findAll());
+		if(userRole != null){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete_role);
+		}
+			
+		roleRepository.delete(role);
+		roleOpRepository.delete(role.getRoleId());
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allPcsRoles\""), 
+			        @CacheEvict(value="userWebApisCache", allEntries=true)})
+	public PcsRole updateCheckState(String roleId, int checkStateCode, Date lastDate, IUser user){
+		PcsRole role = roleRepository.findOne(roleId);
+		role.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		roleRepository.save(role);
+		return role;
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allPcsRoles\""), 
+					@CacheEvict(value="userWebApisCache", allEntries=true),
+					@CacheEvict(value="longTimeCache", key="\"allRoleOps\"")})
+    public PcsRoleOp addRoleOp(PcsRoleOp operation, IUser user){
+    	PcsRoleOp operationPO = roleOpRepository.findAll().findByRoleIdAndOpId(operation.getRoleId(), operation.getOpId());
+		if (operationPO != null){
+			return operationPO;
+		}else{
+			return roleOpRepository.save(operation);
+		}
+    }
+    
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allPcsRoles\""), 
+					@CacheEvict(value="userWebApisCache", allEntries=true),
+					@CacheEvict(value="longTimeCache", key="\"allRoleOps\"")})
+    public void deleteRoleOp(String id, IUser user){
+    	PcsRoleOp roleOperation = roleOpRepository.findAll().findById(id);
+    	if(!roleOperation.canDelete()){
+    		throw new OperateForbiddenException(YardExceptionType.forbide_delete, "opId:" + roleOperation.getOpId());
+    	}
+    	PcsRoleOp roleOperationPO = roleOpRepository.findOne(roleOperation.getId());
+    	roleOpRepository.delete(roleOperationPO);
+    }
+
+}

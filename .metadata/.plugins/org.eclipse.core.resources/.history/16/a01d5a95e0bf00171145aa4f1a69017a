@@ -1,0 +1,116 @@
+package cn.ak4j.yard.extend.zsy;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.zsy.domain.B2BOrderBill;
+import cn.ak4j.yard.extend.zsy.domain.B2BOrderBillItem;
+import cn.ak4j.yard.extend.zsy.domain.SpdZsyIntegrationParams;
+import cn.ak4j.yard.extend.zsy.domain.ZsyIntigrationParams;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+
+@Component
+public class SpdZsyPrepareInformAssember {
+	
+	private final String integrationParams = "zsy_" + YardGlobalInfo.integration_params;
+	
+	public B2BOrderBill build(SpdPrepareInformBiz prepareInform, YdsEdsGoodsRepository egRepository) throws JsonParseException, JsonMappingException, IOException{
+		String intigrationParamsStr = Conf.getAllGlobalInfos().findByKey(integrationParams).getValue();
+		
+		List<SpdZsyIntegrationParams> intigrationParamsList = Global.defaultObjectMapper.readValue(intigrationParamsStr, new TypeReference<List<SpdZsyIntegrationParams>>() {});
+		String depotId = prepareInform.hasCollectDepot() ? prepareInform.getCollectDepotId() : prepareInform.getToDepotId();
+		
+		ZsyIntigrationParams instigrationParams = findInstigrationParamsByDepotId(intigrationParamsList, depotId);
+		
+		B2BOrderBill orderBill = new B2BOrderBill();
+		orderBill.setOutOrderId(prepareInform.getBizCode());
+		orderBill.setOutOrderNo(prepareInform.getBizCode());
+		orderBill.setOutClientId(instigrationParams.getOutClientId());
+		orderBill.setOutClientNo(instigrationParams.getOutClientId());
+		orderBill.setOutClientName(instigrationParams.getOutClientName());
+		orderBill.setOutAddressId(instigrationParams.getOutAddressId());
+		orderBill.setOutAddressName(instigrationParams.getOutAddressName());
+		orderBill.setOutOrderType("STOCK_UP");
+		orderBill.setOutOrderCredate(Global.sdfYMDHms.format(prepareInform.getCreateTime()));
+		
+		String outOrderPickDate = prepareInform.getRequestedDeliveryTime() == null ? "" : Global.sdfYMDHms.format(prepareInform.getRequestedDeliveryTime());
+		orderBill.setOutOrderPickDate(outOrderPickDate);
+		
+		orderBill.setItems(buildItems(prepareInform.getItems(), egRepository, prepareInform.getFromOrgId()));
+		return orderBill;
+	}
+
+	private ZsyIntigrationParams findInstigrationParamsByDepotId(List<SpdZsyIntegrationParams> intigrationParamsList, String depotId) {
+		for(SpdZsyIntegrationParams intigrationParams : intigrationParamsList){
+			if(intigrationParams.getDepotId().equals(depotId)){
+				return intigrationParams.getParams();
+			}
+		}
+		return null;
+	}
+
+	private List<B2BOrderBillItem> buildItems(SpdBizItems items, YdsEdsGoodsRepository egRepository, String orgId) {
+		YdsGoodss goodsList = items.getAllGoods();
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", goodsList);
+		YdsEdsGoodss edsGoodsList = egRepository.findAll().findSupplierUseabledWithGoodsIds(goodsIds, orgId);
+		
+		List<B2BOrderBillItem> billItems = new ArrayList<B2BOrderBillItem>();
+		for(SpdBizItem item : items){
+			if(item.getConfirmQty() <=0 ){
+				continue;
+			}
+			
+			B2BOrderBillItem billItem = new B2BOrderBillItem();
+			
+			YdsEdsGoodss edsGoodss = new YdsEdsGoodss(CollectionUtils.find("yardGoodsId", item.getGoods().getGoodsId(), edsGoodsList));
+			if(CollectionUtils.isEmpty(edsGoodss)){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_without_butting_code, item.getGoods().getFormatName());
+			}else if(edsGoodss.size() > 1){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_relation_many_usable_eds_goods,item.getGoods().getFormatName());
+			}
+			YdsEdsGoods edsGoods = edsGoodss.get(0);
+			
+			float outGdsQty = item.getConfirmQty()/edsGoods.getEdsYdsUnitRatio(); 
+			if(outGdsQty != (int)outGdsQty){
+				throw new InvalidDataException(YardExceptionType.invalid_integration_supplier_qty_error, item.getGoods().getGoodsCode(), item.getConfirmQty(), edsGoods.getEdsGoodsCode(), edsGoods.getEdsYdsUnitRatio());
+			}
+			
+			float price = item.getGoods().getPreparePrice() * edsGoods.getEdsYdsUnitRatio();
+
+//			BigDecimal bigDecimal = new BigDecimal(item.getGoods().getPreparePrice());
+//			float price =  bigDecimal.multiply(new BigDecimal(edsGoods.getEdsYdsUnitRatio())).setScale(3, BigDecimal.ROUND_HALF_UP).floatValue();
+			
+			billItem.setOutGdsFormatName(edsGoods.getEdsGoodsFormatName());
+			billItem.setOutGdsId(edsGoods.getEdsGoodsCode());
+			
+			billItem.setOutGdsQty((int)outGdsQty);
+			billItem.setOutGdsPacksize(1);
+			billItem.setOutGdsUnit(edsGoods.getDeliveryUnitName());
+			billItem.setOutGdsUnitprice(price);
+			billItem.setOutOrderItemId(item.getBizItemId());
+			
+			billItems.add(billItem);
+		};
+		return billItems;
+	}
+
+}

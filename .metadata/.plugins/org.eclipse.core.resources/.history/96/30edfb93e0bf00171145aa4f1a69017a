@@ -1,0 +1,21 @@
+package cn.ak4j.yard.yds.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewYdsGoodsInfoTO {
+
+	private String goodsId;//产品ID
+	private String wjCode;//物价码
+	private String ptCode;//平台码
+	private String ybCode;//医保码
+	private float preparePrice;//备货单价
+	private float consumePrice;//销售单价
+	private float prepareTaxRate;//备货税率
+	private float consumeTaxRate;//销售税率
+	
+	
+}

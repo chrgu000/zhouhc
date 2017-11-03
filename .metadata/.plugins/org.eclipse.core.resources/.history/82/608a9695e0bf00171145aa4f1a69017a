@@ -1,0 +1,142 @@
+package cn.ak4j.yard;
+
+
+import java.sql.Connection;
+import java.util.Arrays;
+import java.util.Comparator;
+
+import javax.sql.DataSource;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.flywaydb.core.Flyway;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationListener;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class AKApplicationEventListener implements ApplicationListener<ApplicationEvent>{
+	@Autowired private DataSource dataSource;
+	@Autowired private YardGlobalInfoRepository giRepository;
+//	@Autowired private CacheManager cacheManager;
+	
+	public void onApplicationEvent(ApplicationEvent event) {
+		if(event instanceof ApplicationReadyEvent){
+			if(Conf.isAutoUpdateDBSchema()){
+				updateSchema();
+			}
+			
+			updateData();
+			//cleanCache();
+		}
+	}
+	
+	private void updateData(){
+		String fileName = "";
+		try{
+			Connection conn = dataSource.getConnection();
+	    	conn.setAutoCommit(false);
+	    	
+	    	//查询数据版本记录
+	    	YardGlobalInfo globalInfo = giRepository.findOne(YardGlobalInfo.data_version);
+	    	YardGlobalInfo dataVersionInfo = null;
+	    	if(globalInfo == null){
+	    		dataVersionInfo = new YardGlobalInfo(YardGlobalInfo.data_version, "数据版本", "0", true, "用于控制数据库数据版本的迁移");
+	    		giRepository.save(dataVersionInfo);
+	    	}else{
+	    		dataVersionInfo = globalInfo;
+	    	}
+	    	int version = Integer.parseInt(dataVersionInfo.getValue());
+	    	int maxVersion = version;
+	    	
+	    	//查询比当前数据版本更高的数据升级脚本文件
+	    	String envCode = Conf.getEnvCode();
+	    	String path = "/db/"+envCode+"_migration";
+	    	ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+	    	Resource[] resources = resolver.getResources("classpath*:"+path+"/V*.sql");
+	    	if(resources == null){
+	    		log.warn("数据版本迁移目录[{}]不存在", path);
+	    		return ;
+	    	}
+	    	
+	    	Arrays.sort(resources, new Comparator<Resource>() {
+	    		public int compare(Resource r1, Resource r2) {
+	    			String fileName1 = r1.getFilename();
+	    			if(!fileName1.startsWith("V") || fileName1.indexOf("__") < 0){
+	    				log.error("invalid sql script file name:{}", fileName1);
+	    				System.exit(0);
+		    		}
+	    			
+	    			String fileName2 = r2.getFilename();
+	    			if(!fileName2.startsWith("V") || fileName2.indexOf("__") < 0){
+	    				log.error("invalid sql script file name:{}", fileName1);
+	    				System.exit(0);
+		    		}
+	    			int version1 = Integer.parseInt(fileName1.substring(1, fileName1.indexOf("__")));
+	    			int version2 = Integer.parseInt(fileName2.substring(1, fileName2.indexOf("__")));
+	    			return version1 - version2;
+	    		}
+			});
+	    	
+	    	StringBuffer sqlBuf = new StringBuffer();
+	    	for(Resource resource : resources){
+	    		fileName = resource.getFilename();
+	    		if(!fileName.startsWith("V") || fileName.indexOf("__") < 0){
+	    			continue;
+	    		}
+	    		String fileVersion = fileName.substring(1, fileName.indexOf("__"));
+	    		int newVersion = Integer.parseInt(fileVersion);
+	    		if(version < newVersion){
+	    			log.debug("new update sql file: {}", fileName);
+	    			//不能使用resource.getFile的方式来获取文件以及文件内容
+	    			String fileContent = IOUtils.toString(resource.getInputStream(), Global.defaultCharset);
+	    			sqlBuf.append(fileContent);
+	    			maxVersion = maxVersion<newVersion?newVersion:maxVersion;
+	    		}
+	    	}
+	    	
+	    	//执行数据升级脚本文件
+	    	String sql = sqlBuf.toString();
+	    	if(StringUtils.isNoneEmpty(sql)){
+	    		ScriptUtils.executeSqlScript(conn, new ByteArrayResource(sql.toString().getBytes(Global.defaultCharset)));
+	    		conn.commit();
+	    	}
+	    	
+	    	dataVersionInfo.updateValue(Integer.toString(maxVersion));
+	    	giRepository.save(dataVersionInfo);
+		}catch(Exception e){
+			log.error("sql脚本执行失败:{}", fileName);
+			e.printStackTrace();
+			System.exit(0);
+		}
+	}
+	
+//	private void cleanCache(){
+//		cacheManager.getCacheNames().forEach(cacheName->{
+//			cacheManager.getCache(cacheName).clear();
+//		});
+//	}
+	
+	private void updateSchema(){
+		log.info("Flyway尝试数据库升级");
+		Flyway flyway = new Flyway();
+		flyway.setDataSource(dataSource);
+		flyway.repair();
+		flyway.migrate();
+	}
+	
+}

@@ -1,0 +1,89 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.web;
+
+import java.util.Arrays;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.params.SpdShelfStockParams;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+/**
+ * 货位产品库存
+ * @Description: 相同货区下的不同批次的货位库存进行合并，
+ * 目前货位产品库存没有新建独立的对象，复用货位库存对象来输出
+ * @author wuyw
+ * @date 2017年10月24日上午10:11:28
+ *
+ */
+@RestController
+public class SpdShelfGoodsStockResource {
+
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	//查询可用仓库货位产品库存记录，必须指定仓库
+	@RequestMapping(value="/yard/spd/spdDepotShelfGoodsStocks", method = RequestMethod.GET)
+	public List<SpdShelfStock> findDepotShelfGoodsStocks(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		SpdShelfStockParams params = SpdShelfStockParams.buildParamsFromJson(paramsStr, SpdShelfStockParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null || params.getDepotId() == null || params.getDepotId().isEmpty()){
+			throw new InvalidDataException("未指定仓库");
+		}
+		if(order == null){
+			order = new OrderParam();
+		}
+		
+		SpdShelfStocks shelfStocks = ssRepository.find(params);
+		shelfStocks.fillGoodsLots(glRepository);
+		SpdShelfStocks goodsShelfStocks = shelfStocks.mergeByGoods().getUseableShelfStock();
+		
+		return goodsShelfStocks.findByPage(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotShelfGoodsStocks/count", method = RequestMethod.GET)
+	public int counDepotShelfGoodsStocks(
+			@RequestParam(value = "params", required = false) String paramsStr,
+			HttpServletRequest request){
+		SpdShelfStockParams params = SpdShelfStockParams.buildParamsFromJson(paramsStr, SpdShelfStockParams.class);
+		if(params == null || params.getDepotId() == null || params.getDepotId().isEmpty()){
+			throw new InvalidDataException("未指定仓库");
+		}
+
+		SpdShelfStocks shelfStocks = ssRepository.find(params);
+		shelfStocks.fillGoodsLots(glRepository);
+		SpdShelfStocks goodsShelfStocks = shelfStocks.mergeByGoods().getUseableShelfStock();
+		
+		return goodsShelfStocks.size();
+	}
+		
+	@RequestMapping(value="/yard/spd/depots/{depotId}/shelfTypes/{shelfType}/spdShelfGoodsStocks/goodsIds,{goodsIds}", method = RequestMethod.GET)
+	public SpdShelfStocks getShelfGoodsStock(@PathVariable("depotId") String depotId,
+			                                @PathVariable("shelfType") String shelfType,
+			                                @PathVariable("goodsIds") String goodsIds){
+		List<String> ids = Arrays.asList(goodsIds.split(","));
+		SpdShelfStocks shelfStocks = ssRepository.findByShelfTypeAndGoodss(depotId, shelfType, ids, 0);
+		shelfStocks.fillGoodsLots(glRepository);
+		SpdShelfStocks result = shelfStocks.mergeByGoods();
+		return result;
+	}
+}

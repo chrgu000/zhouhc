@@ -1,0 +1,61 @@
+package cn.ak4j.yard.extend.gep;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.Base64;
+
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import cn.ak4j.Global;
+
+@SuppressWarnings("rawtypes")
+public class XmlBeanConverter {
+
+	private static Logger logger = LoggerFactory.getLogger(XmlBeanConverter.class);
+
+	public static String getXmlFromBean(Object bean, Class clazz) throws JAXBException, IOException{
+		JAXBContext jaxbContext = JAXBContext.newInstance(clazz);
+		Marshaller jaxbMarshaller = jaxbContext.createMarshaller();
+		jaxbMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+		ByteArrayOutputStream out = null;
+		try{
+			out = new ByteArrayOutputStream();
+			jaxbMarshaller.marshal(bean, out);
+		}finally{
+			out.close();
+		}
+
+		String xml = new String(out.toByteArray(), Global.defaultCharset);
+		logger.info(xml);
+		return xml;
+	}
+	
+	public static String getBase64XmlFromBean(Object bean, Class clazz) throws JAXBException, IOException{
+
+		String xml = getXmlFromBean(bean, clazz);
+		String result = Base64.getEncoder().encodeToString(xml.getBytes(Global.defaultCharset));
+		return result;
+	}
+	
+	public static Object getBeanFromBase64Xml(String str, Class clazz) throws JAXBException, IOException{
+		String xml = new String(Base64.getDecoder().decode(str.getBytes(Global.defaultCharset)), Global.defaultCharset);
+//		logger.debug(xml);
+		JAXBContext jaxbContext = JAXBContext.newInstance(clazz);
+		Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
+		ByteArrayInputStream in = null;
+		try{
+			in = new ByteArrayInputStream(xml.getBytes(Global.defaultCharset));
+			return jaxbUnmarshaller.unmarshal(in);
+		}finally{
+			in.close();
+		}
+	}
+	
+}

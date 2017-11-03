@@ -1,0 +1,40 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedgerItems;
+import cn.ak4j.yard.spd.reconciliation.params.SpdGeneralLedgerItemParams;
+
+public class SpdGeneralLedgerItemResourceTest extends BaseTest{
+	
+	@Test public void testFindAll() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/SpdGeneralLedgerItems?accessToken={accessToken}&pageSize=-1";
+		
+		SpdGeneralLedgerItems items = mockMvcHelper.mockGet(SpdGeneralLedgerItems.class, url, accessToken);
+		assertEquals(51, items.size());
+		
+		
+		url = "/spd/SpdGeneralLedgerItems?params={params}&accessToken={accessToken}";
+		SpdGeneralLedgerItemParams params = new SpdGeneralLedgerItemParams();
+		params.setOrgName(new ListParam<String>("11"));
+		
+		items = mockMvcHelper.mockGet(SpdGeneralLedgerItems.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		 assertEquals(0, items.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/SpdGeneralLedgerItems/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(51, count);
+	}
+}
+

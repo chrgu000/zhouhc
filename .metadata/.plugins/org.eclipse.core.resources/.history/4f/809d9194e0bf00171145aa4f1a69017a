@@ -1,0 +1,141 @@
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.factory.SpdDailyCleanBizReportFactory;
+import cn.ak4j.yard.spd.reconciliation.params.SpdDailyCleanBizParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdDailyCleanBizRepository;
+import cn.ak4j.yard.spd.reconciliation.service.SpdDailyCleanBizService;
+import cn.ak4j.yard.sys.domain.ReportConfig;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.web.PdfExportHelper;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@RestController
+public class SpdDailyCleanBizResource {
+
+	@Autowired private SpdDailyCleanBizRepository dcbRepository;
+	@Autowired private SpdDailyCleanBizService dcbService;
+	@Autowired private PdfExportHelper pdfExportHelper;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDailyCleanBizReportFactory dcbrFactory;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@RequestMapping(value="/yard/spd/needCleanDays", method=RequestMethod.GET)
+	public List<Date> getCleanDays(@RequestParam("depotId")String depotId, HttpServletRequest request){
+		return dcbService.findCleanDays(depotId);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDailyCleans/myRelated", method = RequestMethod.GET)
+	public SpdDailyCleanBizs findMyRelated(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		
+		SpdDailyCleanBizParams params = SpdDailyCleanBizParams.buildParamsFromJson(paramsStr, SpdDailyCleanBizParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdDailyCleanBizParams();
+		}
+		if(CollectionUtils.isNotEmpty(depots)){
+			params.setDepotId(new ListParam<String>(depots.getIds()));
+		}else{
+			return new SpdDailyCleanBizs();
+		}
+		
+		return dcbRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDailyCleans/myRelated/count", method = RequestMethod.GET)
+	public int countMyRelated(@RequestParam(value = "params", required = false) String paramsStr, String orders, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		SpdDailyCleanBizParams params = SpdDailyCleanBizParams.buildParamsFromJson(paramsStr, SpdDailyCleanBizParams.class);
+		if(params == null){
+			params = new SpdDailyCleanBizParams();
+		}
+		if(CollectionUtils.isNotEmpty(depots)){
+			params.setDepotId(new ListParam<String>(depots.getIds()));
+		}else{
+			return 0;
+		}
+		
+		return dcbRepository.count(params);
+	}
+	
+	/**
+	 * 查询没有做财务对账的日清业务
+	 */
+	@RequestMapping(value="/yard/spd/spdDailyCleans/unreconciliations", method=RequestMethod.GET)
+	public SpdDailyCleanBizs findUnReconciliations(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, HttpServletRequest request){
+		log.debug("paramsStr:{}", paramsStr);
+		SpdDailyCleanBizParams params = SpdDailyCleanBizParams.buildParamsFromJson(paramsStr, SpdDailyCleanBizParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = new OrderParam("depotId", "asc");
+		}
+		if(params == null || params.getDepotId() == null || params.getDepotId().isEmpty()){
+			throw new InvalidDataException("没有指定depotId，不能查询");
+		}
+		return dcbRepository.findByUnreconciliation(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDailyCleans/{bizId}/pdf", method = RequestMethod.GET)
+	public void getPdf(@PathVariable("bizId")String bizId,  HttpServletRequest request, HttpServletResponse response) throws Exception{
+		//构造数据
+		SpdDailyCleanBiz dailyClean = dcbRepository.findByWithPropertyChangeRecords(bizId);
+		PcsDepots depots = depotRepository.findAllWithRelations();
+		PcsDepot depot = depots.findById(dailyClean.getDepotId());
+		
+		//获取列表信息
+		List<SpdDailyCleanBizReport> dailyCleanBizReports = dcbrFactory.buildDailyCleanReportsFromDailyClean(dailyClean);
+		
+		//结算总金额
+		float totalAmount = 0;
+		for(SpdDailyCleanBizReport dailyCleanReport : dailyCleanBizReports){
+			totalAmount+=dailyCleanReport.getAmount();
+		}
+		//构造列头信息
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		parameters.put("depotName", depot.getDepotName());
+		parameters.put("targetDate", dailyClean.getTargetDate());
+		parameters.put("bizCode", dailyClean.getBizCode());
+		parameters.put("totalAmout", totalAmount);
+	
+		//执行pdf打印
+		ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.completed_daily_clean_report).getConfig();
+		pdfExportHelper.export(String.format("%s.jasper", config.getJasperFilePath()), config.getPdfFileName(), parameters, dailyCleanBizReports, "inline", response);
+	}
+	
+}

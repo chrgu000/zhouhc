@@ -1,0 +1,75 @@
+package cn.ak4j.yard.pcs.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import lombok.Getter;
+
+/**
+* @Description: PcsDepotRepository只支持findAll()和findAllWithRelation()方法，所有细粒度查询均通过集合来查询，Repository类不做支持
+* 这里的设计强调所有关于仓库的查询都通过缓存来查询
+* @author zhengyf
+* @date 2017年5月19日 上午10:23:01
+* @version V1.0.0
+ */
+@Repository
+public class PcsDepotRepository extends BaseRepository<PcsDepot, PcsDepots, PcsDepotParams, String> {
+	
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsDepotAreaRepository daRepository;
+	
+	@Cacheable(value="longTimeCache", key="\"allDepotsWithRelations\"")
+	public PcsDepots findAllWithRelations(){
+		PcsDepots allDepots = getAll();
+		
+		PcsDepts allDepts = deptRepository.findAllWithRelations();
+		allDepots.fillManageDepts(allDepts);
+		allDepots.fillAreas(daRepository.findAllWithRelation());
+		
+		return allDepots;
+	};
+	
+	@Cacheable(value="longTimeCache", key="\"allDepots\"")
+	public PcsDepots findAll(){
+		return getAll();
+	}
+	
+	@Deprecated
+	public PcsDepots findByIds(List<String> ids){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public PcsDepots find(PcsDepotParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public PcsDepots find(PcsDepotParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	};
+	
+	@Deprecated
+	public PcsDepot findOne(String depotId){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public int count(PcsDepotParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+}

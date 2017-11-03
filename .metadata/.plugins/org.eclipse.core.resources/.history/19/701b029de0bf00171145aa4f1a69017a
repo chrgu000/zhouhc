@@ -1,0 +1,1 @@
+  insert into SYS_GLOBAL_INFO (KEY,NAME,VALUE,DESCRIPTION,CREATE_TIME,LAST_UPDATE_TIME,EDITABLE) values ('prepareInform_batch_goods_size','备货产品数量','200','该属性用来表示缺货备货时按照产品数量进行拆分多个备货通知单',sysDate,sysDate,'1');

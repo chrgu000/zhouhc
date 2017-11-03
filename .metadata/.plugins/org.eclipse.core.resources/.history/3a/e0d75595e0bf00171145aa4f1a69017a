@@ -1,0 +1,7 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import cn.ak4j.yard.extend.SpdIntegrationParams;
+
+public class SpdZsyIntegrationParams extends SpdIntegrationParams<ZsyIntigrationParams>{
+
+}

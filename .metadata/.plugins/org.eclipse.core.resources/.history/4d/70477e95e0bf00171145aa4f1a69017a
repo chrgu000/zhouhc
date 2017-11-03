@@ -1,0 +1,39 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum YardBatchTaskType implements ITypeEnum{
+
+	batch_create_delivery_order_task("batch_create_delivery_sheet_task", "批量创建发货单任务", ""),
+	batch_import_depot_cards_task("batch_import_depot_cards_task", "批量导入帐页任务", ""),
+	batch_import_goods_lot_task("batch_import_goods_lot_task", "批量导入标准产品批次任务", ""),
+	batch_import_eds_goods_lot_task("batch_import_eds_goods_lot_task", "批量导入企业产品批次任务", ""),
+	batch_import_initial_stock_task("batch_import_initial_stock_task", "批量导入初始库存任务", ""),
+	batch_import_initial_ending_task("batch_import_initial_ending_task", "批量导入初始期末任务", ""),
+	batch_import_prepare_inform_item_task("batch_import_prepare_inform_item_task", "批量导入备货计划明细单任务", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	
+	public static YardBatchTaskType typeOf(String type){
+		for(YardBatchTaskType taskType : YardBatchTaskType.values()){
+			if(taskType.getCode().equals(type)){
+				return taskType;
+			}
+		}
+		return null;
+	}
+	
+	private YardBatchTaskType(String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+}

@@ -1,0 +1,107 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdAbstractWrapper;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class SpdDepotTaskItems<T extends SpdDepotTaskItem> extends SpdTaskItems<T>{
+
+	public SpdDepotTaskItems(List<T> entities){
+		super(entities);
+	}
+	
+	public void fillShelfs(PcsDepotShelfs shelfs){
+		for(SpdDepotTaskItem item : this){
+			PcsDepotShelf shelf = CollectionUtils.findWhere("depotShelfId", item.getShelfId(), shelfs);
+			item.setShelf(shelf);
+		}
+	}
+	
+	public void fillGoodsLots(YdsGoodsLots goodsLots){
+		for(SpdDepotTaskItem item : this){
+			YdsGoodsLot goodsLot = CollectionUtils.findWhere("goodsLotId", item.getLotId(), goodsLots);
+			item.setSpecialGoodsLot(goodsLot);
+			if(goodsLot != null && goodsLot.getGoods() != null){
+				item.setGoods(goodsLot.getGoods());
+			}
+		}
+	}
+	
+	public void fillGoodsLots(YdsGoodsLotRepository goodsLotRepository){
+		YdsGoodsLots goodsLots = goodsLotRepository.findAllWithGoods().findByIds(CollectionUtils.pluck("lotId", this));
+		fillGoodsLots(goodsLots);
+	}
+
+	@Deprecated
+	public void orderByDepotShelf(PcsDepot depot) {
+		fillShelfs(depot.getAreas().findShelfsByShelfId(CollectionUtils.pluck("shelfId", this)));
+		Collections.sort(this, new Comparator<SpdDepotTaskItem>() {
+			public int compare(SpdDepotTaskItem item1, SpdDepotTaskItem item2) {
+				PcsDepotShelf shelf1 = item1.getShelf();
+				PcsDepotShelf shelf2 = item2.getShelf();
+				String shelfCode1 = shelf1==null?"":shelf1.getShelfCode();
+				String shelfCode2 = shelf2==null?"":shelf2.getShelfCode();
+				return shelfCode1.compareTo(shelfCode2);
+			}
+		});
+	}
+	
+	public void orderByDepotShelfInx(PcsDepot depot){
+		fillShelfs(depot.getAreas().findShelfsByShelfId(CollectionUtils.pluck("shelfId", this)));
+		Collections.sort(this, new Comparator<SpdDepotTaskItem>() {
+			public int compare(SpdDepotTaskItem item1, SpdDepotTaskItem item2) {
+				PcsDepotShelf shelf1 = item1.getShelf();
+				PcsDepotShelf shelf2 = item2.getShelf();
+				Integer inx1 = shelf1.getInx()==null?-1:shelf1.getInx();
+				Integer inx2 = shelf2.getInx()==null?-1:shelf2.getInx();
+				return inx1.compareTo(inx2);
+			}
+		});
+	}
+
+	public void fillShelfStock(SpdShelfStockRepository ssRepository, PcsDepotArea depotArea) {
+		SpdShelfStocks shelfStocks = ssRepository.findByShelfTypeAndGoodsLots(depotArea.getDepotId(), depotArea.getAreaType(), CollectionUtils.pluck("lotId", this));
+		
+		this.forEach(item->{
+			SpdShelfStock shelfStock = CollectionUtils.findWhere("lotId", item.getLotId(), shelfStocks);
+			if(shelfStock != null){
+				item.setShelfStock(shelfStock);
+			}
+		});
+	}
+
+	public void unwrap(SpdAbstractWrapper wrapper) {
+		this.forEach(item->{
+			if(wrapper.getId().equals(item.getParentWrapperId())){
+				item.unwrap();
+			}
+		});
+	}
+
+	public SpdShelfStocks getAllShelfStocks() {
+		SpdShelfStocks stocks = new SpdShelfStocks();
+		this.forEach(item->{
+			if(item.getShelfStock() != null){
+				stocks.add(item.getShelfStock());
+			}
+		});
+		return stocks;
+	}
+
+}

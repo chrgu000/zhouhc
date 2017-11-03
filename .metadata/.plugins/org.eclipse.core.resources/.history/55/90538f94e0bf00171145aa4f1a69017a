@@ -1,0 +1,110 @@
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.utils.ExcelBuilder;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdRecItemsGenerateStatuses;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReport;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportType;
+import cn.ak4j.yard.spd.reconciliation.service.SpdFinacialReconciliationBizService;
+import cn.ak4j.yard.sys.domain.ReconciliationReportDisplayConfig;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@RestController
+public class SpdFinacialReconciliationResource {
+
+	@Autowired private YardExcelFormatFactory excelFormatFactory;
+	@Autowired private SpdRecItemsGenerateStatuses itemsGenerateStatuses;
+	@Autowired private SpdFinacialReconciliationBizService frbService;
+	
+	@RequestMapping(value="/yard/spd/spdFinacialReconciliations/{id}/generateItemsStatus", method=RequestMethod.GET)
+	public GenerateItemsStatus getGenerateItemsStatus(@PathVariable(name="id")String bizId){
+		Integer status = itemsGenerateStatuses.get(bizId);
+		return new GenerateItemsStatus(bizId, status != null?status:-1);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdFinacialReconciliations(ruleId={ruleId})/beginingReconciliation", method=RequestMethod.GET)
+	public SpdFinacialReconciliationBiz findBeginingReconciliation(@PathVariable(name="ruleId")String ruleId){
+		return frbService.findBeginingReconciliation(ruleId);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdFinacialReconciliations/{id}/syncStatus", method=RequestMethod.PUT)
+	public Map<String, Boolean> syncFinancialReconciliation(@PathVariable(name="id")String bizId, HttpServletRequest request) throws Exception{
+		IUser user = (IUser)request.getAttribute(Constant.user_attr_name);
+		frbService.syncFinancialReconciliation(bizId, user);
+		Map<String, Boolean> result = new HashMap<String, Boolean>();
+		result.put(bizId, true);
+		return result;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdFinacialReconciliations/{id}/report", method=RequestMethod.GET)
+	public SpdReconciliationReport<?> getReport(@PathVariable("id")String reconciliationId, @RequestParam("reportTypeCode")String reportTypeCode){
+		SpdReconciliationReport<?> report = frbService.queryReport(reconciliationId, SpdReconciliationReportType.typeOf(reportTypeCode), null, null);
+		return report;
+	}
+	
+	@RequestMapping(value="/yard/spd/reconciliationReportTypes", method=RequestMethod.GET)
+	public SpdReconciliationReportType[] getAllReportTypes(){
+		SpdReconciliationReportType[] allReportTypes = SpdReconciliationReportType.values();
+		return allReportTypes;
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@RequestMapping(value="/yard/spd/spdFinacialReconciliations/{id}/report/xls", method=RequestMethod.GET)
+	public void getXlsReport(@PathVariable("id")String reconciliationId, @RequestParam("reportTypeCode")String reportTypeCode,
+			HttpServletResponse response) throws Exception{
+		SpdReconciliationReport<?> report = frbService.queryReport(reconciliationId, SpdReconciliationReportType.typeOf(reportTypeCode), null, null);
+		ExcelBuilder exportExcel = new ExcelBuilder<SpdReconciliationReport>();
+		String reportName = report.getReportType().getName();
+		List<ReconciliationReportDisplayConfig> configs = Conf.getAllGlobalInfos().getReconciliationReportDisplayConfigs();
+		ReconciliationReportDisplayConfig config = CollectionUtils.findWhere("reportTypeCode", report.getReportType().getCode(), configs);
+		String customReportName = config.getReportName();
+		if(StringUtils.isNotEmpty(customReportName)){
+			reportName = customReportName;
+		}
+		
+		byte[] bytes = exportExcel.buildExcel(reportName, report, report.getItems(), excelFormatFactory.getExcelFormats(report.getReportType().getCode()));
+		response.reset();
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding(Global.defaultCharset.name());
+		response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode(reportName+".xls", Global.defaultCharset.name()));
+		IOUtils.write(bytes, response.getOutputStream());
+	}
+	
+	
+}
+
+@NoArgsConstructor
+class GenerateItemsStatus{
+	@Getter @Setter private String bizId;
+	@Getter @Setter private int status;
+	
+	public GenerateItemsStatus(String bizId, int status){
+		this.bizId = bizId;
+		this.status = status;
+	}
+}

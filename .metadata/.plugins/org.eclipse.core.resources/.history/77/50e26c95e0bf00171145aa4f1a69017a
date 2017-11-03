@@ -1,0 +1,19 @@
+package cn.ak4j.yard.extend.gep.domain;
+
+import lombok.Data;
+
+@Data
+public class AddInmAllotNoticeResult {
+
+	private String result;
+	private String message;
+	
+	public String getAllotNoticeCode(){
+		int index1 = message.indexOf("单据号：");
+		int index2 = message.indexOf("调拨通知单");
+		if(index1 >=0 && index2 >= 0){
+			return message.substring(index1+4, index2);
+		}
+		return "";
+	}
+}

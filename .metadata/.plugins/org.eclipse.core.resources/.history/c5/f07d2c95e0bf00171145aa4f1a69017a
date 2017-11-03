@@ -1,0 +1,15 @@
+package cn.ak4j.yard.pcs.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewPcsRoleOpTO {
+	
+	private String functionId;
+	private String opId;
+	private String roleId;
+	private Integer yardId;
+}

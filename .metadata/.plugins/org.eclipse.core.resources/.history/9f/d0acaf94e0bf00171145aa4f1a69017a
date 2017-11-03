@@ -1,0 +1,81 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import cn.ak4j.entity.IEntity;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ * 物权变更明细同收货明细的关联明细，完整的表达：物权变更明细收货明细
+* @author zhengyf
+* @date 2017年8月22日 下午3:47:41
+* @version V1.0.0
+ */
+@SuppressWarnings("serial")
+@NoArgsConstructor
+@Entity
+@Table(name="spd_prp_chg_item_relation")
+public class SpdPropertyChangeRelationItem implements IEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String id;
+	
+	@Column(name="prop_chg_item_id") @Getter @Setter
+	private String propertyChangeItemId;
+	
+	@Getter @Setter
+	private String receiveId;
+	
+	@Getter @Setter
+	private String receiveItemId;
+	
+	@Getter @Setter
+	private Integer dealQty;
+	
+	@Getter @Setter
+	private String sendCode;
+	
+	@Getter @Setter
+	private String sendId;
+
+	@Getter @Setter
+	private String sendItemCode;
+	
+	@Getter @Setter
+	private Float unitPrice;
+	
+	public SpdPropertyChangeRelationItem(Integer dealQty, String propertyChangeItemId, String receiveId, String receiveItemId, String sendId, String sendCode, String sendItemCode){
+		this.dealQty = dealQty;
+		this.propertyChangeItemId = propertyChangeItemId;
+		this.receiveId = receiveId;
+		this.receiveItemId = receiveItemId;
+		this.sendId = sendId;
+		this.sendCode = sendCode;
+		this.sendItemCode = sendItemCode;
+	}
+	
+	public int getQtyByUnitLv(YdsGoods goods, int unitLv){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), unitLv);
+		return (int)(getDealQty()*unitRatio);
+	}
+	
+	public float getPriceByUnitLv(YdsGoods goods, int unitLv){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), unitLv);
+		return getUnitPrice() / unitRatio;
+	}
+}

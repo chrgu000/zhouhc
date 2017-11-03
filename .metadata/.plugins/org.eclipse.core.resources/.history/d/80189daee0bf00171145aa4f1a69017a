@@ -1,0 +1,509 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLogs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizLogRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+@SuppressWarnings({"unchecked"})
+public class SpdReplenishBizServiceTest extends BaseTest{
+
+	@Autowired private SpdReplenishBizService rbService;
+	@Autowired private SpdBizItemService biService;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdBizLogRepository logRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testAddWithEnoughStockInQuickMode() throws InterruptedException{
+		testAddAndAutoComplete(createNewBizItemWithoutEnoughStock());
+	}
+	
+	@Test public void testAddWithEnoughStock() throws InterruptedException{
+		testAddAndAutoComplete(createNewBizItemWithEnoughStock());
+	}
+	
+	@Test public void testAddWithoutEnoughStock() throws InterruptedException{
+		testAddAndAutoComplete(createNewBizItemWithoutEnoughStock());
+	}
+	
+	@Test public void testAddWithNotStockRecord() throws InterruptedException{
+		testAddAndAutoComplete(createNewBizItemWithNotStockRecord());
+	}
+	
+	@Test public void testAllQtyEmptyAutoFeedback(){
+		String bizId = "rep_biz_id_018";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdReplenishBiz replenish = rbRepository.findByIdWithRule(bizId);
+		
+		rbService.reviewReplenish(replenish, replenish.getLastUpdateTime(), user);
+		
+		wait(3);
+		
+		replenish = rbRepository.findOne(bizId);
+		
+		assertEquals(SpdReplenishBizSteps.complete_on_shelf_task, replenish.getCurrentBizStep());
+	}
+	
+	private void testAddAndAutoComplete(SpdBizItems items) throws InterruptedException{
+		String fromOrgId = "626";
+		//String toOrgId = "626";
+		String fromDepotId = "depot_id_001";
+		String toDepotId = "depot_id_003";
+		String userId = "user_id_002";
+		
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdReplenishBiz replenish = new SpdReplenishBiz();
+		replenish.setCreatorDepotId(toDepotId);
+		replenish.setBizRuleId("rep_rule_id_20");
+		replenish.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		replenish.setItems(items);
+		
+		replenish = rbService.add(replenish, user);
+		wait(6);
+		
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.shenlingdanhao);
+		
+		replenish = rbRepository.findOne(replenish.getBizId());
+		rbService.fillAllRelations(replenish);
+		assertEquals(SpdReplenishBizSteps.complete_on_shelf_task, replenish.getCurrentBizStep());
+		assertEquals(CheckState.completed, replenish.getCheckState());
+		assertEquals(CodeSort.shenlingdanhao.getCode()+getCurrentDateCode()+sequenceCode, replenish.getBizCode());
+		assertEquals(fromOrgId, replenish.getFromOrgId());
+		assertEquals(fromDepotId, replenish.getFromDepotId());
+		assertEquals(toDepotId, replenish.getToDepotId());
+		assertEquals(PcsAreaType.normal.getCode(), replenish.getFromAreaType());
+		assertEquals(PcsAreaType.normal.getCode(), replenish.getToAreaType());
+		assertEquals(items.size(), replenish.getItems().size());
+		
+		for(int i = 0; i < replenish.getItems().size(); i++){
+			SpdBizItem bizItem = CollectionUtils.findWhere("goodsId", items.get(i).getGoodsId(), replenish.getItems());
+			assertEquals(items.get(i).getLotId(), bizItem.getLotId());
+			assertEquals(items.get(i).getUnitPrice(), bizItem.getUnitPrice());
+			assertEquals(items.get(i).getPlanQtyByStoreUnit(), bizItem.getPlanQtyByStoreUnit());
+			assertEquals(1, replenish.getDeliveryTasks().size());
+		}
+	}
+	
+	@Test public void testCommit(){
+		String userId = "user_id_002";
+		String replenishId = "rep_biz_id_001";
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		//查询出未提交的申领业务计划
+		SpdReplenishBiz replenish = rbRepository.findOne(replenishId);
+		rbService.fillAllRelations(replenish);
+		
+		//调用提交申领业务
+		replenish = rbService.commitReplenish(replenish, replenish.getMaintenanceInfo().getLastDate(), user);
+
+		//对申领计划单据的状态进行断言
+		assertEquals(CheckState.commited, replenish.getCheckState());
+			 
+		wait(2);
+		 
+		//重新查询这条申领计划
+		replenish = rbRepository.findOne(replenish.getBizId());
+		rbService.fillAllRelations(replenish);
+		
+		//对申领计划进行断言
+		assertEquals(CheckState.commited, replenish.getCheckState());
+		assertEquals(SpdReplenishBizSteps.commit_replenish, replenish.getCurrentBizStep());
+	
+		SpdBizLogs logs = logRepository.findByBizId(replenish.getBizId());
+		assertEquals(2, logs.size());
+	}
+	
+	@Test public void testReviewWithEnoughStock(){
+		String userId = "user_id_002";
+		String replenishId = "rep_biz_id_002";
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		//查询出未提交的申领业务计划
+		SpdReplenishBiz replenish = rbRepository.findOne(replenishId);
+		rbService.fillAllRelations(replenish);
+		
+		//查詢审核前的货位库存
+		List<String> lotIds = replenish.getItems().getAllSpecialGoodsLots().getIds();
+		SpdShelfStocks originShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(replenish.getFromDepotId(), replenish.getFromAreaType(), lotIds);
+		//获取库存中实际可用产品数量，用于后续库存断言中
+		List<SpdGoodsQty> planGoodsQtys = replenish.getItems().getPlanGoodsQtysByStoreUnit();
+		List<SpdGoodsQty> realGoodsQtys = dsService.findRealShelfStoreUnitStocks(replenish.getFromDepotId(), replenish.getFromAreaType(), planGoodsQtys);
+		
+		replenish.getItems().forEach(item->{
+			item.confirmAsPlaned();
+		});
+		
+		biRepository.saveAll(replenish.getItems());
+		
+		//执行审核
+		replenish = rbService.reviewReplenish(replenish, replenish.getMaintenanceInfo().getLastDate(), user);
+		assertEquals(CheckState.reviewed, replenish.getCheckState());
+		wait(8);
+		
+		//重新查询这条申领计划
+		replenish = rbRepository.findOne(replenish.getBizId());
+		rbService.fillAllRelations(replenish);
+		
+		//对申领计划进行断言
+		assertEquals(CheckState.reviewed, replenish.getCheckState());
+		assertEquals(SpdReplenishBizSteps.review_replenish, replenish.getCurrentBizStep());
+		
+		//对明细进行断言
+		replenish.getItems().forEach(item->{
+			if(item.getPlanQty() > item.getConfirmQty()){
+				assertFalse(item.getAsPlanned());
+			}else{
+				assertTrue(item.getAsPlanned());
+			}
+		});
+	
+		//断言日志
+		SpdBizLogs logs = logRepository.findByBizId(replenish.getBizId());
+		assertEquals(3, logs.size());
+		
+		//查询审核后的货位库存
+		SpdShelfStocks newShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(replenish.getFromDepotId(), replenish.getFromAreaType(), lotIds);
+		
+		//校验审核后的的货位库存
+		originShelfStocks.forEach(originShelfStock->{
+			String depotId = originShelfStock.getDepotId();
+			String lotId = originShelfStock.getLotId();
+			SpdShelfStock newShelfStock = newShelfStocks.findByDepotAndGoodsLot(depotId, originShelfStock.getShelfType(), lotId);
+			int incrementQtyByMinUnit = 0;
+			for(SpdGoodsQty goodsQty : realGoodsQtys){
+				if(goodsQty.getSpecialGoodsLot().getGoodsLotId().equals(lotId)){
+					incrementQtyByMinUnit = goodsQty.getQtyByBaseUnit();
+				}
+			}
+			assertEquals(incrementQtyByMinUnit+originShelfStock.getLockQtyByMinUnit(), newShelfStock.getLockQtyByMinUnit().intValue());
+		});
+	}
+	
+	//测试确认数量大于可用库存数量异常情况
+	@Test public void testReviewWithoutEnoughStock(){
+		String userId = "user_id_002";
+		String replenishId = "rep_biz_id_008";
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		//查询出未提交的申领业务计划
+		SpdReplenishBiz replenish = rbRepository.findOne(replenishId);
+		rbService.fillAllRelations(replenish);
+
+		replenish.getItems().forEach(item->{
+			item.confirmAsPlaned();
+		});
+		
+		thrown.expect(OperateFailException.class);
+		
+		//执行审核
+		replenish = rbService.reviewReplenish(replenish, replenish.getMaintenanceInfo().getLastDate(), user);
+		assertEquals(CheckState.reviewed, replenish.getCheckState());
+		
+	}
+	
+	/**
+	 * 测试查找可调度的申领业务
+	 * 1)当前调度已关联申领业务，没有可调度的申领业务
+	 * 2)当前调度已关联申领业务，有可调度的申领业务
+	 * TODO 3)当前调度为关联申领业务，有可调度的申领业务，待补充
+	 */
+	@Test public void testFindDispatchableReplenishsWithNoneBiz(){
+		String dispatcherId = "disp_id_010";
+		
+		SpdReplenishBizs replenishBizs = rbService.findDispatcherableReplenishs(dispatcherId);
+		
+		assertEquals(1, replenishBizs.size());
+		
+		SpdDispatcher dispatcher = dispatcherRepository.findOne(dispatcherId);
+		List<String> bizIds = dispatcher.getRefs().pluck("refObjectId");
+		bizIds.forEach(bizId->{
+			assertNotNull(CollectionUtils.findWhere("bizId", bizId, replenishBizs));
+		});
+	}
+	
+	@Test public void testFindDispatchableReplenishsWithOneBiz(){
+		//审核申领业务
+		String reviewedReplenishId = reviewReplenish();
+		
+		String dispatcherId = "disp_id_010";
+		
+		SpdReplenishBizs replenishBizs = rbService.findDispatcherableReplenishs(dispatcherId);
+		
+		assertEquals(2, replenishBizs.size());
+		
+		SpdDispatcher dispatcher = dispatcherRepository.findOne(dispatcherId);
+		List<String> bizIds = dispatcher.getRefs().pluck("refObjectId");
+		bizIds.add(reviewedReplenishId);
+		
+		bizIds.forEach(bizId->{
+			assertNotNull(CollectionUtils.findWhere("bizId", bizId, replenishBizs));
+		});
+	}
+	
+	@Test public void testAddItemsWithoutRelationLotNo(){
+		String fromDepotId = "depot_id_001";
+		String toDepotId = "depot_id_003";
+		String userId = "user_id_002";
+		
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdReplenishBiz replenish = new SpdReplenishBiz();
+		replenish.setBizRuleId("rep_rule_id_19");
+		replenish.setCreatorDepotId(toDepotId);
+		replenish.setMaintenanceInfo(new MaintenanceInfo(user));
+		replenish.setItems(createNewBizItemsWithoutRalationLot());
+		
+		SpdReplenishBiz newReplenish = rbService.add(replenish, user);
+		assertEquals(fromDepotId, newReplenish.getFromDepotId());
+		assertEquals(toDepotId, newReplenish.getToDepotId());
+	}
+	
+	@Test public void testCommitReplenishBYCanApplyByUserException(){
+		String bizId = "rep_biz_id_001";
+		PcsUser user = userRepository.findAll().findById(xyfUserId);
+		SpdReplenishBiz originReplenish = rbRepository.findOne(bizId);
+		
+		thrown.expect(OperateFailException.class);
+		
+		rbService.updateCheckState(bizId, CheckState.commited.getCode(), originReplenish.getMaintenanceInfo().getLastDate(), user);
+		
+	}
+	
+	@Test public void testCommitReplenishByCanApplyByUser(){
+		String bizId = "rep_biz_id_001";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdReplenishBiz originReplenish = rbRepository.findOne(bizId);
+		SpdReplenishBiz newReplenish = rbService.updateCheckState(bizId, CheckState.commited.getCode(), originReplenish.getMaintenanceInfo().getLastDate(), user);
+		
+		assertEquals(CheckState.commited, newReplenish.getCheckState());
+		assertEquals(originReplenish.getBizId(), newReplenish.getBizId());
+	    assertEquals(originReplenish.getMaintenanceInfo().getCreateUserId(), newReplenish.getMaintenanceInfo().getLastUserId());
+	}
+	
+	@Test public void testReviewReplenishByCanApplyByUserException(){
+		String bizId = "rep_biz_id_008";
+		PcsUser user = userRepository.findAll().findById(xyfUserId);
+		SpdReplenishBiz originReplenish = rbRepository.findOne(bizId);
+		
+		thrown.expect(OperateFailException.class);
+		
+		rbService.updateCheckState(bizId, CheckState.reviewed.getCode(), originReplenish.getMaintenanceInfo().getLastDate(), user);
+		
+	}
+	
+	@Test public void testReviewReplenishByCanApplyByUser(){
+		String bizId = "rep_biz_id_008";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdReplenishBiz originReplenish = rbRepository.getWithItems(bizId);
+		SpdBizItems items = originReplenish.getItems();
+		items.forEach(item->{
+			item.setConfirmQty(0);
+			biService.modify(item, user);
+		});
+		
+		SpdReplenishBiz newReplenish = rbService.updateCheckState(bizId, CheckState.reviewed.getCode(), originReplenish.getMaintenanceInfo().getLastDate(), user);
+		wait(4);
+		assertEquals(CheckState.reviewed, newReplenish.getCheckState());
+		assertEquals(originReplenish.getBizId(), newReplenish.getBizId());
+	    assertEquals(originReplenish.getMaintenanceInfo().getCreateUserId(), newReplenish.getMaintenanceInfo().getLastUserId());
+	}
+	
+	private String reviewReplenish() {
+		String userId = "user_id_002";
+		String replenishId = "rep_biz_id_002";
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdReplenishBiz replenish = rbRepository.findOne(replenishId);
+		rbService.fillAllRelations(replenish);
+		
+		replenish.getItems().confirmAsPlan();
+		biRepository.saveAll(replenish.getItems());
+		
+		replenish = rbService.reviewReplenish(replenish, replenish.getMaintenanceInfo().getLastDate(), user);
+		wait(2);
+		return replenishId;
+	}
+
+	//创建明细用于库房调拨(即申领级别为批次级别)库存足够情况
+	private SpdBizItems createNewBizItemWithEnoughStock(){
+		//一个可用批次的产品A：一个散件
+		//goodsId:goods_id_001 big_sum:24
+		//lotId:goods_lot_id_019 stockQty:4800
+		//qty:6
+
+		//一个可用批次的产品B:N个整件、一个散件
+		//goodsId:goods_id_003 big_sum:18
+		//lotId:goods_lot_id_018 stockQty:360 
+		//qty:60
+
+		//一个可用批次的产品C:N个整件
+		//goodsId:goods_id_005 big_sum:30
+		//lotId:goods_lot_id_021 stockQty:15000
+		//qty:90
+
+		//2个可用批次的产品D：批次L1(N个整件)
+		//goodsId:goods_id_007 big_sum:12
+		//lotId:goods_lot_id_014 stockQty:2940
+		//lotId:goods_lot_id_023 stockQty:1500
+		//qty:36
+
+		//2个可用批次的产品E:批次L2(N个整件)，批次L2(N个整件，一个散件)
+		//goodsId:goods_id_010 big_sum:100
+		//lotId:goods_lot_id_002 stockQty:80000
+		//lotId:goods_lot_id_033 stockQty:100000
+		//qty:400
+
+
+		//3个可用批次的产品F:批次1（N个整件），批次L2(N个整件)，批次三(N个整件，一个散件)
+		//goodsId:goods_id_015 big_sum:6
+		//lotId:goods_lot_id_007 stockQty:54
+		//lotId:goods_lot_id_029 stockQty:18
+		//lotId:goods_lot_id_053 stockQty:6000
+		//qty:86
+
+		//一个可用批次的产品E：N个整件，1个散件（库存足够）
+		//一个有两个可用批次的产品F：批次L1库存不足(N个整件，一个散件)，批次L2库存足够(N个整件)
+		//一个有三个可用批次的产品G：批次L1库存不足（N个整件），批次L2库存不足(1个散件)，批次L3库存足够(N个整件，一个散件)
+		//一个有三个可用批次的产品H:批次L1库存不足(N个整件,0/1个散件)，批次L2库存足够(N个整件，0/1个散件)
+		
+		SpdBizItems items = new SpdBizItems();
+		
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put("goods_id_001", 6);
+		map.put("goods_id_003", 60);
+		map.put("goods_id_005", 90);
+		map.put("goods_id_007", 36);
+		map.put("goods_id_010", 400);
+		map.put("goods_id_015", 86);
+		map.put("goods_id_002", 1);
+		
+		map.entrySet().forEach(entry->{
+			SpdBizItem item = new SpdBizItem();
+			item.setPlanQty(entry.getValue());
+			item.setGoodsId(entry.getKey());
+			item.setUnitPrice(32.5f);
+			item.setUnitLv(2);
+			items.add(item);
+		});
+		
+		return items;
+	}
+	
+	//创建库存不足的申领明细（用于库房补货）
+	private SpdBizItems createNewBizItemWithoutEnoughStock(){
+		//一个可用批次的产品A:N个整件，1个散件（库存不足）
+		//goodsId:goods_id_003 big_sum:18
+		//goodsLotId:goods_lot_id_018 stockQty:300
+		//qty:450
+		
+		SpdBizItems items = new SpdBizItems();
+		
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put("goods_id_003", 400);
+		
+		map.entrySet().forEach(entry->{
+			SpdBizItem item = new SpdBizItem();
+			item.setPlanQty(entry.getValue());
+			item.setGoodsId(entry.getKey());
+			item.setUnitPrice(32.5f);
+			item.setUnitLv(2);
+			items.add(item);
+		});
+
+		return items;
+	}
+	
+	//TODO 补充没库存的情况的申领的审核
+	private SpdBizItems createNewBizItemWithNotStockRecord(){
+		SpdBizItems items = new SpdBizItems();
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put("goods_id_020", 2);
+		map.entrySet().forEach(entry->{
+			SpdBizItem item = new SpdBizItem();
+			item.setPlanQty(entry.getValue());
+			item.setConfirmQty(0);
+			item.setGoodsId(entry.getKey());
+			item.setUnitPrice(32.5f);
+			item.setUnitLv(2);
+			items.add(item);
+		});
+		
+		return items;
+	}
+	
+	//没有可关联的批次
+	private SpdBizItems createNewBizItemsWithoutRalationLot(){
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item = new SpdBizItem();
+		item.setPlanQty(2);
+		item.setConfirmQty(0);
+		item.setGoodsId("goods_id_028");
+		item.setUnitPrice(32.5f);
+		item.setUnitLv(2);
+		items.add(item);
+		
+		return items;
+	}
+	
+//	@Test
+//	public void testRealData(){
+//		SpdReplenishBiz replenish = rbRepository.findOne("402887f25e409b87015e4fe2ccba03a7");
+//		rbService.fillAllRelations(replenish);
+//		
+//		replenish.getItems().forEach(item->{
+//			log.debug("item) goods:{} {}, confirmQty:{}, confirmQtyByStoreUnit:{}", item.getGoods().getGoodsCode(), item.getGoods().getGoodsName(), item.getConfirmQty(), item.getConfirmQtyByStoreUnit()); 
+//		});
+//		
+//		List<SpdGoodsQty> prepareQtyByStoreUnit = replenish.getItems().getConfirmGoodsQtysByStoreUnit();
+//		prepareQtyByStoreUnit.forEach(goodsQty->{
+//			log.debug("prepare) goods:{} {}, real qty:{}", goodsQty.getGoods().getGoodsCode(), goodsQty.getGoods().getGoodsName(), goodsQty.getQty());
+//		});
+//		
+//		List<SpdGoodsQty> realQtyByStoreUnit = dsService.findRealShelfStoreUnitStocks(replenish.getFromDepotId(), replenish.getFromAreaType(), prepareQtyByStoreUnit);
+//		realQtyByStoreUnit.forEach(goodsQty->{
+//			log.debug("real) goods:{} {}, real qty:{}", goodsQty.getGoods().getGoodsCode(), goodsQty.getGoods().getGoodsName(), goodsQty.getQty());
+//		});
+//	}
+}

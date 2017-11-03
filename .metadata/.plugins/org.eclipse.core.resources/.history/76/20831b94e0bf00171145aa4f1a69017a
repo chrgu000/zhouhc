@@ -1,0 +1,21 @@
+/**
+ */
+package cn.ak4j.yard.sys.to;
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper = false)
+public class InitialStockImportTO {
+
+	private String goodsCode;
+	private String goodsName;
+	private String storeUnitName;
+	private String lotNo;
+	private String depotCode;
+	private String depotName;
+	private String areaCode;
+	private String shelfCode;
+	private Integer stockQty;
+}

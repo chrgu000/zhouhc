@@ -1,0 +1,51 @@
+//package cn.ak4j.yard.sys.datacheck.task;
+//
+//import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.context.annotation.Lazy;
+//import org.springframework.stereotype.Component;
+//
+//import cn.ak4j.entity.query.param.DateRangeParam;
+//import cn.ak4j.entity.query.param.ListParam;
+//import cn.ak4j.entity.query.param.QueryParam;
+//import cn.ak4j.yard.ScheduleTasks;
+//import cn.ak4j.yard.domain.CheckState;
+//import cn.ak4j.yard.spd.domain.SpdReceive;
+//import cn.ak4j.yard.spd.domain.SpdReceiveItems;
+//import cn.ak4j.yard.spd.domain.SpdReceives;
+//import cn.ak4j.yard.spd.params.SpdReceiveItemParams;
+//import cn.ak4j.yard.spd.params.SpdReceiveParams;
+//import cn.ak4j.yard.spd.repository.SpdReceiveItemRepository;
+//import cn.ak4j.yard.spd.repository.SpdReceiveRepository;
+//import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItem;
+//import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItems;
+//
+//@Component
+//public class SpdReceiveTask {
+//
+//	@Autowired @Lazy private SpdReceiveRepository spdReceiveRepository;
+//	@Autowired @Lazy private SpdReceiveItemRepository spdReceiveItemRepository;
+//	
+//	
+//	public int checkData(SysDataCheckTaskItems dataCheckErrorDetails, DateRangeParam dateRangeParam){
+//		SpdReceiveParams params = new SpdReceiveParams();
+//		params.setMaintenanceInfo_createDate(dateRangeParam);
+//		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode(), QueryParam.operation_not_in));
+//		SpdReceives spdReceives = spdReceiveRepository.find(params);
+//		if(spdReceives.size() > 0){
+//			SpdReceiveItemParams spdReceiveItemParams = new SpdReceiveItemParams();
+//			for(SpdReceive spdReceive : spdReceives){
+//				spdReceiveItemParams.setReceiveId(new ListParam<String>(spdReceive.getReceiveId()));
+//				SpdReceiveItems spdReceiveItems = spdReceiveItemRepository.find(spdReceiveItemParams);
+//				if(spdReceiveItems.size() == 0){
+//					SysDataCheckTaskItem sysDataCheckTaskItem = new SysDataCheckTaskItem();
+//					sysDataCheckTaskItem.setClassName(spdReceive.getClass().getName());
+//					sysDataCheckTaskItem.setDataId(spdReceive.getReceiveId());
+//					sysDataCheckTaskItem.setLevel(ScheduleTasks.ERROR);
+//					sysDataCheckTaskItem.setDescription("非新增状态的收货单不存在对应的明细信息！");
+//					dataCheckErrorDetails.add(sysDataCheckTaskItem);
+//				}
+//			}
+//		}
+//		return spdReceives.size();
+//	}
+//}

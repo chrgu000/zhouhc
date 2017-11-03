@@ -1,0 +1,64 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 库存调节反馈规则
+* @author zhengyf
+* @date 2017年6月14日 上午11:26:15
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity  
+@DiscriminatorValue("adjust_stock") 
+public class SpdAdjustStockFeedbackRule extends SpdAbstractFeedbackRule {
+
+	private Boolean autoCommitAdjustStock;
+	private Boolean autoReviewAdjustStock;
+	private Boolean autoCreateDispatcher;
+	private Boolean autoReviewDispatcher;
+	private Boolean autoReviewDepotTask;
+	
+	@Transient private String description;
+
+	@Override public SpdBizType getBizType() {
+		return SpdBizType.adjust_stock_biz;
+	}
+	
+	@Override public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			buf.append(autoCommitAdjustStock?auto_word:manual_word)
+				.append("提交库存调节").append(Global.generalSeparator)
+				.append(autoReviewAdjustStock?auto_word:manual_word)
+				.append("审核库存调节").append(Global.generalSeparator)
+				.append(autoCreateDispatcher?auto_word:manual_word)
+				.append("创建调度").append(Global.generalSeparator)
+				.append(autoReviewDispatcher?auto_word:manual_word)
+				.append("审核调度").append(Global.generalSeparator)
+				.append(autoReviewDepotTask?auto_word:manual_word)
+				.append("审核仓库作业");
+			this.description = buf.toString();
+		}
+		return description;
+	}
+	
+	public boolean isAllAutoFeedback(){
+		if(autoCommitAdjustStock && autoReviewAdjustStock && autoCreateDispatcher && autoReviewDispatcher && autoReviewDepotTask){
+			return true;
+		}
+		return false;
+	}
+}

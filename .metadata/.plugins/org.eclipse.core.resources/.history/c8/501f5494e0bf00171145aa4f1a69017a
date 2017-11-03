@@ -1,0 +1,17 @@
+package cn.ak4j.yard.spd.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class NewSpdDispatcherTO {
+
+	private String dispatcherCode; // 调度编码
+	private String dispatcherType; // 调度类型
+	private String dispatcherOrgId; // 调度机构
+	private String dispatcherDeptId; // 调度部门
+	private String dispatcherDepotId; // 调度仓库
+
+}

@@ -1,0 +1,121 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveItemParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdReceiveItemRepository extends BaseRepository<SpdReceiveItem, SpdReceiveItems, SpdReceiveItemParams, String>{
+
+	@Autowired @Getter 
+	private EntityManager entityManager;
+	
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	
+	public SpdReceiveItem save(SpdReceiveItem item){
+		item.updateAsPlaned();
+		return super.save(item);
+	}
+	
+	public SpdReceiveItems find(SpdReceiveItemParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			
+			return new SpdReceiveItems(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdReceiveItems();
+	}
+
+	public int count(SpdReceiveItemParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdReceiveItemParams params){
+		if(params != null){
+			YdsGoodsParams goodsParams = new YdsGoodsParams();
+			goodsParams.setFormatName(params.getFormatName());
+			goodsParams.setPackingSpec(params.getPackingSpec());
+			goodsParams.setGoodsId(params.getGoodsId());
+			if(!goodsParams.isEmpty()){
+				YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams, depotRepository, dcRepository));
+				if(goodss.size() == 0){
+					return false;
+				}
+				params.setGoodsId(new ListParam<String>(goodss.getIds()));
+			}
+			
+			YdsGoodsLotParams lotParams = new YdsGoodsLotParams();
+			lotParams.setLotNo(params.getLotNo());
+			lotParams.setLotValidity(params.getLotValidity());
+			lotParams.setGoodsLotId(params.getLotId());
+			lotParams.setSterilizeLotNo(params.getSterilizeLotNo());
+			lotParams.setSterilizeTime(params.getSterilizeTime());
+			lotParams.setProduceDate(params.getProduceDate());
+			if(!lotParams.isEmpty()){
+				YdsGoodsLots lots = new YdsGoodsLots(glRepository.findAll().find(lotParams));
+				if(lots.size() == 0){
+					return false;
+				}
+				params.setLotId(new ListParam<String>(lots.getIds()));
+			}
+			
+			
+		}
+		return true;	
+	}
+	
+	public SpdReceiveItems findByBizId(String bizId){
+		List<String> bizIds = new ArrayList<String>();
+		bizIds.add(bizId);
+		return findByBizIds(bizIds);
+	}
+	
+	public SpdReceiveItems findByBizIds(List<String> ids) {
+		SpdReceiveItemParams params = new SpdReceiveItemParams();
+		params.setBizId(new ListParam<String>(ids));
+		return find(params);
+	}
+
+	public SpdReceiveItems findByDealQtyAndReturnQtyLessConfirmQty(SpdReceiveItemParams params, OrderParam order, int pageNo, int pageSize) {
+		//String hql = "from SpdReceiveItem spdReceiveItem where ((spdReceiveItem.confirmQty - spdReceiveItem.returnQty) > spdReceiveItem.dealQty)";
+		SpdReceiveItems items = find(params, order, pageNo, pageSize);
+		items.fillGoods(goodsRepository);
+		SpdReceiveItems result = new SpdReceiveItems();
+		items.forEach(item->{
+			if(item.getConfirmQtyByBaseUnit()-item.getReturnQty(YdsUnitLv.base.getLv())>item.getDealQtyByBaseUnit()){
+				result.add(item);
+			}
+		});
+		return result;
+	}
+	
+}

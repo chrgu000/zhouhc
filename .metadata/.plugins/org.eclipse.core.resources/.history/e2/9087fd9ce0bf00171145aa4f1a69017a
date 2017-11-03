@@ -1,0 +1,2 @@
+alter table spd_feedback_rule add(auto_commit_adjust_stock char(1));
+alter table spd_feedback_rule add(auto_review_adjust_stock char(1));

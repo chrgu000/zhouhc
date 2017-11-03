@@ -1,0 +1,11 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+/**
+* @Description: 子规则
+* @author zhengyf
+* @date 2017年6月23日 上午9:52:41
+* @version V1.0.0
+*/
+public interface IChildRule {
+
+}

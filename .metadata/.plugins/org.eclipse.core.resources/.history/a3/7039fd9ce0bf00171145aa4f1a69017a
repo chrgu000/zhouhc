@@ -1,0 +1,2 @@
+alter table spd_property_change add(biz_code varchar2(32));
+alter table spd_property_change add(task_code varchar2(32));

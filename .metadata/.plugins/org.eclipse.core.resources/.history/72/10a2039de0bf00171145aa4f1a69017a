@@ -1,0 +1,1 @@
+alter table pcs_user add(custom_style varchar2(2500));

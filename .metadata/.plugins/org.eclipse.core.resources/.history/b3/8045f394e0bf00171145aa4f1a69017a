@@ -1,0 +1,62 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveItemRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+
+@RestController
+public class SpdReceiveItemResource {
+	
+	@Autowired private SpdReceiveItemRepository riRepository;
+	@Autowired private SpdReceiveBizService rbService;
+
+	@RequestMapping(value="/yard/spd/spdReceiveItems", method=RequestMethod.GET)
+	public SpdReceiveItems getList(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdReceiveItemParams params = SpdReceiveItemParams.buildParamsFromJson(paramsStr, SpdReceiveItemParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null || !order.isNotEmpty()){
+			order = new OrderParam("boxNo", "asc");
+		}
+		return riRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReceiveItems/count", method=RequestMethod.GET)
+	public int getCount(@RequestParam(value = "params", required = false) String paramsStr, 
+			HttpServletRequest request){
+		SpdReceiveItemParams params = SpdReceiveItemParams.buildParamsFromJson(paramsStr, SpdReceiveItemParams.class);
+		return riRepository.count(params);
+	}
+	
+	@RequestMapping(value="/yard/spd/uncompletedDealItems(depotId,{depotId})", method=RequestMethod.GET)
+	public SpdReceiveItems findUncompletedDealItemsByDepotId(@PathVariable("depotId")String depotId,
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdReceiveItemParams params = SpdReceiveItemParams.buildParamsFromJson(paramsStr, SpdReceiveItemParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdReceiveItems items = rbService.findUncompletedDealItemsByDepotId(depotId, params, order, currentPage-1, pageSize);
+		return items;
+	}
+	
+	@RequestMapping(value="/yard/spd/uncompletedDealItems(depotId,{depotId})/count", method=RequestMethod.GET)
+	public int countUncompletedDealItemsByDepotId(@PathVariable("depotId")String depotId){
+		int count = rbService.findUncompletedDealItemsByDepotId(depotId, null, null, -1, -1).size();
+		return count;
+	}
+	
+}

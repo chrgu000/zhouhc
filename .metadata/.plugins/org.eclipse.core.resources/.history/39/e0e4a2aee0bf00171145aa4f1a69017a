@@ -1,0 +1,232 @@
+package cn.ak4j.yard.pcs.web;
+
+import static org.junit.Assert.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.ErrorInfo;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.pcs.to.NewPcsUserTO;
+
+public class PcsUserResourceTest extends BaseTest{
+	
+	@Test public void testGetAccessToken() throws Exception{
+		String webToken = getAccessTokenByClientType(YardChannelType.spd_web.getCode());
+		String pdaToken = getAccessTokenByClientType(YardChannelType.spd_pda.getCode());
+		String eisToken = getAccessTokenByClientType(YardChannelType.eis.getCode());
+		
+		PcsUser user = getUser(webToken);
+		assertNotNull(user);
+		
+		user = getUser(pdaToken);
+		assertNotNull(user);
+		
+		user = getUser(eisToken);
+		assertNotNull(user);
+	}
+	
+	@Test public void getAccessTokenWithInvalidPassword() throws UnsupportedEncodingException, Exception{
+		String urlTemplate = "/pcs/accessTokens?userCode={userCode}&password={password}";
+		mockMvcHelper.mockPost(Map.class, null, urlTemplate, status().is4xxClientError(), YardExceptionType.invalid_password, "test", "QqfCymiP%!");
+	}
+	
+	@Test public void testList() throws Exception{
+		int pageSize = 10;
+		
+		PcsUsers users = mockMvcHelper.findList(PcsUsers.class, testUserCode, null, pageSize);
+		assertEquals(pageSize, users.size());
+		
+		PcsUserParams params = new PcsUserParams();
+		params.setOrgName(new ListParam<String>("中山医", QueryParam.operation_like_in));
+		users = mockMvcHelper.findList(PcsUsers.class, testUserCode, params);
+		assertEquals(2, users.size());
+		
+		params = new PcsUserParams();
+		params.setDeptName(new ListParam<String>("总务", QueryParam.operation_like_in));;
+		users = mockMvcHelper.findList(PcsUsers.class, testUserCode, params);
+		assertEquals(2, users.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = getUrlTemplate("/pcs/pcsUsers/count?accessToken={accessToken}");
+		String json = mockMvc.perform(get(urlTemplate, accessToken))
+							.andExpect(status().isOk())
+							.andReturn().getResponse().getContentAsString();
+		assertEquals(14, Global.defaultObjectMapper.readValue(json, Integer.class).intValue());
+	}
+	
+	@Test public void testFindByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String[] ids = new String[]{"user_id_012", "user_id_011", "user_id_001", "user_id_002", "user_id_003"};
+		String urlTemplate = getUrlTemplate("/pcs/pcsUsers/ids,{ids}?accessToken={accessToken}");
+		String json = mockMvc.perform(get(urlTemplate, StringUtils.join(ids, ","), accessToken))
+							.andExpect(status().isOk())
+							.andReturn().getResponse().getContentAsString();
+		
+		PcsUsers users = Global.defaultObjectMapper.readValue(json, PcsUsers.class);
+		List<String> idsList = Arrays.asList(ids);
+		assertEquals(5, users.size());
+		users.forEach(user->{
+			assertTrue(idsList.contains(user.getUserId()));
+		});
+	}
+	
+	@Test public void testFindOne() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String userId = "user_id_002";
+		String urlTemplate = getUrlTemplate("/pcs/pcsUsers/{userId}?accessToken={accessToken}");
+		
+		String json = mockMvc.perform(get(urlTemplate, userId, accessToken))
+						.andExpect(status().isOk())
+						.andReturn().getResponse().getContentAsString();
+		PcsUser user = Global.defaultObjectMapper.readValue(json, PcsUser.class);
+		assertNotNull(user);
+		assertEquals(userId, user.getUserId());
+	}
+	
+	private String getAccessTokenByClientType(String clientType) throws UnsupportedEncodingException, Exception{
+		String urlTemplate = "/pcs/accessTokens?userCode={userCode}&password={password}&clientType={clientType}";
+		String token = (String)mockMvcHelper.mockPost(Map.class, null, urlTemplate, "test", "ak1234", clientType).get("accessToken");
+		return token;
+	}
+	
+	private PcsUser getUser(String accessToken) throws UnsupportedEncodingException, Exception{
+		String urlTemplate = getUrlTemplate("/pcs/pcsUsers/mine?accessToken={accessToken}");
+		String json = mockMvc.perform(get(urlTemplate, accessToken))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		PcsUser user = Global.defaultObjectMapper.readValue(json, PcsUser.class);
+		
+		return user;
+	}
+	
+	@Test public void testAdd() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = getUrlTemplate("/pcs/pcsUsers?accessToken={accessToken}");
+		NewPcsUserTO to1 = createNewPcsUerTO("测试用户001", "test001");
+		NewPcsUserTO to2 = createNewPcsUerTO("西药库管理用户", "xyk");
+		NewPcsUserTO to3 = createNewPcsUerTO("西药库管理用户001", "xyk");
+		
+		String json = mockMvc.perform(post(urlTemplate, accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(to1)))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		
+		PcsUser user = Global.defaultObjectMapper.readValue(json, PcsUser.class);
+		
+		assertEquals("test001", user.getUserCode());
+		
+		json = mockMvc.perform(post(urlTemplate, accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(to2)))
+				.andExpect(status().is4xxClientError())
+				.andReturn().getResponse().getContentAsString();
+		
+		ErrorInfo info = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+		
+		assertEquals(info.getCode(), YardExceptionType.invalid_exist_user_name.getCode());
+		
+		json = mockMvc.perform(post(urlTemplate, accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(to3)))
+				.andExpect(status().is4xxClientError())
+				.andReturn().getResponse().getContentAsString();
+		
+		ErrorInfo info1 = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+		
+		assertEquals(info1.getCode(), YardExceptionType.invalid_resource_exist.getCode());
+	}
+	
+	@Test public void testModify() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = getUrlTemplate("/pcs/pcsUsers/{id}?accessToken={accessToken}");
+		
+		String userId = "user_id_002";
+		
+		
+		String json = mockMvc.perform(get(urlTemplate, userId, accessToken))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		
+		PcsUser originUser = Global.defaultObjectMapper.readValue(json, PcsUser.class);
+		String originUserName = originUser.getUserName();
+		
+		assertEquals(userId, originUser.getUserId());
+		
+		String userName = "西药库管理用户001";
+		String customStyle = "测试自定义样式编辑";
+		originUser.setUserName(userName);
+		originUser.setCustomStyle(customStyle);
+		
+		json = mockMvc.perform(put(urlTemplate, userId, accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(originUser)))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		
+		PcsUser newUser = Global.defaultObjectMapper.readValue(json, PcsUser.class);
+		
+		assertEquals(userName, newUser.getUserName());
+		assertEquals(customStyle, newUser.getCustomStyle());
+		
+		newUser.setUserName("西药库用户1");
+		json = mockMvc.perform(put(urlTemplate, userId, accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(newUser)))
+				.andExpect(status().is4xxClientError())
+				.andReturn().getResponse().getContentAsString();
+		
+		ErrorInfo info = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+		
+		assertEquals(info.getCode(), YardExceptionType.invalid_exist_user_name.getCode());
+		
+		newUser.setUserName(originUserName);
+		newUser.setUserCode("xyk1");
+		json = mockMvc.perform(put(urlTemplate, userId, accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(newUser)))
+				.andExpect(status().is4xxClientError())
+				.andReturn().getResponse().getContentAsString();
+		
+		ErrorInfo info1 = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+		
+		assertEquals(info1.getCode(), YardExceptionType.invalid_resource_exist.getCode());
+	}
+	
+	private NewPcsUserTO createNewPcsUerTO(String userName, String userCode){
+		NewPcsUserTO to = new NewPcsUserTO();
+		to.setOrgId("626");
+		to.setDeptId("dept_id_001");
+		to.setEmail("xyk@ak.com");
+		to.setEnabled(true);
+		to.setGender("f");
+		to.setLinkTel("13685452154");
+		to.setOriginPassword("ak1234");
+		to.setUserCode(userCode);
+		to.setUserName(userName);
+		to.setCustomStyle("");
+		return to;
+	}
+
+}

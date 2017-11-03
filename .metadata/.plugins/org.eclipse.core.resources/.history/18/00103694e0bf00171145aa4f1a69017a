@@ -1,0 +1,201 @@
+package cn.ak4j.yard.sys.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.domain.YardEntity;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: 全局信息对象，该对象的职能实际包含：
+* 1）全局配置信息，记录系统的配置
+* 2）全局状态信息，表达系统的状态
+* @author zhengyf
+* @date 2017年7月19日 下午3:06:46
+* @version V1.0.0
+*/
+
+@Slf4j
+@Entity
+@Table(name="sys_global_info")
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class YardGlobalInfo extends YardEntity{
+	
+	//根据业务规则查询业务明细的天数限定，默认值为99999
+	public static final String find_replenish_items_by_biz_rule_id_recent_days = "find_replenish_items_by_biz_rule_id_recent_days";
+	
+	//申领计划差额查询天数限定，默认值为99999
+	public static final String replenish_plan_difference_recent_days = "replenish_plan_difference_recent_days";
+	
+	//数据版本
+	public static final String data_version = "data_version";
+	
+	//单品种货位标签报表
+	public static final String simple_shelf_lable_report = "simple_shelf_lable_report";
+
+	//报损报溢单确认报表
+	public static final String commited_adjust_stock_report = "commited_adjust_stock_report";
+
+	//报损报溢单记录报表
+	public static final String completed_adjust_stock_report = "completed_adjust_stock_report";
+
+	//业务差额配送单报表
+	public static final String apply_difference_report = "apply_difference_report";
+
+	//送货作业差额配送单报表
+	public static final String delivery_difference_report = "delivery_difference_report";
+
+	//物资盲盘盘点单报表
+	public static final String blind_inventory_report = "blind_inventory_report";
+
+	//物资盘点单报表
+	public static final String inventory_report = "inventory_report";
+
+	//送货作业单报表
+	public static final String delivery_task_report = "delivery_task_report";
+
+	//药品隔离记录单报表
+	public static final String completed_move_area_report = "completed_move_area_report";
+
+	//拣配下架作业单报表
+	public static final String off_shelf_task_report = "off_shelf_task_report";
+
+	//拣配上架作业单报表
+	public static final String on_shelf_task_report = "on_shelf_task_report";
+
+	//收货记录单报表
+	public static final String completed_receives_report = "completed_receives_report";
+
+	//拣配作业单报表
+	public static final String completed_depot_task_report = "completed_depot_task_report";
+
+	//周转箱标签报表
+	public static final String turnover_box_lable_report = "turnover_box_lable_report";
+
+	//整件标签报表
+	public static final String off_shelf_block_item_lables_report = "off_shelf_block_item_lables_report";
+
+	//所有货位标签报表
+	public static final String all_shelf_lables_report = "all_shelf_lables_report";
+
+	//混品种货位标签报表
+	public static final String mixed_shelf_lable_report = "mixed_shelf_lable_report";
+	
+	//日清对账记录报表
+	public static final String completed_daily_clean_report = "completed_daily_clean_report";
+	
+	//默认用户密码
+	public static final String default_user_password = "default_user_password";
+	
+	//默认用户邮箱
+	public static final String default_user_email = "default_user_email";
+		
+	//默认用户联系电话
+	public static final String default_user_link_tel = "default_user_link_tel";
+	
+	//业务单位设置
+	public static final String biz_unit_setting = "biz_unit_setting";
+	
+	//标准产品价格单位级别
+	public static final String yds_goods_price_unit_lv = "yds_goods_price_unit_lv";
+	
+	//允许修改标准产品包装单位
+	public static final String allow_modify_package_specification = "allow_modify_package_specification";
+	
+	//盘点产品品种数量
+	public static final String inventory_batch_goods_size = "inventory_batch_goods_size";
+
+	//备货产品数量
+	public static final String prepareInform_batch_goods_size = "prepareInform_batch_goods_size";
+	
+	//集成参数 = 代理简称(如：zsy) + _集成参数 
+	public static final String integration_params = "integration_params";
+	
+	public static final String reconciliation_report_display_config = "reconciliation_report_display_config";
+	
+	public static final String check_stocks_depots = "check_stocks_depots";
+
+	public static final String keep_shelf_lock_days = "keep_shelf_lock_days";
+	
+	public static final String receive_price_prior = "receive_price_prior";
+	
+	@Id @Getter @Setter
+	private String key;
+	
+	@Getter @Setter
+	private String name;
+	
+	@Getter @Setter
+	private String value;
+	
+	@Getter @Setter
+	private Boolean editable;
+	
+	@Getter @Setter
+	private String description;
+	
+	@Getter @Setter
+	private Date createTime;
+	
+	@Getter @Setter
+	private Date lastUpdateTime;
+	
+	@Transient @JsonIgnore
+	private ReportConfig config;
+	
+	public YardGlobalInfo(String key, String name, String value, Boolean editable, String description){
+		setKey(key);
+		setName(name);
+		setValue(value);
+		setEditable(editable);
+		setDescription(description);
+		setCreateTime(new Date());
+		setLastUpdateTime(getCreateTime());
+	}
+	
+	public void updateValue(String value){
+		updateValue(value, null);
+	}
+	
+	public void updateValue(String value, String description){
+		if(StringUtils.isNotEmpty(description)){
+			setDescription(description);
+		}
+		setValue(value);
+		setLastUpdateTime(new Date());
+	}
+	
+	@JsonIgnore public ReportConfig getConfig(){
+		try{
+			return Global.defaultObjectMapper.readValue(getValue(), ReportConfig.class);
+		}catch(Exception e){
+			log.error("获取pdf报表的全局配置失败", e);
+		}
+		return null;
+	}
+
+	@JsonIgnore public int getIntValue() {
+		return Integer.parseInt(getValue());
+	}
+	
+	@JsonIgnore public boolean getBooleanValue(){
+		return Boolean.parseBoolean(getValue());
+	}
+	
+	@JsonIgnore public float getFloatValue(){
+		return Float.parseFloat(getValue());
+	}
+}

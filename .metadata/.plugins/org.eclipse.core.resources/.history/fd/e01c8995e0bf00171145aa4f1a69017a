@@ -1,0 +1,47 @@
+package cn.ak4j.yard.domain;
+
+import java.util.Set;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+public abstract class AbstractEntity {
+
+	public Set<ConstraintViolation<AbstractEntity>> validate(){
+		ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+	    Validator validator = factory.getValidator();
+	    return validator.validate(this);
+	}
+	
+	/**
+	 * @return 返回true表示数据校验合法，false表示数据校验不合法
+	 */
+	@JsonIgnore
+	public boolean isValid(){
+		Set<ConstraintViolation<AbstractEntity>> constraintViolations = validate();
+		if(constraintViolations != null && constraintViolations.size() > 0){
+			return false;
+		}
+		return true;
+	}
+	
+	@JsonIgnore
+	public String getValidateMsg(){
+		StringBuffer buf = new StringBuffer();
+		Set<ConstraintViolation<AbstractEntity>> constraintViolations = validate();
+		int count = 0;
+		for (ConstraintViolation<AbstractEntity> constraintViolation : constraintViolations) {
+			count++;
+			buf.append(constraintViolation.getMessage());
+			if(count != constraintViolations.size()){
+				buf.append(";");
+			}
+		}
+		return buf.toString();
+	}
+	
+}

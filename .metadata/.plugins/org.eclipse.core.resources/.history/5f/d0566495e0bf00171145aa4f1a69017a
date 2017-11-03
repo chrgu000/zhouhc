@@ -1,0 +1,46 @@
+package cn.ak4j.yard.extend.scheduletask;
+
+import java.util.Calendar;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.AbstractScheduleTask;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class CleanShelfLockStockTask extends AbstractScheduleTask{
+
+	@Getter @Setter private String name;
+	@Autowired private SpdDepotStockService dsService;
+	
+	public CleanShelfLockStockTask(String name) {
+		this.name = name;
+	}
+
+	@Override
+	public void executeTask() throws Exception {
+		log.info("定时执行清除货位锁库存任务！");
+		YardGlobalInfo globalInfo = Conf.getAllGlobalInfos().findByKey(YardGlobalInfo.keep_shelf_lock_days);
+		if(globalInfo == null){
+			throw new OperateFailException(YardExceptionType.not_found_yard_global_info, YardGlobalInfo.keep_shelf_lock_days);
+		}
+		Calendar cal = Calendar.getInstance();
+		int days = globalInfo.getIntValue();
+		cal.add(Calendar.DAY_OF_YEAR, -days);
+		dsService.cleanShelfStock(cal.getTime());
+	}
+
+	@Override
+	public String getDescription() {
+		String description = String.format("需要配置全局变量:[%s]", YardGlobalInfo.keep_shelf_lock_days);
+		return description;
+	}
+
+}

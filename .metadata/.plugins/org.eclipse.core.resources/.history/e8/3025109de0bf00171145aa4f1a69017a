@@ -1,0 +1,1 @@
+alter table SPD_PREPARE_INFORM_BIZ rename column ID to BIZ_ID;

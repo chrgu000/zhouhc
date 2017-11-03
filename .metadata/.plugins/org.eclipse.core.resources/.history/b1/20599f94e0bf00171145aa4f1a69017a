@@ -1,0 +1,19 @@
+package cn.ak4j.yard.spd.reconciliation.report.hspt_credit_rep_detail;
+
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportItem;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class Item extends SpdReconciliationReportItem{
+
+	private String bizId;
+	private String bizCode;
+	private String bizItemId;
+	
+	private String originBizId;
+	private String originBizCode;
+	private String originBizItemId;
+	
+}

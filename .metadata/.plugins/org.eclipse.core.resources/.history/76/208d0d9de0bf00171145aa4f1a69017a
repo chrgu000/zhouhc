@@ -1,0 +1,2 @@
+--1）删除周转箱turnoverBoxStateCode字段
+alter table spd_turnover_box drop(turnover_box_state_code);

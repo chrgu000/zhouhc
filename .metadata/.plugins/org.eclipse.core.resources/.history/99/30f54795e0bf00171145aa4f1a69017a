@@ -1,0 +1,44 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.List;
+
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.params.PcsRoleOpParams;
+
+@SuppressWarnings({"serial"})
+public class PcsRoleOps extends Entities<PcsRoleOp>{
+
+	public PcsRoleOps(){}
+	
+	public PcsRoleOps(List<PcsRoleOp> roleOps){
+		super(roleOps);
+	}
+
+	public PcsRoleOps findByRoleIds(List<String> roleIds) {
+		if(CollectionUtils.isEmpty(roleIds)){
+			return new PcsRoleOps();
+		}
+		PcsRoleOpParams params = new PcsRoleOpParams();
+		params.setRoleId(new ListParam<String>(roleIds));
+		return new PcsRoleOps(find(params));
+	}
+	
+	public PcsRoleOp findByRoleIdAndOpId(String roleId, String opId){
+		PcsRoleOpParams params = new PcsRoleOpParams();
+    	params.setRoleId(new ListParam<String>(roleId));
+    	params.setOpId(new ListParam<String>(opId));
+    	List<PcsRoleOp> ops = find(params);
+    	return ops.size()>0?ops.get(0):null;
+	}
+
+	public PcsRoleOps findByRoleId(String roleId) {
+		return new PcsRoleOps(CollectionUtils.find("roleId", roleId, this));
+	}
+
+	public PcsRoleOp findById(String id) {
+		return CollectionUtils.findWhere("id", id, this);
+	}
+}

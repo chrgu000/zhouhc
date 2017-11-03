@@ -1,0 +1,1 @@
+ insert into SYS_GLOBAL_INFO (KEY,NAME,VALUE,DESCRIPTION,CREATE_TIME,LAST_UPDATE_TIME,EDITABLE) values ('completed_daily_clean_report','日清对账记录报表','{"pdfFileName":"日清对账单","jasperFilePath":"/reports/spd/reconciliation/completed_daily_clean_01"}','日清对账报表',sysDate,sysDate,'1');

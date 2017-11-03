@@ -1,0 +1,25 @@
+package cn.ak4j.yard.spd.task.web;
+
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+
+
+@Data
+@NoArgsConstructor
+public class SpdOffShelfTaskReport{
+	
+	public static final String type_block_report = "block";
+	public static final String type_piece_report = "piece";
+	
+	private String type;
+	private JRBeanCollectionDataSource itemDs;
+	
+	public SpdOffShelfTaskReport(String type, SpdDepotTaskItems<SpdDepotTaskItem> items){
+		setType(type);
+		setItemDs(new JRBeanCollectionDataSource(items));
+	}
+	
+}

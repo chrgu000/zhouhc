@@ -1,0 +1,36 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.HashMap;
+
+import org.springframework.stereotype.Component;
+
+@SuppressWarnings("serial")
+@Component
+public class SpdRecItemsGenerateStatuses extends HashMap<String, Integer>{
+
+	public static final int status_init = 0;
+	public static final int status_generating = 1;
+	public static final int status_generate_fail = 2;
+	public static final int status_generate_success = 3;
+	
+	public synchronized void newReconciliation(String reconciliationId){
+		this.put(reconciliationId, status_init);
+	}
+	
+	public synchronized void start(String reconciliationId){
+		this.put(reconciliationId, status_generating);
+	}
+	
+	public synchronized void success(String reconciliationId){
+		this.put(reconciliationId, status_generate_success);
+	}
+	
+	public synchronized void fail(String reconciliationId){
+		this.put(reconciliationId, status_generate_fail);
+	}
+
+	public boolean isGenerating(String bizId) {
+		return this.get(bizId) != null && this.get(bizId).intValue() == status_generating;
+	}
+	
+}

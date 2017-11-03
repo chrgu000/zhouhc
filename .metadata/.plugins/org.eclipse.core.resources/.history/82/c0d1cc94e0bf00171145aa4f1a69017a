@@ -1,0 +1,41 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.to;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdMoveAreaRuleTO {
+	private String id;
+	private String name;
+	private String ruleCode;
+	private String customName;
+	private String primaryName;
+	private Integer prior;
+	private String usage;
+	private String originRuleId;
+	private String feedbackRuleId;
+	
+	private String depotId;
+	private String fromAreaType;
+	private String toAreaType;
+	
+	private Date createTime;
+	private Date lastUpdateTime;
+	private String description;
+	
+	private Boolean enabled;
+	private Boolean canBeOriginRule;
+	private Boolean manualApply;
+	
+	private PcsDepot depot;
+	
+	private String displayName;
+	
+}

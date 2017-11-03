@@ -1,0 +1,83 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.io.Serializable;
+
+import javax.persistence.Embeddable;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.yard.domain.IDescribable;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 申领业务的契约规则
+* @author zhengyf
+* @date 2017年6月20日 下午3:21:02
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Embeddable
+public class SpdReplenishContractRule implements Serializable, IDescribable, IChildRule{
+
+	/**
+	 * 发货方仓库发起
+	 */
+	@NotNull(message="发货方仓库请领不能为空") @Getter @Setter
+	private Boolean fromDepotCanApply;
+	
+	/**
+	 * 收货方仓库发起
+	 */
+	@NotNull(message="收货方仓库请领不能为空") @Getter @Setter
+	private Boolean toDepotCanApply;
+	
+	/**
+	 * 发货方仓库确认
+	 */
+	@NotNull(message="发货方仓库确认不能为空") @Getter @Setter
+	private Boolean fromDepotCanConfirm;
+	
+	/**
+	 * 收货方仓库确认
+	 */
+	@NotNull(message="收货方仓库确认不能为空") @Getter @Setter
+	private Boolean toDepotCanConfirm;
+	
+	@Transient private String description;
+
+	@Override
+	public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			if(fromDepotCanApply){
+				buf.append("发货方仓库发起,");
+			}
+			if(toDepotCanApply){
+				buf.append("收货方仓库发起,");
+			}
+			if(fromDepotCanConfirm){
+				buf.append("发货方仓库确认");
+			}
+			if(toDepotCanConfirm){
+				buf.append("发货方仓库确认");
+			}
+			
+			return this.description = buf.toString();
+		}
+		return description;
+	}
+	
+	public boolean equals(SpdReplenishContractRule rule){
+		if(rule.getFromDepotCanApply().equals(getFromDepotCanApply())
+				&& rule.getFromDepotCanConfirm().equals(getFromDepotCanConfirm())
+				&& rule.getToDepotCanApply().equals(getToDepotCanApply())
+				&& rule.getToDepotCanConfirm().equals(getToDepotCanConfirm())){
+			return true;
+		}
+		return false;
+	}
+}

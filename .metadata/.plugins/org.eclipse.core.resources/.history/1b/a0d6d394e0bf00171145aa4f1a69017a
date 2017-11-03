@@ -1,0 +1,38 @@
+package cn.ak4j.yard.spd.bizrule.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdReplenishRuleParams extends QueryParams{
+
+	private static final long serialVersionUID = -3211880096403691812L;
+
+	private ListParam<String> name;
+	private ListParam<String> primaryName;
+	private ListParam<String> ruleCode;
+	private ListParam<String> customName;
+	private IntegerRangeParam prior;
+	private ListParam<String> feedbackRuleId;
+	private ListParam<Boolean> enabled;
+	private ListParam<Boolean> canBeOriginRule;
+	private ListParam<Boolean> contractRule_fromDepotCanApply;
+	private ListParam<Boolean> contractRule_toDepotCanApply;
+	private ListParam<Boolean> contractRule_fromDepotCanConfirm;
+	private ListParam<Boolean> contractRule_toDepotCanConfirm;
+	private ListParam<String> goodsRule_specificationTypeCode;
+	private ListParam<String> directionRule_fromDepotId;
+	private ListParam<String> directionRule_toDepotId;
+	private ListParam<String> directionRule_collectDepotId;
+	private ListParam<String> directionRule_fromDepot_depotName;
+	private ListParam<String> directionRule_toDepot_depotName;
+	private ListParam<Boolean> manualApply;
+	
+	private DateRangeParam createTime;
+	
+}

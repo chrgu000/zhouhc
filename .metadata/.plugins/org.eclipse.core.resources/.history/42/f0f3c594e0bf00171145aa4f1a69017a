@@ -1,0 +1,207 @@
+package cn.ak4j.yard.spd.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public abstract class SpdGoodsItems<T extends SpdGoodsItem> extends Entities<T>{
+	
+	public SpdGoodsItems(List<T> items){
+		super(items);
+	}
+	
+	public void confirmAsPlan(){
+		this.forEach(item->item.confirmAsPlaned());
+	}
+	
+	public boolean isAllPlaned(){
+		for(T item : this){
+			if(item.getPlanQty() == null || item.getPlanQty()<0){
+				return false;
+			}
+		}
+		
+		return true;
+	}
+
+	public boolean isAllConfirmed() {
+		for(T item : this){
+			if(item.getConfirmQty() == null || item.getConfirmQty() < 0){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public boolean isAllConfirmEmpty(){
+		for(T item : this){
+			if(item.getConfirmQty() > 0){
+				return false;
+			}
+		}
+		
+		return true;
+	}
+	
+	public boolean isAllPlanEmpty(){
+		for(T item : this){
+			if(item.getPlanQty() > 0){
+				return false;
+			}
+		}
+		
+		return true;
+	}
+	
+	public void fillGoods(YdsGoodsRepository goodsRepository){
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", this);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds);
+		forEach(item->{
+			YdsGoods theGoods = goodss.findById(item.getGoodsId());
+			item.setGoods(theGoods);
+		});
+	}
+	
+	public void fillSpecialGoodsLot(YdsGoodsLotRepository glRepository){
+		List<String> lotIds = CollectionUtils.pluck("lotId", this);
+		YdsGoodsLots lots = glRepository.findAll().findByIds(lotIds);
+		forEach(item->{
+			if(StringUtils.isNotEmpty(item.getLotId())){
+				YdsGoodsLot lot = lots.findById(item.getLotId());
+				item.setSpecialGoodsLot(lot);
+			}
+		});
+	}
+	
+	/**
+	 * 填充产品，并且产品关联了可用批次对象
+	 */
+	public void fillGoodsWithUsableLots(YdsGoodsRepository goodsRepository, YdsGoodsLotRepository glRepository, SpdShelfStockRepository ssRepository) {
+		//查询并关联产品
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", this);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds).fillUsableLots(glRepository, ssRepository);
+		forEach(item->{
+			YdsGoods theGoods = goodss.findById(item.getGoodsId());
+			item.setGoods(theGoods);
+		});
+		
+	}
+
+	/**
+	 * 该方法用于当明细中的产品没有可用批次时，特定应用场景中又需要访问产品的某一个批次，
+	 * 这时通过这个方法为明细渲染没有库存的产品批次(通过明细的批次id)
+	 * 例如创建下架作业时，作业明细的产品在当前仓库中没有任何库存则使用任意一个不可用批次进行关联
+	 * 以保障后续能够构造作业明细
+	 */
+	public void fillUnuseableGoodsLot(YdsGoodsLotRepository glRepository){
+		List<String> unuseableLotIds = new ArrayList<String>();
+		for(Object obj : this){
+			SpdGoodsItem item = (SpdGoodsItem)obj;
+			if(StringUtils.isNotEmpty(item.getLotId()) && !item.isSpecialGoodsLotUseable()){
+				unuseableLotIds.add(item.getLotId());
+			}
+		}
+		YdsGoodsLots unusableGoodsLots = glRepository.findAll().findByIds(unuseableLotIds);
+		for(Object obj : this){	
+			SpdGoodsItem item = (SpdGoodsItem)obj;
+			YdsGoodsLot unusableGoodsLot = unusableGoodsLots.findById(item.getLotId());
+			if(unusableGoodsLot != null){
+				unusableGoodsLot.setGoods(item.getGoods());
+				item.setSpecialGoodsLot(unusableGoodsLot);
+			}
+		}
+	}
+	
+	public YdsGoodss getAllGoods(){
+		YdsGoodss result = new YdsGoodss();
+		this.forEach(item->result.add(item.getGoods()));
+		return result;
+	}
+	
+
+	public YdsGoodsLots getAllSpecialGoodsLots() {
+		YdsGoodsLots lots = new YdsGoodsLots();
+		for(T item : this){
+			if(item.getSpecialGoodsLot() == null){
+				continue;
+			}
+			lots.add(item.getSpecialGoodsLot());
+		}
+		return lots;
+	}
+
+	public List<SpdGoodsQty> getPlanGoodsQtysByStoreUnit() {
+		List<SpdGoodsQty> goodsQtyList = new ArrayList<SpdGoodsQty>();
+		this.forEach(item->{
+			goodsQtyList.add(new SpdGoodsQty(item.getGoods(), item.getSpecialGoodsLot(), item.getPlanQtyByStoreUnit(), item.getGoods().getStoreUnitLv()));
+		});
+		return goodsQtyList;
+	}
+
+	public List<SpdGoodsQty> getConfirmGoodsQtysByStoreUnit() {
+		List<SpdGoodsQty> goodsQtyList = new ArrayList<SpdGoodsQty>();
+		this.forEach(item->{
+			goodsQtyList.add(new SpdGoodsQty(item.getGoods(), item.getSpecialGoodsLot(), item.getConfirmQtyByStoreUnit(), item.getGoods().getStoreUnitLv()));
+		});
+		return goodsQtyList;
+	}
+
+	public void verifyConfirmQtyWithRealQty(List<SpdGoodsQty> realQtyByStoreUnit) {
+		this.forEach(goodsItem->{
+			//实际可确认库存数量
+			int realConfirmGoodsQty = 0;
+			for(SpdGoodsQty goodsQtyObj : realQtyByStoreUnit){
+				if(goodsQtyObj.getGoods().getGoodsId().equals(goodsItem.getGoodsId())){
+					realConfirmGoodsQty += goodsQtyObj.getQtyByStoreUnit();
+				}
+			}
+			
+			if(realConfirmGoodsQty >= goodsItem.getConfirmQtyByStoreUnit()){
+				//实际可确认的库存数量大于已经确认的库存数量，nothing todo
+			}else{
+				throw new OperateFailException(YardExceptionType.invalid_goods_shelf_stock_not_enough, goodsItem.getGoods().getFormatName());
+			}
+		});
+	}
+	
+	public int getTotalConfirmQtyByStoreUnit() {
+		int confirmQty = 0;
+		for(SpdGoodsItem item : this){
+			confirmQty += item.getConfirmQtyByStoreUnit();
+		}
+		return confirmQty;
+	}
+	
+	public int getTotalPlanQtyByStoreUnit(){
+		int planQty = 0;
+		for(SpdGoodsItem item : this){
+			planQty += item.getPlanQtyByStoreUnit();
+		}
+		return planQty;
+	}
+
+	public SpdGoodsQtys getGoodsQtys(){
+		SpdGoodsQtys goodsQtys = new SpdGoodsQtys();
+		for(SpdGoodsItem item : this){
+			SpdGoodsQty goodsQty = new SpdGoodsQty(item.getGoods(), item.getSpecialGoodsLot(), item.getConfirmQty(), item.getUnitLv());
+			goodsQtys.add(goodsQty);
+		}
+		return goodsQtys;
+	}
+}

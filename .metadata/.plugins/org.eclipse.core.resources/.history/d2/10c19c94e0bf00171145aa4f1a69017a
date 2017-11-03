@@ -1,0 +1,107 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.report.rep_aggr_by_goods;
+
+import java.util.Comparator;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.factory.SpdFinacialReconciliationFactory;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportQuerier;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Component
+public class SpdReplenishAggregateByGoodsQuerier extends SpdReconciliationReportQuerier<Report>{
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private SpdFinacialReconciliationFactory frFactory;
+
+	@Override
+	public Report query(SpdFinacialReconciliationBiz reconciliation, Map<String, Object> queryParams,
+			OrderParam orderParam) {
+		filteData(reconciliation);
+		
+		SpdPropertyChangeRecordItems changeRecordItems = reconciliation.getDailyCleans().getAllPropertyChangeItems();
+		changeRecordItems.fillGoods(goodsRepository);
+		SpdFinacialReconciliationItems reconciliationItems = frFactory.buildReconciliationItems(changeRecordItems);
+		Report report = buildReport(reconciliation, reconciliationItems);
+		
+		return report;
+	}
+	
+	private void filteData(SpdFinacialReconciliationBiz reconciliation){
+		for(SpdDailyCleanBiz dailyClean : reconciliation.getDailyCleans()){
+			Iterator<SpdPropertyChangeRecord> recordIt = dailyClean.getPropertyChangeRecords().iterator();
+			
+			while(recordIt.hasNext()){
+				SpdPropertyChangeRecord record = recordIt.next();
+				
+				//过滤掉非申领业务
+				if(!record.getBizTypeCode().equals(SpdBizType.replenish_biz.getCode())){
+					recordIt.remove();
+					continue;
+				}
+			}
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private Report buildReport(SpdFinacialReconciliationBiz reconciliation,
+			SpdFinacialReconciliationItems reconciliationItems) {
+		Report report = new Report();
+		report.setReconciliationCode(reconciliation.getBizCode());
+		report.setStartDate(reconciliation.getStartDate());
+		report.setEndDate(reconciliation.getEndDate());
+		PcsOrg org = reconciliation.getBizRule().getSupplierDept().getOrg();
+		report.setSupplierCode(org.getOrgCode());
+		report.setSupplierName(org.getOrgName());
+		PcsDepots depots = reconciliation.getBizRule().getTargetDepots();
+		report.setTargetDepotNames((String[])depots.pluck("depotName").toArray(new String[depots.size()]));
+		report.setItems(buildItems(reconciliation, reconciliationItems));
+		report.setGenerateTime(new Date());
+		report.setTotalAmount(report.getItems().getTotalAmount());
+		return report;
+	}
+	
+	private Items buildItems(SpdFinacialReconciliationBiz reconciliation, SpdFinacialReconciliationItems reconciliationItems){
+		Items items = new Items();
+		
+		YdsEdsGoodss edsGoodss = egRepository.findAll().findByOrgId(reconciliation.getBizRule().getSupplierDept().getOrgId());
+		
+		reconciliationItems.forEach(reconciliationItem->{
+			items.aggregate(reconciliationItem);
+		});
+		
+		//填充企业产品名称
+		items.fillEdsGoodsFormatName(edsGoodss);
+		
+		items.sort(new Comparator<Item>() {
+			@Override
+			public int compare(Item item1, Item item2) {
+				return item1.getGoodsCode().compareTo(item2.getGoodsCode());
+			}
+		});
+		return items;
+	}
+
+	@Override
+	public String getDescription() {
+		return "1)过滤出所有申领业务的物权变更  2)按唯一的产品单价进行汇总";
+	}
+}

@@ -1,0 +1,95 @@
+package cn.ak4j.yard.extend.scheduletask;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import cn.ak4j.yard.domain.AbstractScheduleTask;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.service.SpdDepotGoodsConfigService;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class DepotGoodsStockChecker extends AbstractScheduleTask{
+
+	@Autowired private SpdDepotGoodsConfigService dgcService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private NotifyMsgBuilder msgBuilder;
+	@Autowired private MGProxy mgProxy;
+	
+	@Getter @Setter private String name;
+	
+	public DepotGoodsStockChecker(String name) {
+		this.name = name;
+	}
+
+	@Override
+	public void executeTask() throws Exception {
+		log.info("定时检查仓库产品库存是否充足");
+		YardGlobalInfo global = Conf.getAllGlobalInfos().findByKey(YardGlobalInfo.check_stocks_depots);
+		if(global == null){
+			throw new OperateFailException(YardExceptionType.not_found_yard_global_info, YardGlobalInfo.check_stocks_depots);
+		}
+		List<DepotNotice> depotNotices = Global.defaultObjectMapper.readValue(global.getValue(), new TypeReference<List<DepotNotice>>() {});
+		for(DepotNotice depotNotice : depotNotices){
+			SpdDepotGoodsConfigs notEnoughDepotGoodsStocks = dgcService.getNotEnoughStocksGoods(depotNotice.getDepotId());
+			List<String> userCodes = depotNotice.getUserCodes();
+			PcsUsers users = findByUserCodes(userCodes);
+			List<String> emails = CollectionUtils.pluck("email", users);
+			String email = String.join(",", emails);
+			
+			if(CollectionUtils.isNotEmpty(notEnoughDepotGoodsStocks)){
+				PcsDepot depot = notEnoughDepotGoodsStocks.get(0).getDepot();
+				YdsGoodss goodss = getGoodsFromDepotGoodsConfigs(notEnoughDepotGoodsStocks);
+				MailMsg mail = msgBuilder.buildNotEnoughDepotGoodsStockEmail(depot, goodss, email);
+				mgProxy.sendMail(mail);
+			}
+		}
+	}
+	
+	private YdsGoodss getGoodsFromDepotGoodsConfigs(SpdDepotGoodsConfigs notEnoughDepotGoodsStocks){
+		YdsGoodss goodss = new YdsGoodss();
+		notEnoughDepotGoodsStocks.forEach(depotGoods->{
+			goodss.add(depotGoods.getGoods());
+		});
+		return goodss;
+	}
+	
+	private PcsUsers findByUserCodes(List<String> userCode){
+		PcsUserParams userParams = new PcsUserParams();
+		userParams.setUserCode(new ListParam<String>(userCode));
+		return new PcsUsers(userRepository.findAll().find(userParams));
+	}
+
+	@Override
+	public String getDescription() {
+		String description = String.format("定时检查仓库产品库存是否充足,需要配置全局变量:[%s]", YardGlobalInfo.check_stocks_depots);
+		return description;
+	}
+
+}
+
+class DepotNotice{
+	
+	@Getter @Setter private String depotId;
+	@Getter @Setter private List<String> userCodes;
+}

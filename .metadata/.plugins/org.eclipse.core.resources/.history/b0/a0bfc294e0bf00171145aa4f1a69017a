@@ -1,0 +1,51 @@
+package cn.ak4j.yard.spd.domain;
+
+import cn.ak4j.entity.IEntity;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.spd.stock.domain.SpdStockChanges;
+
+/**
+* @Description: 库存变更接口，该接口表示实现对象会造成库存的变更，
+* 库存变更可能是
+* 1）仓库库存变更
+* 2）货位库存变更
+* 对于业务计划引发的是仓库库存变更
+* 对于仓库作业引发的是货位库存变更
+* 对于物流作业引发的是仓库库存变更
+* 
+* 其中业务计划如果涉及到一个以上仓库则这些方法需要根据当前的状态返回是哪个仓库的库存发生变更
+* 例如申领业务中当业务事务的流程还在发货方仓库时返回的库存变更对象是关于发货方仓库的，当业务事务流程
+* 进入到收货方仓库时返回的库存变更对象是关于收货方仓库的，具体逻辑可参见申领业务对象的getStockChangeDepot()方法
+* @author zhengyf
+* @date 2017年4月1日 上午10:12:40
+* @version V1.0.0
+*/
+@SuppressWarnings({"rawtypes"})
+public interface IStockChangeable<T extends SpdStockChanges> extends IEntity{
+
+	/**
+	 * 获取库存变更集合
+	 * @return
+	 */
+	public T getStockChanges(); 
+	
+	/**
+	 * 获取库存变更的目标仓库
+	 * @return
+	 */
+	public PcsDepot getStockChangeDepot();
+	
+	
+	/**
+	 * 获取库存变更的目标货区类型
+	 * @return
+	 */
+	public String getTargetAreaType();
+	
+	/**
+	 * 获取库存变更的相关的产品明细集合
+	 * @return
+	 */
+	public SpdGoodsItems getItems();
+	
+}

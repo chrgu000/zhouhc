@@ -1,0 +1,316 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.SpdOriginItemCondition;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+public class SpdBizItemResourceTest extends BaseTest{
+	
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+
+	/***** 库存调节开始   *****/
+	@Test public void testGetAdjustStockById() throws Exception{
+		String bizId = "adju_biz_id_001";
+		SpdBizItems items = commonGetItemById(bizId);
+		assertEquals(2, items.size());
+	}
+	
+	@Test public void testGetAdjustStockByIdCount() throws Exception{
+		String bizId = "adju_biz_id_001";
+		int count = commonGetCountById(bizId);
+		assertEquals(2, count);
+	}
+	
+	@Test public void testUpdateAdjustStockBizItem() throws Exception{
+		String bizItemId = "biz_item_id_129";
+		SpdBizItem bizItem = biRepository.findOne(bizItemId);
+		bizItem.setConfirmQty(300);
+		
+		SpdBizItem updateItem = mockMvcHelper.modify(SpdBizItem.class, xykUserCode, bizItemId, Global.defaultObjectMapper.writeValueAsString(bizItem));
+		assertEquals(bizItem.getConfirmQty(), updateItem.getConfirmQty());
+		assertEquals(true, updateItem.getAsPlanned());
+	}
+	/***** 库存调节结束  *****/
+	
+	/***** 移仓开始    @throws Exception *****/
+	@Test public void testGetMoveAreaBizById() throws Exception{
+		String bizId = "move_biz_id_001";
+		SpdBizItems items = commonGetItemById(bizId);
+		assertEquals(3, items.size());
+	}
+	
+	@Test public void testGetMoveAreaBizByIdCount() throws Exception{
+		String bizId = "move_biz_id_001";
+		int count = commonGetCountById(bizId);
+		assertEquals(3, count);
+	}
+	
+	@Test public void testUpdateMoveAreaBiz() throws Exception{
+		String bizItemId = "biz_item_id_200";
+		SpdBizItem bizItem = biRepository.findOne(bizItemId);
+		bizItem.setConfirmQty(5);
+		
+		SpdBizItem updateItem = mockMvcHelper.modify(SpdBizItem.class, xykUserCode, bizItemId, Global.defaultObjectMapper.writeValueAsString(bizItem));
+		assertEquals(bizItem.getConfirmQty(), updateItem.getConfirmQty());
+		assertEquals(false, updateItem.getAsPlanned());
+	}
+	
+	/***** 移仓结束   *****/
+	
+	/*****   申领业务开始  *****/
+	
+	
+	/*****   补货类型的申领业务开始      *****/
+	@Test public void testFindBizItem() throws Exception{
+		String bizId = "rep_biz_id_003";
+		SpdBizItems items = commonGetItemById(bizId);
+		assertEquals(7, items.size());
+	}
+	
+	@Test public void testCountFindBizItem() throws Exception{
+		String bizId = "rep_biz_id_003";
+		int count = commonGetCountById(bizId);
+		assertEquals(7, count);
+	}
+	
+	//TODO 根据主单的ids获取明细，待废弃
+	@Test public void testGetBizItemIds() throws Exception{
+		String bizId003 = "rep_biz_id_003";
+		String bizId004 = "rep_biz_id_004";
+		String bizId005 = "rep_biz_id_005";
+		List<String> bizIds = new ArrayList<String>();
+		bizIds.add(bizId003);
+		bizIds.add(bizId004);
+		bizIds.add(bizId005);
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(bizIds));
+		SpdBizItems bizItems = mockMvcHelper.findList(SpdBizItems.class, xykUserCode, params, -1);
+
+		assertEquals(13, bizItems.size());
+		
+		bizIds.forEach(bizId->{
+			SpdBizItem theItem = CollectionUtils.findWhere("bizId", bizId, bizItems);
+			assertNotNull(theItem);
+		});
+	}
+	
+	@Test public void testAddBizItem() throws Exception{
+		String bizId = "rep_biz_id_001";
+		String goodsId = "goods_id_012";
+		String lotId = "goods_lot_id_031";
+		int planQty = 300;
+		float unitPrice = 20.00f;
+		
+		SpdBizItem newBizItem = new SpdBizItem(goodsId, lotId, YdsUnitLv.big.getLv(), planQty, 0, unitPrice);
+		newBizItem.setBizId(bizId);
+		testAndCheckCommonAddBizItem(newBizItem);
+	}
+	
+	@Test public void testDeleteBizItem() throws Exception{
+		String bizItemId = "biz_item_id_126";
+		String urlTemplate = "/spd/spdBizItems/{bizItemId}?accessToken={accessToken}";
+		testAndCheckCommomDeleteBizItem(bizItemId, urlTemplate);
+	}
+	
+	@Test public void testModifyBizItem() throws Exception{
+		String bizItemId = "biz_item_id_063";
+		SpdBizItem originItem = biRepository.findOne(bizItemId);
+		originItem.setConfirmQty(10);
+		testAndCheckComminModifyBizItem(originItem);
+	}
+	
+	/*****   补货类型的申领业务结束      *****/
+	
+	
+	/*****   请领和调拨类型的申领业务开始      *****/
+	
+	@Test public void testFindBizItemForApply() throws Exception{
+		String bizId = "rep_biz_id_003";
+		SpdBizItems items = commonGetItemById(bizId);
+		assertEquals(7, items.size());
+	}
+	
+	
+	@Test public void testCountBizItemForApply() throws Exception{
+		String bizId = "rep_biz_id_003";
+		int count = commonGetCountById(bizId);
+		assertEquals(7, count);
+	}
+	
+	@Test public void testAddApplyReplenishBizItem() throws Exception{
+		String bizId = "rep_biz_id_001";
+		String goodsId = "goods_id_012";
+		String lotId = "goods_lot_id_031";
+		int planQty = 300;
+		float unitPrice = 20.00f;
+		
+		SpdBizItem newBizItem = new SpdBizItem(goodsId, lotId, YdsUnitLv.big.getLv(), planQty, 0, unitPrice);
+		newBizItem.setBizId(bizId);
+		testAndCheckCommonAddBizItem(newBizItem);
+	}
+	
+	@Test public void testDeleteApplyReplenishBizItem() throws Exception{
+		String bizItemId = "biz_item_id_126";
+		
+		String urlTemplate = "/spd/spdBizItems/{bizItemId}?accessToken={accessToken}";
+		testAndCheckCommomDeleteBizItem(bizItemId, urlTemplate);
+	}
+	
+	@Test public void testModifyApplyRenplenishBizItem() throws Exception{
+		String bizItemId = "biz_item_id_063";
+		SpdBizItem originItem = biRepository.findOne(bizItemId);
+		originItem.setConfirmQty(10);
+		testAndCheckComminModifyBizItem(originItem);
+	}
+	
+	/*****   请领和调拨类型的申领业务结束     *****/
+	
+	
+	
+	
+	/*****   退货类型的申领业务开始      *****/
+	
+	@Test public void testFindRefundReplenishBizItem() throws Exception{
+		String bizId = "rep_biz_id_003";
+		SpdBizItems items = commonGetItemById(bizId);
+		assertEquals(7, items.size());
+	}
+	
+	@Test public void testCountRefundReplenishBizItem() throws Exception{
+		String bizId = "rep_biz_id_003";
+		int count = commonGetCountById(bizId);
+		assertEquals(7, count);
+	}
+	
+	@Test public void testAddRefundBizItem() throws Exception{
+		String bizId = "rep_biz_id_001";
+		String goodsId = "goods_id_012";
+		String lotId = "goods_lot_id_031";
+		int planQty = 300;
+		float unitPrice = 20.00f;
+		
+		SpdBizItem newBizItem = new SpdBizItem(goodsId, lotId, YdsUnitLv.big.getLv(), planQty, 0, unitPrice);
+		newBizItem.setBizId(bizId);
+		testAndCheckCommonAddBizItem(newBizItem);
+	}
+	
+	@Test public void testModifyRefundBizItem() throws Exception{
+		String bizItemId = "biz_item_id_063";
+		SpdBizItem originItem = biRepository.findOne(bizItemId);
+		originItem.setConfirmQty(10);
+		testAndCheckComminModifyBizItem(originItem);
+	}
+	
+	@Test public void testDeleteRefundBizItem() throws Exception{
+		String bizItemId = "biz_item_id_126";
+		
+		String urlTemplate = "/spd/spdBizItems/{bizId}?accessToken={accessToken}";
+		testAndCheckCommomDeleteBizItem(bizItemId, urlTemplate);
+	}
+	
+	
+	/*****   退货类型的申领业务结束  *****/
+	
+	@Test public void testBizItemWithStockOrderBy() throws Exception{
+		String bizId = "rep_biz_id_008";
+		String depotId = "depot_id_001";
+		String url = "/spd/spdBizItems/bizId,{bizId}?accessToken={accessToken}";
+		SpdBizItems items = mockMvcHelper.mockGet(SpdBizItems.class, url, bizId, getAccessToken(xykUserCode));
+		SpdBizItem item1 = items.get(0);
+		SpdBizItem item2 = items.get(1);
+		SpdShelfStocks shelfStocks = ssRepository.findByDepot(depotId);
+		shelfStocks.fillGoodsLots(glRepository);
+		SpdShelfStock shelfStock1 = CollectionUtils.findWhere("goodsId", item1.getGoodsId(), shelfStocks);
+		SpdShelfStock shelfStock2 = CollectionUtils.findWhere("goodsId", item2.getGoodsId(), shelfStocks);
+		assertTrue(item1.getPlanQty()>shelfStock1.getUseableQtyByStoreUnit());
+		assertEquals(shelfStock2.getUseableQtyByStoreUnit(),0);
+	}
+	
+	
+	
+	
+	/*****   申领业务结束  *****/
+
+	
+	private void testAndCheckCommonAddBizItem(SpdBizItem newBizItem) throws Exception{
+		SpdBizItem bizItem = mockMvcHelper.add(SpdBizItem.class, xykUserCode, newBizItem);
+		assertNotNull(bizItem);
+		
+		SpdBizItem createdBizItem = biRepository.findOne(bizItem.getBizItemId());
+		assertNotNull(createdBizItem);
+		assertEquals(newBizItem.getBizId(), createdBizItem.getBizId());
+		assertEquals(newBizItem.getGoodsId(), createdBizItem.getGoodsId());
+		assertEquals(newBizItem.getLotId(), createdBizItem.getLotId());
+		assertEquals(newBizItem.getPlanQty(), createdBizItem.getPlanQty());
+		assertEquals(newBizItem.getUnitPrice(), createdBizItem.getUnitPrice());
+		assertEquals(false, newBizItem.getAsPlanned());
+	}
+	
+	private void testAndCheckComminModifyBizItem(SpdBizItem bizItem) throws Exception{
+		SpdBizItem newItem = mockMvcHelper.modify(SpdBizItem.class, xykUserCode, bizItem.getBizItemId(), bizItem);
+		assertEquals(10, newItem.getConfirmQty().intValue());
+		SpdBizItem findItem = biRepository.findOne(bizItem.getBizItemId());
+		assertEquals(10, findItem.getConfirmQty().intValue());
+	}
+	
+	private void testAndCheckCommomDeleteBizItem(String bizItemId, String urlTemplate) throws Exception{
+		mockMvcHelper.mockDelete(urlTemplate, bizItemId, getAccessToken(xykUserCode));
+		SpdBizItem bizItem = biRepository.findOne(bizItemId);
+		assertNull(bizItem);
+	}
+	
+	private SpdBizItems commonGetItemById(String bizId) throws Exception{
+		String url = "/spd/spdBizItems/bizId,{bizId}?accessToken={accessToken}&pageSize=-1";
+		SpdBizItems bizItems = mockMvcHelper.mockGet(SpdBizItems.class, url, bizId, getAccessToken(xykUserCode));
+		return bizItems;
+	}
+	
+	private int commonGetCountById(String bizId) throws Exception{
+		String url = "/spd/spdBizItems/bizId,{bizId}/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, bizId, getAccessToken(xykUserCode));
+		return count;
+	}
+	
+	@Test public void testFindReviewedReplenishItemsByBizRuleId() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReviewedReplenishItems/bizRuleId,{bizRuleId}(itemConditionCode={itemConditionCode})?orders={orders}&accessToken={accessToken}";
+		String bizRuleId = "rep_rule_id_09";
+		String orderParam = Global.defaultObjectMapper.writeValueAsString(new OrderParam("createTime", "desc"));
+		SpdBizItems items = mockMvcHelper.mockGet(SpdBizItems.class, url, bizRuleId, SpdOriginItemCondition.not_as_planned.getCode(), orderParam, accessToken);
+		assertEquals(1, items.size());
+	}
+	
+	@Test public void testCountReviewedReplenishItemsByBizRuleId() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReviewedReplenishItems/bizRuleId,{bizRuleId}(itemConditionCode={itemConditionCode})/count?accessToken={accessToken}";
+		String bizRuleId = "rep_rule_id_09";
+		int count = mockMvcHelper.mockGet(Integer.class, url, bizRuleId, SpdOriginItemCondition.not_as_planned.getCode(), accessToken);
+		assertEquals(1, count);
+	}
+	
+}

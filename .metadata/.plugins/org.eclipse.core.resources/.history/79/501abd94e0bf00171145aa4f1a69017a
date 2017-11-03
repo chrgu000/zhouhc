@@ -1,0 +1,32 @@
+package cn.ak4j.yard.spd.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdDepotCardParams extends QueryParams{
+	
+	private ListParam<String> depotCardId;
+	private ListParam<String> cardCode;
+	private ListParam<String> depotId;
+	private ListParam<String>    goodsId;
+	private ListParam<String> isolationShelfId;//隔离货位
+	private ListParam<String> unqualifiedShelfId;
+	private ListParam<String>    shelfId;
+	private ListParam<String>    storeUnitLv;
+	private ListParam<String>    storeUnitName;
+	private ListParam<Integer>  checkStateCode;
+	private ListParam<Boolean> enabled;
+	private ListParam<String> depotName;
+	private ListParam<String> formatName;
+	private ListParam<String> shelfName;
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	//用来根据指定仓库和货区以及货位编码获取对应的帐页信息
+	private ListParam<String> shelfCode;
+	private ListParam<String> areaId;
+}

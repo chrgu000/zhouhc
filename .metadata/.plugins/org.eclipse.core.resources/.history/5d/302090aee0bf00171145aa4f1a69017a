@@ -1,0 +1,129 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdConsumeRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdConsumeRules;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdConsumeRuleResourceTest extends BaseTest{
+
+	@Autowired private YardCodeService codeService;
+
+	
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdConsumeRules?accessToken={accessToken}";
+		SpdConsumeRules rules = mockMvcHelper.mockGet(SpdConsumeRules.class, url, accessToken);
+		assertEquals(4, rules.size());
+	}
+
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdConsumeRules/count?accessToken={accessToken}";
+		int count =  mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(4, count);
+	}
+
+	@Test public void testGetByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdConsumeRules/ids,{ids}?accessToken={accessToken}";
+		List<String> ids = new ArrayList<String>();
+		ids.add("cns_rule_id_01");
+		ids.add("cns_rule_id_02");
+		SpdConsumeRules rules = mockMvcHelper.mockGet(SpdConsumeRules.class, url, StringUtils.join(ids, ","), accessToken);
+		assertEquals(2, rules.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("id", id, rules));
+		}
+	}
+	
+	@Test public void testAdd() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdConsumeRules?accessToken={accessToken}";
+		SpdConsumeRule rule = createConsumeRule();
+		SpdConsumeRule newRule = mockMvcHelper.mockPost(SpdConsumeRule.class, rule, url, accessToken);
+		assertTrue(newRule.getId() != null);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.xiaohaoguize);
+		assertEquals(CodeSort.xiaohaoguize.getCode()+getCurrentDateCode()+sequenceCode, newRule.getRuleCode());
+		assertEquals(rule.getAreaType(), newRule.getAreaType());
+		assertEquals(rule.getDepotId(), newRule.getDepotId());
+		assertEquals(rule.getEnabled(), newRule.getEnabled());
+		assertEquals(rule.getFeedbackRuleId(), newRule.getFeedbackRuleId());
+		assertEquals(rule.getName(), newRule.getName());
+		assertEquals(rule.getCustomName(), newRule.getCustomName());
+		assertEquals(rule.getPrior(), newRule.getPrior());
+		assertEquals(rule.getUsage(), newRule.getUsage());
+		
+		rule.setName("X消耗");
+		mockMvcHelper.mockPost(SpdConsumeRule.class, rule, url, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit, accessToken);
+		
+		rule.setFeedbackRuleId("prp_fb_id_011");
+		mockMvcHelper.mockPost(SpdConsumeRule.class, rule, url, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different, accessToken);
+	}
+
+	@Test public void testModify() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdConsumeRules/{id}?accessToken={accessToken}";
+		String id = "cns_rule_id_01";
+		SpdConsumeRule rule = mockMvcHelper.mockGet(SpdConsumeRule.class, url,  id, accessToken);
+		String newName = "处方消耗2";
+		rule.setName(newName);
+		rule.setCustomName("自定义处方消耗");
+		
+		rule = mockMvcHelper.mockPut(SpdConsumeRule.class, rule, url, id, accessToken);
+		assertTrue(rule.getName().equals(newName));
+		assertEquals("自定义处方消耗", rule.getCustomName());
+
+		rule.setFeedbackRuleId("cns_fb_id_21");
+		rule.setUsage("护士领用");
+		rule.setName("护士领用");
+		rule.setPrior(1);
+		mockMvcHelper.mockPut(SpdConsumeRule.class, rule, url, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit, id, accessToken);
+		
+		rule.setFeedbackRuleId("prp_fb_id_011");
+		mockMvcHelper.mockPut(SpdConsumeRule.class, rule, url, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different, id, accessToken);
+	}
+	
+	@Test public void whichICanApply() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdConsumeRules/whichICanApply?accessToken={accessToken}";
+		SpdConsumeRules rules = mockMvcHelper.mockGet(SpdConsumeRules.class, url, accessToken);
+		assertEquals(0, rules.size());
+		
+		accessToken = getAccessToken(yhmanagerUserCode);
+		rules = mockMvcHelper.mockGet(SpdConsumeRules.class, url, accessToken);
+		assertEquals(2, rules.size());
+	}
+	
+	private SpdConsumeRule createConsumeRule(){
+		SpdConsumeRule rule = new SpdConsumeRule();
+		
+		rule.setDepotId("depot_id_002");
+		rule.setAreaType(PcsAreaType.normal.getCode());
+		rule.setEnabled(true);
+		rule.setFeedbackRuleId("cns_fb_id_13");
+		rule.setUsage("护士领用");
+		rule.setName("护士领用");
+		rule.setCustomName("自定义护士领用");
+		rule.setPrior(12);
+		rule.setCanBeOriginRule(false);
+		
+		return rule;
+	}
+}

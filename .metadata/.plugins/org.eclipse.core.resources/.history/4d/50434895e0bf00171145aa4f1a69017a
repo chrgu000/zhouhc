@@ -1,0 +1,109 @@
+package cn.ak4j.yard.pcs.domain;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.domain.YardCodeParser;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name="pcs_depot_shelf")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class PcsDepotShelf extends YardMaintenceEntity {
+	
+	public static final String virtual_shelf_name = "虚拟货位";
+	public static final String virtual_shelf_code = "202XN001";
+	
+	@Id                                               
+	@GeneratedValue(strategy=GenerationType.AUTO,generator="uuidGenerator")
+	@GenericGenerator(name="uuidGenerator",strategy="uuid")
+	@Column(name="shelf_id")
+	@Getter @Setter
+	private String depotShelfId;//货位ID
+	
+	@Getter @Setter
+	private String areaId;//货区ID
+	
+	@NotEmpty(message="货位编码不能为空") @Getter @Setter
+	private String shelfCode;//货位编码
+	
+	@NotEmpty(message="货位名称不能为空") @Getter @Setter
+	private String shelfName;//货位名称
+	
+	@Getter @Setter
+	private String storeType;//存储类型
+	
+	@Getter @Setter
+	private boolean mixedGoods;//是否混品种
+	
+	@Getter @Setter
+	private boolean mixedBatch;//混批次数量
+	
+	@Getter @Setter
+	private String depotId;//仓库ID
+	
+	@Getter @Setter
+	private boolean enabled;
+	
+	@Getter @Setter
+	private Integer inx;//排序编号
+	
+	@Getter @Setter
+	private boolean primary;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepotArea area;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();//审核状态
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+	@Setter
+	@Transient private YardArbitraryCode sysCode;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotCard depotCard;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	//设置enabled的值
+	public String getPcsDepotShelfEnabled(){
+		return this.enabled?"是":"否";
+	}
+
+	public YardArbitraryCode getSysCode(){
+		return YardCodeParser.parseArbitraryCode(getShelfCode());
+	}
+
+	@Transient @JsonIgnore
+	public boolean isVirtual() {
+		if(getShelfName().equals(virtual_shelf_name) && getShelfCode().equals(virtual_shelf_code)){
+			return true;
+		}
+		return false;
+	}
+	
+}

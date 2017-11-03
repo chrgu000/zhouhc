@@ -1,0 +1,10 @@
+--删除数据
+delete from spd_consume_biz;
+
+--插入数据
+
+
+
+
+
+

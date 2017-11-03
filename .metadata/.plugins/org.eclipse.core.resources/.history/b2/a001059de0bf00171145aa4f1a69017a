@@ -1,0 +1,1 @@
+ALTER TABLE eis_block_sync_resource RENAME COLUMN ex_resource_id TO from_resource_id;

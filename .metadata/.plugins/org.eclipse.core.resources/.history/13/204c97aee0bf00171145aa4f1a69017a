@@ -1,0 +1,581 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLogs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizLogRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.factory.SpdDepotCardFactory;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdReceiveBizResourceTest extends BaseTest{
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdBizLogRepository blRepository;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdDepotCardFactory dcFactory;
+
+	@Test public void testAddReceiveBizWithItems() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		SpdReceiveBiz receiveBiz = createNewReceiveBiz();
+		receiveBiz.setBizRuleId("rec_rule_id_03");
+		receiveBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		mockMvcHelper.add(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receiveBiz, status().is4xxClientError(), YardExceptionType.not_found_receive_relation_prepare_inform);
+		
+		//提交新增收货业务
+		receiveBiz.setPrepareInformBizId("prp_inf_biz_id_029");
+		receiveBiz = mockMvcHelper.add(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receiveBiz);
+		wait(2);
+		
+		//检查新增的收货业务
+		receiveBiz = mockMvcHelper.findOne(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receiveBiz.getBizId());
+		assertSpdReceiveBiz(receiveBiz);
+		
+		//检查收货明细
+		String url = "/spd/spdBizItems/bizId,{id}?accessToken={accessToken}";
+		SpdBizItems items = mockMvcHelper.mockGet(SpdBizItems.class, url, receiveBiz.getBizId(),getAccessToken(xykUserCode));
+		assertEquals(2, items.size());
+		for(SpdBizItem item : items){
+			assertEquals(receiveBiz.getBizId(), item.getBizId());
+		}
+		
+		//检查业务日志
+		SpdBizLogs logs = blRepository.findByBizId(receiveBiz.getBizId());
+		assertEquals(1, logs.size());
+		assertEquals(SpdReceiveBizSteps.create_receive.getStatusCode(), logs.get(0).getBizStatusCode());
+		assertEquals("user_id_002", logs.get(0).getUserId());
+	}
+	
+	@Test public void testAddReceiveWithoutPrepareInform() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		SpdReceiveBiz receiveBiz = createNewReceiveBiz();
+		receiveBiz.setBizRuleId("rec_rule_id_05");
+		receiveBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		//提交新增收货业务
+		receiveBiz = mockMvcHelper.add(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receiveBiz);	
+		assertEquals(CheckState.new_created, receiveBiz.getCheckState());
+	}
+	
+	@Test public void testAddReceiveByEis() throws Exception{
+		PcsUser user =  mockMvcHelper.findOne(PcsUser.class, testUserCode, eisUserId);
+		
+		SpdReceiveBiz receive = createNewReceiveBiz();
+		receive.setBizRuleId("rec_rule_id_02");
+		receive.setPrepareInformBizId("prp_inf_biz_id_029");
+		receive.setMaintenanceInfo(new MaintenanceInfo(user));
+		//提交新增收货业务
+		receive = mockMvcHelper.add(SpdReceiveBiz.class, eisUserCode, "spd", "spdReceives", receive);	
+		assertEquals(YardChannelType.eis.getCode(), receive.getChannelTypeCode());
+		assertEquals("user_id_002", receive.getMaintenanceInfo().getCreateUserId());
+		assertEquals(receive.getMaintenanceInfo().getCreateUserId(), receive.getMaintenanceInfo().getLastUserId());
+		wait(4);
+		
+		receive = mockMvcHelper.findOne(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receive.getBizId());
+		assertEquals(CheckState.completed, receive.getCheckState());
+		assertEquals(receive.getMaintenanceInfo().getCreateUserId(), receive.getMaintenanceInfo().getLastUserId());
+		assertEquals(0, msgs.size());
+	}
+	
+	//测试审核未确认的收货业务，检查系统抛出异常
+	@Test public void testReviewReceiveWithError() throws Exception{
+		String bizId = "rece_biz_id_001";
+		SpdReceiveBiz receiveBiz = rbRepository.getWithItems(bizId);
+		assertEquals(CheckState.new_created, receiveBiz.getCheckState());
+		
+		//提交审核收货业务
+		String url = "/spd/spdReceives/{bizId}/checkState/reviewed?accessToken={accessToken}";
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), receiveBiz.getMaintenanceInfo().getLastDate());
+		mockMvcHelper.mockPut(CheckStateTO.class, checkState, url, status().is4xxClientError(), YardExceptionType.invalid_item_not_confirm, receiveBiz.getBizId(), getAccessToken(xykUserCode));
+		
+		receiveBiz.getItems().forEach(item->{
+			item.confirmAsPlaned();
+		});
+		biRepository.saveAll(receiveBiz.getItems());
+		
+		mockMvcHelper.mockPut(CheckStateTO.class, checkState, url, status().is4xxClientError(), YardExceptionType.forbide_update_check_state, receiveBiz.getBizId(), getAccessToken(xykUserCode));
+	}
+	
+	//测试审核未确认的收货业务，存在已过期批次
+	@Test public void testReviewReceiveWithExpireGoodsLot() throws Exception{
+		String bizId = "rece_biz_id_009";
+		
+		//标准器械更改为检查有效期
+		String goodsId = "goods_id_046";
+		YdsGoods goods = mockMvcHelper.findOne(YdsGoods.class, xykUserCode, goodsId);
+		goods.setCheckValidity(true);
+		goods = goodsRepository.save(goods);
+		
+		//创建不存在账页
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		PcsDepot depot = depotRepository.findAllWithRelations().findById("depot_id_001");
+		SpdDepotCard depotCard  = dcFactory.createCard(depot, goods, user);
+		depotCard = mockMvcHelper.add(SpdDepotCard.class, xykUserCode, depotCard);
+		
+		YdsGoodsLot goodsLot = getExpireLotNo("gl_20170919", goodsId);
+		goodsLot = mockMvcHelper.add(YdsGoodsLot.class, xykUserCode, goodsLot);
+		
+		SpdReceiveItem item = createReceiveItem(bizId, goodsLot.getGoodsLotId(), goodsId);
+		item = mockMvcHelper.add(SpdReceiveItem.class, xykUserCode, item);
+		
+		String accessToken = getAccessToken(xykUserCode);
+		
+		SpdReceiveBiz receive = mockMvcHelper.mockGet(SpdReceiveBiz.class, "/spd/spdReceives/{id}?accessToken={accessToken}", bizId, accessToken);
+		
+		SpdBizItemParams itemParams = new SpdBizItemParams();
+		itemParams.setBizId(new ListParam<String>(bizId));
+		//明细确认
+		SpdBizItems bizItems = mockMvcHelper.mockGet(SpdBizItems.class, "/spd/spdBizItems?params={params}&pageSize=-1&accessToken={accessToken}", Global.defaultObjectMapper.writeValueAsString(itemParams), accessToken);
+		for(SpdBizItem bizItem : bizItems){
+			bizItem.confirmAsPlaned();
+			mockMvcHelper.mockPut(SpdBizItem.class, bizItem, "/spd/spdBizItems/{id}?accessToken={accessToken}", bizItem.getBizItemId(), accessToken);
+		};
+		
+		//审核失败
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), receive.getLastUpdateTime());
+		mockMvcHelper.mockPut(CheckStateTO.class, checkState, "/spd/spdReceives/{id}/checkState/reviewed?accessToken={accessToken}", status().is4xxClientError(), YardExceptionType.forbid_use_expire_goods_lot, bizId, accessToken);
+		
+		//确认为零
+		bizItems = mockMvcHelper.mockGet(SpdBizItems.class, "/spd/spdBizItems?params={params}&pageSize=-1&accessToken={accessToken}", Global.defaultObjectMapper.writeValueAsString(itemParams), accessToken);
+		for(SpdBizItem bizItem : bizItems){
+			bizItem.setConfirmQty(0);
+			mockMvcHelper.mockPut(SpdBizItem.class, bizItem, "/spd/spdBizItems/{id}?accessToken={accessToken}", bizItem.getBizItemId(), accessToken);
+		};
+		
+		//审核成功
+		checkState = mockMvcHelper.mockPut(CheckStateTO.class, checkState, "/spd/spdReceives/{id}/checkState/reviewed?accessToken={accessToken}", bizId, accessToken);
+		wait(4);
+	}
+	
+	@Test public void testAddReceiveWithOutItems() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		SpdReceiveBiz receiveBiz = createNewReceiveBizWithoutItems();
+		receiveBiz.setBizRuleId("rec_rule_id_03");
+		receiveBiz.setPrepareInformBizId("prp_inf_biz_id_029");
+		receiveBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		receiveBiz = mockMvcHelper.add(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receiveBiz);	
+		
+		assertNotEquals("", receiveBiz.getBizCode());
+		assertNotNull(receiveBiz.getBizId());
+
+		assertEquals(CheckState.new_created.getCode(), receiveBiz.getCheckStateCode().intValue());
+		assertTrue(CollectionUtils.isEmpty(receiveBiz.getItems()));
+		
+		wait(1);
+		receiveBiz = mockMvcHelper.findOne(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receiveBiz.getBizId());
+		assertEquals(SpdReceiveBizSteps.create_receive.getStatusCode(), receiveBiz.getBizStatusCode());
+	}
+
+
+	//测试审核收货业务，自动创建上架作业并自动审核上架
+	@Test public void testReviewReceiveWithAutoCompleteOnShelfTask() throws Exception{
+		String bizId = "rece_biz_id_008";
+		SpdReceiveBiz receiveBiz = mockMvcHelper.findOne(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", bizId);
+		
+		//提交审核收货业务
+		String url = "/spd/spdReceives/{bizId}/checkState/reviewed?accessToken={accessToken}";
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), receiveBiz.getMaintenanceInfo().getLastDate());
+		checkState = mockMvcHelper.mockPut(CheckStateTO.class, checkState, url, status().isOk(), null, receiveBiz.getBizId(), getAccessToken(xykUserCode));
+		assertEquals(CheckState.reviewed.getCode(), checkState.getCheckStateCode().intValue());
+		
+		//等待异步消息驱动完成自动创建上架作业以及自动审核上架作业
+		wait(3);
+		
+		receiveBiz = mockMvcHelper.findOne(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receiveBiz.getBizId());
+		
+		//检查业务状态
+		assertEquals(SpdReceiveBizSteps.complete_on_shelf_task, receiveBiz.getCurrentBizStep());
+		assertTrue(receiveBiz.isCompleted());
+		
+		//检查业务日志
+		SpdBizLogs logs = blRepository.findByBizId(bizId);
+		assertEquals(6, logs.size());
+		
+		//检查上架作业
+		SpdDepotTasks depotTasks = dtRepository.findWithItemsByBizId(bizId);
+		for(SpdDepotTask task : depotTasks){
+			assertEquals(CheckState.reviewed, task.getCheckState());
+		}
+		
+		assertEquals(1, msgs.size());
+		assertEquals("sync_receive", msgs.get(0).getMsgType());
+	}
+	
+	@Test public void testCommitReceive() throws Exception{
+		//获取收货单据
+		String bizId = "rece_biz_id_001";
+		SpdReceiveBiz receiveBiz = mockMvcHelper.findOne(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", bizId);
+		
+		//提交收货单据
+		String url = "/spd/spdReceives/{bizId}/checkState/commited?accessToken={accessToken}";
+		CheckStateTO checkState = new CheckStateTO(CheckState.commited.getCode(), receiveBiz.getMaintenanceInfo().getLastDate());
+		checkState = mockMvcHelper.mockPut(CheckStateTO.class, checkState, url, status().isOk(), null, receiveBiz.getBizId(), getAccessToken(xykUserCode));
+		assertEquals(CheckState.commited.getCode(), checkState.getCheckStateCode().intValue());
+		
+		wait(2);
+		
+		receiveBiz = mockMvcHelper.findOne(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", receiveBiz.getBizId());
+		
+		//检查单据状态
+		assertEquals(CheckState.commited.getCode(), receiveBiz.getCheckStateCode().intValue());
+		assertEquals(SpdReceiveBizSteps.commite_receive.getStatusCode(), receiveBiz.getBizStatusCode());
+	}
+	
+	@Test public void modifyReceive() throws Exception{
+		//获取收货单据
+		String bizId = "rece_biz_id_001";
+		SpdReceiveBiz receiveBiz = mockMvcHelper.findOne(SpdReceiveBiz.class, xykUserCode, "spd", "spdReceives", bizId);
+		
+		//修改收货单据
+		receiveBiz.setToDepotId("depot_id_002");
+		receiveBiz.setToDeptId("dept_id_002");
+		
+		String url = "/spd/spdReceives/{bizId}?accessToken={accessToken}";
+		receiveBiz = mockMvcHelper.mockPut(SpdReceiveBiz.class, receiveBiz, url, bizId, getAccessToken(xykUserCode));
+		assertEquals("depot_id_002", receiveBiz.getToDepotId());
+		assertEquals("dept_id_002", receiveBiz.getToDeptId());
+	}
+
+	@Test public void testFindReceives() throws Exception{
+		testFindAll();
+		testCountAll();
+		testFindAllWithParams();
+		testFindByIds();
+		
+		testFindUncompleteReceives(CheckState.new_created.getCode(), 6);
+		testCountUncompleteReceives(CheckState.new_created.getCode(), 6);
+		
+		testFindUncompleteReceives(CheckState.commited.getCode(), 6);
+		testCountUncompleteReceives(CheckState.commited.getCode(), 6);
+		
+		testFindCompletedReceives();
+		testCountCompletedReceives();
+		
+		testFindAllBySendCode();
+		testFindByReceiveCode();
+		
+		testGetPdf();
+		testGetReceDeliveryPdf();
+	}
+	
+	public void testFindAll() throws Exception{
+		SpdReceiveBizs receiveBizs = mockMvcHelper.findList(SpdReceiveBizs.class, testUserCode, "spd", "spdReceives", null, status().isOk(), null);
+		assertEquals(20, receiveBizs.size());
+		for(SpdReceiveBiz biz : receiveBizs){
+			assertNotEquals("", biz.getBizCode());
+		}
+	}
+	
+	public void testCountAll() throws Exception{
+		int count = mockMvcHelper.count(Integer.class, testUserCode, "spd", "spdReceives", null, status().isOk(), null);
+		assertEquals(20, count);
+	}
+	
+	public void testFindAllWithParams() throws Exception{
+		List<String> bizIds = new ArrayList<String>();
+		bizIds.add("rece_biz_id_001");
+		bizIds.add("rece_biz_id_002");
+		bizIds.add("rece_biz_id_003");
+		bizIds.add("rece_biz_id_004");
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setBizId(new ListParam<String>(bizIds));
+		
+		params.setBizStatusCode(new ListParam<String>(SpdReceiveBizSteps.commite_receive.getStatusCode()));
+		SpdReceiveBizs receiveBizs = mockMvcHelper.findList(SpdReceiveBizs.class, testUserCode, "spd", "spdReceives", params, status().isOk(), null);
+		assertEquals(2, receiveBizs.size());
+		
+		for(SpdReceiveBiz biz : receiveBizs){
+			assertNotEquals("", biz.getBizCode());
+		}
+	}
+	
+	public void testFindByIds() throws Exception{
+		List<String> bizIds = new ArrayList<String>();
+		bizIds.add("rece_biz_id_001");
+		bizIds.add("rece_biz_id_002");
+		bizIds.add("rece_biz_id_003");
+		bizIds.add("rece_biz_id_004");
+		bizIds.add("rece_biz_id_005");
+		SpdReceiveBizs receiveBizs = mockMvcHelper.getByIds(SpdReceiveBizs.class, xykUserCode, "spd", "spdReceives", bizIds, status().isOk(), null);
+		assertEquals(5, receiveBizs.size());
+	}
+	
+	public void testFindUncompleteReceives(int checkStateCode, int count) throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReceives/iTakeChargeOfReceives/uncompleteReceives?params={params}&accessToken={accessToken}";
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(checkStateCode));
+		SpdReceiveBizs receiveBizs = mockMvcHelper.mockGet(SpdReceiveBizs.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(count, receiveBizs.size());
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		receiveBizs.forEach(receiveBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", receiveBiz.getToDepotId(), depots));
+		});
+		
+		receiveBizs.forEach(receiveBiz->{
+			assertEquals(checkStateCode, receiveBiz.getCheckState().getCode());
+		});
+	}
+	
+	public void testCountUncompleteReceives(int checkStateCode, int count) throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReceives/iTakeChargeOfReceives/uncompleteReceives/count?params={params}&accessToken={accessToken}";
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(checkStateCode));
+		int bizcount = mockMvcHelper.mockGet(Integer.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(count, bizcount);
+	}
+	
+	public void testFindCompletedReceives() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReceives/iTakeChargeOfReceives/completedReceives?accessToken={accessToken}";
+		SpdReceiveBizs receiveBizs = mockMvcHelper.mockGet(SpdReceiveBizs.class, url, accessToken);
+		assertEquals(8, receiveBizs.size());
+		
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		receiveBizs.forEach(receiveBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", receiveBiz.getToDepotId(), depots));
+		});
+		
+		receiveBizs.forEach(receiveBiz->{
+			assertTrue(receiveBiz.getCheckState()==CheckState.reviewed || receiveBiz.getCheckState()==CheckState.completed);
+		});
+	}
+	
+	public void testCountCompletedReceives() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReceives/iTakeChargeOfReceives/completedReceives/count?accessToken={accessToken}";
+		int bizcount = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(8, bizcount);
+	}
+	
+	public void testFindAllBySendCode() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReceives?params={params}&accessToken={accessToken}";
+		String sendCode = "1131707041";
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setSendCode(new ListParam<String>(sendCode));
+		SpdReceiveBizs receives = mockMvcHelper.mockGet(SpdReceiveBizs.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(sendCode, receives.get(0).getSendCode());
+	}
+	
+	//TODO 调度的相关接口暂时关闭
+//	@Test public void testFindDispatcherableReceives() throws Exception{
+//		String dispatcherId = "disp_id_002";
+//		String accessToken = getAccessToken(xykUserCode);
+//		String urlTemplate = getUrlTemplate("/spd/dispatchers/{dispatcherId}/dispatchableReceives?accessToken={accessToken}");
+//		String json = mockMvc.perform(get(urlTemplate, dispatcherId, accessToken))
+//				.andExpect(status().isOk())
+//				.andReturn().getResponse().getContentAsString();
+//		SpdReceiveBizs receives = Global.defaultObjectMapper.readValue(json, SpdReceiveBizs.class);
+//		//TODO 测试数据待完善，增加一个已审核的收货，这里断言的预期数量就为2
+//		assertEquals(1, receives.size());
+//		
+//		PcsUser user = userRepository.findOne(xykUserId);
+//		PcsDepots depots = depotRepository.findAll().findDeptManageDepot(user.getDeptId());
+//		receives.forEach(receiveBiz->{
+//			assertNotNull(CollectionUtils.findWhere("depotId", receiveBiz.getToDepotId(), depots));
+//		});
+//	}
+	
+	//TODO 调度相关接口暂时关闭
+//	@Test public void testGetDispatcherableReceivesCount() throws Exception{
+//		String dispatcherId = "disp_id_002";
+//		String accessToken = getAccessToken(xykUserCode);
+//		String urlTemplate = getUrlTemplate("/spd/dispatchers/{dispatcherId}/dispatchableReceives/count?accessToken={accessToken}");
+//		String json = mockMvc.perform(get(urlTemplate, dispatcherId, accessToken))
+//				.andExpect(status().isOk())
+//				.andReturn().getResponse().getContentAsString();
+//		int count = Global.defaultObjectMapper.readValue(json, Integer.class).intValue();
+//		
+//		assertEquals(1, count);
+//	}
+	
+	
+//	@Test public void testListReceiveConfirmed() throws Exception{
+//		String dispatcherId = "disp_id_003";
+//		String accessToken = getAccessToken(xykUserCode);
+//		String urlTemplate = getUrlTemplate("/spd/dispatchers/{dispatcherId}/relationReceives?accessToken={accessToken}");
+//		String json = mockMvc.perform(get(urlTemplate, dispatcherId, accessToken))
+//				.andExpect(status().isOk())
+//				.andReturn().getResponse().getContentAsString();
+//		SpdReceiveBizs receives = Global.defaultObjectMapper.readValue(json, SpdReceiveBizs.class);
+//		
+//		assertEquals(1, receives.size());
+//		
+//		PcsUser user = userRepository.findOne(xykUserId);
+//		PcsDepots depots = depotRepository.findAll().findDeptManageDepot(user.getDeptId());
+//		receives.forEach(receiveBiz->{
+//			assertNotNull(CollectionUtils.findWhere("depotId", receiveBiz.getToDepotId(), depots));
+//		});
+//	}
+	
+	//TODO 调度相关接口暂时关闭
+//	@Test public void countListReceiveConfirmed() throws Exception{
+//		String dispatcherId = "disp_id_003";
+//		String accessToken = getAccessToken(xykUserCode);
+//		String urlTemplate = getUrlTemplate("/spd/dispatchers/{dispatcherId}/relationReceives/count?accessToken={accessToken}");
+//		String json = mockMvc.perform(get(urlTemplate, dispatcherId, accessToken))
+//				.andExpect(status().isOk())
+//				.andReturn().getResponse().getContentAsString();
+//		
+//		int count = Global.defaultObjectMapper.readValue(json, Integer.class).intValue();
+//		
+//		assertEquals(1, count);
+//	}
+	
+	public void testFindByReceiveCode() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String bizCode = "1041703314";
+		String url = "/spd/spdReceives/code,{code}?accessToken={accessToken}";
+		SpdReceiveBiz receiveBiz = mockMvcHelper.mockGet(SpdReceiveBiz.class, url, bizCode, accessToken);
+		assertNotNull(receiveBiz);
+		assertEquals(bizCode, receiveBiz.getBizCode());
+	}
+	
+	public void testGetPdf() throws Exception{
+		String bizId = "rece_biz_id_002";
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdReceives/bizId,{bizId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, bizId, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("收货记录单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+	}
+	
+	 public void testGetReceDeliveryPdf() throws Exception{
+		String bizId = "rece_biz_id_014";
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdReceives/receDelivery/bizId,{bizId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, bizId, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("供应送货信息", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+	}
+	
+	private void assertSpdReceiveBiz(SpdReceiveBiz receiveBiz){
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.shouhuodan);
+		
+		assertEquals(SpdReceiveBizSteps.create_receive, receiveBiz.getCurrentBizStep());
+		String dateCode = Global.yyMMddDF.format(Global.defaultCalendar.getTime());
+		assertEquals(CodeSort.shouhuodan.getCode()+dateCode+sequenceCode, receiveBiz.getBizCode());	
+	}
+	
+	
+	private SpdReceiveBiz createNewReceiveBiz(){
+		SpdReceiveBiz receiveBiz = new SpdReceiveBiz();
+		receiveBiz.setCreatorDepotId("depot_id_001");
+		receiveBiz.setItems(createNewBizItem());
+		return receiveBiz;
+	}
+	
+	private SpdBizItems createNewBizItem(){
+		SpdBizItems items = new SpdBizItems();
+		
+		SpdBizItem item3 = new SpdBizItem();
+		item3.setPlanQty(300);
+		item3.setGoodsId("goods_id_003");
+		item3.setLotId("goods_lot_id_018");
+		item3.setUnitPrice(20.5f);
+		item3.setUnitLv(1);
+		items.add(item3);
+		
+		SpdBizItem item4 = new SpdBizItem();
+		item4.setPlanQty(400);
+		item4.setGoodsId("goods_id_004");
+		item4.setLotId("goods_lot_id_011");
+		item4.setUnitPrice(123.2f);
+		item4.setUnitLv(1);
+		items.add(item4);
+		
+		return items;
+	}
+	
+	private SpdReceiveItem createReceiveItem(String bizId, String lotId, String goodsId){
+		
+		SpdReceiveItem item = new SpdReceiveItem();
+		item.setPlanQty(300);
+		item.setGoodsId(goodsId);
+		item.setLotId(lotId);
+		item.setUnitPrice(20.5f);
+		item.setUnitLv(1);
+		item.setBizId(bizId);
+		return item;
+	}
+	
+	private SpdReceiveBiz createNewReceiveBizWithoutItems() {
+		SpdReceiveBiz receiveBiz = new SpdReceiveBiz();
+		receiveBiz.setToAreaType(PcsAreaType.normal.getCode());
+		receiveBiz.setCreatorDepotId("depot_id_001");
+		return receiveBiz;
+	}
+	
+	private YdsGoodsLot getExpireLotNo(String lotNo, String goodsId) {
+		YdsGoodsLot goodsLot = new YdsGoodsLot();
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.DAY_OF_YEAR, -30);
+		goodsLot.setLotValidity(cal.getTime());
+		cal.add(Calendar.DAY_OF_YEAR, -30);
+		goodsLot.setProduceDate(cal.getTime());
+		goodsLot.setGoodsId(goodsId);
+		goodsLot.setLotNo(lotNo);
+		return goodsLot;
+	}
+}

@@ -1,0 +1,13 @@
+package cn.ak4j.yard.extend;
+
+import lombok.Getter;
+import lombok.Setter;
+
+public class SpdIntegrationParams<T> {
+
+	@Setter @Getter
+	private String depotId;
+	
+	@Setter @Getter
+	private T params;
+}

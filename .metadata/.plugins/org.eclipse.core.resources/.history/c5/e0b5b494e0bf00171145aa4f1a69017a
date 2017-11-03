@@ -1,0 +1,16 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import lombok.NoArgsConstructor;
+
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdPropertyChangeRelationItems extends Entities<SpdPropertyChangeRelationItem>{
+
+	public SpdPropertyChangeRelationItems(List<SpdPropertyChangeRelationItem> entities){
+		super(entities);
+	}
+}

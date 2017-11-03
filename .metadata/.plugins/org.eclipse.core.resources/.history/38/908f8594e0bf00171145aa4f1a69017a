@@ -1,0 +1,35 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 仓库库存变更
+* @author zhengyf
+* @date 2017年3月31日 上午11:16:01
+* @version V1.0.0
+*/
+
+@NoArgsConstructor
+public class SpdDepotStockChange extends SpdStockChange{
+	
+	public SpdDepotStockChange(YdsGoodsLot goodsLot, PcsDepot depot){
+		setGoodsLot(goodsLot);
+		setDepot(depot);
+	}
+	
+	public SpdDepotStockChange(YdsGoodsLot goodsLot, PcsDepot depot, int storeUnitQty){
+		this(goodsLot, depot);
+		setQtyByStoreUnit(storeUnitQty);
+	}
+	
+	public boolean isSameLot(SpdDepotStockChange stockChange){
+		return this.getGoodsLot().getGoodsLotId().equals(stockChange.getGoodsLot().getGoodsLotId());
+	}
+	
+	public void incrementQtyByStoreUnit(SpdDepotStockChange stockChange){
+		setQtyByStoreUnit(getQtyByStoreUnit()+stockChange.getQtyByStoreUnit());
+	}
+
+}

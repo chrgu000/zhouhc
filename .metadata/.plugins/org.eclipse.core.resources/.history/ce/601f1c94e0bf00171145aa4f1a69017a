@@ -1,0 +1,18 @@
+/**
+ */
+package cn.ak4j.yard.sys.to;
+
+import lombok.Data;
+
+@Data
+public class InitialEndingImportTO {
+	private String ruleCode;
+	private String deptCode;
+	private String depotName;
+	private String goodsCode;
+	private String goodsName;
+	private String lotNo;
+	private String storeUnitName;
+	private float storePrice;
+	private Integer endingQty;
+}

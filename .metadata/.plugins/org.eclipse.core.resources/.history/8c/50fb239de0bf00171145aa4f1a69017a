@@ -1,0 +1,1 @@
+update spd_receive_rule set must_prepare='1' where id ='ff8080815f104552015f292b3ab501f7';

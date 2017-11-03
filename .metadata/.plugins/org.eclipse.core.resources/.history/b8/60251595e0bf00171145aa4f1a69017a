@@ -1,0 +1,216 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.List;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRules;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRule;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTasks;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: 申领业务
+* 申领业务用于支持院内从仓库到仓库之间的医疗物资的流通
+* @author zhengyf
+* @date 2017年4月2日 下午2:51:40
+* @version V1.0.0
+*/
+
+@Slf4j
+@NoArgsConstructor
+@Entity
+@Table(name="spd_replenish_biz")
+@SuppressWarnings({"serial"})
+public class SpdReplenishBiz extends SpdGoodsBizPlan<SpdReplenishRule> implements IFromDepotTask, IToDepotTask{
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_c_r_f;
+	
+	@Getter @Setter
+	private String fromOrgId;
+	
+	@Getter @Setter
+	private String fromDepotId;
+	
+	@Getter @Setter
+	private String toOrgId;
+	
+	@Getter @Setter
+	private String toDepotId;
+	
+	@Getter @Setter
+	private String fromAreaType;
+	
+	@Getter @Setter
+	private String toAreaType;
+	
+	@Getter @Setter
+	private String reason;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot fromDepot;
+	
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot toDepot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot creatorDepot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotTasks offShelfTasks;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotTasks onShelfTasks;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdLogisticsTasks deliveryTasks;
+	
+	@JsonIgnore @Transient
+	public List<SpdGoodsQty> getGoodsQty(){
+		return null;
+	}
+	
+	@JsonIgnore @Transient
+	public PcsDepot getStockChangeDepot() {
+		if(getCurrentBizStep() == null || getCurrentBizStep().equals(SpdReplenishBizSteps.review_replenish)){
+			return getFromDepot();
+		}else{
+			return getToDepot();
+		}
+	}
+	
+	public void autoFillBizRule(SpdAbstractBizRules rules) {
+		throw new UnsupportedOperationException("申领业务不支持该方法");
+	}
+	
+	@JsonIgnore @Transient
+	public SpdDepotStockChanges getStockChanges(){
+		throw new UnsupportedOperationException("申领业务不支持该方法");
+	}
+
+	@Transient
+	public SpdBizType getBizType() {
+		return SpdBizType.replenish_biz;
+	}
+
+	@JsonIgnore @Transient
+	public String getTargetAreaType(){
+		if(getCurrentBizStep() == null || getCurrentBizStep().equals(SpdReplenishBizSteps.review_replenish)){
+			return getFromAreaType();
+		}else{
+			return getToAreaType();
+		}
+	}
+
+	public void setBizRule(SpdReplenishRule rule){
+		super.setBizRule(rule);
+		if(rule != null){
+			setFromDepot(rule.getDirectionRule().getFromDepot());
+			setToDepot(rule.getDirectionRule().getToDepot());
+		}
+	}
+	
+	/**
+	 * 应用业务规则
+	 */
+	public void applyRule(SpdReplenishRule rule, PcsUser user) {
+		setBizRule(rule);
+		setFromDepot(rule.getDirectionRule().getFromDepot());
+		setToDepot(rule.getDirectionRule().getToDepot());
+		setFromDepotId(rule.getDirectionRule().getFromDepotId());
+		setFromOrgId(rule.getDirectionRule().getFromDepot().getManageOrgId());
+		setFromAreaType(rule.getDirectionRule().getFromDepotAreaType());
+		setToDepotId(rule.getDirectionRule().getToDepotId());
+		setToAreaType(rule.getDirectionRule().getToDepotAreaType());
+		setToOrgId(rule.getDirectionRule().getToDepot().getManageOrgId());
+		String creatorDeptId = user.getDeptId();
+		
+		boolean isFromDepotUser = rule.getDirectionRule().getFromDepot().getManageDeptId().equals(creatorDeptId);
+		boolean isToDepotUser = rule.getDirectionRule().getToDepot().getManageDeptId().equals(creatorDeptId);
+		
+		if(isFromDepotUser){
+			if(!rule.getContractRule().getFromDepotCanApply()){
+				throw new OperateFailException(YardExceptionType.forbid_can_not_apply_biz, creatorDeptId, rule.getDisplayName());
+			}
+			setCreatorDepotId(rule.getDirectionRule().getFromDepotId());
+		}else if(isToDepotUser){
+			if(!rule.getContractRule().getToDepotCanApply()){
+				throw new OperateFailException(YardExceptionType.forbid_can_not_apply_biz, creatorDeptId, rule.getDisplayName());
+			}
+			setCreatorDepotId(rule.getDirectionRule().getToDepotId());
+		}
+	}
+
+	public void updateBizRule(SpdReplenishRule rule) {
+		setBizRuleId(rule.getId());
+		updateLastUpdateTime();
+	}
+
+	/**
+	 * EIS渠道发起的情况下：
+	 * 1) 如果申领计划中的创建用户存在并能发起则将其作为执行用户
+	 * 2) 如果申领计划中创建用户不存在或没有发起权限则使用代理用户
+	 */
+	public PcsUser determinCreateUser(SpdReplenishRule rule, PcsUser user, PcsUsers allUsers) {
+		PcsUser createUser = null;
+		String createUserId = null;
+		if(getChannelType() == YardChannelType.eis){
+			//尝试使用申领计划中的用户作为执行用户
+			if(getMaintenanceInfo() != null && StringUtils.isNotEmpty(getMaintenanceInfo().getCreateUserId())){
+				createUserId = getMaintenanceInfo().getCreateUserId();
+				createUser = allUsers.findById(createUserId);
+			}
+			
+			//校验用户是否存在
+			if(createUser == null){
+				throw new OperateFailException(YardExceptionType.not_found_apply_user, createUserId);
+			}
+			
+			if(!rule.canApplyByUser(createUser)){
+				createUserId = rule.getApplyDepot().getManageDept().getDefaultUserId();
+				createUser = allUsers.findById(createUserId);
+				if(createUser == null){
+					throw new OperateFailException(YardExceptionType.not_found_default_user, rule.getApplyDepot().getManageDept().getDeptCode(), rule.getApplyDepot().getManageDept().getDeptName());
+				}
+				log.info("EIS同步申领，申领计划中的用户没有发起能力，采用代理用户[{}]发起，管理部门：{}", createUserId, rule.getApplyDepot().getManageDept().getDeptId());
+			}			
+		}else{
+			if(!rule.canApplyByUser(user)){
+				log.warn("当前用户{}不能发起该申领计划", user.getUserCode());
+				createUser = allUsers.findById(rule.getApplyDepot().getManageDept().getDefaultUserId());
+				if(createUser == null){
+					throw new OperateFailException(YardExceptionType.not_found_default_user, rule.getApplyDepot().getManageDept().getDeptCode(), rule.getApplyDepot().getManageDept().getDeptName());	
+				}
+			}else{
+				createUser = user;
+			}
+		}
+		
+		return createUser;
+	}
+
+	
+}

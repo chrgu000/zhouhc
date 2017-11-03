@@ -1,0 +1,86 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.Past;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="yds_eds_goods_lot")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class YdsEdsGoodsLot extends YardMaintenceEntity {
+   
+	@Id
+	@GeneratedValue(strategy=GenerationType.AUTO,generator="uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String edsGoodsLotId;//批号ID
+	
+	@Getter @Setter
+	private String yardGoodsLotId;//标准产品批号ID
+	
+	@NotEmpty(message = "产品不能为空") @Getter @Setter
+	private String edsGoodsId;//产品ID
+	
+	@NotEmpty(message = "批号不能为空") @Getter @Setter
+	private String edsLotNo;//批号
+	
+    @Getter @Setter
+	private Date edsLotValidity;//批号有效期
+	
+	@Getter @Setter
+	private String sterilizeLotNo;//灭菌批次
+	
+	@Getter @Setter
+	private Date sterilizeTime;//灭菌日期
+	
+	@Column(name="EDS_PRODUCE_DATE")
+	@Past(message = "生产日期必须大于当前时间")
+	@Getter @Setter
+	private Date produceDate;//生产日期
+	
+	@Getter @Setter
+	private String ownerOrgId;//隶属机构
+	
+	@Getter @Setter
+	private boolean enabled;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+
+	//设置为是否
+	public String getYdsEdsGoodsLotEnabled(){
+		return this.enabled?"是":"否";
+	}
+	
+	public String attachSN(String lotNo, String sn){
+		return String.format("%s[[%s]]", lotNo, sn);
+	}
+
+}

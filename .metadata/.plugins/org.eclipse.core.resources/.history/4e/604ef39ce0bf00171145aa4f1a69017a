@@ -1,0 +1,7 @@
+alter table spd_general_ledger drop column unit_lv;
+alter table spd_general_ledger rename column storage_count to storage_qty;
+alter table spd_general_ledger rename column deal_count to deal_qty;
+alter table spd_general_ledger rename column verification_count to verification_qty;
+
+alter table spd_general_ledger add(current_storage_qty integer);
+alter table spd_general_ledger add(return_qty integer);

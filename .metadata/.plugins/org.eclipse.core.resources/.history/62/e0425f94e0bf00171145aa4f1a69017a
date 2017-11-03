@@ -1,0 +1,130 @@
+package cn.ak4j.yard.spd.task.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdDispatchers;
+import cn.ak4j.yard.spd.task.params.SpdDispatcherParams;
+import lombok.Getter;
+
+@Repository
+public class SpdDispatcherRepository extends BaseRepository<SpdDispatcher, SpdDispatchers, SpdDispatcherParams,String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsOrgRepository pcsOrgRepository;
+	@Autowired private PcsDeptRepository pcsDeptRepository;
+	@Autowired private SpdDispatcherRefRepository drRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdLogisticsTaskItemRepository ltiRepository;
+	@Autowired private SpdDepotTaskRepository taskRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	
+	public SpdDispatcher saveWithRefs(SpdDispatcher dispatcher){
+		dispatcher = save(dispatcher);
+		dispatcher.updateRefId();
+		drRepository.saveAll(dispatcher.getRefs());
+		return dispatcher;
+	}
+
+	/**
+	 * 查找并关联仓库、调度明细、仓库作业(关联明细)
+	 */
+	public SpdDispatcher findWithRelationsById(String dispatcherId) {
+		SpdDispatcher dispatcher = findOne(dispatcherId);
+		dispatcher.fillDepot(depotRepository, dcRepository);
+		dispatcher.fillRefsWithGoodsItems(drRepository, biRepository, ltiRepository);
+		dispatcher.fillTasksWithItems(taskRepository);
+		return dispatcher;
+	}
+	
+	/**
+	 * 查找并关联仓库、调度明细、仓库作业(关联明细)
+	 */
+	public SpdDispatchers findWithRelationsByIds(List<String> ids) {
+		SpdDispatchers dispatchers = findByIds(ids);
+		dispatchers.fillDepot(depotRepository);
+		dispatchers.fillRefsWithGoodsItems(drRepository, biRepository, ltiRepository);
+		dispatchers.fillTasks(taskRepository);
+		return dispatchers;
+	}
+	
+	public SpdDispatchers find(SpdDispatcherParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = OrderParam.getDefaultOrder();
+			}
+			return new SpdDispatchers(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdDispatchers();
+	}
+	
+	public int count(SpdDispatcherParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdDispatcherParams params){
+		if (params != null) {
+
+			// 当指定了仓库名称，则需要先筛选仓库
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			if(!depotParams.isEmpty()){
+				PcsDepots depots = new PcsDepots(depotRepository.findAll().find(depotParams));
+				if (depots.size() == 0) {
+					return false;
+				}
+				params.setDispatcherDepotId(new ListParam<String>(depots.getIds()));
+			}
+			 
+			// 当指定了机构名称，则需要先筛选机构
+			PcsOrgParams orgParams = new PcsOrgParams();
+			orgParams.setOrgName(params.getOrgName());
+			if(!orgParams.isEmpty()){
+				PcsOrgs orgs = new PcsOrgs(pcsOrgRepository.findAll().find(orgParams));
+				if (orgs.size() == 0) {
+					return false;
+				}
+				params.setDispatcherOrgId(new ListParam<String>(orgs.getIds()));
+			}
+			
+
+			// 当指定部门名称，则需要先筛选部门
+			PcsDeptParams deptParams = new PcsDeptParams();
+			deptParams.setDeptName(params.getDeptName());
+			if(!deptParams.isEmpty()){
+				PcsDepts depts = new PcsDepts(pcsDeptRepository.findAll().find(deptParams));
+				if (depts.size() == 0) {
+					return false;
+				}
+				params.setDispatcherDeptId(new ListParam<String>(depts.getIds()));
+			}
+			
+		}
+		return true;
+	}
+}

@@ -1,0 +1,142 @@
+package cn.ak4j.yard.spd.domain;
+
+import java.util.List;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+import org.springframework.beans.BeanUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.SpdInventoryWay;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="SPD_INVENTORY")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SpdInventory extends YardMaintenceEntity{
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String inventoryId;//盘点单ID
+	
+	@Getter @Setter
+	private String inventoryCode;//盘点单编码
+	
+	@NotEmpty(message = "请选择盘点人!") @Getter @Setter
+	private String inventoryUser;//盘点人
+	
+	@Getter @Setter
+	private String orgId;//使用机构
+	
+	@Getter @Setter
+	private String deptId;//使用部门
+	
+	@NotEmpty(message = "请选择盘点仓库！") @Getter @Setter
+	private String depotId;//使用仓库
+	
+	@NotEmpty(message = "请选择货区!") @Getter @Setter
+	private String areaId;//货区
+	
+	@NotEmpty(message = "请选择盘点方式!") @Getter @Setter
+	private String inventoryType;//盘点单类型
+	
+	@Column(name="IS_FIXED") @Getter @Setter
+	private String fixed;//定数类型
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot depot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDept dept;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsOrg org;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepotArea depotArea;
+	
+	@Transient @Getter @Setter
+	private PcsUser user;
+	
+	@Transient @Getter @Setter
+	private SpdInventoryItems items = new SpdInventoryItems();
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_r_f;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient
+	public String getInventoryWayName(){
+		return SpdInventoryWay.typeOf(getInventoryType()).getName();
+	}
+
+	public void updateItemsId(){
+		if(CollectionUtils.isNotEmpty(getItems())){
+			getItems().forEach(item->item.setInventoryId(getInventoryId()));
+		}
+	}
+
+	public void addItem(SpdInventoryItem item) {
+		items.add(item);
+	}
+
+	public void addItems(SpdInventoryItems theItems) {
+		items.addAll(theItems);
+	}
+
+	@SuppressWarnings("unchecked")
+	public SpdInventorys splitInventory(SpdInventory originInventory, int batchGoodsSize) {
+		SpdInventorys inventorys = new SpdInventorys();
+		
+		List<String> goodsIds = originInventory.getItems().pluck("goodsId");
+		int goodsSize = goodsIds.size();
+		int groupSize = (int)Math.ceil((double)goodsSize/batchGoodsSize);
+		
+		for(int i=1; i<groupSize; i++){
+			int startInx = batchGoodsSize*i;
+			int endInx = batchGoodsSize*(i+1)<goodsIds.size()?batchGoodsSize*(i+1):goodsIds.size();
+			List<String> subGoodsIds = goodsIds.subList(startInx, endInx);
+			
+			SpdInventory theInventory = new SpdInventory();
+			BeanUtils.copyProperties(originInventory, theInventory, "inventoryId");
+			
+			SpdInventoryItems theItems = originInventory.getItems().findByGoodsIds(subGoodsIds);
+			theInventory.setItems(theItems);
+			
+			inventorys.add(theInventory);
+		}
+		
+		return inventorys;
+	}
+	
+}

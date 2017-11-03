@@ -1,0 +1,22 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Inheritance;
+import javax.persistence.InheritanceType;
+
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizPlan;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRule;
+
+/**
+* @Description: 结算业务抽象类
+* @author zhengyf
+* @date 2017年8月15日 下午12:10:20
+* @version V1.0.0
+*/
+
+@SuppressWarnings({ "rawtypes", "serial" })
+@Entity
+@Inheritance(strategy=InheritanceType.TABLE_PER_CLASS) 
+public abstract class SpdReconciliationBizPlan<R extends SpdAbstractBizRule> extends SpdBizPlan<R>{
+
+}

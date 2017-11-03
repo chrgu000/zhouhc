@@ -1,0 +1,54 @@
+package cn.ak4j.yard.yds.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfo;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfos;
+import cn.ak4j.yard.yds.params.YdsGoodsInfoParams;
+
+public class YdsGoodsInfoResourceTest extends BaseTest{
+
+	@Test public void testList() throws Exception{
+		YdsGoodsInfos infos = mockMvcHelper.findList(YdsGoodsInfos.class, testUserCode, null);
+		assertEquals(48, infos.size());
+		
+		YdsGoodsInfoParams params = new YdsGoodsInfoParams();
+		params.setFormatName(new ListParam<String>("三九胃泰", QueryParam.operation_like_in));
+		infos = mockMvcHelper.findList(YdsGoodsInfos.class, testUserCode, params);
+		assertEquals(1, infos.size());
+	}
+	
+	@Test public void testGet() throws Exception{
+		String goodsId = "goods_id_008";
+		YdsGoodsInfo info = mockMvcHelper.findOne(YdsGoodsInfo.class, testUserCode, goodsId);
+		assertEquals(goodsId, info.getGoodsId());
+	}
+	
+	@Test public void testCount() throws Exception{
+		Integer count = mockMvcHelper.findList(Integer.class, testUserCode, null);
+		assertEquals(48, count.intValue());
+		
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		List<String> ids = new ArrayList<String>();
+		ids.add("goods_id_004");
+		ids.add("goods_id_007");
+		ids.add("goods_id_008");
+		YdsGoodsInfos infos = mockMvcHelper.getByIds(YdsGoodsInfos.class, testUserCode, ids);
+		ids.forEach(id->{
+			assertNotNull(CollectionUtils.findWhere("goodsId", id, infos));
+		});
+ 	}
+	
+}

@@ -1,0 +1,59 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+public class SpdDepotStockChangesTest extends BaseTest{
+
+	//两个同批次的产品库存变更集
+	//两个不同批次的产品库存变更集
+	
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	
+	@Test public void testAddSameLot(){
+		SpdDepotStockChanges stockChanges = new SpdDepotStockChanges();
+		YdsGoodsLots allLots = glRepository.findAll();
+		PcsDepot depot = depotRepository.findAll().get(0);
+		
+		//添加一个批次不存在的库存变更
+		stockChanges.add(new SpdDepotStockChange(allLots.get(0), depot, 10));
+		assertStockChange(stockChanges, allLots.get(0), 10);
+		
+		//添加一个批次不存在库存变更
+		stockChanges.add(new SpdDepotStockChange(allLots.get(1), depot, 20));
+		assertStockChange(stockChanges, allLots.get(1), 20);
+		
+		//添加一个批次已存在的库存变更
+		stockChanges.add(new SpdDepotStockChange(allLots.get(0), depot, 20));
+		assertStockChange(stockChanges, allLots.get(0), 30);
+		
+		//添加一个批次不存在的库存变更
+		stockChanges.add(new SpdDepotStockChange(allLots.get(2), depot, 30));
+		assertStockChange(stockChanges, allLots.get(2), 30);
+		
+		//添加一个批次已存在的库存变更
+		stockChanges.add(new SpdDepotStockChange(allLots.get(1), depot, 30));
+		assertStockChange(stockChanges, allLots.get(1), 50);
+		
+		//添加一个批次已存在的库存变更
+		stockChanges.add(new SpdDepotStockChange(allLots.get(1), depot, 10));
+		assertStockChange(stockChanges, allLots.get(1), 60);
+	}
+
+	private void assertStockChange(SpdDepotStockChanges stockChanges, YdsGoodsLot goodsLot, int qty) {
+		SpdDepotStockChange stockChange = stockChanges.findByGoodsLot(goodsLot);
+		assertEquals(qty, stockChange.getQtyByStoreUnit());
+	}
+	
+	
+}

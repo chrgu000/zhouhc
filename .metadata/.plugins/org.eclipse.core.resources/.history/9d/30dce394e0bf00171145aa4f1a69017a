@@ -1,0 +1,100 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdDailyCleanFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 日清对账业务规则
+* @author zhengyf
+* @date 2017年8月15日 上午10:51:32
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_daily_clean_rule")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdDailyCleanRule extends SpdAbstractBizRule<SpdDailyCleanFeedbackRule>{
+
+	@Getter @Setter @NotNull(message="结算仓库不能为空")
+	private String depotId;
+	
+	@Transient @Getter @Setter 
+	private PcsDepot depot;
+	
+	@Override
+	public String getDescription() {
+		return null;
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.daily_clean_biz;
+	}
+
+	/**
+	 * 同一个仓库只能有一个日清结算规则
+	 */
+	@SuppressWarnings("rawtypes") @Override
+	public boolean equalsRule(SpdAbstractBizRule theRule) {
+		if(theRule.getBizType() != getBizType()){
+			return false;
+		}
+		SpdDailyCleanRule rule = (SpdDailyCleanRule)theRule;
+		if(getDepotId().equals(rule.getDepotId())){
+			return true;
+		}
+		
+		return false;
+	}
+	
+	@SuppressWarnings("rawtypes") @Override
+	public void update(SpdAbstractBizRule theRule) {
+		setName(theRule.getName());
+		setPrior(theRule.getPrior());
+		setCustomName(theRule.getCustomName());
+		setEnabled(theRule.getEnabled());
+		setCanBeOriginRule(theRule.getCanBeOriginRule());
+		setFeedbackRuleId(theRule.getFeedbackRuleId());
+		setManualApply(theRule.getManualApply());
+	}
+
+	@Override
+	public String getDisplayName() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public boolean canApplyByUser(PcsUser user) {
+		return user.getDeptId().equals(depot.getManageDeptId());
+	}
+
+	@Override
+	public void checkRule(SpdBizRules<?> allRules, SpdPropertyChangeRules propertyChangeRules) {
+	}
+	
+	public boolean equals(Object obj){
+		if(obj == null || !(obj instanceof SpdDailyCleanRule)){
+			return false;
+		}
+		SpdDailyCleanRule theRule = (SpdDailyCleanRule)obj;
+		return equalsRule(theRule) 
+				&& getName().equals(theRule.getName())
+				&& getFeedbackRuleId().equals(theRule.getFeedbackRuleId())
+				&& getEnabled().equals(theRule.getEnabled()
+				&& getManualApply().equals(theRule.getManualApply()));
+	}
+
+}

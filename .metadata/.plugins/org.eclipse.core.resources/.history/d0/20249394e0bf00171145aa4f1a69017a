@@ -1,0 +1,87 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdFinancialReconciliationBizSteps;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdBizAssistantService;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationBizRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class SpdReconciliationAssistantService extends SpdBizAssistantService<SpdFinacialReconciliationBiz>{
+
+	@Autowired private SpdFinacialReconciliationBizService frbService;
+	@Autowired private SpdFinacialReconciliationBizRepository frbRepository;
+
+	public void process(SpdFinacialReconciliationBiz reconciliation, String taskId, String userId, String action) {
+		frbService.fillAllRelation(reconciliation);
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		reconciliation = forwardBizStep(reconciliation, taskId, action);
+		SpdFinacialReconciliationRule rule = reconciliation.getBizRule();
+		
+		try{
+			if(action.equals(AmqpMsgType.CREATE_FINACIAL_RECONCILIATION_BIZ.getCode())
+					|| action.equals(AmqpMsgType.GENERATE_FINACIAL_RECONCILIATION_ITEMS.getCode())){
+				frbService.generateItems(reconciliation);
+			}
+			
+			if(action.equals(AmqpMsgType.REVIEW_FINACIAL_RECONCILIATION_BIZ.getCode()) && StringUtils.isEmpty(rule.getIntigrationComponent())){
+				frbService.syncFinancialReconciliation(reconciliation, user);
+			}
+			
+			if(action.equals(AmqpMsgType.SYNC_FINACIAL_RECONCILIATION_TO_SUPPLIER.getCode())){
+				frbService.updateCheckState(reconciliation, CheckState.completed.getCode(), reconciliation.getLastUpdateTime(), user);
+			}
+		}catch(Exception e){
+			handleException(action, reconciliation, e);
+		}
+		
+		saveBizLog(reconciliation, user);
+		frbRepository.save(reconciliation);
+	}
+
+	@Override
+	protected SpdFinacialReconciliationBiz forwardBizStep(SpdFinacialReconciliationBiz reconciliation, String taskId, String action) {
+		if(action.equals(AmqpMsgType.GENERATE_FINACIAL_RECONCILIATION_ITEMS.getCode())){
+			return reconciliation;
+		}
+		
+		SpdBizStep currentStep = reconciliation.getCurrentBizStep();
+		if(currentStep == null){
+			reconciliation.setBizStatusCode(reconciliation.getBizSteps().get(0).getStatusCode());
+		}else{
+			SpdBizStep nextStep = reconciliation.getNextStep();
+			if(nextStep == null){
+				log.warn("已经完成了最后一个步骤，不需要步进");
+				return reconciliation;
+			}
+			
+			if((nextStep == SpdFinancialReconciliationBizSteps.create_financial_reconciliation && action.equals(AmqpMsgType.CREATE_FINACIAL_RECONCILIATION_BIZ.getCode()))
+				|| (nextStep == SpdFinancialReconciliationBizSteps.commit_financial_reconciliation && action.equals(AmqpMsgType.COMMIT_FINACIAL_RECONCILIATION_BIZ.getCode()))
+				|| (nextStep == SpdFinancialReconciliationBizSteps.commit_financial_reconciliation && action.equals(AmqpMsgType.COMMIT_FINACIAL_RECONCILIATION_BIZ.getCode()))
+				|| (nextStep == SpdFinancialReconciliationBizSteps.review_financial_reconciliation && action.equals(AmqpMsgType.REVIEW_FINACIAL_RECONCILIATION_BIZ.getCode()))
+				|| (nextStep == SpdFinancialReconciliationBizSteps.sync_to_supplier && action.equals(AmqpMsgType.SYNC_FINACIAL_RECONCILIATION_TO_SUPPLIER.getCode()))
+				|| (nextStep == SpdFinancialReconciliationBizSteps.complete_financial_reconciliation && action.equals(AmqpMsgType.COMPLETE_FINACIAL_RECONCILIATION_BIZ.getCode()))){
+				reconciliation.setBizStatusCode(nextStep.getStatusCode());
+			}else{
+				log.info("{}, {}, {}", currentStep.getStatusCode(), nextStep.getStatusCode(), action);
+				throw new OperateFailException(YardExceptionType.biz_forward_fail, action, nextStep.getStatusName());
+			}
+		}
+		
+		return reconciliation;
+	}	
+	
+}

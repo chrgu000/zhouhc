@@ -1,0 +1,16 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.List;
+
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdOnShelfTaskItems extends SpdDepotTaskItems<SpdOnShelfTaskItem>{
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public SpdOnShelfTaskItems(List entities){
+		super(entities);
+	}
+	
+}

@@ -1,0 +1,181 @@
+package cn.ak4j.yard.web.request;
+
+import java.lang.reflect.Method;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Component;
+import org.springframework.util.ReflectionUtils;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.web.ResourceDefine;
+
+/**
+* @Description: 通用资源的助手类，主要用于获取反射类型以及业务组件
+* @author zhengyf
+* @date 2016年11月29日 上午8:59:41
+* @version V1.0.0
+*/
+@Component
+public class CommonResourceHelper {
+
+	private Logger logger = LoggerFactory.getLogger(CommonResourceHelper.class);
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public Method getBuildMethod(YardRequest yardRequest) throws ClassNotFoundException, NoSuchMethodException, SecurityException{
+		Class assemberType = null;
+		try{
+			assemberType = getAssemberType(yardRequest);
+		}catch(ClassNotFoundException e){
+			return null;
+		}
+		Class toType = getNewResourceTOType(yardRequest);
+		String methodName = String.format("build%s%s", StringUtils.capitalize(yardRequest.getModuleName()), yardRequest.getResourceName());
+		
+		Method method = assemberType.getMethod(methodName, toType, IUser.class);
+		return method;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public Class getAssemberType(YardRequest yardRequest) throws ClassNotFoundException{
+		String assemberClassName = String.format("cn.ak4j.yard.%s.assember.%s%sAssember", 
+													getSubPackageName(yardRequest),
+													StringUtils.capitalize(yardRequest.getModuleName()),
+													getDomainName(yardRequest));
+		Class assemberClazz = Class.forName(assemberClassName);
+		return assemberClazz;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public Class getQueryParamsType(YardRequest yardRequest) throws ClassNotFoundException{
+		String paramsClassName = String.format("cn.ak4j.yard.%s.params.%s%sParams", 
+													getSubPackageName(yardRequest),
+													StringUtils.capitalize(yardRequest.getModuleName()),
+													getDomainName(yardRequest));
+//		logger.debug("params class name:{}", paramsClassName);
+		Class paramsClazz = Class.forName(paramsClassName);
+		return paramsClazz;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public Class getNewResourceTOType(YardRequest yardRequest) throws ClassNotFoundException{
+		String toClassName = String.format("cn.ak4j.yard.%s.to.New%s%sTO",  
+													getSubPackageName(yardRequest),
+													StringUtils.capitalize(yardRequest.getModuleName()),
+													getDomainName(yardRequest));
+		Class toClazz = null;
+		try{
+			toClazz = Class.forName(toClassName);
+		}catch(ClassNotFoundException e){
+			return getDomainType(yardRequest);
+		}
+		return toClazz;
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked"}) 
+	public QueryParams getQueryParams(String json, YardRequest yardRequest) throws ClassNotFoundException{
+		Class queryParamsType = getQueryParamsType(yardRequest);
+		if(StringUtils.isEmpty(json)){
+			return null;
+		}
+		
+		try {
+			Map<String, Object> tempObject = Global.defaultObjectMapper.readValue(json, new TypeReference<Map<String, Object>>(){});
+			for(String key : tempObject.keySet()){
+				if(key.indexOf(".") > 0){
+					Object value = tempObject.get(key);
+					tempObject.put(key.replaceAll("\\.", "_"), value);
+				}
+			}
+			json = Global.defaultObjectMapper.writeValueAsString(tempObject);
+			return  (QueryParams)Global.defaultObjectMapper.readValue(json, queryParamsType);
+		} catch (Exception e) {
+			logger.error(ExceptionUtils.getStackTrace(e));
+			throw new InvalidDataException(YardExceptionType.invalid_param_string);
+		}
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public BaseRepository getYardRepository(YardRequest yardRequest, ApplicationContext applicationContext) throws ClassNotFoundException{
+		String repositoryClassName = "cn.ak4j.yard."+getSubPackageName(yardRequest)+".repository."+StringUtils.capitalize(yardRequest.getModuleName())+getDomainName(yardRequest)+"Repository";
+		Class repositoryClazz = Class.forName(repositoryClassName);
+		BaseRepository repository = (BaseRepository)applicationContext.getBean(repositoryClazz);
+		return repository;
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public IYardService getService(YardRequest yardRequest, ResourceDefine resource, ApplicationContext applicationContext) throws ClassNotFoundException{
+		if(resource.getServiceType() != null){
+			IYardService service = (IYardService)applicationContext.getBean(resource.getServiceType());
+			return service;
+		}
+		Class serviceType = getServiceType(yardRequest);
+		IYardService service = (IYardService)applicationContext.getBean(serviceType);
+		return service;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public Class getDomainType(YardRequest yardRequest) throws ClassNotFoundException{
+		String toClassName = String.format("cn.ak4j.yard.%s.domain.%s%s", 
+													getSubPackageName(yardRequest),
+													StringUtils.capitalize(yardRequest.getModuleName()),
+													getDomainName(yardRequest));
+		Class toClazz = Class.forName(toClassName);
+		return toClazz;
+	}
+
+	@SuppressWarnings("rawtypes")
+	public Class getServiceType(YardRequest yardRequest) throws ClassNotFoundException{
+		String serviceClassName = String.format("cn.ak4j.yard.%s.service.%s%sService", 
+													getSubPackageName(yardRequest),
+													StringUtils.capitalize(yardRequest.getModuleName()),
+													getDomainName(yardRequest));
+		Class serviceClazz = Class.forName(serviceClassName);
+		return serviceClazz;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public Method getAddMethod(YardRequest yardRequest, ResourceDefine resource, ApplicationContext applicationContext) throws ClassNotFoundException{
+		IYardService service = getService(yardRequest, resource, applicationContext);
+		String methodName = "add"+StringUtils.capitalize(resource.getResourceName());
+		Class domainType = getDomainType(yardRequest);
+		Method addMethod = ReflectionUtils.findMethod(service.getClass(), methodName, domainType, IUser.class);
+		if(addMethod == null){
+			logger.error("service组件中没有找到相应的方法，通常是因为方法签名不对或者参数不对，正确格式例如:public PcsRoleOp addRoleOp(PcsRoleOp pcsRoleOp, IUser user)");
+		}
+		return addMethod;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public Method getDeleteMethod(YardRequest yardRequest, ResourceDefine resource, ApplicationContext applicationContext) throws ClassNotFoundException{
+		IYardService service = getService(yardRequest, resource, applicationContext);
+		String methodName = "delete"+StringUtils.capitalize(resource.getResourceName());
+		Method addMethod = ReflectionUtils.findMethod(service.getClass(), methodName, String.class, IUser.class);
+		return addMethod;
+	}
+	
+	private String getSubPackageName(YardRequest yardRequest){
+		String subPackageName = yardRequest.getModuleName();
+		if(!StringUtils.isEmpty(yardRequest.getSubModuleName())){
+			subPackageName = subPackageName+"."+yardRequest.getSubModuleName();
+		}
+		return subPackageName;
+	}
+	
+	private String getDomainName(YardRequest yardRequest){
+		String domainName = StringUtils.isEmpty(yardRequest.getDomainName())?yardRequest.getResourceName():yardRequest.getDomainName();
+		return domainName;
+	}
+}

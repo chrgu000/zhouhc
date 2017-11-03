@@ -1,0 +1,30 @@
+package cn.ak4j.yard.spd.bizrule.to;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdBizRuleTO {
+
+	private String id;
+	private String name;
+	private String ruleCode;
+	private String customName;
+	private String primaryName;
+	private Integer prior;
+	private String feedbackRuleId;
+	private String displayName;
+	private Date createTime;
+	private Date lastUpdateTime;
+	private Boolean enabled;
+	private Boolean canBeOriginRule;
+	private Boolean manualApply;
+	private String description;
+	
+	private String bizTypeCode;
+	
+}

@@ -1,0 +1,20 @@
+package cn.ak4j.yard.web.request;
+
+import javax.servlet.http.HttpServletRequest;
+
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 获取资源列表请求
+* @author zhengyf
+* @date 2016年11月28日 下午7:09:31
+* @version V1.0.0
+*/
+@NoArgsConstructor
+public class YardListRequest extends YardRequest{
+	
+	public YardListRequest(HttpServletRequest request){
+		super(request);
+	}
+	
+}

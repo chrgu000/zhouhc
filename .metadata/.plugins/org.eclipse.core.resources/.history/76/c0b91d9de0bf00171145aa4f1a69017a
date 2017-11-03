@@ -1,0 +1,81 @@
+--删除数据
+delete from SPD_FEEDBACK_RULE;
+
+--插入数据
+insert into spd_feedback_rule(id, name, auto_commit_prepare_inform, auto_review_prepare_inform, auto_inform_supplier, create_time, last_update_time, biz_type, auto_complete_prepare_inform, empty_biz_auto_feedback) 
+  values('prp_fb_id_011','备货自动反馈', '1', '1', '1',sysDate,sysDate, 'prepare_inform', '1', '1');
+  insert into spd_feedback_rule(id, name, auto_commit_prepare_inform, auto_review_prepare_inform, auto_inform_supplier, create_time, last_update_time, biz_type, auto_complete_prepare_inform,empty_biz_auto_feedback) 
+  values('prp_fb_id_012','备货半自动反馈01', '0', '0', '1',sysDate,sysDate, 'prepare_inform', '1', '1');
+  insert into spd_feedback_rule(id, name, auto_commit_prepare_inform, auto_review_prepare_inform, auto_inform_supplier, create_time, last_update_time, biz_type, auto_complete_prepare_inform, empty_biz_auto_feedback) 
+  values('prp_fb_id_013','备货反馈', '0', '0', '0',sysDate,sysDate, 'prepare_inform', '1', '1');
+
+
+
+  insert into spd_feedback_rule(id, name, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task ,create_time,last_update_time,biz_type, empty_biz_auto_feedback) 
+  values ('as_fb_id_03','库存调节反馈','0','0','0',sysDate,sysDate,'adjust_stock','1');
+  insert into spd_feedback_rule(id, name, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task ,create_time,last_update_time,biz_type, empty_biz_auto_feedback) 
+  values ('as_fb_id_04','库存调节自动反馈','1','1','1',sysDate,sysDate,'adjust_stock','1');
+  insert into spd_feedback_rule (id, name, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task ,create_time,last_update_time,biz_type, empty_biz_auto_feedback) 
+  values ('as_fb_id_10','库存调节半自动反馈01','1','1','0',sysDate,sysDate,'adjust_stock','1');
+
+  insert into spd_feedback_rule (id, name, auto_commit_move_area, auto_review_move_area, auto_create_off_shelf_disp, auto_review_off_shelf_disp, auto_review_off_shelf_task, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time)
+  values ('ma_fb_id_05', '移仓反馈', '0', '0', '0', '0', '0', '0', '0', '0', 'move_area', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_commit_move_area, auto_review_move_area, auto_create_off_shelf_disp, auto_review_off_shelf_disp, auto_review_off_shelf_task, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ma_fb_id_06', '移仓自动反馈', '1', '1', '1', '1', '1', '1', '1', '1', 'move_area', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_commit_move_area, auto_review_move_area, auto_create_off_shelf_disp, auto_review_off_shelf_disp, auto_review_off_shelf_task, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ma_fb_id_11', '移仓半自动反馈01', '0', '0', '1', '1', '0', '1', '1', '0', 'move_area', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_commit_move_area, auto_review_move_area, auto_create_off_shelf_disp, auto_review_off_shelf_disp, auto_review_off_shelf_task, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ma_fb_id_12', '移仓半自动反馈02', '0', '0', '1', '1', '1', '1', '1', '0', 'move_area', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_commit_move_area, auto_review_move_area, auto_create_off_shelf_disp, auto_review_off_shelf_disp, auto_review_off_shelf_task, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ma_fb_id_13', '移仓半自动反馈03', '0', '0', '1', '1', '0', '1', '1', '1', 'move_area', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_commit_move_area, auto_review_move_area, auto_create_off_shelf_disp, auto_review_off_shelf_disp, auto_review_off_shelf_task, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ma_fb_id_14', '移仓半自动反馈04', '0', '0', '1', '1', '1', '1', '1', '1', 'move_area', '1', sysDate, sysDate);
+
+  insert into spd_feedback_rule (id, name, auto_review_return_goods, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task, auto_complete_return_goods, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ret_fb_id_15', '退货自动反馈', '1', '1', '1', '1', '1', 'return_goods', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_review_return_goods, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task, auto_complete_return_goods, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ret_fb_id_17', '退货反馈', '0', '0', '0', '0', '0', 'return_goods', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_review_return_goods, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task, auto_complete_return_goods, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ret_fb_id_16', '退货半自动反馈01', '0', '1', '1', '1', '1', 'return_goods', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_review_return_goods, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task, auto_complete_return_goods, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('ret_fb_id_18', '退货半自动反馈02', '0', '1', '1', '0', '1', 'return_goods', '1', sysDate, sysDate);
+ 
+
+  insert into spd_feedback_rule (id, name, auto_commit_receive, auto_review_receive, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('rec_fb_id_07', '收货反馈', '0', '0', '0', '0', '0', 'receive', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_commit_receive, auto_review_receive, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('rec_fb_id_08', '收货自动反馈', '1', '1', '1', '1', '1', 'receive', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_commit_receive, auto_review_receive, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('rec_fb_id_09', '收货半自动反馈01', '0', '0', '1', '1', '1', 'receive', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_commit_receive, auto_review_receive, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('rec_fb_id_19', '收货半自动反馈02', '0', '0', '1', '1', '0', 'receive', '1', sysDate, sysDate);
+
+  insert into spd_feedback_rule (id, name, auto_review_consume, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task, auto_complete_consume, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('cns_fb_id_13', '消耗自动反馈', '1', '1', '1', '1', '1', 'consume', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_review_consume, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task, auto_complete_consume, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('cns_fb_id_20', '消耗反馈', '0', '0', '0', '0', '0', 'consume', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_review_consume, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task, auto_complete_consume, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('cns_fb_id_14', '消耗半自动反馈01', '0', '1', '1', '0', '1', 'consume', '1', sysDate, sysDate);
+  insert into spd_feedback_rule (id, name, auto_review_consume, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task, auto_complete_consume, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+  values ('cns_fb_id_21', '消耗半自动反馈02', '0', '1', '1', '1', '1', 'consume', '1', sysDate, sysDate);
+  
+
+
+
+
+  insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback) 
+  values ('rep_fb_id_01','申领反馈','0','0','0','0','0','0','0','0','0','0',sysDate,sysDate,'replenish','1');
+  insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback) 
+  values ('rep_fb_id_09','申领自动反馈','1','1','1','1','1','1','1','1','1','1',sysDate,sysDate,'replenish','1');
+  insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback)
+  values ('rep_fb_id_010','申领半自动反馈01','1','1','0','1','1','1','0','1','0','0',sysDate,sysDate,'replenish','1');
+  insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback)
+  values ('rep_fb_id_12','申领半自动反馈02','1','1','1','1','1','1','1','0','1','0',sysDate,sysDate,'replenish','1');
+  insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback) 
+  values ('rep_fb_id_02','申领半自动反馈03','1','1','0','1','1','0','0','0','0','0',sysDate,sysDate,'replenish','1');
+  insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback) 
+  values ('rep_fb_id_011','申领半自动反馈04','1','1','1','1','1','1','0','0','1','0',sysDate,sysDate,'replenish','1');
+  insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback) 
+  values ('rep_fb_id_022','申领半自动反馈05','1','1','1','1','1','1','0','0','1','1',sysDate,sysDate,'replenish','1');
+  insert into spd_feedback_rule (id,name,auto_create_off_shelf_disp,auto_review_off_shelf_disp,auto_review_off_shelf_task,auto_create_on_shelf_disp,auto_review_on_shelf_disp,auto_review_on_shelf_task,auto_commit_replenish,auto_review_replenish,auto_commit_delivery_task,auto_review_delivery_task,create_time,last_update_time,biz_type,empty_biz_auto_feedback) 
+  values ('rep_fb_id_023','申领半自动反馈06','1','1','0','1','1','1','0','0','1','1',sysDate,sysDate,'replenish','1');

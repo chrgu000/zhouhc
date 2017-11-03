@@ -1,0 +1,163 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.vo.SpdReturnGoodsQty;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsRule;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: 退货业务
+* @author zhengyf
+* @date 2017年7月31日 上午10:21:45
+* @version V1.0.0
+*/
+
+@Slf4j
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_return_goods_biz")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdReturnGoodsBiz extends SpdGoodsBizPlan<SpdReturnGoodsRule>{
+
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_r_f;
+	
+	@Getter @Setter
+	private String toOrgId;
+	
+	@Getter @Setter
+	private String toDeptId;
+	
+	@Getter @Setter
+	private String fromDepotId;
+	
+	@Getter @Setter
+	private String fromAreaType;
+	
+	@Getter @Setter
+	private Boolean autoAssignReceive;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot fromDepot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDept toDept;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotTask offShelfTask; 
+
+	@Override @JsonIgnore
+	public PcsDepot getStockChangeDepot() {
+		return fromDepot;
+	}
+
+	@Override @JsonIgnore
+	public String getTargetAreaType() {
+		return PcsAreaType.typeOf(fromAreaType).getCode();
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.return_goods_biz;
+	}
+
+	@Override
+	public void applyRule(SpdReturnGoodsRule rule, PcsUser user) {
+		if(!rule.canApplyByUser(user)){
+			throw new OperateFailException(YardExceptionType.forbid_can_not_apply_biz, rule.getDirectionRule().getFromDepotId(), rule.getDisplayName());
+		}
+		setBizRule(rule);
+
+		setBizRuleId(rule.getId());
+		setAutoAssignReceive(rule.getAutoAssignReceive());
+		setFromDepotId(rule.getDirectionRule().getFromDepotId());
+		setFromAreaType(rule.getDirectionRule().getFromAreaType());
+		setToOrgId(rule.getDirectionRule().getToOrgId());
+		setToDeptId(rule.getDirectionRule().getToDeptId());
+		setCreatorDepotId(rule.getDirectionRule().getFromDepotId());
+	}
+	
+	public void setBizRule(SpdReturnGoodsRule bizRule){
+		super.setBizRule(bizRule);
+		if(bizRule == null){
+			return ;
+		}
+		setFromDepot(bizRule.getDirectionRule().getFromDepot());
+		setToDept(bizRule.getDirectionRule().getToDept());
+	}
+
+	/**
+	 * 如果由EIS渠道发起:
+	 * 1) 当前消耗业务的创建用户存在并能发起将其作为执行用户
+	 * 2) 如果消耗业务的创建用户不存在或没有发起权限则使用代理用户
+	 */
+	public PcsUser determinCreateUser(SpdReturnGoodsRule rule, PcsUser user, PcsUsers allUsers) {
+		PcsUser createUser = null;
+		
+		if(getChannelType() == YardChannelType.eis){
+			//尝试使用申领计划中的用户作为执行用户
+			String createUserId = null;
+			if(getMaintenanceInfo() != null && StringUtils.isNotEmpty(getMaintenanceInfo().getCreateUserId())){
+				createUserId = getMaintenanceInfo().getCreateUserId();
+				createUser = allUsers.findById(createUserId);
+			}
+			
+			//校验用户是否存在
+			if(createUser == null){
+				throw new OperateFailException(YardExceptionType.not_found_apply_user, createUserId);
+			}
+			
+			if(!rule.canApplyByUser(createUser)){
+				createUserId = rule.getDirectionRule().getFromDepot().getManageDept().getDefaultUserId();
+				createUser = allUsers.findById(createUserId);
+				if(createUser == null){
+					throw new OperateFailException(YardExceptionType.not_found_default_user, 
+							rule.getDirectionRule().getFromDepot().getManageDept().getDeptCode(), 
+							rule.getDirectionRule().getFromDepot().getManageDept().getDeptName());
+				}
+				log.info("EIS同步退货，退货计划中的用户没有发起能力，采用代理用户[{}]发起，管理部门：{}", createUserId, 
+						rule.getDirectionRule().getFromDepot().getManageDept().getDeptId());
+			}	
+		}else{
+			createUser = user;
+		}
+		
+		return createUser;
+	}
+
+	public List<SpdReturnGoodsQty> getReturnGoodsQtys() {
+		List<SpdReturnGoodsQty> returnGoodsQtys = new ArrayList<SpdReturnGoodsQty>();
+		
+		this.getItems().forEach(item->{
+			SpdReturnGoodsQty returnGoodsQty = new SpdReturnGoodsQty(item.getOriginItemId(), item.getConfirmQty(), item.getUnitLv());
+			returnGoodsQtys.add(returnGoodsQty);
+		});
+		
+		return returnGoodsQtys;
+	}
+	
+}

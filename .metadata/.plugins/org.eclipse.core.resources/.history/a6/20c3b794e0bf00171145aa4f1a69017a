@@ -1,0 +1,45 @@
+package cn.ak4j.yard.spd.reconciliation.configuration;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdConsumeBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReturnGoodsBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+
+/**
+* @Description: TODO(描述该文件做什么)
+* @author zhengyf
+* @date 2017年8月26日 下午2:20:07
+* @version V1.0.0
+*/
+
+@Configuration
+public class SpdReconciliationConfiguration {
+
+	@Bean(name="propertyChangePoints")
+	public Map<SpdBizType, SpdBizStep[]> propertyChangePoints(){
+		Map<SpdBizType, SpdBizStep[]> result = new HashMap<SpdBizType, SpdBizStep[]>();
+		
+		//备货收货业务
+		result.put(SpdBizType.receive_biz, new SpdBizStep[]{SpdReceiveBizSteps.review_receive, SpdReceiveBizSteps.complete_on_shelf_task});
+		
+		//备货退货业务
+		result.put(SpdBizType.return_goods_biz, new SpdBizStep[]{SpdReturnGoodsBizSteps.review_return_goods, SpdReturnGoodsBizSteps.complete_off_shelf_task, SpdReturnGoodsBizSteps.complete_return_goods});
+		
+		//申领业务
+		result.put(SpdBizType.replenish_biz, new SpdBizStep[]{SpdReplenishBizSteps.review_delivery_task, SpdReplenishBizSteps.complete_on_shelf_task});
+		
+		//消耗业务
+		result.put(SpdBizType.consume_biz, new SpdBizStep[]{SpdConsumeBizSteps.review_consume, SpdConsumeBizSteps.complete_consume});
+		
+		return result;
+	}
+	
+}

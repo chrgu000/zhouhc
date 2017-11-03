@@ -1,0 +1,107 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRules;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdFinacialReconciliationRuleResourceTest extends BaseTest{
+
+	@Autowired private YardCodeService codeService;
+	
+	@Test public void testList() throws Exception{
+		SpdFinacialReconciliationRules rules = mockMvcHelper.findList(SpdFinacialReconciliationRules.class, testUserCode, null);
+		assertEquals(2, rules.size());
+	}
+
+	@Test public void testCount() throws Exception{
+		int count = mockMvcHelper.count(SpdFinacialReconciliationRules.class, testUserCode, null);
+		assertEquals(2, count);
+	}
+
+	@Test public void testGetByIds() throws Exception{
+		List<String> ids = new ArrayList<String>();
+		ids.add("fin_rec_rule_id_01");
+		SpdFinacialReconciliationRules rules  = mockMvcHelper.getByIds(SpdFinacialReconciliationRules.class, testUserCode, ids);
+		assertEquals(1, rules.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("id", id, rules));
+		}
+	}
+	
+	@Test public void testAdd() throws Exception{
+		SpdFinacialReconciliationRule rule = createRule();
+		SpdFinacialReconciliationRule newRule = mockMvcHelper.add(SpdFinacialReconciliationRule.class, testUserCode, rule);
+		assertTrue(newRule.getId() != null);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.caiwuduizhangguize);
+		assertEquals(CodeSort.caiwuduizhangguize.getCode()+getCurrentDateCode()+sequenceCode, newRule.getRuleCode());
+		assertNotNull(newRule.getCustomName());
+		assertEquals(rule.getTargetDepotIds(), newRule.getTargetDepotIds());
+		assertEquals(rule.getEnabled(), newRule.getEnabled());
+		assertEquals(rule.getApplyDeptId(), newRule.getApplyDeptId());
+		assertEquals(rule.getSupplierDeptId(), newRule.getSupplierDeptId());
+		assertEquals(rule.getFeedbackRuleId(), newRule.getFeedbackRuleId());
+		assertEquals(rule.getName(), newRule.getName());
+		assertEquals(rule.getCustomName(), newRule.getCustomName());
+		assertEquals(rule.getPrior(), newRule.getPrior());
+		
+		rule.setName("财务对账2");
+		mockMvcHelper.add(SpdFinacialReconciliationRule.class, testUserCode, rule, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+	}
+
+	@Test public void testModify() throws Exception{
+		String id = "fin_rec_rule_id_01";
+		SpdFinacialReconciliationRule rule = mockMvcHelper.findOne(SpdFinacialReconciliationRule.class, testUserCode, id);
+	
+		String newName = "财务对账2";
+		rule.setName(newName);
+		rule.setCustomName("自定义财务对账");
+		rule = mockMvcHelper.modify(SpdFinacialReconciliationRule.class, testUserCode, id, rule);
+		assertNotNull(rule.getCustomName());
+		assertTrue(rule.getName().equals(newName));
+		assertEquals("自定义财务对账", rule.getCustomName());
+	}
+	
+	@Ignore public void whichICanApply() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdFinacialReconciliationRules/whichICanApply?accessToken={accessToken}";
+		SpdFinacialReconciliationRules rules = mockMvcHelper.mockGet(SpdFinacialReconciliationRules.class, url, accessToken);
+		assertEquals(0, rules.size());
+		
+		accessToken = getAccessToken(mzmanagerUserCode);
+		rules = mockMvcHelper.mockGet(SpdFinacialReconciliationRules.class, url, accessToken);
+		assertEquals(1, rules.size());
+	}
+	
+	private SpdFinacialReconciliationRule createRule(){
+		SpdFinacialReconciliationRule rule = new SpdFinacialReconciliationRule();
+		
+		rule.setApplyDeptId("626");
+		rule.setSupplierDeptId("dept_id_005");
+		rule.setTargetDepotIds("depot_id_001");
+		rule.setEnabled(true);
+		rule.setFeedbackRuleId("fin_rec_fb_id_01");
+		rule.setName("财务对账");
+		rule.setCustomName("自定义财务对账");
+		rule.setPrior(12);
+		rule.setCanBeOriginRule(false);
+		
+		return rule;
+	}
+	
+}

@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+public class SpdReplenishOperation {
+
+	private String ruleId;
+	private Boolean canApply;
+	private Boolean canConfirm;
+	
+	public SpdReplenishOperation(String ruleId, Boolean canApply, Boolean canConfirm){
+		this.ruleId = ruleId;
+		this.canApply = canApply;
+		this.canConfirm = canConfirm;
+	}
+	
+}

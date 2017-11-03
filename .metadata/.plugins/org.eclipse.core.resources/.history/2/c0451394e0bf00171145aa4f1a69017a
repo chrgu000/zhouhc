@@ -1,0 +1,106 @@
+package cn.ak4j.yard.web;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.PcsDeptType;
+import cn.ak4j.yard.enums.SpdDealPriceStratage;
+import cn.ak4j.yard.enums.SpdDepotRouteType;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.enums.SpdInventoryType;
+import cn.ak4j.yard.enums.SpdInventoryWay;
+import cn.ak4j.yard.enums.SpdMoveAreaUsage;
+import cn.ak4j.yard.enums.SpdOriginItemCondition;
+import cn.ak4j.yard.enums.SpdPurchaseType;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.enums.SpdSellerSendType;
+import cn.ak4j.yard.enums.SpdUsedType;
+import cn.ak4j.yard.enums.SyncResourceType;
+import cn.ak4j.yard.enums.YardBatchTaskStatus;
+import cn.ak4j.yard.enums.YardBatchTaskType;
+import cn.ak4j.yard.enums.YardDataType;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.CycleType;
+import cn.ak4j.yard.enums.YdsEquipmentLevel;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.enums.YdsWorkBookSortName;
+import cn.ak4j.yard.enums.YdsWorkbookType;
+import cn.ak4j.yard.spd.bizplan.enums.SpdAdjustStockType;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.enums.SpdGoodsSpecificationType;
+import cn.ak4j.yard.spd.bizplan.enums.SpdReplenishType;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.sys.domain.CodeSort;
+
+@RestController
+public class YardResource {
+	
+	@Autowired private RabbitProxy rabbitProxy;
+
+	@RequestMapping(value="/yard/enums", method=RequestMethod.GET)
+	public Map<String, Object> allEnums(){
+		Map<String, Object> enums = new HashMap<String, Object>();
+		
+		enums.put("checkStates", CheckState.values());
+		enums.put("syncResourceTypes", SyncResourceType.values());
+		enums.put("codeSorts", CodeSort.values());
+		
+		enums.put("pcsDeptTypes", PcsDeptType.values());
+		enums.put("areaTypes", PcsAreaType.values());
+		
+		enums.put("spdSellerSendTypes", SpdSellerSendType.values());
+		enums.put("spdDispatcherTypes", SpdDispatcherType.values());
+		enums.put("spdTaskTypes", SpdDepotTaskType.values());
+		enums.put("spdDepotRouteTypes", SpdDepotRouteType.values());
+		enums.put("spdInventoryWays", SpdInventoryWay.values());
+		enums.put("spdUsedTypes", SpdUsedType.values());
+		enums.put("spdInventoryTypes", SpdInventoryType.values());
+		enums.put("spdReplenishTypes", SpdReplenishType.values());
+		enums.put("spdAdjustStockTypes", SpdAdjustStockType.values());
+		enums.put("spdPurchaseTypes", SpdPurchaseType.values());
+		enums.put("spdBizTypes", SpdBizType.values());
+		enums.put("spdGoodsSpecificationTypes", SpdGoodsSpecificationType.values());
+		enums.put("spdSceneTypes", SpdSceneType.values());
+		
+		enums.put("ydsWorkBookNames", YdsWorkBookSortName.values());
+		enums.put("ydsWorkBookTypes", YdsWorkbookType.values());
+		enums.put("ydsGoodsTypes", YdsGoodsType.values());
+		enums.put("ydsGoodsPackLvlUnits", YdsUnitLv.values());
+		enums.put("cycleTypes", CycleType.values());
+		enums.put("ydsEquipmentLevels", YdsEquipmentLevel.values());
+		
+		enums.put("yardBatchTaskStatus", YardBatchTaskStatus.values());
+		enums.put("yardBatchTaskTypes", YardBatchTaskType.values());
+		enums.put("spdMoveAreaUsages", SpdMoveAreaUsage.values());
+		enums.put("originItemConditions", SpdOriginItemCondition.values());
+		
+		enums.put("dealPriceStratages", SpdDealPriceStratage.values());
+		enums.put("amqpMsgTypes", AmqpMsgType.values());
+		enums.put("yardDataTypes", YardDataType.values());
+		
+		return enums;
+	}
+	
+	@RequestMapping(value="/yard/stateFlows")
+	public StateFlowTemplates allStateFlowTemplates(){
+		return StateFlowTemplates.getAlltemplates();
+	}
+	
+	@RequestMapping(value="/yard/syncTaskMsgs", method=RequestMethod.POST)
+	public String publishSyncTaskMsg(@RequestParam(value="syncResourceType")String syncResourceType){
+		rabbitProxy.sendCreateSyncTaskMsg(syncResourceType);
+		return "ok";
+	}
+	
+}

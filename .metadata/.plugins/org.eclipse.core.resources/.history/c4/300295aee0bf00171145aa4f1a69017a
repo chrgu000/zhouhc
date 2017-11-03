@@ -1,0 +1,113 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdMoveAreaFeedbackRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+
+public class SpdMoveAreaRuleTest extends BaseTest{
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	
+	@Test public void testEqualsRule(){
+
+		SpdMoveAreaRules maRules = brRepository.findAllWithRelations().getAllMoveAreaRules();
+		
+		SpdMoveAreaRule maRule01 = maRules.findById("ma_rule_id_01");
+		SpdMoveAreaRule maRule01_01 = buildMoveAreaRule(maRule01);
+		
+		SpdMoveAreaRule maRule02 = maRules.findById("ma_rule_id_01");
+		
+		SpdMoveAreaRule maRule03 = maRules.findById("ma_rule_id_02");
+		
+		assertTrue(maRule01.equalsRule(maRule02));
+		assertFalse(maRule01.equalsRule(maRule03));
+		
+		maRule01 = maRules.findById("ma_rule_id_01");
+		maRule01.setFeedbackRuleId("ma_fb_id_06");
+		assertFalse(maRule01_01.equalsRule(maRule01));
+		
+		maRule01 = maRules.findById("ma_rule_id_01");
+		maRule01.getDirectionRule().setDepotId("depot_id_003");
+		assertFalse(maRule01_01.equalsRule(maRule01));
+		
+		maRule01 = maRules.findById("ma_rule_id_01");
+		maRule01.getDirectionRule().setFromAreaType(PcsAreaType.unqualified.getCode());
+		assertFalse(maRule01_01.equalsRule(maRule01));
+		
+		maRule01 = maRules.findById("ma_rule_id_01");
+		maRule01.getDirectionRule().setToAreaType(PcsAreaType.unqualified.getCode());
+		assertFalse(maRule01_01.equalsRule(maRule01));
+	}
+	
+	@Test public void testUpdate(){
+		SpdMoveAreaRules maRules = brRepository.findAllWithRelations().getAllMoveAreaRules();
+		
+		SpdMoveAreaRule rule01 = maRules.findById("ma_rule_id_01");
+		SpdMoveAreaRule rule01_01 = buildMoveAreaRule(rule01);
+		
+		SpdMoveAreaRule rule02 = maRules.findById("ma_rule_id_01");
+		SpdMoveAreaRule rule02_02 = buildMoveAreaRule(rule02);
+		
+		SpdMoveAreaRule rule03 = maRules.findById("ma_rule_id_01");
+		
+		rule01_01.setName("自动隔离");
+		rule01_01.setPrior(100);
+		rule01_01.setEnabled(false);
+		rule01_01.setCanBeOriginRule(true);
+		rule01_01.setUsage("隔离测试");
+		rule01_01.setFeedbackRuleId("ma_fb_id_06");
+		rule01_01.getDirectionRule().setDepotId("depot_id_006");
+		rule01_01.getDirectionRule().setFromAreaType(PcsAreaType.unqualified.getCode());
+		rule01_01.getDirectionRule().setToAreaType(PcsAreaType.unqualified.getCode());
+		rule01_01.setManualApply(false);
+		
+		rule02_02.update(rule01_01);
+		
+		assertTrue(rule02_02.getName()!=rule03.getName());
+		assertTrue(rule02_02.getPrior()!=rule03.getPrior());
+		assertTrue(rule02_02.getEnabled()!=rule03.getEnabled());
+		assertTrue(rule02_02.getCanBeOriginRule()!=rule03.getCanBeOriginRule());
+		assertTrue(rule02_02.getUsage()!=rule03.getUsage());
+		assertTrue(rule02_02.getManualApply()!=rule03.getManualApply());
+		
+		assertTrue(rule02_02.getFeedbackRuleId() == rule03.getFeedbackRuleId());
+		assertTrue(rule02_02.getDirectionRule().getDepotId()==rule03.getDirectionRule().getDepotId());
+		assertTrue(rule02_02.getDirectionRule().getFromAreaType()==rule03.getDirectionRule().getFromAreaType());
+		assertTrue(rule02_02.getDirectionRule().getToAreaType()==rule03.getDirectionRule().getToAreaType());
+	}
+	
+	private SpdMoveAreaRule buildMoveAreaRule(SpdMoveAreaRule maRule){
+		SpdMoveAreaRule rule = new SpdMoveAreaRule();
+		
+		rule.setName(maRule.getName());
+		rule.setPrior(maRule.getPrior());
+		
+		SpdMoveAreaFeedbackRule mafeRule = new SpdMoveAreaFeedbackRule();
+		BeanUtils.copyProperties(maRule.getFeedbackRule(), mafeRule);
+		rule.setFeedbackRule(mafeRule);
+		rule.setFeedbackRuleId(maRule.getFeedbackRuleId());
+		
+		rule.setUsage(maRule.getUsage());
+		rule.setEnabled(maRule.getEnabled());
+		rule.setCanBeOriginRule(maRule.getCanBeOriginRule());
+		
+		SpdMoveAreaDirectionRule directionRule = new SpdMoveAreaDirectionRule();
+		BeanUtils.copyProperties(maRule.getDirectionRule(), directionRule);
+		rule.setDirectionRule(directionRule);
+		
+		rule.setCreateTime(maRule.getCreateTime());
+		rule.setLastUpdateTime(maRule.getLastUpdateTime());
+		
+		return rule;
+	}
+}

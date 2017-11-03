@@ -1,0 +1,81 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"rawtypes", "serial", "unchecked"})
+public class SpdReplenishBizs extends Entities<SpdReplenishBiz>{
+
+	public SpdReplenishBizs (List entites){
+		super(entites);
+	}
+
+	public SpdReplenishBizs findByIds(List<String> replenishIds) {
+		SpdReplenishBizs result = new SpdReplenishBizs();
+		this.forEach(replenish->{
+			if(replenishIds.contains(replenish.getBizId())){
+				result.add(replenish);
+			}
+		});
+		return result;
+	}
+
+	public void fillFromDepot(PcsDepotRepository depotRepository) {
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		this.forEach(replenish->{
+			replenish.setFromDepot(CollectionUtils.findWhere("depotId", replenish.getFromDepotId(), allDepots));
+		});
+	}
+
+	public void fillToDepot(PcsDepotRepository depotRepository) {
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		this.forEach(replenish->{
+			replenish.setToDepot(CollectionUtils.findWhere("depotId", replenish.getToDepotId(), allDepots));
+		});
+	}
+
+	public void fillBizRules(SpdReplenishRules allReplenishRules) {
+		this.forEach(replenish->{
+			SpdReplenishRule bizRule = allReplenishRules.findById(replenish.getBizRuleId());
+			replenish.setBizRule(bizRule);
+			replenish.setFromDepot(bizRule.getDirectionRule().getFromDepot());
+			replenish.setToDepot(bizRule.getDirectionRule().getToDepot());
+			if(replenish.getFromDepotId().equals(replenish.getCreatorDepotId())){
+				replenish.setCreatorDepot(replenish.getFromDepot());
+			}else if(replenish.getToDepotId().equals(replenish.getCreatorDepotId())){
+				replenish.setCreatorDepot(replenish.getToDepot());
+			}
+		});
+	}
+
+	public SpdReplenishBizs getWhichINeedProcess(PcsUser user) {
+		SpdReplenishBizs result = new SpdReplenishBizs();
+		this.forEach(replenish->{
+			//是否由我发起
+			boolean appliedByMe = replenish.getCreatorDepot().getManageDeptId().equals(user.getDeptId());
+			
+			//新增状态下，如果是由我发起
+			if(replenish.getCheckState() == CheckState.new_created && appliedByMe){
+				result.add(replenish);
+			}
+			
+			//提交状态下，如果是由我发起的或者是我可以确认的
+			if(replenish.getCheckState() == CheckState.commited && (appliedByMe || replenish.getBizRule().canConfirmByUser(user))){
+				result.add(replenish);
+			}
+			
+		});
+		return result;
+	}
+
+}

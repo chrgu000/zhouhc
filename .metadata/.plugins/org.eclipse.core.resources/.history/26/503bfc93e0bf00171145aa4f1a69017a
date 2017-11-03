@@ -1,0 +1,22 @@
+/**
+ */
+package cn.ak4j.yard.yds.to;
+
+import java.util.Date;
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class YdsUnuseableLotTO {
+
+	private String lotId;
+	private String lotNo;//批号
+	private Date lotValidity;//有效期
+	private Date produceDate;//生产日期
+	private String sterilizeLotNo;//灭菌批次
+	private Date sterilizeTime;//灭菌日期
+	private String goodsId;
+	private boolean enabled;
+}

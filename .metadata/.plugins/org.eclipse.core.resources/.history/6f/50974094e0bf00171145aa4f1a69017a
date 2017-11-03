@@ -1,0 +1,52 @@
+package cn.ak4j.yard.sys.datacheck.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+
+@Entity
+@Table(name="SYS_DATA_CHECK_TYPE")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SysDataCheckType implements IEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name = "uuidGenerator", strategy = "uuid")
+	private String id;
+	private String className;
+	private String classType; //basic和stream
+	
+	public SysDataCheckType(String className, String classType) {
+		setClassName(className);
+		setClassType(classType);
+	}
+	
+	public String getId() {
+		return id;
+	}
+	public void setId(String id) {
+		this.id = id;
+	}
+	public String getClassName() {
+		return className;
+	}
+	public void setClassName(String className) {
+		this.className = className;
+	}
+	public String getClassType() {
+		return classType;
+	}
+	public void setClassType(String classType) {
+		this.classType = classType;
+	}
+		
+}

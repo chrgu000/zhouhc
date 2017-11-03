@@ -1,0 +1,19 @@
+package cn.ak4j.yard.spd.stock.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+@SuppressWarnings("serial")
+public class SpdShelfLockStockParams extends QueryParams{
+
+	private ListParam<String> bizId;
+	private ListParam<String> shelfStockId;
+	private DateRangeParam lastUpdateTime;
+	private ListParam<Boolean> locked;
+	
+}

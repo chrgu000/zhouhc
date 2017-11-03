@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+public class SpdAdjustStockFeedbackRuleTest {
+
+	@Test public void testGetDescription(){
+		SpdAdjustStockFeedbackRule rule = new SpdAdjustStockFeedbackRule();
+		rule.setAutoCommitAdjustStock(false);
+		rule.setAutoReviewAdjustStock(false);
+		rule.setAutoCreateDispatcher(true);
+		rule.setAutoReviewDepotTask(false);
+		rule.setAutoReviewDispatcher(true);
+
+		assertEquals("手动提交库存调节;手动审核库存调节;自动创建调度;自动审核调度;手动审核仓库作业", rule.getDescription());
+	}
+	
+}

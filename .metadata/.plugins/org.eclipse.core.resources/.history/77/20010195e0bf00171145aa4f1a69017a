@@ -1,0 +1,108 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdReturnGoodsBizParams;
+import lombok.Getter;
+
+@Repository
+public class SpdReturnGoodsBizRepository extends BaseRepository<SpdReturnGoodsBiz, SpdReturnGoodsBizs, SpdReturnGoodsBizParams, String> {
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+
+	public SpdReturnGoodsBiz saveWithItems(SpdReturnGoodsBiz returnGoods) {
+		returnGoods = save(returnGoods);
+		returnGoods.updateItemsBizIdAndTime();
+		biRepository.saveAll(returnGoods.getItems());
+		return returnGoods;
+	}
+	
+	public SpdReturnGoodsBiz getWithItems(String bizId) {
+		SpdReturnGoodsBiz returnGoods = findOne(bizId);
+		SpdBizItems items = biRepository.findWithGoodsByBizId(bizId);
+		returnGoods.setItems(items);
+		return returnGoods;
+	}
+	
+	public SpdReturnGoodsBizs find(SpdReturnGoodsBizParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			return new SpdReturnGoodsBizs(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdReturnGoodsBizs();
+	}
+	
+	public int count(SpdReturnGoodsBizParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+
+	
+	private boolean setRelationParams(SpdReturnGoodsBizParams params) {
+		
+		if(params != null){
+			PcsOrgParams orgParams = new PcsOrgParams();
+			orgParams.setOrgName(params.getToOrgName());
+			if(orgParams.isNotEmpty()){
+				PcsOrgs orgs = new PcsOrgs(orgRepository.findAll().find(orgParams));
+				if(CollectionUtils.isEmpty(orgs)){
+					return false;
+				}
+				
+				params.setToOrgId(new ListParam<String>(orgs.getIds()));
+			}
+			
+			PcsDeptParams deptParams = new PcsDeptParams();
+			deptParams.setDeptName(params.getToDeptName());
+			if(deptParams.isNotEmpty()){
+				PcsDepts depts = new PcsDepts(deptRepository.findAll().find(deptParams));
+				if(CollectionUtils.isEmpty(depts)){
+					return false;
+				}
+				
+				params.setToDeptId(new ListParam<String>(depts.getIds()));
+			}
+			
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getFromDepotName());
+			if(depotParams.isNotEmpty()){
+				PcsDepots depots = new PcsDepots(depotRepository.findAll().find(depotParams));
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				
+				params.setFromDepotId(new ListParam<String>(depots.getIds()));
+			}
+		}
+		
+		return true;
+	}
+	
+}

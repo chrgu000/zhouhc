@@ -1,0 +1,133 @@
+package cn.ak4j.yard.spd.stock.service;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChange;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdStockChange;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+public class SpdIncrementShelfStocksTest extends BaseTest{
+	
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	private static String depotId = "depot_id_001";
+	private static String lotId1 = "goods_lot_id_001";
+	private static String lotId2 = "goods_lot_id_002";
+	private static String lotId3 = "goods_lot_id_003";
+	private static List<String> lotIds = new ArrayList<String>();
+	static{
+		lotIds.add(lotId1);
+		lotIds.add(lotId2);
+		lotIds.add(lotId3);
+		
+		Collections.reverse(lotIds);
+	}
+
+	//测试增加货位库存
+	@Test public void testIncrementShelfStocks(){
+//		int[] increments = new int[]{1000, 1500, 1900};
+		Map<String, Integer> increments = new HashMap<String, Integer>();
+		increments.put(lotId1, 1000);
+		increments.put(lotId2, 1500);
+		increments.put(lotId3, 1900);
+		
+		testIncrementShelfStocks(increments, PcsAreaType.normal.getCode());
+		testIncrementShelfStocks(increments, PcsAreaType.isolation.getCode());
+	}
+	
+	private void testIncrementShelfStocks(Map<String, Integer> increments, String areaType){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		YdsGoodsLots lots = glRepository.findAllWithGoods().findByIds(lotIds);
+		//查询出变更前的库存
+		SpdShelfStocks stocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+		
+		//构造库存增加变更集
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges();
+		SpdDepotCards cards = dcRepository.findAll().findByDepot(depotId);
+		for(Entry<String, Integer> entry : increments.entrySet()){
+			YdsGoodsLot lot = lots.findById(entry.getKey());
+			SpdDepotCard card = cards.findEnableCardByGoodsId(lot.getGoodsId());
+			stockChanges.add(new SpdShelfStockChange(lot, depot, areaType, card.getShelfId(PcsAreaType.typeOf(areaType)), entry.getValue()));
+		}
+		
+		//执行库存变更
+		dsService.incrementShelfStocks(stockChanges);
+		
+		//检查库存变更集结果		
+		SpdShelfStocks newStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+		for(Entry<String, Integer> entry : increments.entrySet()){
+			SpdStockChange stockChange = null;
+			for(SpdStockChange theStockChange : stockChanges){
+				if(theStockChange.getGoodsLot().getGoodsLotId().equals(entry.getKey())){
+					stockChange = theStockChange;
+					break;
+				}
+			}
+			YdsGoods goods = stockChange.getGoodsLot().getGoods();
+	 		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), YdsUnitLv.base.getLv());
+			int incrementByMinUnit = (int)(entry.getValue()*unitRatio);
+			assertShelfStock(stocks, newStocks, areaType, entry.getKey(), entry.getValue(), incrementByMinUnit);
+		}
+	}
+	
+	private void assertShelfStock(SpdShelfStocks stocks, SpdShelfStocks newStocks, String areaType, String lotId, int storeUnitIncrement, int minUnitIncrement){
+		SpdShelfStock stock = stocks.findByDepotAndGoodsLot(depotId, areaType, lotId);
+		SpdShelfStock newStock = newStocks.findByDepotAndGoodsLot(depotId, areaType, lotId);
+		assertEquals((stock==null?0:stock.getQtyByMinUnit())+minUnitIncrement, newStock.getQtyByMinUnit().intValue());
+	}
+	
+	//测试增加货位库存传入负数库存变更
+	@Test public void testIncrementShelfStocksWithError(){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		YdsGoodsLots lots = glRepository.findAllWithGoods().findByIds(lotIds);
+		
+		//声明异常
+		thrown.expect(OperateFailException.class);
+		
+		//构造库存扣减变更集
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges();
+		SpdDepotCards cards = dcRepository.findAll().findByDepot(depotId);
+		YdsGoodsLot lot = lots.findById(lotId3);
+		String shelfId = cards.findEnableCardByGoodsId(lot.getGoodsId()).getShelfId(PcsAreaType.normal);
+		stockChanges.add(new SpdShelfStockChange(lot, depot, PcsAreaType.normal.getCode(), shelfId, -1000));
+		
+		//执行增加货位库存
+		dsService.incrementShelfStocks(stockChanges);
+	}
+	
+}

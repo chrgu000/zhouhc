@@ -1,0 +1,51 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+@JsonSerialize(using = CommonEnumJsonSerializer.class)
+public enum YdsWorkBookSortName implements ITypeEnum{
+	pack_unit("pack_unit", "包装单位", ""),
+	store_type("store_type", "存储类型", ""),
+	goods_model("goods_model", "产品剂型", ""),
+	measurement_unit ("measurement_unit", "计量单位", ""),
+	tax_ratiot("tax_ratiot", "开票税率", ""),
+	replenish_rule("replenish_rule", "仓库申领规则", ""),
+	receive_rule("receive_rule", "备货收货规则", ""),
+	equipment_sort_name("equipment_sort_name", "器械分类" ,""),
+	prepareInform_rule("prepareInform_rule", "备货通知规则", ""),
+	return_goods_rule("return_goods_rule", "仓库退货规则", ""),
+	consume_rule("consume_rule", "仓库消耗规则",""),
+	consume_usage("consume_usage", "仓库消耗用途", ""),
+	adjust_stock_rule("adjust_stock_rule", "库存调节规则", ""),
+	move_area_rule("move_area_rule", "库内移仓规则", ""),
+	feedback_rule("feedback_rule", "反馈规则", ""),
+	adjust_stock_usage("adjust_stock_usage", "库存调节事由", ""),
+	daily_clean_rule("daily_clean_rule", "日清对账规则", ""),
+	fin_rec_rule("fin_rec_rule", "财务对账规则", "");
+	//bill_type("bill_type", "单据类型", "")
+
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private YdsWorkBookSortName (String code,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static YdsWorkBookSortName typeOf(String workCode){
+		for(YdsWorkBookSortName work : YdsWorkBookSortName.values()){
+			if(work.getCode().equals(workCode)){
+				return work;
+			}
+		}
+		return null;
+	}
+	
+}

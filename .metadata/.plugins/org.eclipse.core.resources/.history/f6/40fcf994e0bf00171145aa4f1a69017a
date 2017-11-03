@@ -1,0 +1,535 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.validation.Valid;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.ISupplierProxy;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.factory.SpdReceiveFactory;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveItemRepository;
+import cn.ak4j.yard.spd.bizplan.vo.SpdReturnGoodsQty;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+@SuppressWarnings({"unchecked"})
+public class SpdReceiveBizService extends IYardService<SpdReceiveBiz>{
+
+	@Autowired private PcsDepotRepository depotRepository; 
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdReceiveItemRepository riRepository;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdReceiveFactory receiveFactory;
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private ApplicationContext context;
+	
+	@Transactional
+	public SpdReceiveBizs add(SpdDeliveryOrders orders, PcsUser user) {
+		SpdReceiveBizs newReceives = receiveFactory.buildReceives(orders, user);
+		SpdReceiveBizs result = new SpdReceiveBizs();
+		
+		for(SpdReceiveBiz receive : newReceives){
+			SpdReceiveBiz newReceive = add(receive, user);
+			result.add(newReceive);
+		}
+		
+		return result;
+	}
+
+	@Transactional
+	public SpdReceiveBiz add(@Valid SpdReceiveBiz receive, IUser user){
+		//设置业务规则
+		if(StringUtils.isEmpty(receive.getBizRuleId())){
+			SpdReceiveRules rules = new SpdReceiveRules(brRepository.findAllWithRelations().getAllReceiveRules().getEnabledRules());
+			receive.autoFillBizRule(rules);
+		}else{
+			SpdReceiveRule rule = brRepository.findAllWithRelations().getAllReceiveRules().findById(receive.getBizRuleId());
+			if(rule == null){
+				throw new NotFoundException(YardExceptionType.not_found_receive_rule, receive.getFromDeptId(), receive.getBizRuleId());
+			}
+			receive.setBizRule(rule);
+		}
+		
+		//应用规则收货规则
+		receive.applyRule(receive.getBizRule(), (PcsUser)user);
+		
+		if(!receive.isValid()){
+			throw new InvalidDataException(receive.getValidateMsg());
+		}
+		
+		//检查是否有相应的产品批次
+		if(receive.hasItems()){
+			receive.verifyGoodsLot(glRepository);
+		}
+		
+		//检查是否有相关的备货业务
+		receive.verifyPrepareInform(pibRepository, rabbitProxy, user.getUserId());
+		
+		//设置收货仓库
+		receive.getToDepot().fillCards(dcRepository);
+		
+		//设置代理用户作为收货用户
+		if(receive.getChannelType() == YardChannelType.eis){
+			PcsUser defaultUser = userRepository.findAll().findById(receive.getToDepot().getManageDept().getDefaultUserId());
+			receive.setMaintenanceInfo(new MaintenanceInfo(defaultUser));
+		}
+		
+		if(receive.hasItems()){
+			receive.getItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+			//检查是否有账页
+			receive.verifyDepotCard(rabbitProxy, receive.getStockChangeDepot(), (PcsUser)user);
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){		
+				rabbitProxy.sendBizMsg(receive.getBizId(), null, receive.getMaintenanceInfo().getLastUserId(), AmqpMsgType.CREATE_RECEIVE_BIZ);
+				if(receive.getBizRule().getMustPrepare()){
+					try {
+						SpdPrepareInformRule prepareInformRule = (SpdPrepareInformRule) brRepository.findAllWithRelations().findById(receive.getBizRule().getOriginRuleId());
+						if(prepareInformRule == null){
+							throw new InvalidDataException(YardExceptionType.not_found_prepare_inform_rule, String.format("id:%s", receive.getBizRule().getOriginRuleId()));
+						}
+						ISupplierProxy supplierProxy = (ISupplierProxy)context.getBean(prepareInformRule.hasInformComponent() ? prepareInformRule.getInformComponent() : "defaultSupplierProxy");
+						supplierProxy.receiveCallback(receive);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+            }
+		});
+		
+		//设置业务编码
+		receive.setBizCode(codeService.publishCode(CodeSort.shouhuodan).getCode());
+		
+		//保存收货单
+		rbRepository.saveWithItems(receive);
+		
+		return receive;
+	}
+
+	@Override
+	public void delete(String bizId, IUser user) {
+		SpdReceiveBiz receive = rbRepository.findOne(bizId);
+		if (!receive.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, receive.getBizCode());
+		}
+		SpdBizItems items = biRepository.findWithGoodsByBizId(bizId);
+		if(items.size() != 0){
+			items.forEach(item->{
+				biRepository.delete(item);
+			});
+		}
+		
+		rbRepository.delete(receive);
+	}
+
+	@Override
+	public SpdReceiveBiz modify(SpdReceiveBiz receiveBiz, IUser user) {
+		SpdReceiveBiz receiveBizPO = rbRepository.findOne(receiveBiz.getBizId());
+		receiveBizPO.update(receiveBiz, user.getOrgId(), user.getUserId());
+		receiveBizPO = rbRepository.save(receiveBizPO);
+		return receiveBizPO;
+	}
+
+	@Override @Transactional
+	public SpdReceiveBiz updateCheckState(String bizId, int checkStateCode, Date lastDate, IUser user) {
+		SpdReceiveBiz receive = rbRepository.findOne(bizId);
+		fillAllRelations(receive);
+		if(checkStateCode == CheckState.commited.getCode()){
+			return commitReceive(receive, lastDate, user);
+		}else if(checkStateCode == CheckState.reviewed.getCode()){
+			return reviewReceive(receive, lastDate, user);
+		}else if(checkStateCode == CheckState.completed.getCode()){
+			return completeReceive(receive,lastDate,user);
+		}
+		return null;
+	}
+	
+	
+	@Transactional
+	public SpdReceiveBiz commitReceive(SpdReceiveBiz receive, Date lastDate, IUser user){
+		if(receive.getItems().size()>0){
+			receive.updateCheckState(CheckState.commited.getCode(), lastDate, user.getOrgId(), user.getUserId());
+			
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+				public void afterCommit(){
+					rabbitProxy.sendBizMsg(receive.getBizId(), null, user.getUserId(), AmqpMsgType.COMMIT_RECEIVE_BIZ);
+	            }
+			});
+			
+			rbRepository.save(receive);
+			return receive;
+		}
+		
+		throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("备货收货[%s]", receive.getBizCode()));
+	}
+	
+	@Transactional
+	public SpdReceiveBiz reviewReceive(SpdReceiveBiz receive, Date lastDate, IUser user){
+		SpdReceiveRules rules = new SpdReceiveRules(brRepository.findAllWithRelations().getAllReceiveRules().getEnabledRules());
+		SpdReceiveRule rule = rules.findById(receive.getBizRuleId());
+		if(rule == null){
+			throw new OperateForbiddenException(YardExceptionType.forbid_rule_not_enabled, SpdBizType.receive_biz.getName(), receive.getBizRuleId());
+		}
+		
+		if(!receive.getItems().isAllConfirmed()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("备货收货[%s]", receive.getBizCode()));
+		}
+		
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(receive.getToDepotId());
+		depot.fillCards(dcRepository);
+		receive.setToDepot(depot);
+		
+		if(receive.hasItems()){
+			receive.getItems().fillGoods(goodsRepository);
+			receive.getItems().fillGoodsLot(glRepository);
+			//检查是否有账页
+			receive.verifyDepotCard(rabbitProxy, receive.getStockChangeDepot(), (PcsUser)user);
+			receive.getItems().verifyEquipmentLotValidity();
+		}
+		
+		if(receive.getItems().size()>0){
+			receive.updateCheckState(CheckState.reviewed.getCode(), lastDate, user.getOrgId(), user.getUserId());
+			
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+				public void afterCommit(){		
+					rabbitProxy.sendBizMsg(receive.getBizId(), null, user.getUserId(), AmqpMsgType.CONFIRM_RECEIVE_BIZ);
+	            }
+			});
+			
+			rbRepository.save(receive);
+			dsService.updateDepotStocks(receive.getStockChanges());
+			return receive;
+		}
+		
+		throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("备货收货[%s]", receive.getBizCode()));
+	}
+	
+	@Transactional
+	private SpdReceiveBiz completeReceive(SpdReceiveBiz receive, Date lastDate, IUser user){
+		receive.updateCheckState(CheckState.completed.getCode(), lastDate);
+		rbRepository.save(receive);
+		return receive;
+	}
+	
+	/**
+	 * 查询可被特定的调度任务进行调度的收货业务，包含两类：
+	 * 1）未创建调度任务的收货业务:也即已确认收货但没有被任何调度任务所关联的收货业务
+	 * 2）当前调度任务所关联的收货业务
+	 * @param dispatcherId
+	 * @return
+	 */
+	public SpdReceiveBizs findDispatchableReceives(String dispatcherId){
+		SpdDispatcher dispatcher = dispatcherRepository.findOne(dispatcherId);
+		
+		//查询未创建调度任务的收货业务
+		SpdReceiveBizs reviewdReceives = rbRepository.findByBizStatusCodeAndToDepotId(SpdReceiveBizSteps.review_receive.getStatusCode(), dispatcher.getDispatcherDepotId());
+		
+		//查询待调度的收货业务
+		SpdReceiveBizs dispatcherRelationReceives = findDispatcherRelationReceives(dispatcherId);
+		
+		SpdReceiveBizs result = new SpdReceiveBizs();
+		result.addAll(reviewdReceives);
+		result.addAll(dispatcherRelationReceives);
+		
+		return result;
+	}
+	
+	/**
+	 * 根据调度查询关联的收货业务
+	 */
+	public SpdReceiveBizs findDispatcherRelationReceives(String dispatcherId){
+		//查询当前调度明细关联的收货业务
+		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+		
+		SpdReceiveBizs receives = rbRepository.findByIds(dispatcher.getRefs().pluck("refObjectId"));
+		return receives;
+	}
+	
+	public SpdReceiveBizs findUncompleteReceives(PcsUser user, SpdReceiveBizParams params, OrderParam order, int pageNo,
+			int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.size() <= 0){
+			return new SpdReceiveBizs();
+		}
+		
+		params.setToDepotId(new ListParam<String>(depots.getIds()));
+		if(params.getCheckStateCode().isEmpty()){
+			List<Integer> checkSateCodes = new ArrayList<Integer>();
+			checkSateCodes.add(CheckState.new_created.getCode());
+			checkSateCodes.add(CheckState.commited.getCode());
+			params.setCheckStateCode(new ListParam<Integer>(checkSateCodes));
+		}
+		
+		return rbRepository.find(params, order, pageNo, pageSize);
+	}
+
+	public SpdReceiveBizs findCompletedReceives(PcsUser user, SpdReceiveBizParams params, OrderParam order, int pageNo,
+			int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.size() <= 0){
+			return new SpdReceiveBizs();
+		}
+		
+		params.setToDepotId(new ListParam<String>(depots.getIds()));
+		
+		List<Integer> checkSateCodes = new ArrayList<Integer>();
+		checkSateCodes.add(CheckState.reviewed.getCode());
+		checkSateCodes.add(CheckState.completed.getCode());
+		params.setCheckStateCode(new ListParam<Integer>(checkSateCodes));
+		
+		return rbRepository.find(params, order, pageNo, pageSize);
+	}
+
+	public SpdReceiveBizs findVerificationReceives(String deptId, List<String> goodsIds, List<String> lotIds){
+		return findDealReceives(deptId, goodsIds, lotIds, 1);
+	}
+	
+	public SpdReceiveBizs findChargeOffReceives(String deptId, List<String> goodsIds, List<String> lotIds){
+		return findDealReceives(deptId, goodsIds, lotIds, 2);
+	}
+	
+	/**
+	 * 查询交易相关的收货明细
+	 * @param verificationOrChargeOff 1为核销，2位冲账
+	 */
+	private SpdReceiveBizs findDealReceives(String deptId, List<String> goodsIds, List<String> lotIds, int verificationOrChargeOff){
+		SpdReceiveBizParams receiveParams = new SpdReceiveBizParams();
+		receiveParams.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()).addValue(CheckState.completed.getCode()));
+		receiveParams.setRecorded(new ListParam<Boolean>(true));
+		receiveParams.setFromDeptId(new ListParam<String>(deptId));
+
+		String orderType = verificationOrChargeOff==1?"asc":"desc";
+		if(verificationOrChargeOff == 1){
+			receiveParams.setSaleCompleted(new ListParam<Boolean>(false));
+		}
+		SpdReceiveBizs receives = rbRepository.find(receiveParams, new OrderParam("maintenanceInfo.createDate", orderType), -1, -1);
+		if(CollectionUtils.isEmpty(receives)){
+			return receives;
+		}
+		SpdReceiveItemParams itemParams = new SpdReceiveItemParams();
+		itemParams.setBizId(new ListParam<String>(receives.getIds()));
+		itemParams.setGoodsId(new ListParam<String>(goodsIds));
+		itemParams.setLotId(new ListParam<String>(lotIds));
+		SpdReceiveItems items = riRepository.find(itemParams, new OrderParam("createTime", orderType), -1, -1);
+		//log.debug("query params: {}, {}, {}", receives.getIds(), goodsIds, lotIds);
+		//log.debug("query result:{}", items.size());
+		items.fillGoods(goodsRepository);
+		receives.fillItems(items);
+		return receives;
+	}
+	
+	/**
+	 * 对收货业务及其明细进行“核销”
+	 */
+	@Transactional public SpdReceiveBizs verification(String deptId, SpdGoodsQtys goodsQtys) {
+		//log.debug("with goodsIds:{}, lotIds:{}", goodsQtys.getGoodsIds(), goodsQtys.getLotIds());
+		SpdReceiveBizs receives = findVerificationReceives(deptId, goodsQtys.getGoodsIds(), goodsQtys.getLotIds());
+		//log.info("target verification receives: {}, receiveItems: {}", receives.getIds(), receives.getAllItems().size());
+		SpdReceiveItems dealReceiveItems = new SpdReceiveItems(receives.getAllItems()).deal(goodsQtys);	
+		//log.info("final verification receive items: {}", dealReceiveItems.size());
+		if(CollectionUtils.isEmpty(dealReceiveItems)){
+			return receives;
+		}
+		riRepository.saveAll(dealReceiveItems);
+		
+		//检查收货业务，如果全部明细都已交易完成，则更新"核销记录"
+		SpdReceiveItemParams itemParams = new SpdReceiveItemParams();
+		itemParams.setBizId(new ListParam<String>(receives.getIds()));
+		SpdReceiveItems allItems = riRepository.find(itemParams);
+		allItems.fillGoods(goodsRepository);
+		receives.fillItems(allItems);
+		
+		SpdReceiveBizs updatedReceives = receives.checkAndUpdateSaleCompleted(true);
+		rbRepository.saveAll(updatedReceives);
+		//SpdReceiveBizs saleCompletedReceives = receives.checkAndUpdateSaleCompleted(dealReceiveItems, true);
+		
+		receives.fillItems(dealReceiveItems);
+		return receives;
+	}
+
+	@Transactional public SpdReceiveBizs chargeOff(String deptId, SpdGoodsQtys goodsQtys) {
+		SpdReceiveBizs receives = findChargeOffReceives(deptId, goodsQtys.getGoodsIds(), goodsQtys.getLotIds());
+//		log.debug("charge off receives: {}, receiveItems:{}", receives.size(), receives.getAllItems().size());
+		SpdReceiveItems dealReceiveItems = new SpdReceiveItems(receives.getAllItems()).chargeOff(goodsQtys);
+		riRepository.saveAll(dealReceiveItems);
+//		log.debug("charge off receive items: {}", dealReceiveItems.size());
+		
+		//检查收货业务，如果全部明细都已交易完成，则更新"核销记录"
+		SpdReceiveItemParams itemParams = new SpdReceiveItemParams();
+		itemParams.setBizId(new ListParam<String>(receives.getIds()));
+		SpdReceiveItems allItems = riRepository.find(itemParams);
+		allItems.fillGoods(goodsRepository);
+		receives.fillItems(allItems);
+		
+		SpdReceiveBizs updatedReceives = receives.checkAndUpdateSaleCompleted(false);
+		rbRepository.saveAll(updatedReceives);
+		
+		receives.fillItems(dealReceiveItems);		
+		
+		return receives;
+	}
+	
+	/**
+	 * 查找未完成交易的收货明细
+	 */
+	public SpdReceiveItems findUncompleteDealItemsByLotIds(List<String> lotIds) {
+		SpdReceiveItemParams params = new SpdReceiveItemParams();
+		params.setLotId(new ListParam<String>(lotIds));
+		SpdReceiveItems items = riRepository.findByDealQtyAndReturnQtyLessConfirmQty(params, new OrderParam("createTime", "asc"), -1, -1);
+		return items;
+	}
+	
+	public SpdReceiveItems findUncompletedDealItemsByDepotId(String depotId, SpdReceiveItemParams itemParams, OrderParam order, int pageNo, int pageSize){
+		SpdReceiveBizParams receiveParams = new SpdReceiveBizParams();
+		receiveParams.setToDepotId(new ListParam<String>(depotId));
+		receiveParams.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode()));
+		receiveParams.setSaleCompleted(new ListParam<Boolean>(false));
+		SpdReceiveBizs receives = rbRepository.find(receiveParams);
+		
+		if(itemParams == null){
+			itemParams = new SpdReceiveItemParams();
+		}
+		if(order == null){
+			order = new OrderParam("createTime", "desc");
+		}
+		itemParams.setBizId(new ListParam<String>(receives.getIds()));
+		SpdReceiveItems items = riRepository.findByDealQtyAndReturnQtyLessConfirmQty(itemParams, order, pageNo, pageSize);
+		return items;
+	}
+	
+	@Transactional public void updateReturnGoodsQty(List<SpdReturnGoodsQty> returnGoodsQtys) {
+		List<String> itemIds = CollectionUtils.pluck("receiveItemId", returnGoodsQtys);
+		SpdReceiveItems receiveItems = riRepository.findByIds(itemIds);
+		receiveItems.fillGoods(goodsRepository);
+		
+		if(receiveItems.size() != returnGoodsQtys.size()){
+			log.error("收货明细id和收货明细结果不一致:{}", itemIds);
+			throw new OperateFailException("系统故障，退货明细的关联收货明细有些没有找到，请检查相关的收货明细");
+		}
+
+		List<String> receiveIds = receiveItems.pluck("bizId");
+		SpdReceiveBizs receives = rbRepository.findByIds(receiveIds);
+		receives.forEach(receive->{
+			if(receive.getCheckState() != CheckState.completed){
+				throw new OperateFailException("只能对已完成的收货发起退货");
+			}
+		});
+		
+		receiveItems.forEach(receiveItem->{
+			SpdReturnGoodsQty returnGoodsQty = CollectionUtils.findWhere("receiveItemId", receiveItem.getBizItemId(), returnGoodsQtys);
+			receiveItem.incrementReturnGoodsQty(returnGoodsQty);
+		});
+		riRepository.saveAll(receiveItems);
+		
+		receiveItems = riRepository.findByBizIds(receiveIds);
+		receiveItems.fillGoods(goodsRepository);
+		receives.fillItems(receiveItems);
+		
+		receives.forEach(receive->{
+			boolean updated = receive.updateSaleComplete();
+			if(updated){
+				rbRepository.save(receive);
+			}
+		});
+	}
+
+	
+	public SpdReceiveBiz getFullReceive(String bizId) {
+		SpdReceiveBiz receive = rbRepository.getWithItems(bizId);
+		fillAllRelations(receive);
+		return receive;
+	}
+	
+	public void fillAllRelations(SpdReceiveBiz receive){
+		if(CollectionUtils.isEmpty(receive.getItems())){
+			SpdBizItems items = biRepository.findWithGoodsByBizId(receive.getBizId());
+			receive.setItems(items);
+		}
+		
+		if(CollectionUtils.isNotEmpty(receive.getItems())){
+			receive.getItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+			receive.getItems().fillUnuseableGoodsLot(glRepository);
+			
+			SpdDepotTasks onShelfTasks = dtRepository.findWithItemsByBizId(receive.getBizId());
+			onShelfTasks.getAllItems().fillGoodsLots(glRepository);
+			onShelfTasks.fillDepotAreas(depotRepository);
+			receive.setOnShelfTasks(onShelfTasks);
+		}
+		
+		SpdReceiveRule rule = (SpdReceiveRule)(brRepository.findAllWithRelations().findById(receive.getBizRuleId()));
+		receive.setBizRule(rule);
+		receive.getToDepot().fillCards(dcRepository);
+	}
+
+
+}

@@ -1,0 +1,421 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.gep.domain.SpdGepPrepareInformBizTO;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdPrepareInformBizSteps;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizplan.vo.SpdPrepareReceiveQty;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfig;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.params.SpdDepotGoodsConfigParams;
+import cn.ak4j.yard.spd.repository.SpdDepotGoodsConfigRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.service.YdsEdsGoodsService;
+
+public class SpdPrepareInformResourceTest extends BaseTest{
+
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private YdsEdsGoodsService egService;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdDepotGoodsConfigRepository dgcRepository;
+	
+	@Test public void testAdd() throws Exception{
+		SpdPrepareInformBiz prepareInform = mockMvcHelper.add(SpdPrepareInformBiz.class, xykUserCode, "spd", "spdPrepareInforms", createPrepareInform(), status().isOk(), null);
+		assertNotNull(prepareInform.getBizId());
+		assertEquals(CheckState.new_created, prepareInform.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.beihuodan);
+		assertEquals(CodeSort.beihuodan.getCode()+getCurrentDateCode()+sequenceCode, prepareInform.getBizCode());
+
+		wait(2);
+		
+		prepareInform = mockMvcHelper.findOne(SpdPrepareInformBiz.class, xykUserCode, "spd", "spdPrepareInforms", prepareInform.getBizId(), status().isOk(), null);
+		assertNotNull(prepareInform.getFromDeptId());
+		assertNotNull(prepareInform.getToDepotId());
+		assertEquals("prp_inf_rule_id_004", prepareInform.getBizRuleId());
+		assertEquals(SpdPrepareInformBizSteps.create_prepare_inform, prepareInform.getCurrentBizStep());
+	}
+	
+	@Test public void testReviewAndInformSupplier() throws Exception {
+		//新增备货通知业务
+		SpdPrepareInformBiz prepareInform = mockMvcHelper.add(SpdPrepareInformBiz.class, xykUserCode, "spd", "spdPrepareInforms", createPrepareInform(), status().isOk(), null);
+		wait(1);
+		
+		//测试禁止对未审核的备货通知进行同步
+		String url = "/spd/spdPrepareInforms/{id}/informStatus?accessToken={accessToken}";
+		mockMvcHelper.mockPut(SpdPrepareInformBiz.class, null, url, status().is5xxServerError(), YardExceptionType.forbid_inform_supplier, prepareInform.getBizId(), getAccessToken(xykUserCode));
+		
+		CheckStateTO checkStateTo = new CheckStateTO(CheckState.commited.getCode(), prepareInform.getLastUpdateTime());
+		url = "/spd/spdPrepareInforms/{id}/checkState/commited?accessToken={accessToken}";
+		checkStateTo = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, status().isOk(), null, prepareInform.getBizId(), getAccessToken(xykUserCode));
+		wait(2);
+		prepareInform = getPrepareInform(prepareInform.getBizId(),xykUserCode);
+		assertEquals(CheckState.commited, prepareInform.getCheckState());
+		assertEquals(SpdPrepareInformBizSteps.commit_prepare_inform, prepareInform.getCurrentBizStep());
+
+		
+		checkStateTo.setCheckStateCode(CheckState.reviewed.getCode());
+		url = "/spd/spdPrepareInforms/{id}/checkState/reviewed?accessToken={accessToken}";
+		checkStateTo = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, status().isOk(), null, prepareInform.getBizId(), getAccessToken(xykUserCode));
+		wait(2);
+		prepareInform = getPrepareInform(prepareInform.getBizId(), xykUserCode);
+		assertEquals(CheckState.reviewed, prepareInform.getCheckState());
+		assertEquals(SpdPrepareInformBizSteps.review_prepare_inform, prepareInform.getCurrentBizStep());
+		
+		//测试同步备货通知到供应商
+		url = "/spd/spdPrepareInforms/{id}/informStatus?accessToken={accessToken}";
+		Map<String, Date> result = mockMvcHelper.mockPut(new TypeReference<Map<String, Date>>(){}, null, url, status().isOk(), null, prepareInform.getBizId(), getAccessToken(xykUserCode));
+		assertNotNull(result.get("lastUpdateTime"));
+		assertNotNull(result.get("informTime"));
+		wait(2);
+		prepareInform = getPrepareInform(prepareInform.getBizId(), xykUserCode);
+		assertEquals(SpdPrepareInformBizSteps.complete_prepare_inform, prepareInform.getCurrentBizStep());
+		
+
+		//测试禁止对已同步的备货通知进行同步
+		mockMvcHelper.mockPut(SpdPrepareInformBiz.class, null, url, status().is5xxServerError(), YardExceptionType.forbid_inform_supplier, prepareInform.getBizId(), getAccessToken(xykUserCode));
+	}
+	
+	@Test public void testReviewByAnotherDept() throws Exception {
+		//新增备货通知业务
+		SpdPrepareInformBiz prepareInform = mockMvcHelper.add(SpdPrepareInformBiz.class, xykUserCode, "spd", "spdPrepareInforms", createPrepareInform(), status().isOk(), null);
+		wait(3);
+		
+		//提交备货
+		CheckStateTO checkStateTo = new CheckStateTO(CheckState.commited.getCode(), prepareInform.getLastUpdateTime());
+		String url = "/spd/spdPrepareInforms/{id}/checkState/commited?accessToken={accessToken}";
+		checkStateTo = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, status().isOk(), null, prepareInform.getBizId(), getAccessToken(xyfUserCode));
+		
+		//无效审核备货
+		checkStateTo.setCheckStateCode(CheckState.reviewed.getCode());
+		url = "/spd/spdPrepareInforms/{id}/checkState/reviewed?accessToken={accessToken}";
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, status().is4xxClientError(), YardExceptionType.forbid_review_prepare_inform, prepareInform.getBizId(), getAccessToken(xyfUserCode));
+		
+		//审核备货
+		checkStateTo = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, status().isOk(), null, prepareInform.getBizId(), getAccessToken(xykUserCode));
+		wait(3);
+	}
+	
+	@Test public void testAddPrepareInformAndAutoComplete() throws Exception{
+		SpdPrepareInformBiz prepareInform = mockMvcHelper.add(SpdPrepareInformBiz.class, xykUserCode, "spd", "spdPrepareInforms", createPrepareInform2(), status().isOk(), null);
+		wait(4);
+		
+		prepareInform = getPrepareInform(prepareInform.getBizId(), xykUserCode);
+		assertEquals(CheckState.completed, prepareInform.getCheckState());
+	}
+	
+	@Test public void testIgnore() throws Exception{
+		String bizId = "prp_inf_biz_id_004";
+
+		String accessToken = getAccessToken(xykUserCode);
+		
+		SpdPrepareInformBiz prepareInform = mockMvcHelper.mockGet(SpdPrepareInformBiz.class, "/spd/spdPrepareInforms/{id}?accessToken={accessToken}", bizId, accessToken);
+
+		SpdBizItemParams itemParams = new SpdBizItemParams();
+		itemParams.setBizId(new ListParam<String>(bizId));
+		
+		SpdBizItems bizItems = mockMvcHelper.mockGet(SpdBizItems.class, "/spd/spdBizItems?params={params}&accessToken={accessToken}", Global.defaultObjectMapper.writeValueAsString(itemParams), accessToken);
+		for(SpdBizItem bizItem : bizItems){
+			bizItem.setPlanQty(10);
+			mockMvcHelper.mockPut(SpdBizItem.class, bizItem, "/spd/spdBizItems/{id}?accessToken={accessToken}", bizItem.getBizItemId(), accessToken);
+		};
+		
+		CheckStateTO checkState = new CheckStateTO(CheckState.commited.getCode(), prepareInform.getLastUpdateTime());
+		
+		checkState = mockMvcHelper.mockPut(CheckStateTO.class, checkState, "/spd/spdPrepareInforms/{id}/checkState/commited?accessToken={accessToken}", bizId, accessToken);
+		prepareInform.setLastUpdateTime(checkState.getLastDate());
+		
+		bizItems = mockMvcHelper.mockGet(SpdBizItems.class, "/spd/spdBizItems?params={params}&accessToken={accessToken}", Global.defaultObjectMapper.writeValueAsString(itemParams), accessToken);
+		for(SpdBizItem bizItem : bizItems){
+			bizItem.setConfirmQty(0);
+			mockMvcHelper.mockPut(SpdBizItem.class, bizItem, "/spd/spdBizItems/{id}?accessToken={accessToken}", bizItem.getBizItemId(), accessToken);
+		};
+		
+		prepareInform = mockMvcHelper.mockGet(SpdPrepareInformBiz.class, "/spd/spdPrepareInforms/{id}?accessToken={accessToken}", bizId, accessToken);
+		
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), prepareInform.getLastUpdateTime());
+		checkState = mockMvcHelper.mockPut(CheckStateTO.class, checkState, "/spd/spdPrepareInforms/{id}/checkState/reviewed?accessToken={accessToken}", bizId, accessToken);
+		prepareInform.setLastUpdateTime(checkState.getLastDate());
+		
+		wait(2);
+		prepareInform = mockMvcHelper.mockGet(SpdPrepareInformBiz.class, "/spd/spdPrepareInforms/{id}?accessToken={accessToken}", bizId, accessToken);
+		
+		assertEquals(SpdPrepareInformBizSteps.complete_prepare_inform.getStatusCode(), prepareInform.getBizStatusCode());
+		
+	}
+
+	@Test public void testDelete() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdPrepareInforms/{bizId}?accessToken={accessToken}";
+		String bizId031 = "prp_inf_biz_id_031";
+		String bizId032 = "prp_inf_biz_id_032";
+		
+		mockMvcHelper.mockDelete(url, bizId031, accessToken, status().isOk(), null);
+		mockMvcHelper.mockDelete(url, bizId032, accessToken, status().is5xxServerError(), YardExceptionType.forbide_delete);
+	}
+	
+	@Test public void testFindPrepares() throws Exception{
+		testFindUncompletePrepares();
+		testCountUncompletePrepares();
+		testFindCompletedPrepares();
+		testCountCompletedPrepares();
+	}
+	
+	private void testFindUncompletePrepares() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdPrepareInforms/iTakeChargeOfPrepareInforms/uncompletePrepareInforms?accessToken={accessToken}&pageSize=-1";
+		SpdPrepareInformBizs prepareInforms = mockMvcHelper.mockGet(SpdPrepareInformBizs.class, url, accessToken);
+		assertEquals(4, prepareInforms.size());
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		prepareInforms.forEach(prepareInform->{
+			PcsDepot depot = CollectionUtils.findWhere("depotId", prepareInform.getToDepotId(), depots);
+		    assertNotNull(depot);
+			assertEquals(user.getDeptId(), depot.getManageDeptId());
+		});
+	}
+	
+	private void testCountUncompletePrepares() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdPrepareInforms/iTakeChargeOfPrepareInforms/uncompletePrepareInforms/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(4, count);
+	}
+	
+	private void testFindCompletedPrepares() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdPrepareInforms/iTakeChargeOfPrepareInforms/completedPrepareInforms?accessToken={accessToken}&pageSize=-1";
+		SpdPrepareInformBizs prepareInforms = mockMvcHelper.mockGet(SpdPrepareInformBizs.class, url, accessToken);
+		
+		assertEquals(28, prepareInforms.size());
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		prepareInforms.forEach(prepareInform->{
+			PcsDepot depot = CollectionUtils.findWhere("depotId", prepareInform.getToDepotId(), depots);
+		    assertNotNull(depot);
+			assertEquals(user.getDeptId(), depot.getManageDeptId());
+		});
+	}
+	
+	private void testCountCompletedPrepares() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdPrepareInforms/iTakeChargeOfPrepareInforms/completedPrepareInforms/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		
+		assertEquals(28, count);
+	}
+	
+	@Test public void testUpdateEstimateDeliveryTime() throws Exception{
+		String bizCode = "1121707316";
+		SpdGepPrepareInformBizTO prepareInformTO = new SpdGepPrepareInformBizTO();
+		prepareInformTO.setEstimatedDeliveryTime(new Date());
+		String accessToken = getAccessToken(zsyUserCode);
+		String url = "/spd/spdPrepareInforms/bizCode,{bizCode}/estimatedDeliveryTime?accessToken={accessToken}";
+		SpdPrepareInformBiz pareInform = mockMvcHelper.mockPut(SpdPrepareInformBiz.class, prepareInformTO, url, bizCode, accessToken);
+		assertNotNull(pareInform.getEstimatedDeliveryTime());
+		
+		SpdPrepareInformBiz pareInformPO = pibRepository.findByBizCode(bizCode);
+		assertNotNull(pareInformPO.getEstimatedDeliveryTime());
+	}
+	
+	@Test public void testFindWhichICanReview() throws Exception{
+		String url = "/spd/spdPrepareInforms/whichICanReview?accessToken={accessToken}";
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, testUserId);
+		SpdPrepareInformBizs prepareInforms = mockMvcHelper.mockGet(SpdPrepareInformBizs.class, url, getAccessToken(testUserCode));
+		assertEquals(1, prepareInforms.size());
+		
+		prepareInforms.forEach(prepareInform->{
+			assertTrue(prepareInform.getConfirmDeptId().equals(user.getDeptId()) || prepareInform.getToDepot().getManageDeptId().equals(user.getDeptId()));
+		});
+	}
+	
+	@Test public void testCommitPrepareInfo() throws Exception{
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		String prepareInformBizId = "prp_inf_biz_id_004";
+		String goodsId = "goods_id_021";
+		String orgId = "org_id_001";
+		
+		YdsEdsGoodsParams edsGoodsParams = new YdsEdsGoodsParams();
+		edsGoodsParams.setOwnerOrgId(new ListParam<String>(orgId));
+		edsGoodsParams.setYardGoodsId(new ListParam<String>(goodsId));
+		YdsEdsGoods edsGoods = egRepository.findAll().find(edsGoodsParams).get(0);
+		edsGoods.setCheckStateCode(CheckState.new_created.getCode());
+		edsGoods.setEnabled(false);
+		edsGoods.setYardGoodsId("");
+		edsGoods = egService.modify(edsGoods, user);
+		SpdPrepareInformBiz prepareInform = mockMvcHelper.findOne(SpdPrepareInformBiz.class, testUserCode, "spd", "spdPrepareInforms", prepareInformBizId);
+		
+		CheckStateTO checkStateTO = new CheckStateTO();
+		checkStateTO.setCheckStateCode(CheckState.commited.getCode());
+		checkStateTO.setLastDate(prepareInform.getLastUpdateTime());
+		String url = "/spd/spdPrepareInforms/{bizId}/checkState/commited?accessToken={accessToken}";
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTO, url, status().is4xxClientError(), YardExceptionType.invalid_goods_without_butting_code, prepareInformBizId, getAccessToken(testUserCode));
+	}
+	
+	@Test public void testGetPrepareReceiveQty() throws Exception{
+		String prepareInformBizId = "prp_inf_biz_id_021";
+		String url = "/spd/spdPrepareInforms/{bizId}/prepareReceiveQtys?accessToken={accessToken}";
+		List<SpdPrepareReceiveQty> qtys = mockMvcHelper.mockGet(new TypeReference<List<SpdPrepareReceiveQty>>() {}, url, prepareInformBizId, getAccessToken(testUserCode));
+		assertEquals(13, qtys.size());
+		
+		assertEquals(13, CollectionUtils.findWhere("itemId", "4028b8815dac4c8c015dac4cba7b0074", qtys).getQty());
+		assertEquals(149, CollectionUtils.findWhere("itemId", "4028b8815dac4c8c015dac4cba7b0075", qtys).getQty());
+		assertEquals(171, CollectionUtils.findWhere("itemId", "4028b8815dac4c8c015dac4cba7b0076", qtys).getQty());
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		String ids = "prp_inf_biz_id_023";
+		String accessToken = getAccessToken(xykUserCode);
+		SpdPrepareInformBizs prepareInforms = mockMvcHelper.mockGet(SpdPrepareInformBizs.class, "/spd/spdPrepareInforms/ids,{ids}?accessToken={accessToken}", ids, accessToken);
+		assertEquals(1, prepareInforms.size());
+	}
+
+	private SpdPrepareInformBiz getPrepareInform(String bizId, String userCode) throws Exception{
+		SpdPrepareInformBiz prepareInform = mockMvcHelper.findOne(SpdPrepareInformBiz.class, userCode, "spd", "spdPrepareInforms", bizId, status().isOk(), null);
+		return prepareInform;
+	}
+	
+	private SpdPrepareInformBiz createPrepareInform(){
+		SpdPrepareInformBiz prepareInform = new SpdPrepareInformBiz();
+		prepareInform.setBizRuleId("prp_inf_rule_id_004");
+		prepareInform.setCreatorDepotId("depot_id_001");
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		prepareInform.setMaintenanceInfo(new MaintenanceInfo(user));
+		prepareInform.setItems(createItems());
+		return prepareInform;
+	}
+	
+	private SpdPrepareInformBiz createPrepareInform2(){
+		SpdPrepareInformBiz prepareInform = new SpdPrepareInformBiz();
+		prepareInform.setBizRuleId("prp_inf_rule_id_001");
+		prepareInform.setCreatorDepotId("depot_id_001");
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		prepareInform.setMaintenanceInfo(new MaintenanceInfo(user));
+		prepareInform.setItems(createItems());
+		return prepareInform;
+	}
+	
+//	private SpdPrepareInformBiz createPrepareInform3(){
+//		SpdPrepareInformBiz prepareInform = new SpdPrepareInformBiz();
+//		prepareInform.setBizRuleId("prp_inf_rule_id_008");
+//		prepareInform.setCreatorDepotId("depot_id_002");
+//		PcsUser user = userRepository.findAll().findById(xyfUserId);
+//		prepareInform.setMaintenanceInfo(new MaintenanceInfo(user));
+//		prepareInform.setItems(createItems());
+//		return prepareInform;
+//	}
+	
+	private SpdBizItems createItems(){
+		SpdBizItems items = new SpdBizItems();
+		
+		SpdBizItem item1 = new SpdBizItem();
+		item1.setPlanQty(20);
+		item1.setConfirmQty(20);
+		item1.setGoodsId("goods_id_001");
+		item1.setUnitLv(3);
+		item1.setUnitPrice(41.34f);
+		
+		SpdBizItem item2 = new SpdBizItem();
+		item2.setPlanQty(20);
+		item2.setConfirmQty(20);
+		item2.setGoodsId("goods_id_002");
+		item2.setUnitLv(3);
+		item2.setUnitPrice(32.26f);
+		
+		items.add(item1);
+		items.add(item2);
+		
+		return items;
+	}
+	
+	@Test public void testDownloadExcelFile() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdPrepareInform,{id}/excel?accessToken={accessToken}");
+		String bizId = "prp_inf_biz_id_022";
+
+		mockMvc.perform(get(urlTemplate,bizId,accessToken))
+//		.andDo(print())
+		.andExpect(status().isOk())
+		.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", URLEncoder.encode("备货计划", Global.defaultCharset.name()))))
+		.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"));
+	}
+	
+	@Test public void testPrepareInformCreateTask() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String bizId = "prp_inf_biz_id_039";
+		String url = "/spd/prepareInformCreateTasks?bizId={bizId}&accessToken={accessToken}";
+		mockMvcHelper.mockPost(String.class, null, url, bizId, accessToken);
+		
+		SpdPrepareInformBiz prepareInform = pibRepository.getWithItems(bizId);
+		
+		SpdShelfStocks shelfStocks = ssRepository.findByShelfType(prepareInform.getToDepotId(), PcsAreaType.normal.getCode());
+		shelfStocks.fillGoodsLots(glRepository);
+		SpdShelfStocks goodsShelfStocks = shelfStocks.mergeByGoods();
+		
+		SpdDepotGoodsConfigParams configParams = new SpdDepotGoodsConfigParams();
+		configParams.setDepotId(new ListParam<String>(prepareInform.getToDepotId()));
+		SpdDepotGoodsConfigs goodsConfigs = dgcRepository.find(configParams);
+		
+		prepareInform.getItems().forEach(item->{
+			SpdDepotGoodsConfig config = CollectionUtils.findWhere("goodsId", item.getGoodsId(), goodsConfigs);
+			assertNotNull(config);
+			float prepareAndStoreRatio = SpdUnitUtils.computeUnitExchangeRatio(item.getGoods(), item.getGoods().getStoreUnitLv(), item.getGoods().getPrepareUnitLv());
+			SpdShelfStock stock = CollectionUtils.findWhere("goodsId", item.getGoodsId(), goodsShelfStocks);
+			if(stock == null){
+				assertEquals(item.getPlanQty().intValue(), (int)(config.getUpperLimit()*prepareAndStoreRatio));
+			}else{
+				assertEquals(item.getPlanQty().intValue(), (int)((config.getUpperLimit()-stock.getUseableQtyByStoreUnit())*prepareAndStoreRatio));
+			}
+		});
+	}
+}

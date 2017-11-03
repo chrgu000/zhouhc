@@ -1,0 +1,138 @@
+package cn.ak4j.yard.spd.bizplan.service.assistant;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdMoveAreaBiz;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdMoveAreaBizSteps;
+import cn.ak4j.yard.spd.bizplan.repository.SpdMoveAreaBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdMoveAreaBizService;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.factory.SpdDispatcherFactory;
+
+@Component
+public class SpdMoveAreaBizAssistantService extends SpdBizAssistantService<SpdMoveAreaBiz>{
+
+	@Autowired private SpdMoveAreaBizService mabService;
+	@Autowired private SpdMoveAreaBizRepository mabRepository;
+	@Autowired private SpdDispatcherFactory dispatcherFactory;
+	
+	
+	public void process(SpdMoveAreaBiz moveArea, String taskId, String userId, String action) {
+		mabService.fillAllRelations(moveArea);
+		PcsUser user = userRepository.findAll().findById(userId);
+		moveArea = forwardBizStep(moveArea, taskId, action);
+		
+		try{
+			if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.create_move_area)){
+				//nothing todo 
+			}
+			
+			else if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.commit_move_area)){
+				//nothing todo
+			}
+			
+			else if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.confirm_move_area)){
+				if(moveArea.getBizRule().getFeedbackRule().getAutoCreateOffShelfDispatcher()){
+					SpdDispatcher dispatcher = dispatcherFactory.buildDispatcherFromBiz(moveArea, SpdDispatcherType.off_shelf, user);
+					dispatcherService.add(dispatcher, user);
+				}
+			}
+			
+			else if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.create_off_shelf_dispatcher)){
+				if(moveArea.getBizRule().getFeedbackRule().getAutoReviewOffShelfDispatcher()){
+					reviewDispatcher(moveArea, user, SpdDispatcherType.off_shelf);
+				}
+			}
+			
+			else if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.create_off_shelf_task)){
+				if(moveArea.getBizRule().getFeedbackRule().getAutoReviewOffShelfTask()){
+					moveArea.getOffShelfTasks().getAllItems().forEach(item->item.confirmAsPlaned());
+					tiRepository.saveAll(moveArea.getOffShelfTasks().getAllItems());
+					dtService.batchReview(moveArea.getOffShelfTasks(), user);
+				}
+			}
+			
+			else if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.complete_off_shelf_task)){
+				if(moveArea.getBizRule().getFeedbackRule().getAutoCreateOnShelfDispatcher()){
+					SpdDispatcher dispatcher = dispatcherFactory.buildDispatcherFromBiz(moveArea, SpdDispatcherType.on_shelf, user);
+					dispatcherService.add(dispatcher, user);
+				}
+			}
+			
+			else if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.create_on_shelf_dispatcher)){
+				if(moveArea.getBizRule().getFeedbackRule().getAutoReviewOnShelfDispatcher()){
+					reviewDispatcher(moveArea, user, SpdDispatcherType.on_shelf);
+				}
+			}
+			
+			else if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.create_on_shelf_task)){
+				if(moveArea.getBizRule().getFeedbackRule().getAutoReviewOnShelfTask()){
+					moveArea.getOnShelfTasks().getAllItems().forEach(item->item.confirmAsPlaned());
+					tiRepository.saveAll(moveArea.getOnShelfTasks().getAllItems());
+					dtService.batchReview(moveArea.getOnShelfTasks(), user);
+				}
+			}
+			
+			else if(moveArea.getCurrentBizStep().equals(SpdMoveAreaBizSteps.complete_on_shelf_task)){
+				//nothing todo
+			}
+		}catch(Exception e){
+			handleException(action, moveArea, e);
+		}
+		
+		saveBizLog(moveArea, user);
+		mabRepository.save(moveArea);
+	}
+
+	protected SpdMoveAreaBiz forwardBizStep(SpdMoveAreaBiz biz, String taskId, String action) {
+		SpdBizStep currentStep = biz.getCurrentBizStep();
+		if(currentStep == null){
+			biz.setBizStatusCode(biz.getBizSteps().get(0).getStatusCode());
+		}else{
+			SpdBizStep nextStep = CollectionUtils.findWhere("index", currentStep.getIndex()+1, Integer.class, biz.getBizSteps());
+			
+			if(nextStep == null){
+				return biz;
+			}
+			
+			if(nextStep == SpdMoveAreaBizSteps.create_move_area && action.equals(AmqpMsgType.CREATE_MOVE_AREA_BIZ.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdMoveAreaBizSteps.commit_move_area && action.equals(AmqpMsgType.COMMIT_MOVE_AREA_BIZ.getCode())){
+				//biz = waitForTransaction(biz, CheckState.new_created);
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdMoveAreaBizSteps.confirm_move_area && action.equals(AmqpMsgType.REVIEW_MOVE_AREA_BIZ.getCode())){
+				//biz = waitForTransaction(biz, CheckState.commited);
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdMoveAreaBizSteps.create_off_shelf_dispatcher && action.equals(AmqpMsgType.CREATE_OFF_SHELF_DISPATCHER.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdMoveAreaBizSteps.create_off_shelf_task && action.equals(AmqpMsgType.CREATE_OFF_SHELF_TASK.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdMoveAreaBizSteps.complete_off_shelf_task && action.equals(AmqpMsgType.CONFIRM_OFF_SHELF_TASK.getCode())){
+				if(biz.getOffShelfTasks().isAllReviewed()){
+					biz.setBizStatusCode(nextStep.getStatusCode());
+				}
+			}else if(nextStep == SpdMoveAreaBizSteps.create_on_shelf_dispatcher && action.equals(AmqpMsgType.CREATE_ON_SHELF_DISPATCHER.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdMoveAreaBizSteps.create_on_shelf_task && action.equals(AmqpMsgType.CREATE_ON_SHELF_TASK.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdMoveAreaBizSteps.complete_on_shelf_task && action.equals(AmqpMsgType.CONFIRM_ON_SHELF_TASK.getCode())){
+				if(biz.getOnShelfTasks().isAllReviewed()){
+					biz.setBizStatusCode(nextStep.getStatusCode());
+				}
+			}else{
+				throw new OperateFailException(String.format("业务事务步骤步进失败:%s=>%s", action, nextStep.getStatusName()));
+			}
+		}
+		
+		return biz;
+	}
+	
+}

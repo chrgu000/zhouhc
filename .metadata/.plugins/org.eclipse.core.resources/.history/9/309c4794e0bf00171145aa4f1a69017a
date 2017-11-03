@@ -1,0 +1,24 @@
+package cn.ak4j.yard.spd.wrapper.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 包装物明细，即包装物中的所有明细，这些明细自然必须是实现了SpdIWrappable接口
+* 表示可以被包装
+* @author zhengyf
+* @date 2017年7月13日 下午1:23:57
+* @version V1.0.0
+*/
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdWrapperItems extends ArrayList<SpdIWrappable>{
+
+	public <T extends SpdIWrappable> SpdWrapperItems(List<T> items) {
+		super(items);
+	}
+
+}

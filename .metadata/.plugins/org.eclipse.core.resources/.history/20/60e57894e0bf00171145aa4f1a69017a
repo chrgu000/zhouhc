@@ -1,0 +1,32 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.to;
+
+import java.util.Date;
+
+import cn.ak4j.entity.IEntity;
+import lombok.Data;
+
+@SuppressWarnings("serial")
+@Data
+public class SpdStockReportItem implements IEntity{
+
+	private String goodsId;
+	private String goodsFormatName;
+	private String lotId;
+	private String lotNo;//批号
+	private Date lotValidity;//有效期
+	private Date produceDate;
+	private String depotName;
+	private String shelfType;
+	private String shelfName;
+	private String edsGoodsId;
+	private String edsGoodsFormatName;
+	private String storeUnitName;
+	private Integer normalQtyByStoreUnit;
+	private Integer isolationQtyByStoreUnit;
+	private Integer unqualifiedQtyByStoreUnit;
+	private Integer upperLimit;
+	private Integer lowerLimit;
+	
+}

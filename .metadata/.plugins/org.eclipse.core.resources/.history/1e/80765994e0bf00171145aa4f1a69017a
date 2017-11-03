@@ -1,0 +1,13 @@
+package cn.ak4j.yard.spd.task.to;
+
+import lombok.Data;
+
+@Data
+public class NewSpdTurnoverBoxItemTO {
+
+	private String taskId;
+	private String taskItemType;
+	private String itemCode;
+	
+}
+

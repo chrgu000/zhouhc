@@ -1,0 +1,69 @@
+package cn.ak4j.yard.domain;
+
+import java.io.IOException;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+@JsonSerialize(using=CheckStateSerializer.class)
+public enum CheckState {
+
+	/**
+	 * 新增
+	 */
+	new_created(1, "新增"),
+	/**
+	 * 已提交
+	 */
+	commited(2, "已提交"),
+	/**
+	 * 已审核
+	 */
+	reviewed(3, "已审核"),
+	/**
+	 * 已完成
+	 */
+	completed(4, "已完成");
+	
+	private int code;
+	private String name;
+	
+	private CheckState(int code, String name){
+		this.code = code;
+		this.name = name;
+	}
+	
+	public static CheckState stateOf(int stateCode){
+		for(CheckState state : CheckState.values()){
+			if(state.getCode() == stateCode){
+				return state;
+			}
+		}
+		return null;
+	}
+
+	public int getCode() {
+		return code;
+	}
+
+	public String getName() {
+		return name;
+	}	
+}
+
+class CheckStateSerializer extends JsonSerializer<CheckState>{
+
+	public void serialize(CheckState checkState, JsonGenerator generator,
+			SerializerProvider provider) throws IOException,
+			JsonProcessingException {
+		generator.writeStartObject();
+		if(checkState != null){
+			generator.writeNumberField(checkState.getName(), checkState.getCode());
+		}
+		generator.writeEndObject();
+	}
+	
+}

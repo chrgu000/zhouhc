@@ -1,0 +1,135 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Inheritance;
+import javax.persistence.InheritanceType;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.yard.domain.IDescribable;
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdAbstractFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 业务规则抽象父类，每种业务规则都关联一个反馈规则，所以对反馈规则定义了泛型参数
+* @author zhengyf
+* @date 2017年6月20日 下午2:17:01
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity
+@Inheritance(strategy=InheritanceType.TABLE_PER_CLASS)
+public abstract class SpdAbstractBizRule<T extends SpdAbstractFeedbackRule> extends YardEntity implements IDescribable{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	private String id;
+	
+	@NotNull(message="业务规则名称不能为空")
+	private String name;
+	
+	private String ruleCode;
+	
+	private String customName;
+	
+	/**
+	 * 值越大优先级越高
+	 */
+	@Column(name="rule_prior")
+	private Integer prior;
+	
+	@NotNull(message = "反馈Id不能为空")
+	private String feedbackRuleId;
+	
+	private Date createTime;
+	
+	private Date lastUpdateTime;
+	
+	private Boolean enabled;
+	
+	private Boolean canBeOriginRule;
+	
+	private Boolean manualApply;
+	
+	@Transient private T feedbackRule; 
+	
+	public abstract SpdBizType getBizType();
+	
+	@SuppressWarnings("rawtypes")
+	public abstract boolean equalsRule(SpdAbstractBizRule theRule);
+	
+	public abstract String getDisplayName();
+	
+	public abstract boolean canApplyByUser(PcsUser user);
+	
+	/**
+	 * 检查规则是否有效
+	 */
+	public abstract void checkRule(SpdBizRules<?> allBizRules, SpdPropertyChangeRules allPropertyChangeRules);
+
+	@SuppressWarnings("rawtypes")
+	public abstract void update(SpdAbstractBizRule theRule);
+	
+	public void init(){
+		this.createTime = new Date();
+		this.updateLastUpdateTime();
+	}
+	
+	public String getBizTypeCode(){
+		return getBizType().getCode();
+	}
+	
+	public String getPrimaryName(){
+		if(StringUtils.isNotEmpty(getCustomName())){
+			return getCustomName();
+		}
+		return getName();
+	}
+	
+	@Transient @JsonIgnore
+	public CodeSort getCodeSort(){
+		switch (getBizType()) {
+		case adjust_stock_biz:
+			return CodeSort.tiaojieguize;
+		case receive_biz:
+			return CodeSort.shouhuoguize;
+		case replenish_biz:
+			return CodeSort.shenlingguize;
+		case move_area_biz:
+			return CodeSort.yicangguize;
+		case prepare_inform_biz:
+			return CodeSort.tongzhiguize;
+		case return_goods_biz:
+			return CodeSort.tuihuoguize;
+		case consume_biz:
+			return CodeSort.xiaohaoguize;
+		case daily_clean_biz:
+			return CodeSort.riqingduizhangguize;
+		case finacial_reconciliation_biz:
+			return CodeSort.caiwuduizhangguize;
+		default:
+			break;
+		}
+		return null;
+	}
+}

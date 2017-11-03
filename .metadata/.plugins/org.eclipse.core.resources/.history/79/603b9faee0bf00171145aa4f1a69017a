@@ -1,0 +1,42 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChange;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+
+public class SpdReceiveBizTest extends BaseTest{
+
+	@Autowired private SpdReceiveBizService rbService;
+	
+	@Test public void testGetStockChanges(){
+		String receiveId = "rece_biz_id_001";
+		String lotId1 = "goods_lot_id_019";
+		String lotId2 = "goods_lot_id_024";
+		//查询收货单
+		SpdReceiveBiz receive = rbService.getFullReceive(receiveId);
+		receive.getItems().forEach(item->item.confirmAsPlaned());
+		
+		//获取库存变更集合
+		SpdDepotStockChanges stockChanges = receive.getStockChanges();
+		
+		//检查库存变更集合
+		testStockChange(stockChanges, receive, lotId1);
+		testStockChange(stockChanges, receive, lotId2);
+	}
+	
+	private void testStockChange(SpdDepotStockChanges stockChanges, SpdReceiveBiz receive, String lotId){
+		SpdDepotStockChange lotIdStockChange = stockChanges.findByDepotAndGoodsLot(receive.getToDepotId(), lotId);
+		assertNotNull(lotIdStockChange);
+		SpdBizItem lotIdItem = CollectionUtils.findWhere("lotId", lotId, receive.getItems());
+		assertEquals(lotIdItem.getPlanQtyByStoreUnit(), lotIdStockChange.getQtyByStoreUnit());
+	}
+	
+}

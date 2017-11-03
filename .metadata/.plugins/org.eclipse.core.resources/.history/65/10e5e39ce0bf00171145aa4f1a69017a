@@ -1,0 +1,13 @@
+[{
+	"taskName"    :  "定时清零仓库产品配置的未完成备货数量",
+	"className"   :  "cn.ak4j.yard.extend.scheduletask.ResetUncompletedPrepareQtyTask",
+	"schedule"    :  "0 * 0 * * *"
+},{
+	"taskName"    :  "定时检查仓库产品库存是否充足",
+	"className"   :  "cn.ak4j.yard.extend.scheduletask.DepotGoodsStockChecker",
+	"schedule"    :  "0 * 0 * * *"
+},{
+	"taskName"    :  "定时清除已完成锁库存",
+	"className"   :  "cn.ak4j.yard.extend.scheduletask.CleanShelfLockStockTask",
+	"schedule"    :  "0 * * * * *"
+}] 

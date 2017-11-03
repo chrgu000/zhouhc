@@ -1,0 +1,55 @@
+package cn.ak4j.yard.extend.gep.domain;
+
+import java.util.List;
+
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
+
+@XmlRootElement(name="Bill")
+@XmlType(propOrder = {"orgId", "srcBill", "customer", "items"})
+public class SmsInventoryOut {
+
+	private String orgId;//隶属机构
+	private String srcBill;
+	private String customer;//客户编码
+	
+	private List<SpdGepBillItem> items;
+
+	public String getOrgId() {
+		return orgId;
+	}
+
+	@XmlElement(name="FOrgID")
+	public void setOrgId(String orgId) {
+		this.orgId = orgId;
+	}
+
+	public String getSrcBill() {
+		return srcBill;
+	}
+
+	@XmlElement(name="FSrcBill")
+	public void setSrcBill(String srcBill) {
+		this.srcBill = srcBill;
+	}
+
+	public String getCustomer() {
+		return customer;
+	}
+
+	@XmlElement(name="FCustomer")
+	public void setCustomer(String customer) {
+		this.customer = customer;
+	}
+
+	public List<SpdGepBillItem> getItems() {
+		return items;
+	}
+
+	@XmlElement(name="FItem")
+	public void setItems(List<SpdGepBillItem> items) {
+		this.items = items;
+	}
+	
+}

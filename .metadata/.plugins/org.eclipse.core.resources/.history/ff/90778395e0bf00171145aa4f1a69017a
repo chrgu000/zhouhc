@@ -1,0 +1,34 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+//TODO 待删除
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SpdDepotRouteType implements ITypeEnum{
+	apply("1", "请领", ""),
+	allot("2", "调拨", ""),
+	replenish("3", "补货", ""),
+	refund("4", "退货", "");
+	
+	@Getter @Setter	private String code;
+	@Getter @Setter	private String name;
+	@Getter @Setter	private String description;
+	
+	private SpdDepotRouteType(String code,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+
+	public static SpdDepotRouteType typeOf(String code){
+		for(SpdDepotRouteType state : SpdDepotRouteType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+}

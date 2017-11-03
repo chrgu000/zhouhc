@@ -1,0 +1,202 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+
+public class YdsEdsGoodss extends Entities<YdsEdsGoods> {
+
+	private static final long serialVersionUID = -988316561952855396L;
+
+	public YdsEdsGoodss(){}
+	
+	public YdsEdsGoodss(List<YdsEdsGoods> entities){
+		super(entities);
+	}
+	
+	public YdsEdsGoods findById(String edsGoodsId){
+		return CollectionUtils.findWhere("edsGoodsId", edsGoodsId, this);
+	}
+	
+	public YdsEdsGoodss findByPage(YdsGoodss goodss, YdsEdsGoodsParams params, OrderParam order, int pageNo, int pageSize){
+		if(params != null){
+			if(params.getFormatName() != null && !params.getFormatName().isEmpty()){
+				YdsGoodsParams goodsParams = new YdsGoodsParams();
+				goodsParams.setFormatName(params.getFormatName());
+				goodss = new YdsGoodss(goodss.find(goodsParams));
+				params.setYardGoodsId(new ListParam<String>(goodss.getIds()));
+			}
+		}
+		return new YdsEdsGoodss(findByPage(params, order, pageNo, pageSize));
+	}
+	
+	/**
+	 * 确认企业产品编码存在，如不存在则抛出异常
+	 */
+	public void confirmEdsGoodsCodesExist(List<String> edsGoodsCodes){
+		if(this.size() != edsGoodsCodes.size()){
+			List<String> notExistEdsGoodsCodes = this.findNotExistEdsGoodsCodes(edsGoodsCodes);
+			String notExistEdsGoodsCodesStr = StringUtils.join(notExistEdsGoodsCodes, Global.generalSeparator);
+			throw new InvalidDataException(YardExceptionType.invalid_eds_goods_code_not_exist, notExistEdsGoodsCodesStr);
+		}
+	}
+	
+	/**
+	 * 查找当前企业产品集合中不存在于企业产品编码集合(edsGoodsCodes)中的企业产品编码
+	 */
+	public List<String> findNotExistEdsGoodsCodes(List<String> edsGoodsCodes){
+		List<String> result = new ArrayList<String>();
+		for(String edsGoodsCode : edsGoodsCodes){
+			if(!containsEdsGoodsCode(edsGoodsCode)){
+				result.add(edsGoodsCode);
+			}
+		}
+		return result;
+	}
+	
+	public boolean containsEdsGoodsCode(String edsGoodsCode){
+		boolean contained = false;
+		for(YdsEdsGoods edsGoods : this){
+			if(edsGoods.getEdsGoodsCode().equals(edsGoodsCode)){
+				contained = true;
+				break;
+			}
+		}
+		return contained;
+	}
+	
+	public YdsEdsGoodss findByOrgId(String orgId){
+		return new YdsEdsGoodss(CollectionUtils.find("ownerOrgId", orgId, this));
+	}
+	
+	public YdsEdsGoods findByEdsGoodsCode(String edsGoodsCode){
+		return CollectionUtils.findWhere("edsGoodsCode", edsGoodsCode, this);
+	}
+	
+	public YdsEdsGoodss findByEdsGoodsCodes(List<String> edsGoodsCodes){
+		YdsEdsGoodss result = new YdsEdsGoodss();
+		edsGoodsCodes.forEach(code->{
+			result.add(findByEdsGoodsCode(code));
+		});
+		return result;
+	}
+
+	public YdsEdsGoodss findByIds(List<String> ids) {
+		YdsEdsGoodss result = new YdsEdsGoodss();
+		ids.forEach(id->{
+			result.add(findById(id));
+		});
+		
+		return result;
+	}
+	
+   public void fillGoods(YdsGoodss goodss){
+	   for(YdsEdsGoods edsGoods : this){
+		   YdsGoods goods = CollectionUtils.findWhere("goodsId", edsGoods.getYardGoodsId(), goodss);
+		   edsGoods.setGoods(goods);
+	   }
+   }
+
+	public YdsEdsGoodss getDisabledEdsGoods() {
+		return new YdsEdsGoodss(CollectionUtils.find("enabled", false, Boolean.class, this));
+	}
+
+	public YdsEdsGoodss getAllDrugs() {
+		return new YdsEdsGoodss(CollectionUtils.find("edsGoodsType", YdsGoodsType.drug.getCode(), this));
+	}
+	
+	public YdsEdsGoodss getAllEquipments(){
+		return new YdsEdsGoodss(CollectionUtils.find("edsGoodsType", YdsGoodsType.equipment.getCode(), this));
+	}
+	
+	public void checkDuplicate(YdsEdsGoods edsGoods){
+		YdsEdsGoodss edsGoodss = findByOrgIdAndCode(edsGoods.getOwnerOrgId(), edsGoods.getEdsGoodsCode());
+		if(edsGoodss.size() > 0){
+			if(!edsGoodss.get(0).getEdsGoodsId().equals(edsGoods.getEdsGoodsId())){
+				throw new InvalidDataException(YardExceptionType.invalid_resource_exist, edsGoods.getEdsGoodsCode());
+			}
+		}
+	}
+	
+	/**
+	 * 查找当前企业产品的活跃的同品种企业产品，
+	 * 如果多个企业产品关联对应同一个标准产品，我们称这个多个企业产品为同品种企业产品
+	 */
+	public YdsEdsGoodss findSameSortUseableEdsGoods(YdsEdsGoods edsGoods) {
+		YdsEdsGoodsParams params = new YdsEdsGoodsParams();
+		params.setOwnerOrgId(new ListParam<String>(edsGoods.getOwnerOrgId()));
+		params.setYardGoodsId(new ListParam<String>(edsGoods.getYardGoodsId()));
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		YdsEdsGoodss edsGoodss = new YdsEdsGoodss(find(params));
+		return edsGoodss;
+	}
+
+	public YdsEdsGoodss findBySupplier(String yardGoodsId, String edsGoodsId, String ownerOrgId) {
+		YdsEdsGoodss result = new YdsEdsGoodss();
+		YdsEdsGoodss supplierEdsGoodss = new YdsEdsGoodss(CollectionUtils.find("ownerOrgId", ownerOrgId, 
+								CollectionUtils.find("yardGoodsId", yardGoodsId, this)));
+		
+		supplierEdsGoodss.forEach(edsGoods->{
+			if(!edsGoods.getEdsGoodsId().equals(edsGoodsId)){
+				result.add(edsGoods);
+			}
+		});
+		
+		return result;
+	}
+	
+	public YdsEdsGoodss findByButtingCode(String orgId, String yardGoodsId){
+		YdsEdsGoodsParams params = new YdsEdsGoodsParams();
+		params.setOwnerOrgId(new ListParam<String>(orgId));
+		params.setYardGoodsId(new ListParam<String>(yardGoodsId));
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		
+		return new YdsEdsGoodss(find(params));
+	}
+
+	public YdsEdsGoodss findByOrgIdAndCode(String ownerOrgId, String edsGoodsCode) {
+		return new YdsEdsGoodss(CollectionUtils.find("edsGoodsCode", edsGoodsCode, CollectionUtils.find("ownerOrgId", ownerOrgId, this)));
+	}
+
+	public YdsEdsGoodss findByGoodsId(String goodsId) {
+		return new YdsEdsGoodss(CollectionUtils.find("yardGoodsId", goodsId, this));
+	}
+
+	/**
+	 * 根据标准产品Id和所属机构Id查找启用并且已提交的企业产品
+	 */
+	public YdsEdsGoodss findSupplierUseabledWithGoodsIds(List<String> goodsIds, String orgId) {
+		YdsEdsGoodsParams params = new YdsEdsGoodsParams();
+		params.setOwnerOrgId(new ListParam<String>(orgId));
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		params.setYardGoodsId(new ListParam<String>(goodsIds));
+		return new YdsEdsGoodss(find(params));
+	}
+
+	
+	public YdsEdsGoods findUseableByGoodsId(String goodsId) {
+		YdsEdsGoodsParams params = new YdsEdsGoodsParams();
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		params.setYardGoodsId(new ListParam<String>(goodsId));
+		YdsEdsGoodss edsGoodss = new YdsEdsGoodss(find(params));
+		return CollectionUtils.isNotEmpty(edsGoodss)?edsGoodss.get(0):null;
+	}
+
+}

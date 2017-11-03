@@ -1,0 +1,49 @@
+package cn.ak4j.yard.sys.factory;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.annotation.PostConstruct;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.enums.YardBatchTaskType;
+import cn.ak4j.yard.sys.service.taskprocessor.CreateDeliveryOrderTaskProcessor;
+import cn.ak4j.yard.sys.service.taskprocessor.IBatchTaskProcessor;
+import cn.ak4j.yard.sys.service.taskprocessor.ImportDepotCardsTaskProcessor;
+import cn.ak4j.yard.sys.service.taskprocessor.ImportEdsGoodsLotTaskProcessor;
+import cn.ak4j.yard.sys.service.taskprocessor.ImportGoodsLotTaskProcessor;
+import cn.ak4j.yard.sys.service.taskprocessor.ImportInitialEndingTaskProcessor;
+import cn.ak4j.yard.sys.service.taskprocessor.ImportInitialStockTaskProcessor;
+import cn.ak4j.yard.sys.service.taskprocessor.ImportPrepareInformItemTaskProcessor;
+
+@Component
+public class YardBatchTaskProcessorFactory {
+
+	@Autowired private CreateDeliveryOrderTaskProcessor cdotProcessor;
+	@Autowired private ImportDepotCardsTaskProcessor idctProcessor;
+	@Autowired private ImportEdsGoodsLotTaskProcessor iegltProcessor;
+	@Autowired private ImportGoodsLotTaskProcessor igltProcessor;
+	@Autowired private ImportInitialStockTaskProcessor iistProcessor;
+	@Autowired private ImportInitialEndingTaskProcessor iietProcessor;
+	@Autowired private ImportPrepareInformItemTaskProcessor ipiitProcessor;
+	
+	private Map<YardBatchTaskType, IBatchTaskProcessor> batchTaskTypes = new HashMap<YardBatchTaskType, IBatchTaskProcessor> ();
+	
+	@PostConstruct
+	public void init(){
+		batchTaskTypes.put(YardBatchTaskType.batch_create_delivery_order_task, cdotProcessor);
+		batchTaskTypes.put(YardBatchTaskType.batch_import_depot_cards_task, idctProcessor);
+		batchTaskTypes.put(YardBatchTaskType.batch_import_eds_goods_lot_task, iegltProcessor);
+		batchTaskTypes.put(YardBatchTaskType.batch_import_goods_lot_task, igltProcessor);
+		batchTaskTypes.put(YardBatchTaskType.batch_import_initial_ending_task, iietProcessor);
+		batchTaskTypes.put(YardBatchTaskType.batch_import_initial_stock_task, iistProcessor);
+		batchTaskTypes.put(YardBatchTaskType.batch_import_prepare_inform_item_task, ipiitProcessor);
+	}
+	
+	public IBatchTaskProcessor getBatchTaskProcessor(YardBatchTaskType batchTaskType){
+		return batchTaskTypes.get(batchTaskType);
+	}
+	
+}

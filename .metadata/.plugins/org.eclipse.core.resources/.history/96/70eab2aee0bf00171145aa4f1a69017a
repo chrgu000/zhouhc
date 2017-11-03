@@ -1,0 +1,56 @@
+package cn.ak4j.yard.amqp;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Ignore
+public class NotifyMsgBuilderTest extends BaseTest{
+
+	@Autowired private MGProxy mgProxy;
+	@Autowired private NotifyMsgBuilder notifyMsgBuilder;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdReceiveBizService rbService;
+	@Autowired private SpdDepotCardRepository cardRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	
+	@Test public void testSendEmail(){
+		mgProxy.sendMail(new MailMsg("test email title", "test email content", "wuyw@1ycloud.net"));
+	}
+	
+	@Test public void testBuildConfirmReceiveNotifyEmail(){
+		String bizId  = "rece_biz_id_013";
+		SpdReceiveBiz receive = rbService.getFullReceive(bizId);
+		MailMsg mail = notifyMsgBuilder.buildConfirmReceiveNotifyEmail(receive);
+		mgProxy.sendMail(mail);
+	}
+	
+	
+	@Test public void testBuildAutoCreateDepotCardEmail(){
+		String goodsId = "goods_id_001";
+		YdsGoods goods = goodsRepository.findAll().findById(goodsId);
+//		PcsDepots centralDepots = depotRepository.findAll().getAllCentralDepots(); 
+//		PcsDepots noncentralDepots = depotRepository.findAll().getAllNoncentralDepots();
+		PcsDepots depots = depotRepository.findAll();
+		List<String> goodsIds = new ArrayList<String>();
+		goodsIds.add(goodsId);
+		SpdDepotCards depotCards = cardRepository.findAll().findEnableCardByGoodsIds(goodsIds);
+		MailMsg notifyEmail = notifyMsgBuilder.buildAutoCreateDepotCardEmail(goods, depotCards, depots);
+		mgProxy.sendMail(notifyEmail);
+	}
+}

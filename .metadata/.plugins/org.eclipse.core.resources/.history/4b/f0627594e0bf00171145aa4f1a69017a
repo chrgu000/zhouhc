@@ -1,0 +1,66 @@
+package cn.ak4j.yard.spd.supply.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class SpdDeliveryOrders extends ArrayList<SpdDeliveryOrder>{
+
+	private static final long serialVersionUID = 498070704496993116L;
+
+	public SpdDeliveryOrderItems getAllItems() {
+		SpdDeliveryOrderItems items = new SpdDeliveryOrderItems();
+		this.forEach(order->{
+			items.addAll(order.getItems());
+		});
+		return items;
+	}
+
+	public YdsEdsGoodsLots parseAllEdsGoodsLots(PcsUser user, YdsEdsGoodss edsGoodss) {
+		YdsEdsGoodsLots edsGoodsLots = new YdsEdsGoodsLots();
+		List<SpdDeliveryOrderItem> orderItems = getAllItems();
+		orderItems.forEach(orderItem->{
+			YdsEdsGoodsLot newEdsGoodsLot = orderItem.buildEdsGoodsLot(edsGoodss, user);
+			orderItem.setEdsGoodsLot(newEdsGoodsLot);
+			if(!edsGoodsLots.containedEdsLotNo(newEdsGoodsLot.getEdsLotNo(), newEdsGoodsLot.getEdsGoodsId())){
+				edsGoodsLots.add(newEdsGoodsLot);
+			}
+		});
+		return edsGoodsLots;
+	}
+
+	public SpdDeliveryOrderItems whichItemNotSameUnitName(YdsEdsGoodss edsGoodss) {
+		SpdDeliveryOrderItems notSameUnitNameItems = new SpdDeliveryOrderItems();
+		SpdDeliveryOrderItems orderItems = getAllItems();
+		orderItems.forEach(orderItem->{
+			YdsEdsGoods edsGoods = CollectionUtils.findWhere("edsGoodsCode", orderItem.getEdsGoodsCode(), edsGoodss);
+			if(!edsGoods.getDeliveryUnitName().equals(orderItem.getUnitName())){
+				log.warn("企业产品:{},企业产品送货单位:{}, 送货单里的单位:{},单位不一致！", edsGoods.getEdsGoodsCode(), edsGoods.getDeliveryUnitName(), orderItem.getUnitName());
+				notSameUnitNameItems.add(orderItem);
+			}
+		});
+		return notSameUnitNameItems;
+	}
+
+	public void fillDepots(PcsDepotRepository depotRepository) {
+		List<String> depotIds = CollectionUtils.pluck("depotId", this);
+		PcsDepots depots = depotRepository.findAll().findByIds(depotIds);
+		this.forEach(order->{
+			PcsDepot depot = CollectionUtils.findWhere("depotId", order.getDepotId(), depots);
+			order.setDepot(depot);
+		});
+
+	}
+	
+}

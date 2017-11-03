@@ -1,0 +1,71 @@
+package cn.ak4j.yard.spd.task.factory;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfLockStockRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdDepotTaskFactoryOneItemPerBlockTest extends BaseTest{
+
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	@Autowired private SpdDepotTaskFactoryOneItemPerBlock depotTaskFactory;
+	@Autowired private SpdShelfLockStockRepository slsRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	@SuppressWarnings("unchecked")
+	@Test public void testBuildFromDispatcher(){
+		String dispatcherId = "disp_id_006";
+		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+		
+		SpdDepotTasks depotTasks = depotTaskFactory.buildFromDispatcher(dispatcher);
+		
+		assertEquals(1, depotTasks.size());
+		
+		SpdDepotTask depotTask = depotTasks.get(0);
+		depotTask.getItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		SpdOffShelfTaskItems items = new SpdOffShelfTaskItems(depotTask.getItems());
+		List<String> lotIds = items.pluck("lotId");
+		
+		SpdShelfLockStocks lockStocks = slsRepository.findByBizId(depotTask.getBizId());
+		SpdShelfStocks shelfStocks =  ssRepository.findByShelfTypeAndGoodsLots(depotTask.getTaskDepotId(), PcsAreaType.normal.getCode(), lotIds);
+		lockStocks.fillShelfStocks(shelfStocks);
+		
+		lockStocks.forEach(lockStock->{
+			SpdOffShelfTaskItems theItems = new SpdOffShelfTaskItems(CollectionUtils.find("lotId", lockStock.getShelfStock().getLotId(), depotTask.getItems()));
+		    assertEquals(lockStock.getQtyByMinUnit().intValue(), getTotalPlanQtyByMinUnit(theItems));
+		});
+	}
+	
+	private int getTotalPlanQtyByMinUnit(SpdOffShelfTaskItems items){
+		int minUnitRatio = 1;
+		int TotalPlanQtyByMinUnit = 0;
+		for(SpdOffShelfTaskItem item : items){
+			minUnitRatio = (int)SpdUnitUtils.computeUnitExchangeRatio(item.getGoods(), item.getGoods().getStoreUnitLv(), YdsUnitLv.base.getLv());
+			TotalPlanQtyByMinUnit+=item.getPlanQty().intValue()*minUnitRatio;
+		}
+		
+		return TotalPlanQtyByMinUnit;
+	}
+}

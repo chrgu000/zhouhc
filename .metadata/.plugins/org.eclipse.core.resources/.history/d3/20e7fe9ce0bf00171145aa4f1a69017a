@@ -1,0 +1,3 @@
+alter table spd_fin_rec_rule add(begining_from_rule_id varchar2(500));
+alter table spd_fin_rec_biz add(ending_balance number(16,4));
+alter table spd_fin_rec_biz add(next_rec_id varchar2(32));

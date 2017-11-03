@@ -1,0 +1,27 @@
+package cn.ak4j.yard.spd.utils;
+
+public class ProcedureResult {
+	String flg;
+	String errMsg;
+	String errSql;
+	public String getFlg() {
+		return flg;
+	}
+	public void setFlg(String flg) {
+		this.flg = flg;
+	}
+	public String getErrMsg() {
+		return errMsg;
+	}
+	public void setErrMsg(String errMsg) {
+		this.errMsg = errMsg;
+	}
+	public String getErrSql() {
+		return errSql;
+	}
+	public void setErrSql(String errSql) {
+		this.errSql = errSql;
+	}
+	
+
+}

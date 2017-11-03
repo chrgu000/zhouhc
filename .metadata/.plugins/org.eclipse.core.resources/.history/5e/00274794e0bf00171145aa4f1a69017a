@@ -1,0 +1,88 @@
+package cn.ak4j.yard.spd.wrapper.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Inheritance;
+import javax.persistence.InheritanceType;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.enums.SpdWrapperType;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.domain.YardCodeParser;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 所有包装物的抽象父类
+* @author zhengyf
+* @date 2017年7月13日 上午11:40:57
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity
+@Inheritance(strategy=InheritanceType.TABLE_PER_CLASS) 
+public abstract class SpdAbstractWrapper extends YardMaintenceEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	private String id;
+	
+	private String wrapperNo;
+	
+	@Transient @JsonIgnore
+	private SpdWrapperType wrapperType = SpdWrapperType.turnover_box;
+	
+	private String sceneCode = SpdSceneType.idle.getCode();
+	
+	private String ownerId;
+	
+	@Transient @JsonIgnore private SpdWrapperItems items;
+
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Transient private final String stateFlow = StateFlowTemplates.statesFlow_n_c;
+	
+	@Transient private YardArbitraryCode sysCode;
+	
+	@Embedded
+	private MaintenanceInfo maintenanceInfo; 
+	
+	public abstract void putIn(SpdIWrappable wrapperItem);
+	
+	public abstract void getOut(SpdIWrappable wrapperItem); 
+	
+	public SpdSceneType getSceneType(){
+		return SpdSceneType.typeOf(sceneCode);
+	}
+
+	public YardArbitraryCode getSysCode(){
+		return YardCodeParser.parseArbitraryCode(getWrapperNo());
+	}
+
+	/**
+	 * 清除所有的包装明细
+	 */
+	public void clean() {
+		if(CollectionUtils.isEmpty(items)){
+			return ;
+		}
+		items.clear();
+	}
+	
+}

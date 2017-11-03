@@ -1,0 +1,216 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdConsumeBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdConsumeBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdConsumeRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SpdConsumeBizService extends IYardService<SpdConsumeBiz>{
+
+	@Autowired private YardCodeService codeService;
+	@Autowired private RabbitProxy rabbitProxy;	
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdConsumeBizRepository cbRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+
+	@Override @Transactional
+	public SpdConsumeBiz add(SpdConsumeBiz consume, IUser user) {
+		SpdConsumeRule rule = (SpdConsumeRule)brRepository.findAllWithRelations().findById(consume.getBizRuleId());
+		if(rule == null){
+			throw new NotFoundException(YardExceptionType.not_found_consume_rule, consume.getBizRuleId());
+		}
+		PcsUser createUser = consume.determinCreateUser(rule, (PcsUser)user, userRepository.findAll());
+		consume.setMaintenanceInfo(new MaintenanceInfo(createUser));
+		consume.applyRule(rule, createUser);
+		
+		if(!consume.isValid()){
+			throw new InvalidDataException(consume.getValidateMsg());
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(consume.getBizId(), null, createUser.getUserId(), AmqpMsgType.CREATE_CONSUME_BIZ);
+            }
+		});
+		
+		String bizCode = codeService.publishCode(CodeSort.xiaohaodan).getCode();
+		consume.setBizCode(bizCode);
+		
+		cbRepository.saveWithItems(consume);
+		return consume;
+	}
+
+	@Override
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+	
+	@Override @Transactional
+	public SpdConsumeBiz modify(SpdConsumeBiz consume, IUser user) {
+		SpdConsumeBiz consumePO = cbRepository.findOne(consume.getBizId());
+		consumePO.update(consume, user.getOrgId(), user.getUserId());
+		consumePO = cbRepository.save(consumePO);
+		return consumePO;
+	}
+
+	@Override  @Transactional
+	public SpdConsumeBiz updateCheckState(String bizId, int checkStateCode, Date lastUpdateTime, IUser user) {
+		SpdConsumeBiz consume = cbRepository.getWithItems(bizId);
+		fillAllRelations(consume);
+		if(checkStateCode == CheckState.reviewed.getCode()){
+			return reviewConsume(consume, lastUpdateTime, user);
+		}
+		throw new OperateFailException(YardExceptionType.forbide_update_check_state, consume.getCheckState().getName(), CheckState.stateOf(checkStateCode).getName());
+	}
+	
+	@Transactional public SpdConsumeBiz reviewConsume(SpdConsumeBiz consume, Date lastUpdateTime, IUser user) {
+		if(!consume.hasItems()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("消耗业务[%s]", consume.getBizCode()));
+		}
+		
+		if(!consume.getItems().isAllConfirmed()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("消耗业务[%s]", consume.getBizCode()));
+		}
+		
+		List<SpdGoodsQty> prepareQtyByStoreUnit = consume.getItems().getConfirmGoodsQtysByStoreUnit();
+		List<SpdGoodsQty> realQtyByStoreUnit = dsService.findRealShelfStoreUnitStocks(consume.getDepotId(), consume.getAreaType(), prepareQtyByStoreUnit);
+		
+		//根据实际可用产品数量更新申领明细的确认数量，防止在确认数量输入之后库存有变更
+		consume.getItems().verifyConfirmQtyWithRealQty(realQtyByStoreUnit);
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(consume.getBizId(), null, user.getUserId(), AmqpMsgType.REVIEW_CONSUME_BIZ);
+            }
+		});
+		
+		//根据实际可用产品数量增加货位预备库存/锁库存
+		consume.getDepot().fillCards(dcRepository);
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges(consume.getDepot(), consume.getAreaType(), realQtyByStoreUnit);
+		dsService.scheduleDecrementShelfStocks(stockChanges, consume.getBizId());
+		
+		consume.updateCheckState(CheckState.reviewed.getCode(), lastUpdateTime, user.getOrgId(), user.getUserId());
+		cbRepository.save(consume);
+		log.info("审核消耗, 仓库:{}, 单号:{}", consume.getDepot().getDepotName(), consume.getBizCode());
+		return consume;
+	}
+
+	@Transactional public SpdConsumeBiz completeConsume(SpdConsumeBiz consume, PcsUser user) {
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(consume.getBizId(), null, user.getUserId(), AmqpMsgType.COMPLETE_CONSUME_BIZ);
+            }
+		});
+		
+		//完成库存扣减
+		SpdDepotStockChanges depotStockChanges = consume.getStockChanges();
+		depotStockChanges.setToNegativeQty();
+		depotStockChanges.forEach(change->change.setDepot(consume.getDepot()));
+		dsService.updateDepotStocks(depotStockChanges);
+		
+		consume.updateCheckState(CheckState.completed.getCode(), consume.getLastUpdateTime(), user.getOrgId(), user.getUserId());
+		cbRepository.save(consume);
+		return consume;
+	}
+	
+	public void fillAllRelations(SpdConsumeBiz consume) {
+		SpdConsumeRule rule = (SpdConsumeRule)brRepository.findAllWithRelations().findById(consume.getBizRuleId());
+		consume.setBizRule(rule);
+		
+		SpdBizItems bizItems = biRepository.findByBizId(consume.getBizId());
+		consume.setItems(bizItems);
+		consume.getItems().fillGoods(goodsRepository);
+		
+		SpdDepotTasks depotTasks = dtRepository.findWithItemsByBizId(consume.getBizId());
+		if(CollectionUtils.isNotEmpty(depotTasks)){
+			consume.setOffShelfTask(depotTasks.get(0));
+		}
+	}
+
+	public SpdConsumeBizs findUncompleteConsumes(PcsUser user, SpdConsumeBizParams params, OrderParam order, int pageNo,
+			int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.size() <= 0){
+			return new SpdConsumeBizs();
+		}
+		
+		params.setDepotId(new ListParam<String>(depots.getIds()));
+		if(params.getCheckStateCode() == null || params.getCheckStateCode().isEmpty()){
+			List<Integer> checkSateCodes = new ArrayList<Integer>();
+			checkSateCodes.add(CheckState.new_created.getCode());
+			checkSateCodes.add(CheckState.commited.getCode());
+			params.setCheckStateCode(new ListParam<Integer>(checkSateCodes));
+		}
+		
+		return cbRepository.find(params, order, pageNo, pageSize);
+	}
+
+	public SpdConsumeBizs findCompletedConsumes(PcsUser user, SpdConsumeBizParams params, OrderParam order, int pageNo,
+			int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.size() <= 0){
+			return new SpdConsumeBizs();
+		}
+		
+		params.setDepotId(new ListParam<String>(depots.getIds()));
+		
+		List<Integer> checkSateCodes = new ArrayList<Integer>();
+		checkSateCodes.add(CheckState.reviewed.getCode());
+		checkSateCodes.add(CheckState.completed.getCode());
+		params.setCheckStateCode(new ListParam<Integer>(checkSateCodes));
+		
+		return cbRepository.find(params, order, pageNo, pageSize);
+	}
+	
+}

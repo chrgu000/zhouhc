@@ -1,0 +1,1 @@
+update pcs_user set primary='0';

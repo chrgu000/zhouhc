@@ -1,0 +1,63 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 备货反馈规则
+* @author zhengyf
+* @date 2017年7月21日 上午8:20:24
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity  
+@DiscriminatorValue("prepare_inform") 
+public class SpdPrepareInformFeedbackRule extends SpdAbstractFeedbackRule{
+
+	public Boolean autoCommitPrepareInform;
+	
+	public Boolean autoReviewPrepareInform;
+	
+	public Boolean autoInformSupplier;
+	
+	/**
+	 * 备货通知到达后自动将备货通知置为完成状态
+	 */
+	private Boolean autoCompletePrepareInform;
+	
+	@Transient private String description;
+	
+	@Override
+	public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			buf.append(autoCommitPrepareInform?auto_word:manual_word)
+			 	.append("提交备货通知").append(Global.generalSeparator)
+			 	.append(autoReviewPrepareInform?auto_word:manual_word)
+			 	.append("审核备货通知").append(Global.generalSeparator)
+			 	.append(autoInformSupplier?auto_word:manual_word)
+			 	.append("通知供应商").append(Global.generalSeparator)
+			 	.append(autoCompletePrepareInform?auto_word:manual_word)
+			 	.append("完成备货通知").append(Global.generalSeparator);
+			return this.description = buf.toString();
+		}
+		return description;
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.prepare_inform_biz;
+	}
+	
+}

@@ -1,0 +1,60 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import java.util.Date;
+
+import javax.persistence.DiscriminatorColumn;
+import javax.persistence.DiscriminatorType;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Inheritance;
+import javax.persistence.InheritanceType;
+import javax.persistence.Table;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.IDescribable;
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.IChildRule;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 业务反馈规则
+* @author zhengyf
+* @date 2017年6月14日 上午11:20:11
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity
+@Table(name="spd_feedback_rule")
+@Inheritance(strategy=InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name="biz_type", discriminatorType=DiscriminatorType.STRING)
+@JsonIgnoreProperties(ignoreUnknown=true)
+@NoArgsConstructor
+public abstract class SpdAbstractFeedbackRule extends YardEntity implements IDescribable, IChildRule{
+
+	protected static final String auto_word = "自动";
+	protected static final String manual_word = "手动";
+
+	@Id	
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	private String id;
+	
+	private Date createTime;
+	
+	private Date lastUpdateTime;
+	
+	private String name;
+
+	public abstract SpdBizType getBizType();
+}

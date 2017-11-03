@@ -1,0 +1,90 @@
+package cn.ak4j.yard.sys.service.taskprocessor;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.sys.to.YdsGoodsLotImportTO;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import cn.ak4j.yard.yds.service.YdsGoodsLotService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class ImportGoodsLotTaskProcessor implements IBatchTaskProcessor{
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsLotService glService;
+	
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public void process(YardBatchTask batchTask, PcsUser user, MailMsg hisMail, MailMsg supplyMail) throws Exception {
+		String json = batchTask.getJson();
+		YardBatchTaskTO<List<YdsGoodsLotImportTO>> importGoodsLotTaskTO = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTaskTO<List<YdsGoodsLotImportTO>>>(){});
+		batchTask.setData(importGoodsLotTaskTO.getData());
+		
+		List<YdsGoodsLotImportTO> goodsLotTOs = (List<YdsGoodsLotImportTO>) batchTask.getData();
+		List<YdsGoodsLotImportTO> withoutGoodsLotTOs = new ArrayList<YdsGoodsLotImportTO>();
+		
+		List<String> goodsCodes = CollectionUtils.pluck("goodsCode", goodsLotTOs);
+		YdsGoodsParams goodsParams = new YdsGoodsParams();
+		goodsParams.setGoodsCode(new ListParam<String>(goodsCodes));
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams));
+		
+		for(YdsGoodsLotImportTO goodsLotTO : goodsLotTOs){
+			YdsGoods exsitGoods = goodss.findByGoodsCode(goodsLotTO.getGoodsCode());
+			if(exsitGoods == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_goods, "标准产品编码:"+goodsLotTO.getGoodsCode());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			YdsGoodsLot exsitGoodsLot = glRepository.findAll().findByGoodsLotNoAndGoodsId(goodsLotTO.getLotNo(), exsitGoods.getGoodsId());
+			if(exsitGoodsLot == null){
+				withoutGoodsLotTOs.add(goodsLotTO);
+			}else{
+				log.info(String.format("标准产品[%s:%s]的标准产品批次号[%s]已存在", goodsLotTO.getGoodsCode(), goodsLotTO.getGoodsName(), goodsLotTO.getLotNo()));
+			}
+		}
+		log.info("处理导入标准产品批次, 共{}个", withoutGoodsLotTOs.size());
+		
+		int i = 0;
+		for(YdsGoodsLotImportTO goodsLotTO : withoutGoodsLotTOs){
+			log.info("{}] 导入标准产品批次, lotNo: {}, goodsCode: {}", i, goodsLotTO.getLotNo(), goodsLotTO.getGoodsCode());
+			
+			YdsGoods goods = goodss.findByGoodsCode(goodsLotTO.getGoodsCode());
+			YdsGoodsLot goodsLot = new YdsGoodsLot();
+			goodsLot.setGoodsId(goods.getGoodsId());
+			goodsLot.setLotNo(goodsLotTO.getLotNo());
+			goodsLot.setProduceDate(goodsLotTO.getProduceDate());
+			goodsLot.setLotValidity(goodsLotTO.getLotValidity());
+			goodsLot.setSterilizeLotNo(goodsLotTO.getSterilizeLotNo());
+			goodsLot.setSterilizeTime(goodsLotTO.getSterilizeTime());
+			goodsLot.setEnabled(true);
+			goodsLot.setMaintenanceInfo(new MaintenanceInfo(user));
+			glService.add(goodsLot, user);
+			
+			i++;
+		}
+	}
+	
+}

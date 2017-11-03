@@ -1,0 +1,217 @@
+package cn.ak4j.yard.spd.reconciliation.repository;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.DateRange;
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItems;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRecordParams;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Repository
+public class SpdPropertyChangeRecordRepository extends BaseRepository<SpdPropertyChangeRecord, SpdPropertyChangeRecords, SpdPropertyChangeRecordParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private SpdPropertyChangeRecordItemRepository recordItemRepository;
+	@Autowired private SpdPropertyChangeRelationItemRepository relationItemRepository;
+	
+	public SpdPropertyChangeRecords find(SpdPropertyChangeRecordParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			return new SpdPropertyChangeRecords(doQuery(params, order, pageNo, pageSize));
+		}
+		
+		return new SpdPropertyChangeRecords();
+	}
+
+	@SuppressWarnings("unchecked")
+	public SpdPropertyChangeRecords findWithRelationItemsByDailyCleanIds(List<String> ids) {
+		SpdPropertyChangeRecordParams params = new SpdPropertyChangeRecordParams();
+		params.setDailyCleanId(new ListParam<String>(ids));
+		SpdPropertyChangeRecords records = find(params);
+		
+		SpdPropertyChangeRecordItems recordItems = recordItemRepository.findByRecordIds(records.getIds());
+		log.debug("共找到[{}]条物权变更记录明细", recordItems.size());
+		records.fillItems(recordItems);
+		
+		SpdPropertyChangeRelationItems relationItems = relationItemRepository.findByChangeItems(recordItems.getIds());
+		log.debug("共找到[{}]条物权变更关联明细", relationItems.size());
+		recordItems.fillItems(relationItems);
+		
+		return records;
+	}
+
+	public SpdPropertyChangeRecords findByDailyCleanId(String bizId) {
+		SpdPropertyChangeRecordParams params = new SpdPropertyChangeRecordParams();
+		params.setDailyCleanId(new ListParam<String>(bizId));
+		SpdPropertyChangeRecords records = find(params);
+		return records;
+	}
+	
+	private StringBuffer appendHqlConditionByDeptAndDepotIdsAndRuleIds(StringBuffer buffer, String deptId, List<String> depotIds, List<String> ruleIds){
+		String depotIdCondition = "";
+		if(CollectionUtils.isNotEmpty(depotIds)){
+			depotIdCondition = "'"+StringUtils.join(depotIds.iterator(), "','")+"'";
+		}
+		buffer.append(" where (");
+		buffer.append("spdPropertyChangeRecord.debitDeptId='%s' ");
+		buffer.append("or spdPropertyChangeRecord.creditDeptId='%s' ");
+		if(CollectionUtils.isNotEmpty(depotIds)){
+			buffer.append(String.format("or spdPropertyChangeRecord.debitDepotId in(%s) ", depotIdCondition));
+			buffer.append(String.format("or spdPropertyChangeRecord.creditDepotId in(%s) ", depotIdCondition));
+		}
+		if(CollectionUtils.isNotEmpty(ruleIds)){
+			String ruleIdsStr = "'"+StringUtils.join(ruleIds.iterator(), "','")+"'";
+			buffer.append(String.format("or spdPropertyChangeRecord.propertyChangeRuleId in(%s) ", ruleIdsStr));
+		}
+		buffer.append(")");
+		return buffer;
+	}
+
+	public SpdPropertyChangeRecords findByDeptOrDepots(String deptId, List<String> depotIds, List<String> ruleIds, SpdPropertyChangeRecordParams params, OrderParam order, int pageNo, int pageSize) {
+		StringBuffer buffer = new StringBuffer("from SpdPropertyChangeRecord spdPropertyChangeRecord");
+		appendHqlConditionByDeptAndDepotIdsAndRuleIds(buffer, deptId, depotIds, ruleIds);
+		
+		String hql = buffer.toString();
+		hql = String.format(hql, deptId, deptId);
+		if(setRelationParams(params)){
+			return new SpdPropertyChangeRecords(doQuery(hql, params, order, pageNo, pageSize));
+		}
+		
+		return new SpdPropertyChangeRecords();
+	}
+	
+	public int countByDeptOrDepots(String deptId, List<String> depotIds, List<String> ruleIds, SpdPropertyChangeRecordParams params) {
+		StringBuffer buffer = new StringBuffer("select count(*) from SpdPropertyChangeRecord spdPropertyChangeRecord");
+		appendHqlConditionByDeptAndDepotIdsAndRuleIds(buffer, deptId, depotIds, ruleIds);
+		
+		String hql = buffer.toString();
+		hql = String.format(hql, deptId, deptId);
+		if(setRelationParams(params)){
+			int count = count(hql, params);
+			return count;
+		}
+		
+		return 0;
+	}
+	
+	public int count(SpdPropertyChangeRecordParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+
+	
+	public SpdPropertyChangeRecords findByRulesAndTargetDate(List<String> ruleIds, Date start, Date end) {
+		String hql = "from SpdPropertyChangeRecord spdPropertyChangeRecord where spdPropertyChangeRecord.dailyCleanId is null";
+		SpdPropertyChangeRecordParams params = new SpdPropertyChangeRecordParams();
+		params.setTargetDate(new DateRangeParam(new DateRange(start, end)));
+		params.setPropertyChangeRuleId(new ListParam<String>(ruleIds));
+		SpdPropertyChangeRecords changeRecords = find(hql, params, new OrderParam(), -1, -1);
+
+		return changeRecords;
+	}
+	
+	private boolean setRelationParams(SpdPropertyChangeRecordParams params) {
+		if(params != null) {
+			PcsOrgParams creditOrgParams = new PcsOrgParams();
+			creditOrgParams.setOrgName(params.getCreditOrgName());
+			creditOrgParams.setOrgId(params.getCreditOrgId());
+			if(creditOrgParams.isNotEmpty()){
+				PcsOrgs orgs = new PcsOrgs(orgRepository.findAll().find(creditOrgParams));
+				if(CollectionUtils.isEmpty(orgs)){
+					return false;
+				}
+				
+				params.setCreditOrgId(new ListParam<String>(orgs.getIds()));
+			}
+			
+			PcsOrgParams debitOrgParams = new PcsOrgParams();
+			debitOrgParams.setOrgName(params.getDebitOrgName());
+			debitOrgParams.setOrgId(params.getDebitOrgId());
+			if(debitOrgParams.isNotEmpty()){
+				PcsOrgs orgs = new PcsOrgs(orgRepository.findAll().find(debitOrgParams));
+				if(CollectionUtils.isEmpty(orgs)){
+					return false;
+				}
+				params.setDebitOrgId(new ListParam<String>(orgs.getIds()));
+			}
+			
+			PcsDeptParams creditDeptParams = new PcsDeptParams();
+			creditDeptParams.setDeptName(params.getCreditDeptName());
+			creditDeptParams.setDeptId(params.getCreditDeptId());
+			if(creditDeptParams.isNotEmpty()){
+				PcsDepts depts = new PcsDepts(deptRepository.findAll().find(creditDeptParams));
+				if(CollectionUtils.isEmpty(depts)){
+					return false;
+				}
+				
+				params.setCreditDeptId(new ListParam<String>(depts.getIds()));
+			}
+			
+			PcsDeptParams debitDeptParams = new PcsDeptParams();
+			debitDeptParams.setDeptName(params.getDebitDeptName());
+			debitDeptParams.setDeptId(params.getDebitDeptId());
+			if(debitDeptParams.isNotEmpty()){
+				PcsDepts depts = new PcsDepts(deptRepository.findAll().find(debitDeptParams));
+				if(CollectionUtils.isEmpty(depts)){
+					return false;
+				}
+				
+				params.setDebitDeptId(new ListParam<String>(depts.getIds()));
+			}
+			
+			PcsDepotParams debitDepotParams = new PcsDepotParams();
+			debitDepotParams.setDepotName(params.getDebitDepotName());
+			debitDepotParams.setDepotId(params.getDebitDepotId());
+			if(debitDepotParams.isNotEmpty()){
+				PcsDepots depots = new PcsDepots(depotRepository.findAll().find(debitDepotParams));
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				params.setDebitDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			PcsDepotParams creditDepotParams = new PcsDepotParams();
+			creditDepotParams.setDepotName(params.getCreditDepotName());
+			creditDepotParams.setDepotId(params.getCreditDepotId());
+			if(creditDepotParams.isNotEmpty()){
+				PcsDepots depots = new PcsDepots(depotRepository.findAll().find(creditDepotParams));
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				params.setCreditDepotId(new ListParam<String>(depots.getIds()));
+			}
+		}
+		return true;
+	}
+	
+}

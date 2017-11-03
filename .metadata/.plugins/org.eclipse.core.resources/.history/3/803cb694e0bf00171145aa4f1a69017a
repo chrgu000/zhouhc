@@ -1,0 +1,223 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.enums.SpdDealPriceStratage;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 物权变更规则
+* @author zhengyf
+* @date 2017年8月8日 下午8:02:18
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_property_change_rule")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdPropertyChangeRule extends YardEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String id;
+	
+	@Getter @Setter
+	private String ruleCode;
+	
+	@Getter @Setter @NotNull(message="名称不能为空") 
+	private String name;
+	
+	@Getter @Setter
+	private String customName;
+	
+	//借入机构id
+	@Getter @Setter @NotNull(message="借入机构不能为空") 
+	private String debitOrgId;
+	
+	@Getter @Setter @NotNull(message="借入部门不能为空")
+	private String debitDeptId;
+	
+	@Getter @Setter
+	private String debitDepotId;
+	
+	//贷出机构id
+	@Getter @Setter @NotNull(message="贷出机构不能为空")
+	private String creditOrgId;
+	
+	@Getter @Setter @NotNull(message="贷出部门不能为空")
+	private String creditDeptId;
+	
+	@Getter @Setter
+	private String creditDepotId;
+
+	@Getter @Setter @NotNull(message="业务类型编码不能为空")
+	private String bizTypeCode;
+	
+	@Getter @Setter @NotNull(message="关联业务规则不能为空")
+	private String bizRuleId;
+
+	@Getter @Setter @NotNull(message="触发步骤编码不能为空")
+	private String triggerStepCode;
+
+	@Getter @Setter @NotNull(message="是否启用不能为空")
+	private Boolean enabled;
+	
+	@Getter @Setter @NotNull(message="交易价格策略不能为空")
+	private String dealPriceStratageCode;
+	
+	@Getter @Setter
+	private Date createTime = new Date();
+	
+	@Getter @Setter
+	private Date lastUpdateTime = new Date();
+	
+	@Transient @Getter @Setter
+	private PcsDept debitDept;
+	
+	@Transient @Getter @Setter
+	private PcsDept creditDept;
+	
+	@Transient @Getter @Setter
+	private PcsDepot debitDepot;
+	
+	@Transient @Getter @Setter
+	private PcsDepot creditDepot;
+	
+	@Transient @Getter @Setter
+	private PcsOrg debitOrg;
+	
+	@Transient @Getter @Setter
+	private PcsOrg creditOrg;
+	
+	@Transient @Getter @Setter
+	private String triggerStepName;//触发步骤的名称
+	
+	public String getPrimaryName(){
+		if(StringUtils.isNotEmpty(getCustomName())){
+			return getCustomName();
+		}
+		return getName();
+	}
+	
+	@Transient public SpdBizType getBizType(){
+		return SpdBizType.typeOf(bizTypeCode);
+	}
+	
+	@Transient public SpdDealPriceStratage getDealPriceStratage(){
+		return SpdDealPriceStratage.typeOf(dealPriceStratageCode);
+	}
+	
+	@Transient
+	public void fillTriggerStepName(SpdBizStep[] bizSteps){
+		for(SpdBizStep bizStep : bizSteps){
+			if(getTriggerStepCode().equals(bizStep.getStatusCode())){
+				setTriggerStepName(bizStep.getAction());
+			}	
+		}
+	}
+	
+	public boolean equalsRule(SpdPropertyChangeRule theRule){
+		boolean sameDebitDepotId = (StringUtils.isEmpty(getDebitDepotId()) 
+											&& StringUtils.isEmpty(theRule.getDebitDepotId()))
+									 || (StringUtils.isNotEmpty(getDebitDepotId()) 
+											 && getDebitDepotId().equals(theRule.getDebitDepotId()));
+		boolean sameCreditDepotId = (StringUtils.isEmpty(getCreditDepotId()) 
+											&& StringUtils.isEmpty(theRule.getCreditDepotId()))
+									 || (StringUtils.isNotEmpty(getCreditDepotId()) 
+											 && getCreditDepotId().equals(theRule.getCreditDepotId()));
+		
+		if(getDebitOrgId().equals(theRule.getDebitOrgId())
+			&& getDebitDeptId().equals(theRule.getDebitDeptId())
+			&& getCreditOrgId().equals(theRule.getCreditOrgId())
+			&& getCreditDeptId().equals(theRule.getCreditDeptId())
+			&& getBizRuleId().equals(theRule.getBizRuleId())
+			&& getTriggerStepCode().equals(theRule.getTriggerStepCode())
+			&& dealPriceStratageCode.equals(theRule.getDealPriceStratageCode())
+			&& sameDebitDepotId
+			&& sameCreditDepotId){
+			return true;
+		}
+		return false;
+	}
+	
+	public boolean equals(Object obj){
+		if(!(obj instanceof SpdPropertyChangeRule)){
+			return false;
+		}
+		SpdPropertyChangeRule theRule = (SpdPropertyChangeRule)obj;
+		if(this.equalsRule(theRule)
+			&& getName().equals(theRule.getName())
+			&& getEnabled().equals(theRule.getEnabled())){
+			return true;
+		}
+			
+		return false;
+	}
+	
+	public void checkRule(SpdPropertyChangeRules allRules){
+		if(getDebitOrgId().equals(getCreditOrgId())){
+			throw new InvalidDataException(YardExceptionType.invalid_debit_org_and_credit_org_same);
+		}
+	}
+
+	
+	public void update(SpdPropertyChangeRule rule) {
+		setEnabled(rule.getEnabled());
+		setName(rule.getName());
+		setCustomName(rule.getCustomName());
+		updateLastUpdateTime();		
+	}
+
+	@Transient @JsonIgnore
+	public String getLedgerOrgId() {
+		if(getCreditDept().getOrg().isMain()){
+			return getDebitOrgId();
+		}else{
+			return getCreditOrgId();
+		}
+	}
+
+	@Transient @JsonIgnore
+	public String getLedgerDeptId(){
+		if(getCreditDept().getOrg().isMain()){
+			return getDebitDeptId();
+		}else{
+			return getCreditDeptId();
+		}
+	}
+	
+	/**
+	 * 是否是主机构借入，即是否是医院借入
+	 */
+	@Transient @JsonIgnore
+	public boolean isMainOrgDebit(){
+		return getDebitDept().getOrg().isMain();
+	}
+	
+}

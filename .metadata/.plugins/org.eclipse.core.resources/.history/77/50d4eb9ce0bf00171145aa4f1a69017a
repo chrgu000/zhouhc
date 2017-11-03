@@ -1,0 +1,28 @@
+set serveroutput on;
+
+declare 
+  CURSOR tab_cur IS select TABLE_NAME,TABLESPACE_NAME from user_tables where TABLESPACE_NAME=(select default_tablespace from user_users);
+  CURSOR seq_cur IS select SEQUENCE_NAME from user_sequences;
+  var_sql VARCHAR(1000);
+begin
+  DBMS_OUTPUT.PUT_LINE('开始清除已有表>>>');
+  FOR v_table IN tab_cur LOOP
+    var_sql := 'DROP TABLE "' ||  v_table.TABLE_NAME || '" cascade constraints purge';
+    Dbms_Output.put_line(var_sql);
+    execute immediate var_sql;
+  END LOOP;
+  DBMS_OUTPUT.PUT_LINE('完成清除已有表>>>');
+ 
+  DBMS_OUTPUT.PUT_LINE('开始清除已有序列>>>');
+  FOR v_seq IN seq_cur LOOP
+    var_sql := 'DROP SEQUENCE "' ||  v_seq.SEQUENCE_NAME || '"';
+    Dbms_Output.put_line(var_sql);
+    execute immediate var_sql;
+  END LOOP;
+  DBMS_OUTPUT.PUT_LINE('完成清除已有序列>>>');
+  
+END;
+
+--确保这两行代码永远在文件最尾部
+/
+exit;

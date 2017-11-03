@@ -1,0 +1,23 @@
+<#if receive??>
+<h4>供应商:${receive.fromDept.org.orgName}</h4>
+<h4>入库仓库:${receive.toDepot.depotName}</h4>
+<#if receive.sellerSend??>
+<h4>送货单号:${receive.sellerSend.sendInputCode}</h4>
+</#if>
+<h4>收货单码:${receive.bizCode}</h4>
+</br>
+<h4>详细信息:</h4>
+<ul>
+<#list receive.items as receiveItem>
+<li>
+<pre>
+产品:${"[${receiveItem.goods.wareName}]"}
+批次:批号:${receiveItem.specialGoodsLot.lotNo},有效期:${(receiveItem.specialGoodsLot.lotValidity?string('yyyy-MM-dd'))!'未设置'}
+单价:${"[#{receiveItem.unitPrice;M2}]"}
+确认数量:${"[${receiveItem.confirmQty}${receiveItem.preparePackageUnitName}]"}
+确认金额:${"[#{receiveItem.confirmAmount;M2}]"}
+</pre>
+</li>
+</#list>
+</ul>
+</#if>

@@ -1,0 +1,27 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * @Description:批次库存
+ * @author wuyw
+ * @date 2017年10月24日上午11:04:26
+ *
+ */
+@SuppressWarnings("serial")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdGoodsLotStock extends SpdGoodsStock{
+
+	@Getter @Setter private String lotId;
+	
+	@JsonIgnore @Getter @Setter
+	private YdsGoodsLot goodsLot;
+	
+}

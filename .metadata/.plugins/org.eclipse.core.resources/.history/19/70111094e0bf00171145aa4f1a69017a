@@ -1,0 +1,17 @@
+package cn.ak4j.yard.web.request;
+
+import javax.servlet.http.HttpServletRequest;
+
+/**
+* @Description: 新增资源请求
+* @author zhengyf
+* @date 2016年11月28日 下午7:08:50
+* @version V1.0.0
+*/
+public class YardAddRequest extends YardRequest{
+
+	public YardAddRequest(HttpServletRequest request){
+		super(request);
+	}
+	
+}

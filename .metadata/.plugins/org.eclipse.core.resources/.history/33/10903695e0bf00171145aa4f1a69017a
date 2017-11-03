@@ -1,0 +1,60 @@
+package cn.ak4j.yard.pcs.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.params.PcsDepotAreaParams;
+import lombok.Getter;
+
+@Repository
+public class PcsDepotAreaRepository extends BaseRepository<PcsDepotArea, PcsDepotAreas, PcsDepotAreaParams, String>{
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired @Lazy
+	private PcsDepotShelfRepository dsRepository;
+	@Autowired @Lazy
+	private PcsDepotRepository depotRepository;
+	
+	@Cacheable(value="longTimeCache", key="\"allPcsDepotAreas\"")
+	public PcsDepotAreas findAllWithRelation(){
+		PcsDepotAreas depotAreas = getAll();
+		depotAreas.fillDepots(depotRepository);
+		depotAreas.fillShelfs(dsRepository);
+		return depotAreas;
+	}
+
+	@Deprecated
+	public PcsDepotAreas findByIds(List<String> ids){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public PcsDepotAreas find(PcsDepotAreaParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public PcsDepotAreas find(PcsDepotAreaParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	};
+	
+	@Deprecated
+	public PcsDepotArea findOne(String depotId){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public int count(PcsDepotAreaParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+}

@@ -1,0 +1,1 @@
+update spd_feedback_rule set auto_review_on_shelf_task='1' where id='rec_fb_id_20';

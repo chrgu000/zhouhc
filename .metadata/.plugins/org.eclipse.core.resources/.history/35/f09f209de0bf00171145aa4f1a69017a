@@ -1,0 +1,1 @@
+update spd_biz_item set unit_lv=2 where unit_lv=1 and biz_item_type='common';

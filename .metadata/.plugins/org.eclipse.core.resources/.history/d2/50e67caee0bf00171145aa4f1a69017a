@@ -1,0 +1,354 @@
+package cn.ak4j.yard.spd.task.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItem;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import cn.ak4j.yard.spd.wrapper.domain.SpdWrappers;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@SuppressWarnings({"unchecked", "rawtypes"})
+public class SpdDepotTaskServiceTest extends BaseTest {
+
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdDepotTaskService dtService;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private SpdDepotTaskItemRepository tiRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	@Autowired private SpdTurnoverBoxRepository tbRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YardCodeService codeService;
+
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test
+	public void testGetTaskForReport() {
+		SpdDepotTask task = dtService.getTaskForReport("task_id_001");
+
+		assertNotNull(task.getDepotArea());
+		assertNotNull(task.getDepotArea().getDepot());
+		assertNotNull(task.getDepotArea().getDepot().getManageDept());
+		assertNotNull(task.getDepotArea().getDepot().getManageDept().getOrg());
+
+		assertTrue(task.getItems().size() > 0);
+		for (SpdDepotTaskItem taskItem : task.getItems()) {
+			assertNotNull(taskItem.getShelf());
+			assertNotNull(taskItem.getSpecialGoodsLot());
+			assertNotNull(taskItem.getSpecialGoodsLot().getGoods());
+			assertNotNull(taskItem.getSpecialGoodsLot().getGoods().getFormatName());
+		}
+	}
+
+	@Test public void testBatchReviewOffShelfTask() {
+		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById("disp_id_008");
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdDepotTasks tasks = dispatcher.getTasks();
+		tasks.forEach(task -> {
+			assertTrue(task.getItems().size() > 0);
+		});
+
+		tasks.getAllItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		tasks.forEach((task) -> {
+			SpdWrappers wrappers = tbRepository.findAll().findByOwnerId(task.getTaskId());
+			wrappers.fillItems(task.getItems());
+			task.setWrappers(wrappers);
+			
+			task.getItems().forEach(item -> {
+				item.setConfirmQty(item.getPlanQty());
+				dtService.modifyOffShelfItem((SpdOffShelfTaskItem)item, user);
+			});	
+		
+		});
+		
+		List<String> lotIds = new ArrayList<String>();
+		tasks.forEach(task -> lotIds.addAll(CollectionUtils.pluck("lotId", task.getItems())));
+
+		String depotId = dispatcher.getDispatcherDepotId();
+		String areaType = dispatcher.getRefs().get(0).getAreaType();
+
+		SpdShelfStocks originShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+
+		dtService.batchReview(dispatcher.getTasks(), user);
+
+		SpdShelfStocks newShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+
+		//检查库存
+		checkShelfStock(originShelfStocks, newShelfStocks, tasks.getAllItems(), tasks.get(0).getTaskType());
+		
+		// 通过调度明细获取申领单信息再 通过申领单信息获取送货单信息
+		wait(4);
+		SpdLogisticsTask logisticsTask = ltRepository.findWithItemsByBizId(dispatcher.getRefs().get(0).getRefObjectId()).get(0);
+		assertNotNull(logisticsTask.getFromDepotId());
+		assertNotNull(logisticsTask.getFromOrgId());
+		assertNotNull(logisticsTask.getToDepotId());
+		assertNotNull(logisticsTask.getTaskCode());
+		assertEquals(CheckState.new_created, logisticsTask.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.shouhuodan);
+		assertEquals(CodeSort.shouhuodan.getCode()+getCurrentDateCode()+sequenceCode, logisticsTask.getTaskCode());
+		assertEquals(logisticsTask.getFromDepotId(), dispatcher.getDispatcherDepotId());
+
+		//断言送货单的数量情况
+		logisticsTask.getItems().forEach(item->{
+			assertNotNull(item.getItemCode());
+			assertNotNull(item.getUnitPrice());
+			assertTrue(item.getPlanQty()>0);
+			assertEquals(item.getPlanQty(), item.getConfirmQty());
+		});
+		
+		// 获取仓库作业明细的所有批次的确认数量，获取物流作业明细的所有批次的计划数量 断言是否相同
+		lotIds.forEach(lotId -> {
+			SpdDepotTaskItems<SpdDepotTaskItem> depotTaskItems = new SpdDepotTaskItems(CollectionUtils.find("lotId", lotId, tasks.getAllItems()));
+			SpdLogisticsTaskItems logisticsTaskItems = new SpdLogisticsTaskItems(
+					CollectionUtils.find("lotId", lotId, logisticsTask.getItems()));
+			int depotTaskItemSameLotQtys = 0;
+			int logisticsTaskItemSameLotQtys = 0;
+
+			for (SpdDepotTaskItem item : depotTaskItems) {
+				depotTaskItemSameLotQtys += item.getConfirmQty();
+			}
+
+			for (SpdLogisticsTaskItem item : logisticsTaskItems) {
+				logisticsTaskItemSameLotQtys += item.getPlanQty();
+			}
+
+			assertEquals(depotTaskItems.size(), logisticsTaskItems.size());
+			assertEquals(depotTaskItemSameLotQtys, logisticsTaskItemSameLotQtys);
+		});
+	}
+
+	 @Test public void testBatchReviewAsPlaned(){
+		 testBatchView(1.0f);
+	 }
+	
+	 @Test public void testBatchReviewHalfExec(){
+		 testBatchView(0.5f);
+	 }
+
+	public void testBatchView(float execRatio) {
+		String dispatcherId = "disp_id_011";
+		PcsUser user = userRepository.findAll().findById("user_id_002");
+		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+		SpdDepotTasks tasks = dispatcher.getTasks();
+		tasks.getAllItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		tasks.getAllItems().fillGoodsLots(glRepository);
+
+		List<String> lotIds = CollectionUtils.pluck("lotId", tasks.getAllItems());
+		SpdShelfStocks originShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(dispatcher.getDispatcherDepotId(), PcsAreaType.normal.getCode(), lotIds);
+		originShelfStocks.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		tasks.forEach((task) -> task.getItems().forEach(item -> {
+			item.setConfirmQty((int) (item.getPlanQty() * execRatio));
+			dtService.modifyOnShelfItem((SpdOnShelfTaskItem)item, user);
+		}));
+		dtService.batchReview(tasks, user);
+		wait(2);
+
+		dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+		tasks = dispatcher.getTasks();
+		lotIds = CollectionUtils.pluck("lotId", tasks.getAllItems());
+		tasks.getAllItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		tasks.forEach((task) -> {
+			assertEquals(CheckState.reviewed, task.getCheckState());
+			task.getItems().forEach((item) -> {
+				assertEquals((int)(item.getPlanQty()*execRatio), item.getConfirmQty().intValue());
+			});
+		});
+
+		//校验库存	
+		SpdShelfStocks newShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(dispatcher.getDispatcherDepotId(), PcsAreaType.normal.getCode(), lotIds);
+		newShelfStocks.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		checkShelfStock(originShelfStocks, newShelfStocks, tasks.getAllItems(), tasks.get(0).getTaskType());
+	}
+	
+	@Test public void testModifyTurnoverBoxOffShelfTaskItem(){
+		String taskId = "task_id_007";
+		String wrapperNo = "600001";
+		SpdDepotTask task = dtRepository.findWithItemsByTaskId(taskId);
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		SpdTurnoverBox turnoverBox = tbRepository.findAll().findByWrapperNo(wrapperNo);
+		
+		for(SpdDepotTaskItem taskItem : task.getItems()){
+			taskItem.setParentWrapperId(turnoverBox.getId());
+			taskItem = dtService.modifyOffShelfItem((SpdOffShelfTaskItem)taskItem, user);
+			assertEquals(taskItem.getParentWrapperId(), turnoverBox.getId());
+		}
+	}
+	
+	@Test public void testReviewOffShelfTaskItemWithoutItems(){
+		String taskId = "task_id_007";
+		SpdDepotTask task = dtRepository.findWithItemsByTaskId(taskId);
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+
+		task.getItems().clear();
+		
+		SpdDepotTasks tasks = new SpdDepotTasks();
+		tasks.add(task);
+		
+		thrown.expect(InvalidDataException.class);
+		dtService.batchReview(tasks, user);
+		wait(2);
+	}
+
+	@Test public void testReviewNoneTurnoverBoxOffShelfTaskItem(){
+		String taskId = "task_id_007";
+		SpdDepotTask task = dtRepository.findWithItemsByTaskId(taskId);
+		SpdWrappers wrappers = task.getWrappers();
+		
+		wrappers.forEach(wrapper->{
+			assertEquals(SpdSceneType.off_shelf_task, wrapper.getSceneType());
+		});
+		
+		task.getItems().forEach(item->{
+			((SpdOffShelfTaskItem)item).setParentWrapperId(Constant.none);
+			item.confirmAsPlaned();
+		});
+		
+		testReviewTurnoverBoxOffShelfTaskItem(task);
+		wait(3);
+		
+		List<String> wrapperNos = CollectionUtils.pluck("wrapperNo", task.getWrappers());
+		wrappers = tbRepository.findAll().findByWrapperNos(wrapperNos);
+		wrappers.forEach(wrapper->{
+			assertEquals(SpdSceneType.idle, wrapper.getSceneType());
+		});
+	}
+	
+	@Test public void testReviewTurnoverBoxOffShelfTaskItemWithTwo(){
+		String taskId = "task_id_007";
+		String wrapperNo = "600002";
+		SpdDepotTask task = dtRepository.findWithItemsByTaskId(taskId);
+		SpdTurnoverBox turnoverBox = tbRepository.findAll().findByWrapperNo(wrapperNo);
+
+		//周转箱明细添加一个明细
+		for(SpdDepotTaskItem item : task.getItems()){
+			SpdOffShelfTaskItem offShelfItem = (SpdOffShelfTaskItem)item;
+			if(offShelfItem.getParentWrapperId() == null || offShelfItem.getParentWrapperId().equals(turnoverBox.getWrapperNo())){
+				offShelfItem.setParentWrapperId(turnoverBox.getId());
+				break;
+			}
+		};
+		
+		task.getItems().forEach(item->{
+			item.confirmAsPlaned();
+		});
+		testReviewTurnoverBoxOffShelfTaskItem(task);
+		wait(3);
+		
+		List<String> wrapperNos = CollectionUtils.pluck("wrapperNo", task.getWrappers());
+		SpdWrappers wrappers = tbRepository.findAll().findByWrapperNos(wrapperNos);
+		wrappers.forEach(wrapper->{
+			assertEquals(SpdSceneType.logistic_task, wrapper.getSceneType());
+		});
+	}
+	
+	/**
+	 * 审核包含周转箱明细的下架作业
+	 */
+	private void testReviewTurnoverBoxOffShelfTaskItem(SpdDepotTask task){
+		String taskId = task.getTaskId();
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+
+		tiRepository.saveAll(task.getItems());
+		List<String> lotIds = CollectionUtils.pluck("lotId", task.getItems());
+		SpdShelfStocks originShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(task.getTaskDepotId(), PcsAreaType.normal.getCode(), lotIds);
+		originShelfStocks.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		
+		dtService.updateCheckState(taskId, CheckState.reviewed.getCode(), task.getLastUpdateTime(), user);
+		task = dtRepository.findWithItemsByTaskId(taskId);
+		task.getItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		assertEquals(CheckState.reviewed, task.getCheckState());
+		
+		SpdShelfStocks newShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(task.getTaskDepotId(), PcsAreaType.normal.getCode(), lotIds);
+		newShelfStocks.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		checkShelfStock(originShelfStocks, newShelfStocks, task.getItems(), task.getTaskType());
+	}
+	
+	@Test public void testModifyOnShelfItem(){
+		String taskId = "task_id_003";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdDepotTask depotTask = dtRepository.findWithItemsByTaskId(taskId);
+		
+		SpdOnShelfTaskItem item = (SpdOnShelfTaskItem)depotTask.getItems().get(0);
+		item.setConfirmQty(item.getPlanQty()-2);
+		
+		item = dtService.modifyOnShelfItem(item, user);
+		item.setConfirmQty(item.getPlanQty());
+		dtService.modifyOnShelfItem(item, user);
+	}
+	
+	
+	/**
+	 * 断言仓库作业的库存改变
+	 */
+	private void checkShelfStock(SpdShelfStocks originShelfStocks, SpdShelfStocks newShelfStocks, SpdDepotTaskItems<SpdDepotTaskItem>  allItems, String depotTaskType){
+		newShelfStocks.forEach(newShelfStock -> {
+			String lotId = newShelfStock.getLotId();
+			SpdShelfStock originShelfStock = CollectionUtils.findWhere("lotId", lotId, originShelfStocks);
+
+			List<SpdDepotTaskItem> sameLotTaskItems = CollectionUtils.find("lotId", lotId, allItems);
+			int sameLotTaskItemCheckQtyByBaseUnit = 0;
+			int sameLotTaskItemPlanQtyByBaseUnit = 0;
+			for (SpdDepotTaskItem taskItem : sameLotTaskItems) {
+				sameLotTaskItemCheckQtyByBaseUnit += taskItem.getConfirmQtyByBaseUnit();
+				sameLotTaskItemPlanQtyByBaseUnit += taskItem.getPlanQtyByBaseUnit();
+			}
+
+			int expectedShelfStockQtyByBaseUnit = originShelfStock == null ? 0 : originShelfStock.getQtyByMinUnit();
+			int expectedShelfLockStockQtyByBaseUnit = originShelfStock == null ? 0 : originShelfStock.getLockQtyByMinUnit();
+			
+			if(depotTaskType.equals(SpdDepotTaskType.on_shelf_task.getCode())){
+				expectedShelfStockQtyByBaseUnit += sameLotTaskItemCheckQtyByBaseUnit;
+			}else{
+				expectedShelfStockQtyByBaseUnit -= sameLotTaskItemCheckQtyByBaseUnit;
+				expectedShelfLockStockQtyByBaseUnit -= sameLotTaskItemPlanQtyByBaseUnit;
+			}
+
+			assertEquals(expectedShelfStockQtyByBaseUnit, newShelfStock.getQtyByMinUnit().intValue());
+			assertEquals(expectedShelfLockStockQtyByBaseUnit, newShelfStock.getLockQtyByMinUnit().intValue());
+			assertNotNull(newShelfStock.getShelfId());
+		});
+	}
+}

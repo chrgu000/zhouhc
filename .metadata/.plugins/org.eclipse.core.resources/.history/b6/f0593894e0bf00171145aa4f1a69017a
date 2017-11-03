@@ -1,0 +1,37 @@
+package cn.ak4j.yard.sys.datacheck.task;
+
+import org.apache.commons.lang3.StringUtils;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.ScheduleTasks;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItem;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItems;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Component
+public class YdsGoodsTask {
+
+	@Autowired @Lazy private YdsGoodsRepository ydsGoodsRepository;
+	
+	public int checkData(SysDataCheckTaskItems dataCheckErrorDetails){
+		YdsGoodss ydsGoodss = ydsGoodsRepository.getAll();
+		if(ydsGoodss.size() > 0){
+			for(YdsGoods ydsGood : ydsGoodss){
+				if(StringUtils.isEmpty(ydsGood.getFormatName())){
+					SysDataCheckTaskItem sysDataCheckTaskItem = new SysDataCheckTaskItem();
+					sysDataCheckTaskItem.setClassName(ydsGood.getClass().getName());
+					sysDataCheckTaskItem.setDataId(ydsGood.getGoodsId());
+					sysDataCheckTaskItem.setLevel(ScheduleTasks.ERROR);
+					sysDataCheckTaskItem.setDescription("标准产品格式化名称为空!");
+					dataCheckErrorDetails.add(sysDataCheckTaskItem);
+				}
+			}
+		}
+		return ydsGoodss.size();
+	}
+}

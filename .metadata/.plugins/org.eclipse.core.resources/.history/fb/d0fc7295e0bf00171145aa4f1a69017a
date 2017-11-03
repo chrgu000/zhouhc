@@ -1,0 +1,88 @@
+package cn.ak4j.yard.extend;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.factory.SpdDepotCardFactory;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.service.ISpdDepotCardEventProcessor;
+import cn.ak4j.yard.spd.service.SpdDepotCardService;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+
+public class SpdDepotCardEventProcessor implements ISpdDepotCardEventProcessor{
+	
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdDepotCardFactory depotCardFactory;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdDepotCardService dcService;
+	
+	@Getter private CustomComponentDoc doc;
+	
+	public SpdDepotCardEventProcessor(){
+		
+		String name = "默认账页事件处理器";
+		String summary = "处理账页相关事件";
+		String beanName = "defaultDepotCardEventProcessor";
+		String className = getClass().getName();
+		
+		Map<String, String> methodDesc = new HashMap<String, String>();
+		methodDesc.put("缺乏账页事件", "根据仓库和缺失产品id自动创建账页,仓库需要先初始化货区货位,账页建在虚拟货位上。");
+		
+		doc = new CustomComponentDoc(name, summary, beanName, className, null, methodDesc);
+	}
+	
+	@Override
+	public void process(String depotId, List<String> goodsIds, String userId, AmqpMsgType msgType) {
+		
+		if(msgType.equals(AmqpMsgType.LACK_DEPOT_CARD)){
+			PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+			
+			YdsGoodss notExistCardGoods = checkNotExistCardGoods(depotId, goodsIds);
+			
+			PcsUser user = userRepository.findAll().findById(userId);
+			
+			SpdDepotCards notExistCards = depotCardFactory.buildAutoCard(depot, notExistCardGoods, user);
+			
+			notExistCards.forEach(depotCard->{
+				depotCard.setCheckStateCode(CheckState.commited.getCode());
+				dcService.add(depotCard, user);
+			});
+		}
+
+	}	
+
+	private YdsGoodss checkNotExistCardGoods(String depotId, List<String> goodsIds) {
+		SpdDepotCards depotCards = dcRepository.findAll().findByDepotAndGoodsIds(depotId, goodsIds);
+		List<String> notExsitGoodsIds = new ArrayList<String>();
+		goodsIds.forEach(goodsId->{
+			SpdDepotCard depotCard = CollectionUtils.findWhere("goodsId", goodsId, depotCards);
+			if(depotCard == null){
+				notExsitGoodsIds.add(goodsId);
+			}
+		});
+		
+		if(CollectionUtils.isNotEmpty(notExsitGoodsIds)){
+			YdsGoodss notExistGoodsList = goodsRepository.findAll().findByIds(notExsitGoodsIds);
+			return notExistGoodsList;
+		}
+		return new YdsGoodss();
+	}
+
+}

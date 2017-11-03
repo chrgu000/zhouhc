@@ -1,0 +1,87 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdAbstractFeedbackRule;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdFeedbackRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdFeedbackRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdFeedbackRuleRepository;
+import cn.ak4j.yard.spd.bizrule.to.SpdFeedbackRuleTO;
+
+@RestController
+public class SpdFeedbackRuleResource {
+
+	@Autowired private SpdFeedbackRuleRepository frRepository;
+	private SpdFeedbackRuleAssember assember = new SpdFeedbackRuleAssember();
+	
+	@RequestMapping(value="/yard/spd/spdFeedbackRules", method=RequestMethod.GET)
+	public List<SpdFeedbackRuleTO> list(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "orders", required = false) String orders,
+			@RequestParam(value = "params", required = false) String paramsStr){
+		SpdFeedbackRuleParams params = SpdFeedbackRuleParams.buildParamsFromJson(paramsStr, SpdFeedbackRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdFeedbackRules rules = frRepository.findAll();
+		rules = new SpdFeedbackRules(rules.find(params).findByPage(null, order, currentPage-1, pageSize));
+		List<SpdFeedbackRuleTO> ruleTOs = assember.buildList(rules, order);
+		return ruleTOs;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdFeedbackRules/count", method=RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdFeedbackRuleParams params = SpdFeedbackRuleParams.buildParamsFromJson(paramsStr, SpdFeedbackRuleParams.class);
+		SpdFeedbackRules rules = frRepository.findAll();
+		rules = new SpdFeedbackRules(rules.find(params));
+		return assember.buildList(rules, null).size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdFeedbackRules/ids,{ids}", method=RequestMethod.GET)
+	public List<SpdFeedbackRuleTO> findByIds(@PathVariable(value = "ids", required = false) String ids){
+		SpdFeedbackRules rules = frRepository.findAll();
+		rules = new SpdFeedbackRules(rules.findByIds(Arrays.asList(ids.split(","))));
+		return assember.buildList(rules, null);
+	}
+	
+}
+
+class SpdFeedbackRuleAssember{
+	
+	public List<SpdFeedbackRuleTO> buildList(SpdFeedbackRules rules,  OrderParam order){
+		List<SpdFeedbackRuleTO> result = new ArrayList<SpdFeedbackRuleTO>();
+		
+		for(SpdAbstractFeedbackRule rule : rules){
+			SpdFeedbackRuleTO to = new SpdFeedbackRuleTO();
+			to.setId(rule.getId());
+			to.setName(rule.getName());
+			to.setDescription(rule.getDescription());
+			to.setCreateTime(rule.getCreateTime());
+			to.setLastUpdateTime(rule.getLastUpdateTime());	
+			to.setBizType(rule.getBizType().getCode());
+			result.add(to);
+		}
+		if(order == null){
+			Collections.sort(result, comparator);
+		}
+		return result;
+	}
+	
+	Comparator<SpdFeedbackRuleTO> comparator = new Comparator<SpdFeedbackRuleTO>() {
+		public int compare(SpdFeedbackRuleTO rule1, SpdFeedbackRuleTO rule2) {
+			return rule1.getBizType().compareTo(rule2.getBizType());
+		}
+	};
+	
+}

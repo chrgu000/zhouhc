@@ -1,0 +1,100 @@
+package cn.ak4j.yard.spd.reconciliation.report.base;
+
+import java.io.IOException;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.sys.domain.ReconciliationReportDisplayConfig;
+import lombok.Getter;
+
+@JsonSerialize(using=ReconciliationReportTypeJsonSerializer.class)
+public enum SpdReconciliationReportType {
+
+	hospital_credit_replenish_detail("hospital_credit_replenish_detail", "医院贷出申领明细", new String[]{}, new String[]{}, true),
+	hospital_credit_replenish_aggregate_by_goods("hospital_credit_replenish_aggregate_by_goods", "医院贷出申领明细按产品汇总", new String[]{}, new String[]{}, false),
+	hospital_debit_replenish_aggregate_by_goods("hospital_debit_replenish_aggregate_by_goods", "申领按产品汇总", new String[]{}, new String[]{}, false),
+	hospital_debit_replenish_detail("hospital_debit_replenish_detail", "医院借入申领明细", new String[]{}, new String[]{}, true),
+	hospital_credit_detail("hospital_credit_detail", "医院贷出明细", new String[]{}, new String[]{}, true),
+	
+	
+	replenish_detail("replenish_detail", "申领明细", new String[]{}, new String[]{}, true),
+	replenish_aggregate_by_goods_lot("replenish_aggregate_by_goods_lot", "申领按批次汇总", new String[]{}, new String[]{}, false),
+	replenish_aggregate_by_goods("replenish_aggregate_by_goods", "申领按产品汇总", new String[]{}, new String[]{}, false);
+	
+	
+	@Getter private String code;
+	@Getter private String name;
+	@Getter private String[] queryParamNames;
+	@Getter private String[] orderParamNames;
+	@Getter private boolean mayHisVersion;
+	
+	private SpdReconciliationReportType(String code, String name, String[] queryParamNames, String[] orderParamNames, boolean mayHisVersion){
+		this.code = code;
+		this.name = name;
+		this.queryParamNames = queryParamNames;
+		this.orderParamNames = orderParamNames;
+		this.mayHisVersion = mayHisVersion;
+	}
+	
+	public static SpdReconciliationReportType typeOf(String code){
+		for(SpdReconciliationReportType reportType : values()){
+			if(reportType.getCode().equals(code)){
+				return reportType;
+			}
+		}
+		return null;
+	}
+	
+}
+
+class ReconciliationReportTypeJsonSerializer extends JsonSerializer<SpdReconciliationReportType>{
+
+	@Override
+	public void serialize(SpdReconciliationReportType reportType, JsonGenerator generator, SerializerProvider serializers)
+			throws IOException, JsonProcessingException {
+		if(reportType != null){
+			List<ReconciliationReportDisplayConfig> configs = Conf.getAllGlobalInfos().getReconciliationReportDisplayConfigs();
+			ReconciliationReportDisplayConfig config = CollectionUtils.findWhere("reportTypeCode", reportType.getCode(), configs);
+			if(config == null){
+				return ;
+			}
+			
+			generator.writeStartObject();
+			generator.writeStringField("code", reportType.getCode());
+			String reportName = reportType.getName();
+			
+			
+			String customReportName = config.getReportName();
+			if(StringUtils.isNotEmpty(customReportName)){
+				reportName = customReportName;
+			}
+			
+			generator.writeStringField("name", reportName);
+			generator.writeArrayFieldStart("queryParamNames");
+			for(String paramName : reportType.getQueryParamNames()){
+				generator.writeString(paramName);
+			}
+			generator.writeEndArray();
+			
+			generator.writeArrayFieldStart("orderParamNames");
+			for(String paramName : reportType.getOrderParamNames()){
+				generator.writeString(paramName);
+			}
+			generator.writeEndArray();
+			
+			generator.writeBooleanField("mayHisVersion", reportType.isMayHisVersion() && config.isSupportHisVersion());
+		}
+		
+		generator.writeEndObject();
+	}
+
+}

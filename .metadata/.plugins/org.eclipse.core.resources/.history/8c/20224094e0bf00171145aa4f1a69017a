@@ -1,0 +1,16 @@
+package cn.ak4j.yard.sys.datacheck.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+
+@SuppressWarnings({"unchecked", "rawtypes", "serial"})
+public class SysDataCheckTaskReports extends Entities<SysDataCheckTaskReport>{
+
+	public SysDataCheckTaskReports() {
+	}
+	
+	public SysDataCheckTaskReports(List entities){
+		super(entities);
+	}
+}

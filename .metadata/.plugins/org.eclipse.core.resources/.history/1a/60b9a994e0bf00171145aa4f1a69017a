@@ -1,0 +1,23 @@
+package cn.ak4j.yard.spd.reconciliation.params;
+
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdPropertyChangeRelationItemParams extends QueryParams{
+
+	private ListParam<String> id;
+	private ListParam<String> propertyChangeItemId;
+	private ListParam<String> receiveId;
+	private ListParam<String> receiveItemId;
+	private ListParam<Integer> dealQty;
+	private ListParam<String> sendCode;
+	private ListParam<String> sendItemCode;
+	private FloatRangeParam unitPrice;
+	private ListParam<String> bizCode;
+}

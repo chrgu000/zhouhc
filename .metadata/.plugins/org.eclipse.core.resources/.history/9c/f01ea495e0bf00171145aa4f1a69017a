@@ -1,0 +1,23 @@
+package cn.ak4j.yard;
+
+import java.util.Date;
+
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.entity.IEntity;
+import cn.ak4j.yard.domain.IUser;
+
+/**
+* @Description: service抽象接口
+* @author zhengyf
+* @date 2016年11月28日 下午8:17:39
+* @version V1.0.0
+*/
+public abstract class IYardService<T extends IEntity> {
+
+	@Transactional public abstract T add(T t, IUser user);
+	@Transactional public abstract void delete(String id, IUser user);
+	@Transactional public abstract T modify(T t, IUser user);
+	@Transactional public abstract T updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user);
+	
+}

@@ -1,0 +1,52 @@
+package cn.ak4j.yard.extend.web;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.AKStringUtils;
+import cn.ak4j.yard.domain.IScheduleTask;
+
+@RestController
+public class ScheduleTaskResource {
+
+	@Autowired private ApplicationContext context;
+	
+	@RequestMapping(value = "/yard/sys/scheduleTasks", method = RequestMethod.GET)
+	public List<IScheduleTask> getScheduleTasks(){
+		Map<String, IScheduleTask> map = context.getBeansOfType(IScheduleTask.class);
+		List<IScheduleTask> scheduleTasks = new ArrayList<IScheduleTask>();
+		if(map.size() > 0){
+			map.entrySet().forEach(entry->{
+				scheduleTasks.add(entry.getValue());
+			});
+		}
+		return scheduleTasks;
+	}
+	
+	@RequestMapping(value = "/yard/sys/scheduleTasks/{beanName}/active", method = RequestMethod.PUT)
+	public IScheduleTask changeScheduleTask(@PathVariable("beanName") String beanName, @RequestParam("active") Boolean active){
+		IScheduleTask scheduleTask = (IScheduleTask)context.getBean(AKStringUtils.lowerCaseFirstChar(beanName));
+		scheduleTask.setActive(active);
+		return scheduleTask;
+	}
+	
+	@RequestMapping(value = "/yard/sys/scheduleTasks/{beanName}/instances", method = RequestMethod.POST)
+	public IScheduleTask executeScheduleTask(@PathVariable("beanName") String beanName){
+		IScheduleTask scheduleTask = (IScheduleTask)context.getBean(AKStringUtils.lowerCaseFirstChar(beanName));
+		if(scheduleTask.isRunning()){
+			throw new OperateFailException(String.format("定时任务[%s]已经在执行", beanName));
+		}
+		scheduleTask.run();
+		return scheduleTask;
+	}
+}

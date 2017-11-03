@@ -1,0 +1,155 @@
+package cn.ak4j.yard.pcs.service;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.params.PcsDepotShelfParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.service.YardCodeService;
+@Service
+public class PcsDepotShelfService extends IYardService<PcsDepotShelf>{
+
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private YardCodeService ycService;
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotShelfs\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotAreas\"")})
+	public PcsDepotShelf add(@Valid PcsDepotShelf depotShelf, IUser user){
+		//判断当前货位的编码是否存在
+		YardArbitraryCode sysCode = ycService.publishCode(CodeSort.huowei, depotShelf.getShelfCode());
+		PcsDepotShelfs depotShelfCKs = dsRepository.findAll().findByAreaIdAndShelfCode(depotShelf.getDepotId(), depotShelf.getAreaId(), sysCode.getCode());
+		if(CollectionUtils.isNotEmpty(depotShelfCKs)){
+			throw new OperateForbiddenException("当前货位编码已存在,请确认后填写！");
+		}
+		depotShelfCKs = dsRepository.findAll().findByShelfNameAndShelfCodeInArea(depotShelf.getDepotId(), depotShelf.getAreaId(), sysCode.getCode(), depotShelf.getShelfName());
+		if(CollectionUtils.isNotEmpty(depotShelfCKs)){
+			throw new OperateForbiddenException("当前货区虚拟货位已存在");
+		}
+		depotShelf.setShelfCode(sysCode.getCode());
+		
+	    return dsRepository.save(depotShelf);
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotShelfs\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotAreas\"")})
+	public void delete(String shelfId,IUser user){
+		PcsDepotShelf depotShelf = dsRepository.findAll().findById(shelfId);
+		if(!depotShelf.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, depotShelf.getShelfName());
+		}
+		if(depotShelf.isPrimary()){
+			throw new OperateForbiddenException(YardExceptionType.forbid_delete_default_depot_shelf, depotShelf.getShelfName());
+		}
+		
+		dsRepository.delete(shelfId);
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotShelfs\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPcsDepotAreas\"")})
+	public PcsDepotShelf modify(@Valid PcsDepotShelf depotShelf,IUser user){
+		if(depotShelf.isPrimary()){
+			throw new OperateForbiddenException(YardExceptionType.forbid_update_default_depot_shelf, depotShelf.getShelfName());
+		}
+		YardArbitraryCode sysCode = ycService.publishCode(CodeSort.huowei, depotShelf.getShelfCode());
+		depotShelf.setShelfCode(sysCode.getCode());
+		
+		PcsDepotShelfs allShelfs = depotRepository.findAllWithRelations().findById(depotShelf.getDepotId()).getAreas().findById(depotShelf.getAreaId()).getShelfs();
+		
+		//判断修改的当前货位的编码是否存在
+	    PcsDepotShelf depotShelfCK = allShelfs.findByShelfCode(sysCode.getCode());
+		if(!depotShelfCK.getDepotShelfId().equals(depotShelf.getDepotShelfId())){
+			throw new OperateForbiddenException("当前货位编码已存在,请确认后填写！");
+		}
+		
+		PcsDepotShelf depotShelfPO = allShelfs.findById(depotShelf.getDepotShelfId());
+		if(depotShelfPO.isVirtual()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_update, depotShelfPO.getShelfName());
+		}
+		
+		depotShelfPO.update(depotShelf, user.getOrgId(), user.getUserId());
+		dsRepository.save(depotShelfPO);
+		
+		return depotShelfPO;
+	}
+
+	public PcsDepotShelf updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException("货位不支持该行为");
+	}
+	
+	@SuppressWarnings("unchecked")
+	public PcsDepotShelfs findWhichCanConfigDepotCard(PcsDepotShelfParams params, OrderParam order, int pageNo,
+			int pageSize) {
+		if(params == null){
+			params = new PcsDepotShelfParams();
+		}
+		
+		if(params.getDepotId() == null || params.getAreaType() == null){
+			return new PcsDepotShelfs();
+		}
+		params.setEnabled(new ListParam<Boolean>(true));
+		
+    	PcsDepot depot = depotRepository.findAllWithRelations().findById(params.getDepotId().getValue().get(0));
+    	PcsAreaType areaType = PcsAreaType.typeOf(params.getAreaType().getValue().get(0));
+    	PcsDepotAreas pcsDepotAreas = depot.getAreas().findByAreaType(areaType);
+    	if(pcsDepotAreas.size() == 0){
+    		return new PcsDepotShelfs();
+    	}
+    	params.setAreaId(new ListParam<String>(pcsDepotAreas.pluck("depotAreaId"), QueryParam.operation_in));
+    	
+		SpdDepotCardParams cardParams = new SpdDepotCardParams();
+		//根据选择的仓库id获取帐页中对应的所有货位
+		cardParams.setDepotId(params.getDepotId());
+		SpdDepotCards spdDepotCards = new SpdDepotCards(dcRepository.findAll().find(cardParams));
+		//获得所有的货位id
+		List<String> cardShelfIds = spdDepotCards.pluck("shelfId");
+		
+	    if(cardShelfIds.size()>0){
+	    	PcsDepotShelfParams depotShelfParams = new PcsDepotShelfParams();
+			depotShelfParams.setDepotId(params.getDepotId());
+			depotShelfParams.setMixedGoods(new ListParam<Boolean>(false));
+			depotShelfParams.setDepotShelfId(new ListParam<String>(cardShelfIds,QueryParam.operation_in));
+			PcsDepotShelfs pcsDepotShelfs = new PcsDepotShelfs(dsRepository.findAll().find(depotShelfParams));
+			
+			//得到所有的在帐页中存在的，并且不能混品种的货位
+			List<String> shelfIds = pcsDepotShelfs.getIds();
+			
+			params.setDepotShelfId(new ListParam<String>(shelfIds,QueryParam.operation_not_in));
+	    }
+
+	    return new PcsDepotShelfs(dsRepository.findAll().findByPage(params,order,pageNo, pageSize));
+	}
+}

@@ -1,0 +1,262 @@
+package cn.ak4j.yard.extend.zsy;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.DefaultSupplierProxy;
+import cn.ak4j.yard.extend.CustomComponentDoc;
+import cn.ak4j.yard.extend.zsy.domain.B2BOrderBill;
+import cn.ak4j.yard.extend.zsy.domain.B2BSettleBill;
+import cn.ak4j.yard.extend.zsy.domain.B2BTaskBillAffirms;
+import cn.ak4j.yard.extend.zsy.domain.B2BTaskBills;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.factory.YardBatchTaskFactory;
+import cn.ak4j.yard.sys.service.YardBatchTaskService;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class SpdZsyProxy extends DefaultSupplierProxy{
+	
+	private final String PROP_NAME_HOST_IP = "hostIp";
+	private final String PROP_NAME_USER_CODE = "userCode";
+	private final String PROP_NAME_PASSWORD = "password";
+	private final String PROP_NAME_PCS_USER_ID = "pcsUserId";
+	private final String PROP_NAME_PARTNER_CODE  = "partnerCode";
+
+	private String accessToken;
+
+	private RestTemplate restTemplate;
+	private Properties conf;
+	
+	@Autowired private SpdZsyPrepareInformAssember piAssember;
+	@Autowired private SpdZsyReturnGoodsAssember rgAssember;
+	@Autowired private SpdZsyFinacialReconciliationAssember frAssember;
+	@Autowired private SpdZsyDeliveryOrderFactory deliveryFactory;
+	@Autowired private YardBatchTaskService btService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YardBatchTaskFactory batchTaskFactory;
+	
+	
+	public SpdZsyProxy() {
+		//加载配置文件
+		conf = new Properties();
+		try{
+			conf.load(getClass().getResourceAsStream("/extend/xrq.properties"));
+		}catch(Exception e){
+			throw new OperateFailException(YardExceptionType.file_load_fail, "xrq.properties");
+		}
+		restTemplate = new RestTemplate(new HttpComponentsClientHttpRequestFactory());
+		restTemplate.setErrorHandler(new ZsyResponseErrorHandler(this));
+		initDoc();
+	}
+	
+	private void initDoc() {
+		
+		String name = "中山医代理组件";
+		String beanName = "zsySupplierProxy";
+		String className = getClass().getName();
+		
+		StringBuffer summary = new StringBuffer();
+		summary.append(Global.spliteCharacter)
+			  .append("1）中山医的系统集成需要通过账号获取访问凭证，账号有一个付码，付码用于类似'多点登录'的效果，使得eis和yard_service可以同时访问。").append(Global.spliteCharacter)
+			  .append("2）接口调用有频率限制，具体的限制参数可以根据需要同中山医申请").append(Global.spliteCharacter)
+			  .append("3）中山医的很多接口风格都是：数据获取+数据确认，即获取业务数据后需要对获取到的业务数据进行确认").append(Global.spliteCharacter)
+			  .append("4）首先获取企业产品数据，具体参见EIS的企业产品的文档").append(Global.spliteCharacter)
+			  .append("5）SPD同步备货通知单给中山医ERP").append(Global.spliteCharacter)
+			  .append("6）由SPD定时轮训从ERP获取送货单");
+		
+		Map<String, String> properties = new HashMap<String, String>();
+		properties.put(PROP_NAME_HOST_IP, conf.getProperty(PROP_NAME_HOST_IP).toString());
+		properties.put(PROP_NAME_USER_CODE, conf.getProperty(PROP_NAME_USER_CODE).toString());
+		properties.put(PROP_NAME_PASSWORD, conf.getProperty(PROP_NAME_PASSWORD).toString());
+		properties.put(PROP_NAME_PCS_USER_ID, conf.getProperty(PROP_NAME_PCS_USER_ID).toString());
+		properties.put(PROP_NAME_PARTNER_CODE, conf.getProperty(PROP_NAME_PARTNER_CODE).toString());
+		properties.put("集成参数", "zsy_" + YardGlobalInfo.integration_params);
+		
+		Map<String, String> methodDesc = new HashMap<String, String>();
+		methodDesc.put(CustomComponentDoc.doc_sync_prepare_inform, "将SPD的备货通知单同步给中山医ERP, 客户ID对码(将SPD备货仓库ID转换成客户ID, 从而获得客户)");
+		methodDesc.put(CustomComponentDoc.doc_get_delivery_orders, "定时轮训从中山医ERP获取送货单, 转换成SPD的送货单对象, 然后创建SPD的批量任务, 之后调用中山医接口进行收货确认");
+		//TODO 与中山医集成备货退货后把注释打开
+		//methodDesc.put(CustomComponentDoc.doc_sync_return_goods, "将SPD的备货退货单同步给中山医ERP，客户ID对码逻辑与备货通知保持一致");
+		methodDesc.put(CustomComponentDoc.doc_sync_finacial_reconciliation, "将SPD的财务对账单同步给中山医ERP, 对应中山医的销售结算单, 需要传送货单信息, 所以结算单明细对应到物权变更明细关联明细, 根据关联明细数量的正负来结算单明细类型");
+		
+		doc = new CustomComponentDoc(name, summary.toString(), beanName, className, properties, methodDesc);
+	}
+
+	public synchronized String getAccessToken(){
+		if(StringUtils.isEmpty(accessToken)){
+			fetchAccessToken();
+		}
+		return accessToken;
+	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public String fetchAccessToken(){
+		String url = conf.get(PROP_NAME_HOST_IP) + "/user_token_standby?userCode={userCode}&password={password}&partnerCode={partnerCode}";
+		try{
+			HttpHeaders headers =new HttpHeaders();
+			List<MediaType> accepts = new ArrayList<MediaType>();
+			accepts.add(MediaType.APPLICATION_JSON);
+		    headers.setAccept(accepts);
+		    headers.setContentType(MediaType.APPLICATION_JSON);
+		    HttpEntity request = new HttpEntity(null, headers);
+		    
+		    ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class, conf.get(PROP_NAME_USER_CODE), conf.get(PROP_NAME_PASSWORD), conf.get(PROP_NAME_PARTNER_CODE));
+		    String responseBody = response.getBody();
+			Map<String, String> result = Global.defaultObjectMapper.readValue(responseBody, new TypeReference<Map<String, String>>() {});
+			accessToken = result.get("accessToken");
+			log.info("get accessToken:{}", accessToken);
+		}catch(Exception e){
+			log.error("获取中山医凭证失败", e);
+		}
+		return accessToken;
+	}
+	
+	@Override
+	public SpdPrepareInformBiz syncPrepareInform(SpdPrepareInformBiz prepareInform, YdsEdsGoodsRepository egRepository) throws OperateFailException {
+		String url = conf.get(PROP_NAME_HOST_IP) + "/b2b/set_order_bill?accessToken={accessToken}";
+		String accessToken = getAccessToken();
+		
+		try{
+			B2BOrderBill b2bPrepareInform = piAssember.build(prepareInform, egRepository);
+			ResponseEntity<String> responseJson = restTemplate.postForEntity(url, getHttpEntity(b2bPrepareInform), String.class, accessToken);
+			log.info("prepareInform response:{}", responseJson.getBody());
+		}catch(RestAccessException e){
+			log.warn("接口访问失败:{}", e.getErrorInfo().toString());
+			throw e;
+		}catch(Exception e){
+			log.error(ExceptionUtils.getStackTrace(e));
+			throw new InvalidDataException(e.getMessage());
+		}
+		return prepareInform;
+	}
+	
+	@Override
+	public SpdReturnGoodsBiz syncReturnGoods(SpdReturnGoodsBiz returnGoods) throws Exception {
+		String url = conf.get(PROP_NAME_HOST_IP) + "/b2b/set_order_bill?accessToken={accessToken}";
+		String accessToken = getAccessToken();
+		
+		try{
+			B2BOrderBill b2bReturnGoods = rgAssember.build(returnGoods);
+			ResponseEntity<String> responseJson = restTemplate.postForEntity(url, getHttpEntity(b2bReturnGoods), String.class, accessToken);
+			log.info("returnGoods response:{}", responseJson.getBody());
+		}catch(RestAccessException e){
+			log.info(e.getErrorInfo().toString());
+			throw e;
+		}catch(Exception e){
+			log.error(ExceptionUtils.getStackTrace(e));
+			throw new InvalidDataException(e.getMessage());
+		}
+		return returnGoods;
+	}
+	
+	@Override
+	public SpdFinacialReconciliationBiz syncFinacialReconciliationBiz(SpdFinacialReconciliationBiz reconciliationBiz) throws Exception {
+		try{
+			String url = conf.get(PROP_NAME_HOST_IP) + "/b2b/set_settle_bill?accessToken={accessToken}";
+			String accessToken = getAccessToken();
+			B2BSettleBill settleBill = frAssember.build(reconciliationBiz);
+			ResponseEntity<String> responseJson = restTemplate.postForEntity(url, getHttpEntity(settleBill), String.class, accessToken);
+			log.info("finacialReconciliation response:{}", responseJson.getBody());
+		}catch(RestAccessException e){
+			log.info(e.getErrorInfo().toString());
+			throw e;
+		}catch(Exception e){
+			log.error(ExceptionUtils.getStackTrace(e));
+			throw new InvalidDataException(e.getMessage());
+		}
+		
+		return reconciliationBiz;
+	}
+	
+	public B2BTaskBills getTaskBills() throws Exception{
+		String accessToken = getAccessToken();
+		String url = conf.getProperty(PROP_NAME_HOST_IP) + "/b2b/get_task_bills?accessToken={accessToken}";
+		ResponseEntity<String> responseJson = restTemplate.exchange(url, HttpMethod.GET, getHttpEntity(null), String.class , accessToken);
+		log.info("delivery response:{}", responseJson.getBody());
+		B2BTaskBills taskBills = Global.defaultObjectMapper.readValue(responseJson.getBody(), B2BTaskBills.class);
+		return taskBills;
+	}
+	
+	public B2BTaskBillAffirms confirmTaskBills(B2BTaskBillAffirms taskBills) throws Exception{
+		String accessToken = getAccessToken();
+		String url = conf.getProperty(PROP_NAME_HOST_IP) + "/b2b/get_task_bills?accessToken={accessToken}";
+		ResponseEntity<B2BTaskBillAffirms> response = restTemplate.postForEntity(url,  getHttpEntity(taskBills), B2BTaskBillAffirms.class , accessToken);
+		taskBills = response.getBody();
+		return taskBills;
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private HttpEntity getHttpEntity(Object entity) throws IOException{
+		HttpHeaders headers = new HttpHeaders();
+	    headers.setContentType(MediaType.APPLICATION_JSON);
+	    if(entity != null){
+		    String jsonStr = Global.defaultObjectMapper2.writeValueAsString(entity);
+		    log.info("request:{}", jsonStr);
+		    entity = Global.defaultObjectMapper2.readValue(jsonStr, entity.getClass());
+	    }
+	    HttpEntity request = new HttpEntity(entity, headers);
+	    return request;
+	}
+	
+	@SuppressWarnings("unchecked") @Override
+	public SpdDeliveryOrders syncDeliveryOrders() throws Exception {
+		B2BTaskBills taskBills = getTaskBills();
+		
+		SpdDeliveryOrders deliveryOrders = deliveryFactory.buildDeliveryOrder(taskBills);
+		
+		PcsUser user = userRepository.findAll().findById(conf.get(PROP_NAME_PCS_USER_ID).toString());
+		
+		YardBatchTask<SpdDeliveryOrders> batchTask = null;
+		try{
+			batchTask = batchTaskFactory.createDeliveryBatchTask(deliveryOrders);
+			batchTask = btService.createBatchTask(user, batchTask);
+		}catch(InvalidDataException e){
+			if(e.getExceptionType() == YardExceptionType.invalid_batch_task_exist){
+				List<String> orderNos = CollectionUtils.pluck("orderNo", deliveryOrders);
+				log.warn("已经提交过相同的批量任务,重新确认送货单:{}", orderNos);
+				confirmTaskBills(new B2BTaskBillAffirms(deliveryOrders));
+				return new SpdDeliveryOrders();
+			}else if(e.getExceptionType() == YardExceptionType.invalid_delivery_order){
+				log.error("无效的送货单:{}", Global.defaultObjectMapper.writeValueAsString(taskBills));
+			}else{
+				log.error("送货单批量任务创建失败", e);
+			}
+			throw e;
+		}
+		return batchTask == null ? null : batchTask.getData();
+	}
+	
+}
+
+

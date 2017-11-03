@@ -1,0 +1,94 @@
+package cn.ak4j.yard.yds.repository;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.service.YdsGoodsService;
+
+@Ignore
+public class YdsGoodsRepositoryTest extends BaseTest{
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsService goodsService;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	
+	@Test public void testFindByIdsWithUsableLots(){
+		List<String> goodsIds = new ArrayList<String>();
+		goodsIds.add("goods_id_015");
+		
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds).fillUsableLots(glRepository, ssRepository);
+		assertEquals(2, goodss.getAllUseableGoodsLots().size());
+	}
+	
+	@Test public void testFind(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsType(new ListParam<String>(YdsGoodsType.drug.getCode()));
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(params, depotRepository, dcRepository));
+		
+		YdsGoods goods = new YdsGoods();
+		goods.setGoodsType(YdsGoodsType.drug.getCode());
+		goods.setWareName("九九胃泰颗粒");
+		goods.setGoodsName("九九胃泰颗粒");
+		goods.setGoodsCode("gc_170306099");
+		goods.setGoodsSpec("10ml*10支");
+		goods.setGoodsModel("其他");
+		goods.setPackingSpec("2.5g*10包");
+		goods.setFactName("华润三九制药有限公司");
+		goods.setUnitPrice(13f);
+		goods.setBigName("盒");
+		goods.setBigSum(10);
+		goods.setMidName("包");
+		goods.setMidSum(1);
+		goods.setMinName("包");
+		goods.setMinSum(1);
+		goods.setBaseName("盒");
+		goods.setPrepareUnitLv(4);
+		goods.setStoreUnitLv(3);
+		goods.setConsumeUnitLv(2);
+		goods.setSettleUnitLv(4);
+		goods.setEnabled(true);
+		goods.setAthDoc("国药准字H66358959");
+		goods.setChannelType("spd_web");
+		goods.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		goodsService.add(goods, user);
+		wait(2);
+		goodss = new YdsGoodss(goodsRepository.findAll().find(params, depotRepository, dcRepository));
+		assertEquals(39, goodss.size());
+		
+		params.setDepotId(new ListParam<String>("depot_id_001"));
+		goodss = new YdsGoodss(goodsRepository.findAll().find(params, depotRepository, dcRepository));
+		assertEquals(37, goodss.size());
+		
+		params = new YdsGoodsParams();
+		params.setGoodsName(new ListParam<String>("九九"));
+		params.setDepotId(new ListParam<String>("depot_id_001"));
+		goodss = new YdsGoodss(goodsRepository.findAll().find(params, depotRepository, dcRepository));
+		assertEquals(0, goodss.size());
+	}
+	
+}

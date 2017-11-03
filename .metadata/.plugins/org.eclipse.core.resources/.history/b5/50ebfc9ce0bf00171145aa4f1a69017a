@@ -1,0 +1,1 @@
+delete spd_feedback_rule where id in('ma_fb_id_11','ma_fb_id_13','as_fb_id_10','ret_fb_id_18','cns_fb_id_14');

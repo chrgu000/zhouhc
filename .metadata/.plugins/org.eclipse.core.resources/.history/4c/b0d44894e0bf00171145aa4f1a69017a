@@ -1,0 +1,81 @@
+package cn.ak4j.yard.spd.wrapper.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name="SPD_TURNOVER_BOX")
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class SpdTurnoverBox extends SpdAbstractWrapper{
+
+	@Getter @Setter
+	private boolean enabled;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo; 
+	
+	public boolean isUseable(){
+		return  getSceneType() == SpdSceneType.idle
+				&& isEnabled() 
+				&& getCheckState() == CheckState.commited;
+	}
+	
+	public void usedBy(String ownerId, SpdSceneType scene){
+		setOwnerId(ownerId);
+		setSceneCode(scene.getCode());
+		updateLastUpdateTime();
+	}
+
+	public void release() {
+		super.clean();
+		setOwnerId(Constant.none);
+		setSceneCode(SpdSceneType.idle.getCode());
+		updateLastUpdateTime();
+	}
+	
+	public void putIn(SpdIWrappable wrapperItem) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public void getOut(SpdIWrappable wrapperItem) {
+		
+	}
+
+	public void verifyTurnoverBoxCodeExist(SpdTurnoverBoxRepository tbRepository) {
+		SpdTurnoverBox theBox = tbRepository.findAll().findByWrapperNo(getWrapperNo());
+		if(theBox == null){
+			return ;
+		}
+		if(StringUtils.isEmpty(getId())){
+			throw new InvalidDataException(String.format("当前箱号:[%s]已经存在，请重新填写！", getWrapperNo())); 
+		}else{
+			if(!getId().equals(theBox.getId())){
+				throw new InvalidDataException(String.format("当前箱号:[%s]已经存在，请重新填写！", getWrapperNo()));
+			}
+		}
+	}
+	
+	public boolean isIdle(){
+		if(getSceneCode().equals(SpdSceneType.idle.getCode())){
+			return true;
+		}
+		return false;
+	}
+
+}

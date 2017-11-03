@@ -1,0 +1,76 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdDailyCleanBizSteps;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdBizAssistantService;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdDailyCleanBizRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class SpdDailyCleanAssistantService extends SpdBizAssistantService<SpdDailyCleanBiz>{
+
+	@Autowired private SpdDailyCleanBizService dcbService;
+	@Autowired private SpdDailyCleanBizRepository dcbRepository;
+	
+	@Override
+	public void process(SpdDailyCleanBiz dailyClean, String taskId, String userId, String action) {
+		if(dailyClean.isCompleted()){
+			log.warn("收到消息[{}]，但是日清业务[{}]已完成", action, dailyClean.getBizCode());
+			return ;
+		}
+		dcbService.fillAllRelations(dailyClean);
+		
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		dailyClean = forwardBizStep(dailyClean, taskId, action);
+		try{
+			if(dailyClean.getCurrentBizStep().equals(SpdDailyCleanBizSteps.create_daily_clean)){
+				if(dailyClean.getBizRule().getFeedbackRule().getAutoReviewDailyClean()){
+					dcbService.reviewDailyClean(dailyClean, dailyClean.getLastUpdateTime(), user);
+				}
+			}
+		}catch(Exception e){
+			handleException(action, dailyClean, e);
+		}
+		
+		saveBizLog(dailyClean, user);
+		dcbRepository.save(dailyClean);
+	}
+
+	@Override
+	protected SpdDailyCleanBiz forwardBizStep(SpdDailyCleanBiz biz, String taskId, String action) {
+		SpdBizStep currentStep = biz.getCurrentBizStep();
+		
+		if(currentStep == null){
+			biz.setBizStatusCode(biz.getBizSteps().get(0).getStatusCode());
+		}else{
+			SpdBizStep nextStep = biz.getNextStep();
+			if(nextStep == null){
+				log.warn("已经完成了最后一个步骤，不需要步进");
+				return biz;
+			}
+			
+			if((nextStep == SpdDailyCleanBizSteps.create_daily_clean && action.equals(AmqpMsgType.CREATE_DAILY_CLEAN_BIZ.getCode()))
+				|| (nextStep == SpdDailyCleanBizSteps.review_daily_clean && action.equals(AmqpMsgType.REVIEW_DAILY_CLEAN_BIZ.getCode()))){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else{
+				log.info("{}, {}, {}", currentStep.getStatusCode(), nextStep.getStatusCode(), action);
+				throw new OperateFailException(YardExceptionType.biz_forward_fail, action, nextStep.getStatusName());
+			}
+		}
+		
+		return biz;
+	}
+
+	
+	
+}

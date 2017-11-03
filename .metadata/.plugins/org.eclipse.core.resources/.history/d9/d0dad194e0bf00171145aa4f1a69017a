@@ -1,0 +1,53 @@
+package cn.ak4j.yard.spd.bizrule.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRules;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdFeedbackRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdBizRuleParams;
+import lombok.Getter;
+
+@SuppressWarnings("rawtypes")
+@Repository
+public class SpdBizRuleRepository extends BaseRepository<SpdAbstractBizRule, SpdAbstractBizRules, SpdBizRuleParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdFeedbackRuleRepository fbrRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	
+	@Cacheable(value="longTimeCache", key="\"allBizRulesWithRelation\"")
+	public SpdAbstractBizRules findAllWithRelations(){
+		SpdAbstractBizRules bizRules = getAll();
+
+		SpdFeedbackRules allFeedbackRules = fbrRepository.findAll();
+		bizRules.fillFeedbackRules(allFeedbackRules);
+		
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		PcsDepts allDepts = deptRepository.findAllWithRelations();
+		
+		bizRules.getAllReplenishRules().fillAllRelations(allDepots, bizRules);
+		bizRules.getAllReceiveRules().fillAllRelations(allDepts, allDepots, bizRules);
+		bizRules.getAllPrepareInformRules().fillAllRelations(allDepts, allDepots, bizRules);
+		bizRules.getAllConsumeRules().fillAllRelations(allDepots);
+		bizRules.getAllReturnGoodsRules().fillAllRelations(allDepots, allDepts, bizRules);
+		bizRules.getAllMoveAreaRules().fillAllRelations(allDepots);
+		bizRules.getAllAdjustStockRules().fillAllRelations(allDepots);
+		bizRules.getAllDailyCleanRules().fillAllRelations(allDepots);
+		bizRules.getAllFinacialReconciliationRules().fillAllRelations(allDepots, allDepts);
+		
+		return bizRules;
+	}
+
+	
+}

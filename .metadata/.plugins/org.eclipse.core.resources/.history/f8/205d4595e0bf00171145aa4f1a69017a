@@ -1,0 +1,242 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.List;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.domain.YardCodeParser;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@SuppressWarnings("serial")
+@Entity
+@Table(name = "pcs_depot")
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class PcsDepot extends YardMaintenceEntity {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name = "uuidGenerator", strategy = "uuid")
+	@Getter @Setter
+	private String depotId;
+	
+	@Getter @Setter
+	private String manageOrgId;// 管理机构
+	
+	@Getter @Setter @NotEmpty(message="管理部门不能为空")
+	private String manageDeptId;// 管理部门
+	
+	@Getter @Setter
+	private String depotType;// 仓库类型
+	
+	@Getter @Setter @Column(name = "IS_FIXED")
+	private boolean fixed;// 定数存储
+	
+	@Getter @Setter @NotEmpty(message="仓库名称不能为空")
+	private String depotName;// 仓库名称
+	
+	@Getter @Setter @NotEmpty(message="仓库编码不能为空")
+	private String depotCode;// 仓库编码
+	
+	@Getter @NotEmpty(message="仓库地址不能为空")
+	private String depotAddress;// 仓库地址
+	
+	@Getter @Setter
+	private boolean enabled;// 禁用标记
+	
+	@Getter @Setter @Column(name = "IS_CENTRAL")
+	private boolean central;// 是否中心库
+	
+	@Getter @Setter @NotEmpty(message="联系人不能为空")
+	private String linkMan;// 联系人
+	
+	@Getter @Setter @NotEmpty(message="联系电话不能为空")
+	private String linkTel;// 联系电话
+	
+	@Getter @Setter
+	private String goodsType;//产品类型
+
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();// 审核状态
+	
+	@Getter @Setter
+	@Embedded private MaintenanceInfo maintenanceInfo;
+	
+	@Getter @Setter @Transient 
+	private PcsDept manageDept;
+	
+	@Setter @Transient 
+	private YardArbitraryCode sysCode;
+	
+	@Transient @JsonIgnore @Getter
+	private PcsDepotAreas areas;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotCards cards;
+	
+	public void verify(PcsDepotRepository depotRepository){
+		verifyCode(depotRepository);
+		verifyDepotName(depotRepository);
+	}
+	
+	private void verifyDepotName(PcsDepotRepository depotRepository) {
+		PcsDepotParams params = new PcsDepotParams();
+		params.setDepotName(new ListParam<String>(getDepotName()));
+		PcsDepots theDepots = (PcsDepots)depotRepository.findAll().find(params);
+		if(CollectionUtils.isEmpty(theDepots)){
+			return ;
+		}
+		
+		if(StringUtils.isEmpty(getDepotId())){
+			log.warn(String.format(YardExceptionType.invalid_exist_depot_name.getDescription(), getDepotName()));
+			throw new InvalidDataException(YardExceptionType.invalid_exist_depot_name, getDepotName());
+		}else{
+			if(!theDepots.getIds().contains(getDepotId())){
+				throw new InvalidDataException(YardExceptionType.invalid_exist_depot_name, getDepotName());
+			}
+		}
+	}
+
+	private void verifyCode(PcsDepotRepository depotRepository){
+		PcsDepot theDepot = depotRepository.findAll().findByDepotCode(getDepotCode());
+		
+		if(theDepot == null){
+			return ;
+		}
+		
+		if(StringUtils.isEmpty(getDepotId())){
+			throw new InvalidDataException(YardExceptionType.invalid_resource_exist, getDepotCode());
+		}
+		else{
+			if(!getDepotId().equals(theDepot.getDepotId())){
+				throw new InvalidDataException(YardExceptionType.invalid_resource_exist, getDepotCode());
+			}
+		}
+	}
+	
+	@Transient public String getManageDeptOrgName(){
+		return getManageDept() == null ? "" :  String.format("%s[%s]", getManageDept().getDeptName(), getManageDept().getOrg().getOrgName());
+	}
+
+	public void setDepotAddress(String depotAddress) {
+		this.depotAddress = depotAddress;
+	}
+
+	public String getPcsDepotEnabled() {
+		return this.enabled ? "是" : "否";
+	}
+
+	public YardArbitraryCode getSysCode(){
+		return YardCodeParser.parseArbitraryCode(getDepotCode());
+	}
+	
+	public void setAreas(PcsDepotAreas areas){
+		this.areas = areas;
+		if(CollectionUtils.isEmpty(areas)){
+			return ;
+		}
+		for(PcsDepotArea area : areas){
+			area.setDepot(this);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public PcsDepotAreas findAreasByGoodsIds(List<String> goodsIds, PcsAreaType areaType) {
+		if(getCards() == null){
+			throw new OperateFailException("查找失败，没有加载账页");
+		}
+		SpdDepotCards cards = getCards().findEnableCardByGoodsIds(goodsIds);
+		List<String> shelfIds = null;
+		if(areaType == PcsAreaType.normal){
+			shelfIds = cards.pluck("shelfId");
+		}else if(areaType == PcsAreaType.isolation){
+			shelfIds = cards.pluck("isolationShelfId");
+		}else if(areaType == PcsAreaType.unqualified){
+			shelfIds = cards.pluck("unqualifiedShelfId");
+		}
+
+		PcsDepotShelfs shelfs = getAreas().findShelfsByShelfId(shelfIds);
+		List<String> areaIds = shelfs.pluck("areaId");
+		
+		return getAreas().findByIds(areaIds);
+	}
+
+	public void hasEnoughCapacity(List<SpdGoodsQty> goodsQty) {
+		
+	}
+
+	public YdsGoodss whichHasNotCards(YdsGoodss allGoodss, String areaType) {
+		YdsGoodss goodssWithOutCards = new YdsGoodss();
+		SpdDepotCards cards = getCards();
+		for(YdsGoods goods : allGoodss){
+			if(goods == null){
+				continue;
+			}
+			SpdDepotCard card = cards.findEnableCardByGoodsId(goods.getGoodsId());
+			if(card != null){
+				if(areaType.equals(PcsAreaType.normal.getCode()) && StringUtils.isNotEmpty(card.getShelfId())){
+					continue;
+				}else if(areaType.equals(PcsAreaType.isolation.getCode()) && StringUtils.isNotEmpty(card.getIsolationShelfId())){
+					continue;
+				}else if(areaType.equals(PcsAreaType.unqualified.getCode()) && StringUtils.isNotEmpty(card.getUnqualifiedShelfId())){
+					continue;
+				}else{
+					goodssWithOutCards.add(goods);
+				}
+			}
+			goodssWithOutCards.add(goods);
+		}
+		return goodssWithOutCards;
+	}
+
+	public PcsDepotArea findAreayByAreaId(String taskAreaId) {
+		return CollectionUtils.findWhere("depotAreaId", taskAreaId, this.areas);
+	}
+
+	public void fillCards(SpdDepotCardRepository dcRepository) {
+		SpdDepotCards cards = new SpdDepotCards(CollectionUtils.find("depotId", depotId, dcRepository.findAll()));
+		setCards(cards);
+	}
+
+	
+	public void fillManageDept(PcsDepts depts) {
+		PcsDept manageDept = CollectionUtils.findWhere("deptId", getManageDeptId(), depts);
+		setManageDept(manageDept);
+	}
+	
+	
+}

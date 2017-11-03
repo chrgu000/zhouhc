@@ -1,0 +1,2 @@
+alter table spd_prp_chg_item_relation modify(send_code varchar(32) null);
+alter table spd_prp_chg_item_relation modify(send_item_code varchar(32) null);

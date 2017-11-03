@@ -1,0 +1,199 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.SpdOriginItemCondition;
+import cn.ak4j.yard.spd.bizplan.enums.SpdGoodsSpecificationType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdReplenishFeedbackRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+
+public class SpdReplenishRuleTest extends BaseTest{
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	
+	@Test public void testIsApply(){
+		SpdReplenishRules rules = brRepository.findAllWithRelations().getAllReplenishRules();
+		
+		SpdReplenishRule rule07 = (SpdReplenishRule)rules.findById("rep_rule_id_07");
+		assertFalse(rule07.isApply());
+	}
+	
+	@Test public void testEqualsRule(){
+		SpdReplenishRules rules = brRepository.findAllWithRelations().getAllReplenishRules();
+		
+		SpdReplenishRule rule11_01 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		SpdReplenishRule rule11_01_001 = buildNewReplenishRule(rule11_01);
+		
+		SpdReplenishRule rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		SpdReplenishRule rule07 = (SpdReplenishRule)rules.findById("rep_rule_id_07");
+		
+		SpdReplenishRules newRules = new SpdReplenishRules();
+		newRules.add(rule11_01);
+		newRules.add(rule11_02);
+		
+		assertTrue(newRules.contains(rule11_01));
+		assertTrue(newRules.contains(rule11_02));
+		assertFalse(newRules.contains(rule07));
+		
+		assertTrue(rule11_01.equalsRule(rule11_02));
+		assertFalse(rule11_01.equalsRule(rule07));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.setFeedbackRuleId("rep_fb_id_010");
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getDirectionRule().setFromDepotId("depot_id_002");
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getDirectionRule().setFromDepotAreaType(PcsAreaType.isolation.getCode());
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getDirectionRule().setToDepotId("depot_id_003");
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getDirectionRule().setToDepotAreaType(PcsAreaType.isolation.getCode());
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getContractRule().setFromDepotCanApply(true);
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getContractRule().setFromDepotCanConfirm(false);
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getContractRule().setToDepotCanApply(false);
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getContractRule().setToDepotCanConfirm(true);
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getTaskRule().setAutoSetBizConfirmQty(false);
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getTaskRule().setAutoSetOffShelfTaskConfirmQty(false);
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getTaskRule().setUseTurnoverBox(true);
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+		
+		rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		rule11_02.getGoodsRule().setSpecificationTypeCode("lot");
+		assertFalse(rule11_01_001.equalsRule(rule11_02));
+	}
+	
+	@Test public void testValid(){
+		SpdReplenishRules rules = brRepository.findAllWithRelations().getAllReplenishRules();
+		
+		SpdReplenishRule rule11_01 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		assertTrue(rule11_01.isValid());
+		
+		SpdReplenishDirectionRule directionRule = rule11_01.getDirectionRule();
+		directionRule.setFromDepotId(directionRule.getToDepotId());
+		assertFalse(rule11_01.isValid());
+	}
+	
+	@Test public void testUpdate(){
+		SpdReplenishRules rules = brRepository.findAllWithRelations().getAllReplenishRules();
+		SpdReplenishRule rule11_01 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		SpdReplenishRule rule11_01_001 = buildNewReplenishRule(rule11_01);
+		
+		SpdReplenishRule rule11_02 = (SpdReplenishRule)rules.findById("rep_rule_id_11");
+		SpdReplenishRule rule11_03 = buildNewReplenishRule(rule11_02);
+		
+		rule11_01_001.setName("测试");
+		rule11_01_001.setPrior(100);
+		rule11_01_001.setEnabled(false);
+		rule11_01_001.setCanBeOriginRule(true);
+		rule11_01_001.setOriginItemCondition(SpdOriginItemCondition.any.getCode());
+		rule11_01_001.setManualApply(false);
+		
+		rule11_01_001.getTaskRule().setAutoSetBizConfirmQty(false);
+		rule11_01_001.getTaskRule().setAutoSetOffShelfTaskConfirmQty(false);
+		rule11_01_001.getTaskRule().setUseTurnoverBox(true);
+		
+		rule11_01_001.setFeedbackRuleId("");
+		rule11_01_001.setOriginRuleId("rep_rule_id_10");
+		rule11_01_001.getDirectionRule().setFromDepotId("depot_id_006");
+		rule11_01_001.getDirectionRule().setFromDepotAreaType(PcsAreaType.isolation.getCode());
+		rule11_01_001.getDirectionRule().setToDepotId("depot_id_003");
+		rule11_01_001.getDirectionRule().setToDepotAreaType(PcsAreaType.isolation.getCode());
+		
+		rule11_01_001.getContractRule().setFromDepotCanApply(true);
+		rule11_01_001.getContractRule().setFromDepotCanConfirm(false);
+		rule11_01_001.getContractRule().setToDepotCanApply(false);
+		rule11_01_001.getContractRule().setToDepotCanConfirm(true);
+		
+		rule11_01_001.getGoodsRule().setSpecificationTypeCode(SpdGoodsSpecificationType.lot.getCode());
+		
+		rule11_02.update(rule11_01_001);
+		
+		assertTrue(rule11_03.getName()!=rule11_02.getName());
+		assertTrue(rule11_03.getPrior()!=rule11_02.getPrior());
+		assertTrue(rule11_03.getEnabled()!=rule11_02.getEnabled());
+		assertTrue(rule11_03.getCanBeOriginRule()!=rule11_02.getCanBeOriginRule());
+		assertTrue(rule11_03.getOriginItemCondition()!=rule11_02.getOriginItemCondition());
+		assertTrue(rule11_03.getManualApply()!=rule11_02.getManualApply());
+		
+		assertTrue(rule11_03.getTaskRule().getAutoSetBizConfirmQty()!=rule11_02.getTaskRule().getAutoSetBizConfirmQty());
+		assertTrue(rule11_03.getTaskRule().getAutoSetOffShelfTaskConfirmQty()!=rule11_02.getTaskRule().getAutoSetOffShelfTaskConfirmQty());
+		assertTrue(rule11_03.getTaskRule().getUseTurnoverBox()!=rule11_02.getTaskRule().getUseTurnoverBox());
+		
+		assertTrue(rule11_03.getFeedbackRuleId()==rule11_02.getFeedbackRuleId());
+		assertTrue(rule11_03.getOriginRuleId()==rule11_02.getOriginRuleId());
+		
+		assertTrue(rule11_03.getContractRule().getFromDepotCanApply()==rule11_02.getContractRule().getFromDepotCanApply());
+		assertTrue(rule11_03.getContractRule().getFromDepotCanConfirm()==rule11_02.getContractRule().getFromDepotCanConfirm());
+		assertTrue(rule11_03.getContractRule().getToDepotCanApply()==rule11_02.getContractRule().getToDepotCanApply());
+		assertTrue(rule11_03.getContractRule().getToDepotCanConfirm()==rule11_02.getContractRule().getToDepotCanConfirm());
+		
+		assertTrue(rule11_03.getDirectionRule().getFromDepotId()==rule11_02.getDirectionRule().getFromDepotId());
+		assertTrue(rule11_03.getDirectionRule().getFromDepotAreaType()==rule11_02.getDirectionRule().getFromDepotAreaType());
+		assertTrue(rule11_03.getDirectionRule().getToDepotId()==rule11_02.getDirectionRule().getToDepotId());
+		assertTrue(rule11_03.getDirectionRule().getToDepotAreaType()==rule11_02.getDirectionRule().getToDepotAreaType());
+
+		assertTrue(rule11_03.getGoodsRule().getSpecificationTypeCode()==rule11_02.getGoodsRule().getSpecificationTypeCode());
+		
+	}
+	
+	public SpdReplenishRule buildNewReplenishRule(SpdReplenishRule replenishRule){
+		SpdReplenishRule rule = new SpdReplenishRule();
+		rule.setName(replenishRule.getName());
+		rule.setPrior(replenishRule.getPrior());
+		SpdReplenishFeedbackRule feedbackRule = new SpdReplenishFeedbackRule();
+		BeanUtils.copyProperties(replenishRule.getFeedbackRule(), feedbackRule);
+		rule.setFeedbackRuleId(replenishRule.getFeedbackRuleId());
+		rule.setFeedbackRule(feedbackRule);
+		SpdReplenishDirectionRule directionRule = new SpdReplenishDirectionRule();
+		BeanUtils.copyProperties(replenishRule.getDirectionRule(), directionRule);
+		rule.setDirectionRule(directionRule);
+		SpdReplenishContractRule contractRule = new SpdReplenishContractRule();
+		BeanUtils.copyProperties(replenishRule.getContractRule(), contractRule);
+		rule.setContractRule(contractRule);
+		SpdReplenishTaskRule taskRule = new SpdReplenishTaskRule();
+		BeanUtils.copyProperties(replenishRule.getTaskRule(), taskRule);
+		rule.setTaskRule(taskRule);
+		SpdReplenishGoodsRule goodsRule = new SpdReplenishGoodsRule();
+		BeanUtils.copyProperties(replenishRule.getGoodsRule(), goodsRule);
+		rule.setGoodsRule(goodsRule);
+		
+		return rule;
+	}
+	
+}

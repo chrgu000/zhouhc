@@ -1,0 +1,69 @@
+package cn.ak4j.yard.yds.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import lombok.Getter;
+
+@Repository
+public class YdsGoodsLotRepository extends BaseRepository<YdsGoodsLot, YdsGoodsLots, YdsGoodsLotParams, String> {
+	
+	
+	@Autowired @Getter 
+	private EntityManager entityManager;
+	
+	@Autowired @Lazy 
+	private YdsGoodsRepository goodsRepository;
+	
+	@Cacheable(value="longTimeCache", key="\"allLots\"")
+	public YdsGoodsLots findAll(){
+		return getAll();
+	}
+	
+	@Cacheable(value="longTimeCache", key="\"allLotsWithGoods\"")
+	public YdsGoodsLots findAllWithGoods(){
+		YdsGoodsLots allLots = getAll();
+		YdsGoodss goodss = goodsRepository.findAll();
+		allLots.fillGoodss(goodss);
+		return allLots;
+	}
+	
+	@Deprecated
+	public YdsGoodsLots find(YdsGoodsLotParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+	@Deprecated
+	public YdsGoodsLots find(YdsGoodsLotParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsGoodsLots findByIds(List<String> ids){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsGoodsLot findOne(String lotId){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+	@Deprecated
+	public int count(YdsGoodsLotParams params) {
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+}

@@ -1,0 +1,22 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.BaseTest;
+
+public class SpdBizLogicStratageTypeResourceTest extends BaseTest{
+
+	@SuppressWarnings({ "unchecked" })
+	@Test public void testFindSpdBizLogicStratageTypes() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		List<Map<String, String>> types = mockMvcHelper.mockGet(new ArrayList<Map<String, String>>().getClass(), "/spd/spdBizLogicStratageTypes?accessToken={accessToken}", accessToken);
+		assertEquals(11, types.size());
+	}
+	
+}

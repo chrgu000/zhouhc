@@ -1,0 +1,236 @@
+package cn.ak4j.yard.spd.stock.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdGoodsLotStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdGoodsStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.params.SpdShelfStockParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@SuppressWarnings({"unchecked"})
+public class SpdShelfStockResourceTest extends BaseTest{
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	@Test public void testGetList() throws Exception{
+		SpdShelfStocks shelfStocks = mockMvcHelper.findList(SpdShelfStocks.class, xykUserCode, null);
+		assertEquals(62, shelfStocks.size());
+		
+		shelfStocks.forEach(stock->{
+			assertNotNull(stock.getDepotShelf());
+		});
+		
+	}
+	
+	@Test public void testCount() throws Exception{
+		int count = mockMvcHelper.count(SpdShelfStocks.class, xykUserCode, null);
+		assertEquals(62, count);
+	}
+	
+	@Test public void testGetMineList() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdDepotGoodsLotStocks/mine?accessToken={accessToken}&pageSize=-1";
+		
+		SpdGoodsLotStocks goodsLotStocks = mockMvcHelper.mockGet(SpdGoodsLotStocks.class, urlTemplate, accessToken);
+		assertEquals(50, goodsLotStocks.size());
+		
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		PcsDepots depots = new PcsDepots(CollectionUtils.find("manageDeptId", user.getDeptId(), depotRepository.getAll()));
+		List<String> depotIds = depots.getIds();
+		
+		//断言得到的货位库存属于用户所属部门管理的仓库
+		goodsLotStocks.forEach(stock->{
+			assertTrue(depotIds.contains(stock.getDepotId()));
+		});
+	}
+	
+	@Test public void testMineCount() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdDepotGoodsLotStocks/mine/count?accessToken={accessToken}";
+		
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, accessToken);
+		assertEquals(50, count);
+	}
+	
+	@Test public void testGetGoodsShelfStock() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/depots/{depotId}/shelfTypes/{shelfType}/spdShelfGoodsStocks/goodsIds,{goodsIds}?accessToken={accessToken}";
+		String depotId = "depot_id_001";
+		String goodsId011 = "goods_id_011";
+		String goodsId012 = "goods_id_012";
+		String goodsIds = String.format("%s,%s", goodsId012,goodsId011);
+		
+		SpdShelfStocks goodsShelfStocks = mockMvcHelper.mockGet(SpdShelfStocks.class, urlTemplate, depotId, PcsAreaType.normal.getCode(), goodsIds, accessToken);
+		SpdShelfStock goodsShelfStock011 = CollectionUtils.findWhere("goodsId", goodsId011, goodsShelfStocks);
+		assertNotNull(goodsShelfStock011);
+		assertEquals(5235, goodsShelfStock011.getQtyByMinUnit().intValue());
+		assertEquals(205, goodsShelfStock011.getLockQtyByMinUnit().intValue());
+		assertNotNull(goodsShelfStock011.getShelfId());
+		
+		SpdShelfStock goodsShelfStock012 = CollectionUtils.findWhere("goodsId", goodsId012, goodsShelfStocks);
+		assertNotNull(goodsShelfStock012);
+		assertEquals(20, goodsShelfStock012.getQtyByMinUnit().intValue());
+		assertEquals(5, goodsShelfStock012.getLockQtyByMinUnit().intValue());
+		assertNotNull(goodsShelfStock012.getShelfId());
+	}
+	
+	//TODO 补充/yard/yard/spd/spdDepotShelfGoodsStocks的测试用例（吴彦文）
+	@Test public void testGetAllGoodsShelfStocks() throws Exception{
+		String url = "/spd/spdDepotShelfGoodsStocks?params={params}&accessToken={accessToken}&&pageSize=-1";
+		String depotId01 = "depot_id_001";
+		String depotId03 = "depot_id_003";
+		List<String> depotIds = new ArrayList<String>();
+		depotIds.add(depotId01);
+		depotIds.add(depotId03);
+		SpdShelfStockParams params = new SpdShelfStockParams();
+		params.setDepotId(new ListParam<String>(depotIds));
+		SpdShelfStocks goodsShelfStocks = mockMvcHelper.mockGet(SpdShelfStocks.class, url, Global.defaultObjectMapper.writeValueAsString(params), getAccessToken(testUserCode));
+		assertTrue(goodsShelfStocks.size()>0);
+		
+		List<String> newDepotIds = CollectionUtils.pluck("depotId", goodsShelfStocks);
+		assertEquals(2, newDepotIds.size());
+		newDepotIds.forEach(depotId->{
+			assertTrue(depotIds.contains(depotId));
+		});
+	}
+	
+	@Test public void testGetAllGoodsShelfStockCount() throws Exception{
+		String depotId01 = "depot_id_001";
+		String depotId03 = "depot_id_003";
+		List<String> depotIds = new ArrayList<String>();
+		depotIds.add(depotId01);
+		depotIds.add(depotId03);
+		SpdShelfStockParams params = new SpdShelfStockParams();
+		params.setDepotId(new ListParam<String>(depotIds));
+		String url = "/spd/spdDepotShelfGoodsStocks/count?params={params}&accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, Global.defaultObjectMapper.writeValueAsString(params), getAccessToken(testUserCode));
+		assertEquals(count, 31);
+	}
+	
+	@Test public void testGetMineGoodsShelfStocks() throws Exception{
+		String url = "/spd/spdGoodsStocks/mine?accessToken={accessToken}&pageSize=-1";
+		SpdGoodsStocks spdGoodsStocks = mockMvcHelper.mockGet(SpdGoodsStocks.class, url, getAccessToken(xykUserCode));
+		log.debug("spdGoodsStocks size:{}",spdGoodsStocks.size());
+		assertTrue(spdGoodsStocks.size()>0);
+	} 
+	
+	@Test public void testGetMineGoodsShelfStockCount() throws Exception{
+		String url = "/spd/spdGoodsStocks/mine/count?accessToken={accessToken}&pageSize=-1";
+		int count = mockMvcHelper.mockGet(Integer.class, url, getAccessToken(xykUserCode));
+		assertEquals(count, 25);
+	}
+	
+	@Test public void testGetGoodsLotShelfStock() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdDepotUseableShelfStocks?currentPage=1&pageSize=10&&params={parans}&accessToken={accessToken}";
+		SpdShelfStockParams params = new SpdShelfStockParams();
+		params.setDepotId(new ListParam<String>("depot_id_001"));
+		params.setShelfType(new ListParam<String>(PcsAreaType.normal.getCode()));
+		String paramsJson = Global.defaultObjectMapper.writeValueAsString(params);
+		
+		SpdShelfStocks goodsLotShelfStocks = mockMvcHelper.mockGet(SpdShelfStocks.class, urlTemplate, paramsJson, accessToken);
+		assertTrue(goodsLotShelfStocks.size()>0);
+	}
+	//TODO 补充 /yard/spd/spdGoodsLotShelfStocks/lotIds,{lotIds}和/yard/spd/spdGoodsLotShelfStocks/count的测试用例（吴彦文）
+	
+	@Test public void testGetShelfStockByShelfTypeAndLotIds() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/depots/{depotId}/shelfTypes/{shelfType}/spdShelfStocks/lotIds,{lotIds}?accessToken={accessToken}";
+		String depotId = "depot_id_001";
+		String goodsLotId021 = "goods_lot_id_021";
+		String goodsLotId017 = "goods_lot_id_017";
+		String goodsLotIds = String.format("%s,%s", goodsLotId021, goodsLotId017);
+		
+		SpdShelfStocks shelfStocks = mockMvcHelper.mockGet(SpdShelfStocks.class, urlTemplate, depotId, PcsAreaType.normal.getCode(), goodsLotIds, accessToken);
+		assertTrue(shelfStocks.size()>0);
+		shelfStocks.fillGoodsLots(glRepository);
+		
+		SpdShelfStock shelfStock021 = CollectionUtils.findWhere("lotId", goodsLotId021, shelfStocks);
+		assertNotNull(shelfStock021);
+		assertEquals(14799, shelfStock021.getQtyByStoreUnit());
+		assertEquals(14799, shelfStock021.getQtyByMinUnit().intValue());
+		assertEquals(0, shelfStock021.getLockQtyByMinUnit().intValue());
+		
+		SpdShelfStock shelfStock017 = CollectionUtils.findWhere("lotId", goodsLotId017, shelfStocks);
+		assertNotNull(shelfStock017);
+		assertEquals(5258, shelfStock017.getQtyByStoreUnit());
+		assertEquals(5258, shelfStock017.getQtyByMinUnit().intValue());
+		assertEquals(148, shelfStock017.getLockQtyByMinUnit().intValue());
+	}
+	
+	@Test public void testDownloadExcelFile() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdGoodsLotStocks/excel?accessToken={accessToken}");
+		
+		mockMvc.perform(get(urlTemplate, accessToken))
+//		.andDo(print())
+		.andExpect(status().isOk())
+		.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", URLEncoder.encode("仓库批次库存", Global.defaultCharset.name()))))
+		.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"));
+		
+		urlTemplate = getUrlTemplate("/spd/spdGoodsStocks/excel?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, accessToken))
+//		.andDo(print())
+		.andExpect(status().isOk())
+		.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", URLEncoder.encode("仓库产品库存", Global.defaultCharset.name()))))
+		.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"));
+		
+		urlTemplate = getUrlTemplate("/spd/spdSupplierGoodsStocks/excel?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, getAccessToken(zsyUserCode)))
+//		.andDo(print())
+		.andExpect(status().isOk())
+		.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", URLEncoder.encode("企业产品库存", Global.defaultCharset.name()))))
+		.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"));
+	}
+	
+	@Test public void testFindSpdSupplierGoodsStocks() throws Exception{
+		String accessToken = getAccessToken(zsyUserCode);
+		String url = "/spd/spdSupplierGoodsStocks?accessToken={accessToken}";
+		String depotId = "depot_id_001";
+		
+		SpdGoodsStocks spdGoodsStocks = mockMvcHelper.mockGet(SpdGoodsStocks.class, url, accessToken);
+		assertTrue(spdGoodsStocks.size()>0);
+		List<String> depotIds = spdGoodsStocks.pluck("depotId");
+		assertEquals(1, depotIds.size());
+		assertEquals(depotId, spdGoodsStocks.get(0).getDepotId());
+		
+		//TODO 资源逻辑未完善，完善之后补充断言逻辑
+	}
+	
+	@Test public void testFindSpdShelfStockReportCount() throws Exception{
+		String accessToken = getAccessToken(zsyUserCode);
+		String url = "/spd/spdSupplierGoodsStocks/count?accessToken={accessToken}";
+		
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(25, count);
+	}
+	
+}

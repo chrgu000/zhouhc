@@ -1,0 +1,6 @@
+ALTER TABLE SPD_RETURN_GOODS_RULE RENAME COLUMN "FROM_AREA_TYP" TO FROM_AREA_ID;
+
+alter table spd_return_goods_biz rename column AREA_TYPE TO FROM_AREA_ID;
+alter table spd_return_goods_biz rename column DEPOT_ID TO FROM_DEPOT_ID;
+alter table spd_return_goods_biz add(TO_ORG_ID VARCHAR2(32));
+alter table spd_return_goods_biz add(TO_DEPT_ID VARCHAR2(32));

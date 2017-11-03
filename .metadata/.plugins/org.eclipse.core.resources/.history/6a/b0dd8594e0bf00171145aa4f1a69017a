@@ -1,0 +1,56 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.PcsAreaType;
+import lombok.NoArgsConstructor;
+
+/**
+ * 批次库存集合
+ * @Description:根据货位库存集合构造批次库存
+ * @author wuyw
+ * @date 2017年10月24日上午11:06:05
+ *
+ */
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdGoodsLotStocks extends Entities<SpdGoodsLotStock>{
+
+	public SpdGoodsLotStocks(List<SpdGoodsLotStock> entities){
+		super(entities);
+	}
+	
+	public SpdGoodsLotStocks(SpdShelfStocks shelfStocks){
+		List<String> depotIds = CollectionUtils.pluck("depotId", shelfStocks);
+		depotIds.forEach(depotId->{
+			SpdShelfStocks theShelfStocks = new SpdShelfStocks(CollectionUtils.find("depotId", depotId, shelfStocks));
+			
+			List<String> lotIds = CollectionUtils.pluck("lotId", theShelfStocks);
+			lotIds.forEach(lotId->{
+				SpdShelfStocks smaeGoodsLotStocks = new SpdShelfStocks(CollectionUtils.find("lotId", lotId, theShelfStocks));
+				
+				SpdShelfStocks normalAreaTypeStocks = new SpdShelfStocks(CollectionUtils.find("shelfType", PcsAreaType.normal.getCode(), smaeGoodsLotStocks));
+				SpdShelfStocks isolationAreaTypeStocks = new SpdShelfStocks(CollectionUtils.find("shelfType", PcsAreaType.isolation.getCode(), smaeGoodsLotStocks));
+				SpdShelfStocks unqualifiedAreaTypeStocks = new SpdShelfStocks(CollectionUtils.find("shelfType", PcsAreaType.unqualified.getCode(), smaeGoodsLotStocks));
+				
+				SpdGoodsLotStock goodsLotStock = new SpdGoodsLotStock();
+				goodsLotStock.setGoods(smaeGoodsLotStocks.get(0).getGoods());
+				goodsLotStock.setDepot(smaeGoodsLotStocks.get(0).getDepot());
+				goodsLotStock.setGoodsLot(smaeGoodsLotStocks.get(0).getGoodsLot());
+				goodsLotStock.setDepotId(depotId);
+				goodsLotStock.setGoodsId(smaeGoodsLotStocks.get(0).getGoodsId());
+				goodsLotStock.setLotId(lotId);
+				goodsLotStock.setNormalQtyByStoreUnit(normalAreaTypeStocks.getTotalQtyByStoreUnit());
+				goodsLotStock.setIsolationQtyByStoreUnit(isolationAreaTypeStocks.getTotalQtyByStoreUnit());
+				goodsLotStock.setUnqualifiedQtyByStoreUnit(unqualifiedAreaTypeStocks.getTotalQtyByStoreUnit());
+				this.add(goodsLotStock);
+			});
+		});
+	}
+	
+}

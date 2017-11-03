@@ -1,0 +1,1 @@
+alter table spd_prp_chg_item_relation add (deal_qty integer default 0 not null);

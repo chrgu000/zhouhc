@@ -1,0 +1,71 @@
+package cn.ak4j.yard.extend.z2;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import cn.ak4j.yard.yds.service.YdsGoodsService;
+
+/**
+* @Description: TODO(描述该文件做什么)
+* @author zhengyf
+* @date 2017年5月21日 下午4:03:07
+* @version V1.0.0
+*/
+@Ignore
+public class YdsGoodsEventProcessTest extends BaseTest{
+
+	@Autowired private YdsGoodsService goodsService;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsUserRepository userRepository;
+	
+	@Test public void processAddGoods(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		YdsGoods goods = new YdsGoods();
+		goods.setGoodsType(YdsGoodsType.drug.getCode());
+		goods.setWareName("九九胃泰颗粒");
+		goods.setGoodsName("九九胃泰颗粒");
+		goods.setGoodsCode("gc_170306099");
+		goods.setGoodsSpec("10ml*10支");
+		goods.setGoodsModel("其他");
+		goods.setPackingSpec("2.5g*10包");
+		goods.setFactName("华润三九制药有限公司");
+		goods.setUnitPrice(13f);
+		goods.setBigName("盒");
+		goods.setBigSum(99999999);
+		goods.setMidName("包");
+		goods.setMidSum(1);
+		goods.setMinName("包");
+		goods.setMinSum(1);
+		goods.setBaseName("盒");
+		goods.setPrepareUnitLv(4);
+		goods.setStoreUnitLv(3);
+		goods.setConsumeUnitLv(2);
+		goods.setSettleUnitLv(4);
+		goods.setEnabled(true);
+		goods.setAthDoc("国药准字H66358959");
+		goods.setChannelType("spd_web");
+		goods.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		goods = goodsService.add(goods, user);
+		assertEquals(CheckState.new_created, goods.getCheckState());
+		wait(2);
+		
+		goods = goodsRepository.findAll().findById(goods.getGoodsId());
+		assertEquals(CheckState.commited, goods.getCheckState());
+		
+	}
+	
+}
+

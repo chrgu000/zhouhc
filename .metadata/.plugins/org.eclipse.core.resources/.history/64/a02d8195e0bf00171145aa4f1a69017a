@@ -1,0 +1,59 @@
+package cn.ak4j.yard.enums;
+
+import java.util.Calendar;
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum CycleType implements ITypeEnum{
+	each_day("1", "每天", ""),
+	each_week("7", "每周", ""),
+	each_month("month", "每月", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private CycleType(String _code,String _name, String description){
+		this.code = _code;
+		this.name = _name;
+		this.description = description;
+	}
+	
+	public static CycleType typeOf(String typeCode){
+		for(CycleType type : CycleType.values()){
+			if(type.getCode().equals(typeCode)){
+				return type;
+			}
+		}
+		
+		return null;
+	}
+	
+	@JsonIgnore
+	public static Date getLastCycleDate(String cycleTypeCode){
+		CycleType cycle = CycleType.typeOf(cycleTypeCode);
+		Calendar cal = Calendar.getInstance();
+		switch (cycle) {
+		case each_day:
+			cal.add(Calendar.DAY_OF_YEAR, -1);
+			break;
+		case each_week:
+			cal.add(Calendar.DAY_OF_YEAR, -7);
+			break;
+		case each_month:
+			cal.add(Calendar.MONTH, -1);
+			break;
+		default:
+			break;
+		}
+
+		return cal.getTime();
+	}
+}

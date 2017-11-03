@@ -1,0 +1,46 @@
+package cn.ak4j.yard.spd.bizplan.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import cn.ak4j.yard.enums.CommonEnumJsonSerializer;
+import cn.ak4j.yard.enums.ITypeEnum;
+
+/**
+* @Description: TODO(描述该文件做什么)
+* @author zhengyf
+* @date 2017年6月20日 下午3:55:14
+* @version V1.0.0
+*/
+@JsonSerialize(using = CommonEnumJsonSerializer.class)
+public enum SpdGoodsSpecificationType implements ITypeEnum{
+
+	goods("goods", "品种级", "针对产品品种"),
+	lot("lot", "批次级", "针对特定批次的产品");
+	
+	private String code;
+	private String name;
+	private String description;
+	
+	private SpdGoodsSpecificationType(String code, String name, String description){
+		this.code = code;
+		this.name= name;
+		this.description = description;
+	}
+	
+	public String getCode() {
+		return code;
+	}
+
+	public String getName() {
+		return name;
+	}
+	
+	public String getDescription(){
+		return description;
+	}
+	
+	public String toString(){
+		return code;
+	}
+	
+}

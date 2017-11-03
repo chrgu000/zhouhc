@@ -1,0 +1,31 @@
+package cn.ak4j.yard.spd.bizrule.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+
+
+@Data
+@SuppressWarnings("serial")
+@EqualsAndHashCode(callSuper=false)
+public class SpdBizRuleParams extends QueryParams{
+
+	private ListParam<String> id;
+	private ListParam<String> name;
+	private ListParam<String> ruleCode;
+	private ListParam<String> customName;
+	private ListParam<String> primaryName;
+	private IntegerRangeParam prior;
+	private ListParam<String> feedbackRuleId;
+	private ListParam<String> displayName;
+	private DateRangeParam createTime;
+	private DateRangeParam lastUpdateTime;
+	private ListParam<Boolean> enabled;
+	private ListParam<Boolean> canBeOriginRule;
+	private ListParam<Boolean> manualApply;
+	private ListParam<String> bizTypeCode;
+}

@@ -1,0 +1,4 @@
+delete from spd_move_area_biz;
+
+Insert into SPD_MOVE_AREA_BIZ (BIZ_ID,BIZ_CODE,BIZ_STATUS_CODE,DEPOT_ID,FROM_AREA_TYPE,TO_AREA_TYPE,YARD_ID,CHECK_STATE_CODE,CREATE_USER,CREATE_ORG,CREATE_DATE,LAST_USER,LAST_ORG,LAST_DATE,DESCRIBE,CREATOR_DEPOT_ID,BIZ_RULE_ID,CHANNEL_TYPE_CODE,REMARK) values ('move_biz_id_001','1101704191','off_shelf_task_completed','depot_id_003','normal','isolation',626,4,'user_id_005','626',to_date('2017-04-19 15:07:33','YYYY-MM-DD HH24:MI:SS'),'user_id_005','626',to_date('2017-04-19 15:07:33','YYYY-MM-DD HH24:MI:SS'),null,'depot_id_003','ma_rule_id_02','spd_web','');
+

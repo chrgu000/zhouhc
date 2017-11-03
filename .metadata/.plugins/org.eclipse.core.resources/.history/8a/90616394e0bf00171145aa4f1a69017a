@@ -1,0 +1,137 @@
+package cn.ak4j.yard.spd.task.factory;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdGoodsItem;
+import cn.ak4j.yard.spd.domain.SpdGoodsItems;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRef;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItem;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public abstract class SpdAbstractDepotTaskFactory {
+
+	@Autowired protected YardCodeService codeService;
+	@Autowired protected YdsGoodsRepository goodsRepository;
+	@Autowired protected YdsGoodsLotRepository glRepository;
+	@Autowired protected SpdLogisticsTaskRepository ltRepository;
+	@Autowired protected SpdShelfStockRepository ssRepository;
+	
+	@SuppressWarnings("unchecked")
+	public SpdDepotTasks buildFromDispatcher(SpdDispatcher dispatcher){
+		SpdDepotTasks tasks = new SpdDepotTasks();
+		
+		//根据调度明细来创建上架单
+		for(SpdDispatcherRef ref : dispatcher.getRefs()){
+			ref.getGoodsItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+			ref.getGoodsItems().fillUnuseableGoodsLot(glRepository);
+			
+			PcsDepot depot = dispatcher.getDepot();
+			
+			List<String> goodsIds = ref.getGoodsItems().getAllGoods().getIds();
+			PcsDepotAreas depotAreas = depot.findAreasByGoodsIds(goodsIds, PcsAreaType.typeOf(ref.getAreaType()));
+			if(CollectionUtils.isEmpty(depotAreas)){
+				throw new InvalidDataException(YardExceptionType.invalid_not_found_depot_area, depot.getDepotName(), goodsIds.toString(), "可能原因是产品没有设置账页");
+			}
+			MaintenanceInfo maintanceInfo = new MaintenanceInfo(dispatcher.getMaintenanceInfo().getLastOrgId(), dispatcher.getMaintenanceInfo().getLastUserId());
+			for(PcsDepotArea depotArea : depotAreas){
+				SpdDepotTask task = new SpdDepotTask();
+				CodeSort codeSort = dispatcher.getDispatcherType().equals(SpdDispatcherType.on_shelf.getCode())?CodeSort.shangjiadan:CodeSort.xiajiadiaodudan;
+				task.setTaskCode(codeService.publishCode(codeSort).getCode());
+				task.setDispatcherId(dispatcher.getDispatcherId());
+				task.setBizId(ref.getRefObjectId());
+				if(ref.getRefObjectType().equals(SpdDispatcherRef.ref_object_type_logistics_task)){
+					task.setBizId(ltRepository.findOne(ref.getRefObjectId()).getBizId());
+				}
+				task.setTaskOrgId(dispatcher.getDispatcherOrgId());
+				task.setTaskDeptId(dispatcher.getDispatcherDeptId());
+				task.setTaskDepotId(dispatcher.getDispatcherDepotId());
+				SpdDepotTaskType taskType = dispatcher.getDispatcherType().equals(SpdDispatcherType.on_shelf.getCode())?SpdDepotTaskType.on_shelf_task:SpdDepotTaskType.off_shelf_task;
+				task.setTaskType(taskType.getCode());
+				task.fillDepotArea(depotArea);
+				task.setMaintenanceInfo(maintanceInfo);
+				if(task.getTaskType().equals(SpdDepotTaskType.on_shelf_task.getCode())){
+					buildOnShelfTaskItems(ref, task);
+				}else if(task.getTaskType().equals(SpdDepotTaskType.off_shelf_task.getCode())){
+					buildOffShelfTaskItems(ref, task);
+				}
+				tasks.add(task);
+			}
+		}
+		
+		return tasks;
+	}
+
+	protected abstract void buildOffShelfTaskItems(SpdDispatcherRef ref, SpdDepotTask task) ;
+	
+	@SuppressWarnings("unchecked")
+	private void buildOnShelfTaskItems(SpdDispatcherRef ref, SpdDepotTask task){
+		SpdDepotTaskItems<SpdDepotTaskItem> taskItems = new SpdDepotTaskItems<SpdDepotTaskItem>();
+		
+		for(SpdGoodsItem bizItem : (SpdGoodsItems<SpdGoodsItem>)ref.getGoodsItems()){
+			YdsGoodsLot goodsLot = bizItem.getSpecialGoodsLot();
+			SpdDepotCard depotCard = task.getDepotArea().getDepot().getCards().findEnableCardByGoodsId(goodsLot.getGoodsId());
+			if(depotCard == null){
+				throw new OperateFailException(YardExceptionType.forbid_without_depot_card, task.getTaskDepotId(), goodsLot.getGoodsId(), task.getDepotArea().getAreaTypeName());
+			}
+			SpdOnShelfTaskItem taskItem = buildTaskItem(depotCard, bizItem.getSpecialGoodsLot(), task.getMaintenanceInfo(), SpdOnShelfTaskItem.class);
+			taskItem.setPlanQty(bizItem.getConfirmQtyByStoreUnit());
+			taskItems.add(taskItem);
+		}
+		task.setItems(taskItems);
+	}
+	
+	<T extends SpdDepotTaskItem> T buildTaskItem(SpdDepotCard depotCard, YdsGoodsLot goodsLot, MaintenanceInfo maintanceInfo, Class<T> taskItemType){
+		T taskItem = null;
+		try{
+			taskItem = (T)taskItemType.newInstance();
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+		taskItem.setCardId(depotCard.getDepotCardId());
+		CodeSort codeSort = CodeSort.shangjiamingxi;
+		if(taskItemType.equals(SpdOffShelfTaskItem.class)){
+			codeSort = CodeSort.xiajiamingxi;
+		}
+		taskItem.setItemCode(codeService.publishCode(codeSort).getCode());
+		
+		taskItem.setGoodsFormatName(goodsLot.getGoods().getFormatName());
+		taskItem.setGoodsId(goodsLot.getGoodsId());
+		taskItem.setLotId(goodsLot.getGoodsLotId());
+		taskItem.setPackingSpec(goodsLot.getGoods().getPackingSpec());
+		taskItem.setShelfId(depotCard.getShelfId());
+		taskItem.setUnitLv(goodsLot.getGoods().getStoreUnitLv());
+		
+		String packageName = SpdUnitUtils.computeGoodsUnitName(goodsLot.getGoods(), goodsLot.getGoods().getStoreUnitLv());
+		taskItem.setUnitName(packageName);
+		
+		return taskItem;
+	}
+	
+}

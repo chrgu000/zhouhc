@@ -1,0 +1,19 @@
+package cn.ak4j.yard.sys.logging.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.sys.datacheck.params.SysLoggingEventParams;
+import cn.ak4j.yard.sys.logging.domain.SysLoggingEvent;
+import cn.ak4j.yard.sys.logging.domain.SysLoggingEvents;
+import lombok.Getter;
+
+@Repository
+public class SysLoggingEventRepository extends BaseRepository<SysLoggingEvent,SysLoggingEvents,SysLoggingEventParams,Integer>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+}

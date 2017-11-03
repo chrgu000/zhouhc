@@ -1,0 +1,23 @@
+update spd_receive_biz set send_id ='2611887' where send_code='104201710180097';
+update spd_receive_biz set send_id ='2611904' where send_code='104201710180101';
+update spd_receive_biz set send_id ='2611914' where send_code='104201710180103';
+update spd_receive_biz set send_id ='2611636' where send_code='104201710180064';
+update spd_receive_biz set send_id ='2611663' where send_code='104201710180066';
+update spd_receive_biz set send_id ='2611644' where send_code='104201710180065';
+update spd_receive_biz set send_id ='2611608' where send_code='104201710180060';
+update spd_receive_biz set send_id ='2611322' where send_code='104201710180018';
+update spd_receive_biz set send_id ='2611053' where send_code='104201710180008';
+update spd_receive_biz set send_id ='2611030' where send_code='104201710180006';
+update spd_receive_biz set send_id ='2611026' where send_code='104201710180005';
+
+update spd_receive_biz set send_id ='2610874' where send_code='104201710170157';
+update spd_receive_biz set send_id ='2610856' where send_code='104201710170154';
+update spd_receive_biz set send_id ='2610891' where send_code='104201710170160';
+update spd_receive_biz set send_id ='2610883' where send_code='104201710170159';
+update spd_receive_biz set send_id ='2610773' where send_code='104201710170145';
+
+update spd_receive_biz set send_id ='2610675' where send_code='104201710170137';
+update spd_receive_biz set send_id ='2610534' where send_code='104201710170124';
+update spd_receive_biz set send_id ='2610493' where send_code='104201710170119';
+update spd_receive_biz set send_id ='2610282' where send_code='104201710170094';
+update spd_receive_biz set send_id ='2609011' where send_code='104201710170008';

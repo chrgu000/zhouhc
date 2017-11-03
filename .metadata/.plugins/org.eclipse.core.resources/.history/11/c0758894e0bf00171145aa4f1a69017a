@@ -1,0 +1,225 @@
+package cn.ak4j.yard.spd.service;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.transaction.Transactional;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.CycleType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfig;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.params.SpdDepotGoodsConfigParams;
+import cn.ak4j.yard.spd.repository.SpdDepotGoodsConfigRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdGoodsStock;
+import cn.ak4j.yard.spd.stock.domain.SpdGoodsStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Slf4j
+public class SpdDepotGoodsConfigService extends IYardService<SpdDepotGoodsConfig>{
+	
+	@Autowired private SpdDepotGoodsConfigRepository dgcRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+
+	@Override
+	public SpdDepotGoodsConfig add(SpdDepotGoodsConfig config, IUser user) {
+		if(!config.isValid()){
+			throw new InvalidDataException(config.getValidateMsg());
+		}
+		checkConfig(config);
+		
+		return dgcRepository.save(config);
+	}
+
+	@Override
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+	@Override
+	public SpdDepotGoodsConfig modify(SpdDepotGoodsConfig config, IUser user) {
+		if(!config.isValid()){
+			throw new InvalidDataException(config.getValidateMsg());
+		}
+		checkConfig(config);
+		SpdDepotGoodsConfig configPO = dgcRepository.findOne(config.getId());
+		configPO.update(config);
+		
+		return dgcRepository.save(configPO);
+	}
+	
+	private void checkConfig(SpdDepotGoodsConfig config){
+		YdsGoods goods = goodsRepository.findAll().findById(config.getGoodsId());
+		PcsDepot depot = depotRepository.findAll().findById(config.getDepotId());
+		if(!goods.getEnabled() || goods.getCheckStateCode() == CheckState.new_created.getCode()){
+			throw new InvalidDataException(YardExceptionType.invalid_useless_goods, goods.getGoodsId(), goods.getGoodsCode());
+		}
+		
+		SpdDepotGoodsConfigParams params = new SpdDepotGoodsConfigParams();
+		params.setDepotId(new ListParam<String>(config.getDepotId()));
+		params.setGoodsId(new ListParam<String>(config.getGoodsId()));
+		
+		SpdDepotGoodsConfigs configs = dgcRepository.find(params);
+		
+		if(CollectionUtils.isNotEmpty(configs)){
+			if(configs.size() > 1){
+				throw new InvalidDataException(YardExceptionType.invalid_exist_same_depot_goods_config, depot.getDepotId(),
+						depot.getDepotName(), goods.getGoodsId(), goods.getGoodsCode());
+			}else{
+				if(StringUtils.isEmpty(config.getId())){
+					if(configs.size() > 0){
+						throw new InvalidDataException(YardExceptionType.invalid_exist_same_depot_goods_config, depot.getDepotId(),
+								depot.getDepotName(), goods.getGoodsId(), goods.getGoodsCode());
+					}
+				}else{
+					SpdDepotGoodsConfig theConfig = configs.findById(config.getId());
+					if(theConfig == null){
+						throw new InvalidDataException(YardExceptionType.invalid_exist_same_depot_goods_config, depot.getDepotId(),
+								depot.getDepotName(), goods.getGoodsId(), goods.getGoodsCode());
+					}
+				}
+			}
+		}
+	}
+
+	@Override
+	public SpdDepotGoodsConfig updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+	
+	@Transactional
+	public void incrementUncompletedPrepareQty(SpdPrepareInformBiz prepareInform){
+		SpdBizItems prepareItems = prepareInform.getItems();
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", prepareItems);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds);
+		String depotId = prepareInform.hasCollectDepot() ? prepareInform.getCollectDepotId() : prepareInform.getToDepotId();
+		PcsDepot depot = depotRepository.findAll().findById(depotId);
+		
+		SpdDepotGoodsConfigs configs = dgcRepository.findByDepotIdAndGoodsIds(depotId, goodsIds);
+		
+		for(SpdBizItem prepareItem : prepareItems){
+			SpdDepotGoodsConfig config = CollectionUtils.findWhere("goodsId", prepareItem.getGoodsId(), configs);
+			if(config == null){
+				YdsGoods goods = CollectionUtils.findWhere("goodsId", prepareItem.getGoodsId(), goodss);
+				log.warn(String.format("未找到仓库[%s]中产品[%s]的配置", depot.getDepotName(),  goods.getGoodsCode()));
+				continue;
+			}
+			config.setUncompletedPrepareQty(prepareItem.getConfirmQty() + config.getUncompletedPrepareQty());
+			log.info("goods :{} 更新最后备货时间",config.getGoodsId());
+			config.setLastPrepareTime(prepareInform.getInformTime());
+			dgcRepository.save(config);
+		}
+	}
+	
+	@Transactional
+	public void decrementUncompletedPrepareQty(SpdReceiveBiz receive){
+		SpdBizItems receiveItems = receive.getItems();
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", receiveItems);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds);
+		String depotId = receive.getToDepotId();
+		PcsDepot depot = depotRepository.findAll().findById(depotId);
+		
+		SpdDepotGoodsConfigs configs = dgcRepository.findByDepotIdAndGoodsIds(depotId, goodsIds);
+		
+		for(SpdBizItem receiveItem : receiveItems){
+			SpdDepotGoodsConfig config = CollectionUtils.findWhere("goodsId", receiveItem.getGoodsId(), configs);
+			if(config == null){
+				YdsGoods goods = CollectionUtils.findWhere("goodsId", receiveItem.getGoodsId(), goodss);
+				log.warn(String.format("未找到仓库[%s]中产品[%s]的配置", depot.getDepotName(),  goods.getGoodsCode()));
+				continue;
+			}
+			int uncompletedPrepareQty = config.getUncompletedPrepareQty() - receiveItem.getConfirmQty();
+			config.setUncompletedPrepareQty(uncompletedPrepareQty < 0 ? 0 : uncompletedPrepareQty);
+			dgcRepository.save(config);
+		}
+	}
+	
+	private void fillAllRelation(SpdDepotGoodsConfigs configs){
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", configs);
+		List<String> depotIds = CollectionUtils.pluck("depotId", configs);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds);
+		PcsDepots depots = depotRepository.findAll().findByIds(depotIds);
+		configs.forEach(config->{
+			YdsGoods goods = CollectionUtils.findWhere("goodsId", config.getGoodsId(), goodss);
+			config.setGoods(goods);
+			
+			PcsDepot depot = CollectionUtils.findWhere("depotId", config.getDepotId(), depots);
+			config.setDepot(depot);
+		});
+		
+	}
+	
+	@Transactional
+	public void cleanUncompletedPrepareQty(){
+		SpdDepotGoodsConfigs configs = dgcRepository.getAll();
+		fillAllRelation(configs);
+		for(SpdDepotGoodsConfig config : configs){
+			if(config.getLastPrepareTime() == null || config.getUncompletedPrepareQty() == 0){
+				continue;
+			}
+			String autoPrepareStratageCode = config.getAutoPrepareStratageCode();
+			if(CycleType.getLastCycleDate(autoPrepareStratageCode).getTime() - config.getLastPrepareTime().getTime() >= 0){
+				log.info("仓库产品配置产品[{}]未完成备货数量自动清零", config.getGoods().getGoodsCode());
+				config.setUncompletedPrepareQty(0);
+				dgcRepository.save(config);
+			}
+
+		}
+	}
+	
+	public SpdDepotGoodsConfigs getNotEnoughStocksGoods(String depotId){
+		SpdShelfStocks shelfStocks = ssRepository.findByDepot(depotId);
+		shelfStocks.fillGoodsLots(glRepository);
+		
+		SpdGoodsStocks goodsStocks = new SpdGoodsStocks(shelfStocks);
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", goodsStocks);
+		SpdDepotGoodsConfigs configs = dgcRepository.findByDepotIdAndGoodsIds(depotId, goodsIds);
+		fillAllRelation(configs);
+		SpdDepotGoodsConfigs notEnoughDepotGoodsStocks = new SpdDepotGoodsConfigs();
+		for(SpdGoodsStock goodsStock : goodsStocks){
+			SpdDepotGoodsConfig config = CollectionUtils.findWhere("goodsId", goodsStock.getGoodsId(), configs);
+			if(config == null){
+				continue;
+			}
+			if(goodsStock.getNormalQtyByStoreUnit() + config.getUncompletedPrepareQty() <= config.getLowerLimit()){
+				log.info("仓库[{}],产品[{}]{},当前正常区库存数量为:[{}],未完成备货数量:[{}]", 
+						config.getDepot().getDepotName(),
+						config.getGoods().getGoodsCode(),
+						config.getGoods().getGoodsName(),
+						goodsStock.getNormalQtyByStoreUnit(),
+						config.getUncompletedPrepareQty());
+				notEnoughDepotGoodsStocks.add(config);
+			}
+		}
+		return notEnoughDepotGoodsStocks;
+	}
+
+}

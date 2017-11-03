@@ -1,0 +1,195 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.utils.DateUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdBizRules;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.params.SpdDailyCleanBizParams;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRuleParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdDailyCleanBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRecordRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SpdDailyCleanBizService extends IYardService<SpdDailyCleanBiz>{
+	
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdPropertyChangeRecordRepository pcrRepository;
+	@Autowired private SpdPropertyChangeRuleRepository pcRuleRepository;
+	@Autowired private SpdPropertyChangeService pcService;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdDailyCleanBizRepository dcbRepository;
+	
+	@Autowired @Qualifier("propertyChangePoints") Map<SpdBizType, SpdBizStep[]> propertyChangePoints;
+	
+	@Transactional public SpdDailyCleanBiz add(SpdDailyCleanBiz dailyClean, IUser user){
+		dailyClean.setMaintenanceInfo(new MaintenanceInfo(user));
+		if(!dailyClean.isValid()){
+			throw new InvalidDataException(dailyClean.getValidateMsg());
+		}
+		
+		SpdDailyCleanRule rule = (SpdDailyCleanRule)brRepository.findAllWithRelations().findById(dailyClean.getBizRuleId());
+		if(rule == null){
+			throw new NotFoundException(YardExceptionType.not_found_daily_clean_rule, dailyClean.getBizRuleId());
+		}
+		
+		if(!dailyClean.isTargetDateValid()){
+			throw new NotFoundException(YardExceptionType.invalid_daily_clean_target_date, Global.sdfYMD.format(dailyClean.getTargetDate()));
+		}
+		
+		SpdDailyCleanBizs existBizs = dcbRepository.findByTargetDateAndDepot(dailyClean.getTargetDate(), rule.getDepotId());
+		if(CollectionUtils.isNotEmpty(existBizs)){
+			throw new InvalidDataException(YardExceptionType.invalid_same_day_daily_clean_exist, rule.getDepot().getDepotName(), Global.sdfYMD.format(dailyClean.getTargetDate()));
+		}
+		
+		dailyClean.applyRule(rule, (PcsUser)user);
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(dailyClean.getBizId(), null, dailyClean.getMaintenanceInfo().getCreateUserId(), AmqpMsgType.CREATE_DAILY_CLEAN_BIZ);
+            }
+		});
+		dailyClean.setBizCode(codeService.publishCode(CodeSort.riqingdan).getCode());
+		dcbRepository.save(dailyClean);
+		
+		pcService.dailyClean(dailyClean);
+		
+		return dailyClean;
+	}
+	
+	/**
+	 * 查找待日清日期:首先查询最新的日清对账业务，然后倒推15天(作为一个缓冲期)，得到一个起始日期，
+	 * 查询从起始日期到现在的所有物权变更记录，然后从物权变更记录中获得待日清的日期
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public List<Date> findCleanDays(String depotId){
+		SpdBizRules bizRules = brRepository.getAll().findByBizTypesAndDepotIds(propertyChangePoints.keySet(), depotId);
+		SpdPropertyChangeRules propertyChangeRules = null;
+		if(CollectionUtils.isNotEmpty(bizRules)){
+			SpdPropertyChangeRuleParams ruleParams = new SpdPropertyChangeRuleParams();
+			ruleParams.setBizRuleId(new ListParam<String>(CollectionUtils.pluck("id", bizRules)));
+			propertyChangeRules = new SpdPropertyChangeRules(pcRuleRepository.findAllWithRelations().find(ruleParams));
+		}
+		
+		Calendar cal = Calendar.getInstance();
+		SpdDailyCleanBizParams params = new SpdDailyCleanBizParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		OrderParam order = new OrderParam("targetDate", "desc");
+		SpdDailyCleanBizs dailyCleans = dcbRepository.find(params, order, 0, 1);
+		if(CollectionUtils.isNotEmpty(dailyCleans)){
+			Date lastTargetDate = dailyCleans.get(0).getTargetDate();
+			cal.setTime(lastTargetDate);
+		}
+		int bufferDays = Conf.getEnv().equals("dev")?-9999:-15;
+		cal.add(Calendar.DAY_OF_YEAR, bufferDays);
+		Date start = cal.getTime(); 
+		start = DateUtils.setZeroTimePoint(start);
+		
+		SpdPropertyChangeRecords changeRecords = pcrRepository.findByRulesAndTargetDate(propertyChangeRules.getIds(), start, new Date());
+		return changeRecords.getChangeDays();
+	}
+
+	@Override
+	public SpdDailyCleanBiz modify(SpdDailyCleanBiz dailyClean, IUser user) {
+		SpdDailyCleanBiz dailyCleanPO = dcbRepository.findOne(dailyClean.getBizId());
+		dailyCleanPO.update(dailyClean, user.getOrgId(), user.getUserId());
+		dailyCleanPO = dcbRepository.save(dailyCleanPO);
+		return dailyCleanPO;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public SpdDailyCleanBizs findWithRelationByFinacialReconciliation(String finacialReconciliationId){
+		SpdDailyCleanBizs dailyCleans = dcbRepository.findByFinacialConciliationId(finacialReconciliationId);
+		log.debug("共找到[{}]个日清对账业务", dailyCleans.size());
+		if(CollectionUtils.isEmpty(dailyCleans)){
+			return dailyCleans;
+		}
+		
+		SpdPropertyChangeRecords changeRecords = pcrRepository.findWithRelationItemsByDailyCleanIds(dailyCleans.getIds());
+		log.debug("共找到[{}]个物权变更记录", changeRecords.size());
+		
+		dailyCleans.fillRecords(changeRecords);
+		return dailyCleans;
+	}
+
+	@Override @Transactional
+	public SpdDailyCleanBiz updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		SpdDailyCleanBiz dailyClean = dcbRepository.findOne(id);
+		fillAllRelations(dailyClean);
+		
+		if(checkStateCode == CheckState.reviewed.getCode()){
+			return reviewDailyClean(dailyClean, lastUpdateDate, user);
+		}
+
+		throw new OperateFailException(YardExceptionType.forbide_update_check_state, dailyClean.getCheckState().getName(), CheckState.stateOf(checkStateCode).getName());
+	}
+	
+	@Transactional
+	public SpdDailyCleanBiz reviewDailyClean(SpdDailyCleanBiz dailyClean, Date lastUpdateDate, IUser user){
+		if(!dailyClean.hasPropertyChange()){
+			throw new InvalidDataException(YardExceptionType.invalid_data, String.format("日清对账[%s]没有相关的物权变更", dailyClean.getBizCode()));
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(dailyClean.getBizId(), null, user.getUserId(), AmqpMsgType.REVIEW_DAILY_CLEAN_BIZ);
+            }
+		});
+		dailyClean.review(lastUpdateDate, user);
+		
+		dcbRepository.save(dailyClean);
+		return dailyClean;
+	}
+
+	public void fillAllRelations(SpdDailyCleanBiz dailyClean) {
+		SpdDailyCleanRule rule = (SpdDailyCleanRule)brRepository.findAllWithRelations().findById(dailyClean.getBizRuleId());
+		dailyClean.setBizRule(rule);
+		
+		SpdPropertyChangeRecords records = pcrRepository.findByDailyCleanId(dailyClean.getBizId());
+		dailyClean.setPropertyChangeRecords(records);
+	}
+
+	@Override
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+}

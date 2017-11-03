@@ -1,0 +1,5 @@
+update yds_goods set goods_format_name = '['||goods_code||']'||goods_name||' '||goods_spec||' '||goods_model||'  '||fact_name
+where '['||goods_code||']'||goods_name||' '||goods_spec||' '||goods_model||'  '||fact_name != goods_format_name and goods_name = ware_name;
+
+update yds_goods set goods_format_name = '['||goods_code||'] '||goods_name||' '||ware_name||' '||goods_spec||' '||goods_model||'  '||fact_name
+where '['||goods_code||'] '||goods_name||' '||ware_name||' '||goods_spec||' '||goods_model||'  '||fact_name != goods_format_name and goods_name != ware_name;

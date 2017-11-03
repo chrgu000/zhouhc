@@ -1,0 +1,130 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+
+public class YdsEdsGoodsLots extends Entities<YdsEdsGoodsLot> {
+
+	private static final long serialVersionUID = -3598150166633567555L;
+
+	public YdsEdsGoodsLots(){}
+	
+	public YdsEdsGoodsLots(YdsEdsGoodsLots items){
+		super(items);
+	}
+	
+	public YdsEdsGoodsLots(List<YdsEdsGoodsLot> items){
+		super(items);
+	}
+	
+	public YdsEdsGoodsLots findByEdsLotNo(String edsLotNo){
+		return new YdsEdsGoodsLots(CollectionUtils.find("edsLotNo", edsLotNo, this));
+	}
+	
+	public List<String> getNotContainedEdsLotNos(List<String> edsLotNos){
+		List<String> result = new ArrayList<String>();
+		for(String edsLotNo : edsLotNos){
+			if(!containedEdsLotNo(edsLotNo)){
+				result.add(edsLotNo);
+			}
+		}
+		return result;
+	}
+	
+	
+	public boolean containedEdsLotNo(String edsLotNo){
+		return findByEdsLotNo(edsLotNo) != null;
+	}
+	
+	public boolean containedEdsLotNo(String edsLotNo, String edsGoodsId){
+		String[] strArr = {"edsLotNo", "edsGoodsId"};
+		YdsEdsGoodsLot edsGoodsLot = CollectionUtils.findWhere(strArr, this, edsLotNo, edsGoodsId);
+		return edsGoodsLot != null;
+	}
+
+	public YdsEdsGoodsLots findByEdsLotNos(List<String> edsLotNos) {
+		YdsEdsGoodsLots result = new YdsEdsGoodsLots();
+		edsLotNos.forEach(lotNo->{
+			result.addAll(findByEdsLotNo(lotNo));
+		});
+		return result;
+	}
+	
+	public YdsEdsGoodsLots findByEdsLotNosAndEdsGoodsIds(List<String> edsLotNos, List<String> edsGoodsIds){
+		String[] strArr = {"edsLotNo", "edsGoodsId"};
+		YdsEdsGoodsLots result = new YdsEdsGoodsLots();
+		edsGoodsIds.forEach(edsGoodsId->{
+			edsLotNos.forEach(edsLotNo->{
+				YdsEdsGoodsLot edsGoodsLot = CollectionUtils.findWhere(strArr, this, edsLotNo, edsGoodsId);
+				if(edsGoodsLot != null){
+					result.add(edsGoodsLot);
+				}
+			});
+		});
+		return result;
+	}
+
+	public YdsEdsGoodsLots findByEdsGoodsId(String edsGoodsId) {
+		return new YdsEdsGoodsLots(CollectionUtils.find("edsGoodsId", edsGoodsId, this));
+	}
+	
+	public YdsEdsGoodsLots findByEdsGoodsIds(List<String> edsGoodsIds){
+		YdsEdsGoodsLots allEdsGoodsLots = new YdsEdsGoodsLots();
+		edsGoodsIds.forEach(edsGoodsId->{
+			YdsEdsGoodsLots theEdsGoodsLots = findByEdsGoodsId(edsGoodsId);
+			allEdsGoodsLots.addAll(theEdsGoodsLots);
+		});
+		
+		return allEdsGoodsLots;
+	}
+	
+	public YdsEdsGoodsLots findByPage(YdsEdsGoodss allEdsGoodss, YdsEdsGoodsLotParams params, OrderParam order, int pageNo, int pageSize){
+		if(params != null && params.getEdsGoodsFormatName() != null && !params.getEdsGoodsFormatName().isEmpty()){
+			YdsEdsGoodsParams edsGoodsParams = new YdsEdsGoodsParams();
+			edsGoodsParams.setEdsGoodsFormatName(params.getEdsGoodsFormatName());
+			List<String> edsGoodsId = CollectionUtils.pluck("edsGoodsId", allEdsGoodss.find(edsGoodsParams));
+			params.setEdsGoodsId(new ListParam<String>(edsGoodsId));
+		}
+		return new YdsEdsGoodsLots(super.findByPage(params, order, pageNo, pageSize));
+	}
+	
+	@Deprecated
+	public Entities<YdsEdsGoodsLot> findByPage(QueryParams params, OrderParam order, int pageNo, int pageSize) {
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+	public YdsEdsGoodsLot findById(String edsGoodsLotId) {
+		return CollectionUtils.findWhere("edsGoodsLotId", edsGoodsLotId, this);
+	}
+
+	public YdsEdsGoodsLots findByEdsGoodsIdAndEnabled(String edsGoodsId, boolean enabled) {
+		YdsEdsGoodsLots enabledEdsGoodsLot = new YdsEdsGoodsLots(CollectionUtils.find("enabled", enabled, Boolean.class, this));
+		return new YdsEdsGoodsLots(CollectionUtils.find("edsGoodsId", edsGoodsId, enabledEdsGoodsLot));
+	}
+
+	public YdsEdsGoodsLots findByIds(List<String> ids) {
+		YdsEdsGoodsLots result = new YdsEdsGoodsLots();
+		ids.forEach(id->{
+			result.add(findById(id));
+		});
+		return result;
+	}
+
+	public YdsEdsGoodsLots findByLotNoAndOrgIdAndEdsGoodsId(String edsLotNo, String ownerOrgId, String edsGoodsId){
+		YdsEdsGoodsLotParams params = new YdsEdsGoodsLotParams();
+		params.setEdsLotNo(new ListParam<String>(edsLotNo));
+		params.setOwnerOrgId(new ListParam<String>(ownerOrgId));
+		params.setEdsGoodsId(new ListParam<String>(edsGoodsId));
+		return new YdsEdsGoodsLots(find(params));
+	}
+	
+}

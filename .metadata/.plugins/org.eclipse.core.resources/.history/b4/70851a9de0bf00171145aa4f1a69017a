@@ -1,0 +1,3 @@
+update spd_return_goods_biz set check_state_code=3, biz_status_code='off_shelf_task_completed' 
+where biz_id in('ff8080815f4cfab2015f4cfb86550000', 'ff8080815f4cfab2015f4cfb86bf0002');
+

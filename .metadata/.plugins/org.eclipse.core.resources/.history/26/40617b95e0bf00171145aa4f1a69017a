@@ -1,0 +1,43 @@
+/**
+ */
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * @Description:器械类别
+ * @author wuyw
+ * @date 2017年7月12日下午6:14:34
+ *
+ */
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum YdsEquipmentLevel implements ITypeEnum{
+      one("Ⅰ类", "Ⅰ类", ""),
+      two("Ⅱ类", "Ⅱ类", ""),
+      three("Ⅲ类","Ⅲ类",""),
+      four("ALL类","ALL类",""),
+      other("其他类", "其他类", "");
+      
+    @Getter @Setter private String code;
+  	@Getter @Setter private String name;
+  	@Getter @Setter private String description;
+  	
+  	private YdsEquipmentLevel (String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static YdsEquipmentLevel typeOf(String code){
+		for(YdsEquipmentLevel equipment : YdsEquipmentLevel.values()){
+			if(equipment.getCode().equals(code)){
+				return equipment;
+			}
+		}
+		return null;
+	}
+}

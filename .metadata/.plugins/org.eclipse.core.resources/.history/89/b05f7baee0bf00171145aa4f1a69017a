@@ -1,0 +1,145 @@
+package cn.ak4j.yard.spd.task.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.util.List;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTasks;
+import cn.ak4j.yard.spd.task.params.SpdLogisticsTaskParams;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+
+@SuppressWarnings({"unchecked"})
+public class SpdLogisticsTaskResourceTest extends BaseTest{
+
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	
+	private String accessToken;
+	
+	@Before
+	public void init() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+	}
+	
+	@Test public void testCommonFind() throws Exception{
+		
+		String fromDepotId = "depot_id_001";
+
+		SpdLogisticsTaskParams params = new SpdLogisticsTaskParams();
+		params.setFromDepotId(new ListParam<String>(fromDepotId));
+
+		SpdLogisticsTasks logisticsTasks = mockMvcHelper.findList(SpdLogisticsTasks.class, testUserCode, params);
+		
+		assertEquals(4, logisticsTasks.size());
+		logisticsTasks.forEach(logistics->{
+			assertEquals(fromDepotId, logistics.getFromDepotId());
+		});
+	}
+	
+	@Test public void testGetDeliveryTasks() throws Exception{
+		String urlTemplate = "/spd/spdLogisticsTasks/deliveryTasks?accessToken={accessToken}&pageSize=-1";
+		SpdLogisticsTasks logisticsTasks = mockMvcHelper.mockGet(SpdLogisticsTasks.class, urlTemplate, accessToken);
+		
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = new PcsDepots(CollectionUtils.find("manageDeptId", user.getDeptId(), depotRepository.getAll()));
+		List<String> depotIds = depots.getIds();
+		assertEquals(4, logisticsTasks.size());
+		logisticsTasks.forEach(logisticsTask->{
+			assertTrue(depotIds.contains(logisticsTask.getFromDepotId()));
+		});
+	}
+	
+	@Test public void testCountDeliveryTasks() throws Exception{
+		String urlTemplate = "/spd/spdLogisticsTasks/deliveryTasks/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, accessToken);
+		
+		assertEquals(4, count);
+	}
+	
+	@Test public void testGetReceiveTasks() throws Exception{
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		
+		String urlTemplate = "/spd/spdLogisticsTasks/receiveTasks?accessToken={accessToken}&pageSize=-1";
+		SpdLogisticsTasks logisticsTasks =  mockMvcHelper.mockGet(SpdLogisticsTasks.class, urlTemplate, accessToken);
+		
+		assertEquals(4, logisticsTasks.size());
+		PcsUser user = userRepository.findAll().findById(mzmanagerUserId);
+		PcsDepots depots = new PcsDepots(CollectionUtils.find("manageDeptId", user.getDeptId(), depotRepository.getAll()));
+		List<String> depotIds = depots.getIds();
+		assertEquals(4, logisticsTasks.size());
+		logisticsTasks.forEach(logisticsTask->{
+			assertTrue(depotIds.contains(logisticsTask.getToDepotId()));
+		});
+	}
+	
+	@Test public void testReceiveTasksCount() throws Exception{
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		String urlTemplate = "/spd/spdLogisticsTasks/receiveTasks/count?accessToken={accessToken}";
+		
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, accessToken);
+		assertEquals(4, count);
+	}
+	
+	@Test public void testCommit() throws Exception {
+		String taskId = "logi_task_id_001";
+		SpdLogisticsTask logisticsTask = ltRepository.findOne(taskId);
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.commited.getCode(), logisticsTask.getLastUpdateTime());
+		
+		checkUpdateCheckState(taskId, checkStateTO, accessToken);
+	}
+	
+	@Test public void testReview() throws Exception {
+		String taskId = "logi_task_id_002";
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		
+		SpdLogisticsTask logisticsTask = ltRepository.findOne(taskId);
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.reviewed.getCode(), logisticsTask.getLastUpdateTime());
+		
+		checkUpdateCheckState(taskId, checkStateTO, accessToken);
+	}
+	
+	@Test public void testFindOne() throws Exception{
+		String taskId = "logi_task_id_001";
+		SpdLogisticsTask logisticsTask = mockMvcHelper.findOne(SpdLogisticsTask.class, xykUserCode, taskId);
+		
+		assertEquals(taskId, logisticsTask.getTaskId());
+		assertEquals(CheckState.new_created, logisticsTask.getCheckState());
+		
+	}
+	
+	/**
+	 * 检查状态更新结果，并断言
+	 */
+	private void checkUpdateCheckState(String taskId, CheckStateTO checkStateTO, String accessToken) throws Exception{
+		String urlTemplate = "";
+		if(checkStateTO.getCheckStateCode().intValue() == CheckState.commited.getCode()){
+			urlTemplate = "/spd/spdLogisticsTasks/{taskId}/checkState/commited?accessToken={accessToken}";
+		}else if(checkStateTO.getCheckStateCode().intValue() == CheckState.reviewed.getCode()){
+			urlTemplate = "/spd/spdLogisticsTasks/{taskId}/checkState/reviewed?accessToken={accessToken}";
+		}
+
+		//对接口返回结果进行断言
+		CheckStateTO checkState = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTO, urlTemplate, taskId, accessToken);
+		assertEquals(checkStateTO.getCheckStateCode().intValue(), checkState.getCheckStateCode().intValue());
+		
+		//查询出数据库里面的数据进行断言
+		SpdLogisticsTask logisticsTask = ltRepository.findOne(taskId);
+		assertEquals(checkStateTO.getCheckStateCode().intValue(), logisticsTask.getCheckStateCode().intValue());
+	}
+}

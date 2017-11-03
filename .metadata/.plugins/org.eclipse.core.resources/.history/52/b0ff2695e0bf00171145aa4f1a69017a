@@ -1,0 +1,132 @@
+package cn.ak4j.yard.pcs.web;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.service.PcsDepotService;
+import cn.ak4j.yard.pcs.to.PcsDepotExcelTO;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.utils.ExcelBuilder;
+
+@RestController
+public class PcsDepotResource {
+	
+	@Autowired private YardExcelFormatFactory excelFormatFactory;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDepotService depotService;
+	@Autowired private SpdBizRuleRepository brRepository;
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepots", method = RequestMethod.GET)
+	public PcsDepots list(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		PcsDepotParams params = QueryParams.buildParamsFromJson(paramsStr, PcsDepotParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return new PcsDepots(depotRepository.findAllWithRelations().findByPage(params, order, currentPage - 1, pageSize));
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepots/count", method = RequestMethod.GET)
+	public long count(@RequestParam(value = "params", required = false) String paramsStr) {
+		PcsDepotParams params = QueryParams.buildParamsFromJson(paramsStr, PcsDepotParams.class);
+		return depotRepository.findAll().find(params).size();
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepots/ids,{ids}", method = RequestMethod.GET)
+	public PcsDepots listByIds(@PathVariable(value = "ids", required = false) String ids) {
+		PcsDepotParams params = new PcsDepotParams();
+		params.setDepotId(new ListParam<String>(Arrays.asList(ids.split(","))));
+		return new PcsDepots(depotRepository.findAllWithRelations().find(params));
+	}
+	
+	@RequestMapping(value="/yard/pcs/pcsDepots/{id}", method=RequestMethod.GET)
+	public PcsDepot get(@PathVariable("id")String id){
+		return depotRepository.findAllWithRelations().findById(id);
+	}
+	
+	@RequestMapping(value="/yard/pcs/pcsDepots/whichConfiguredRule(bizType,{bizType})", method = RequestMethod.GET)
+	public PcsDepots findWhichConfiguredRule(@PathVariable("bizType") String bizType){
+		PcsDepots allDepots = new PcsDepots();
+		if(bizType.equals(SpdBizType.replenish_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllReplenishRules().getAllDepots();
+		}else if(bizType.equals(SpdBizType.receive_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllReceiveRules().getAllDepots();
+		}else if(bizType.equals(SpdBizType.prepare_inform_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllPrepareInformRules().getAllDepots();
+		}else if(bizType.equals(SpdBizType.return_goods_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllReturnGoodsRules().getAllDepots();
+		}else if(bizType.equals(SpdBizType.move_area_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllMoveAreaRules().getAllDepots();
+		}else if(bizType.equals(SpdBizType.consume_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllConsumeRules().getAllDepots();
+		}else if(bizType.equals(SpdBizType.adjust_stock_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllAdjustStockRules().getAllDepots();
+		}else if(bizType.equals(SpdBizType.daily_clean_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllDailyCleanRules().getAllDepots();
+		}else if(bizType.equals(SpdBizType.finacial_reconciliation_biz.getCode())){
+			allDepots = brRepository.findAllWithRelations().getAllFinacialReconciliationRules().getAllDepots();
+		}
+			
+		return allDepots;
+	}
+
+	@RequestMapping(value="/yard/pcs/pcsDepots/{depotId}/initDepotAreaAndShelfTask", method=RequestMethod.POST)
+	public PcsDepot initPcsDepot(@PathVariable("depotId") String depotId,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		return depotService.initDepotAreaAndShelf(depotId, user);
+	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@ResponseBody
+	@RequestMapping(value = "/yard/pcs/pcsDepots/excel", method = RequestMethod.GET)
+	public void downloadExcelfile(@RequestParam(value = "params", required = false) String paramsStr,
+								@RequestParam(value = "whereMap", required = false) String whereMap,
+								HttpServletResponse response) throws Exception {
+		PcsDepotParams params = PcsDepotParams.buildParamsFromJson(paramsStr, PcsDepotParams.class);
+		PcsDepots depots = new PcsDepots(depotRepository.findAllWithRelations().find(params));
+		List<PcsDepotExcelTO> depotExcels = new ArrayList<PcsDepotExcelTO>();
+		depots.forEach(depot->{
+			PcsDepotExcelTO depotExcel = new PcsDepotExcelTO();
+			BeanUtils.copyProperties(depot, depotExcel);
+			depotExcels.add(depotExcel);
+		});
+
+		ExcelBuilder exportExcel = new ExcelBuilder<PcsDepotExcelTO>();
+		byte[] bytes = exportExcel.buildExcel("仓库信息表", depotExcels, excelFormatFactory.getExcelFormats("depot"));
+		
+		response.reset();
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding(Global.defaultCharset.name());
+		response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode("部门仓库信息.xls", Global.defaultCharset.name()));
+		IOUtils.write(bytes, response.getOutputStream());
+	}
+
+}

@@ -1,0 +1,48 @@
+package cn.ak4j.yard.pcs.service;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.pcs.domain.PcsRoleApi;
+import cn.ak4j.yard.pcs.repository.PcsRoleApiRepository;
+
+@Service
+public class PcsRoleApiService extends IYardService<PcsRoleApi>{
+	
+	@Autowired private PcsRoleApiRepository raRepository;
+
+	@Override
+	public PcsRoleApi add(PcsRoleApi roleApi, IUser user) {
+		
+		if(raRepository.verifyDataReplication(roleApi)){
+			throw new InvalidDataException("当前接口权限已存在，不能重复添加！");
+		}
+		return raRepository.save(roleApi);
+	}
+
+	@Override
+	public void delete(String id, IUser user) {
+		PcsRoleApi roleApi = raRepository.findOne(id);
+		raRepository.delete(roleApi);
+		
+	}
+
+	@Override
+	public PcsRoleApi modify(PcsRoleApi roleApi, IUser user) {
+		PcsRoleApi roleApiPO = raRepository.findOne(roleApi.getId());
+		roleApiPO.update(roleApi);
+		roleApiPO = raRepository.save(roleApiPO);
+		return roleApiPO;
+	}
+
+	@Override
+	public PcsRoleApi updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException("角色权限不支持更改状态！");
+	}
+
+}

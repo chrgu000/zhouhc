@@ -1,0 +1,21 @@
+package cn.ak4j.yard.yds.to;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewYdsGoodsLotTO {
+	private String goodsId;//产品Id
+	private String lotNo;//批号
+	private Date lotValidity;//有效期
+	private Date produceDate;//生产日期
+	
+	private boolean enabled;//禁用标记
+	private String sterilizeLotNo;//灭菌批次
+	private Date sterilizeTime;//灭菌日期
+	
+}

@@ -1,0 +1,23 @@
+package cn.ak4j.yard.spd.reconciliation.report.rep_detail;
+
+import java.util.Date;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportItem;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class Item extends SpdReconciliationReportItem{
+
+	private String edsGoodsFormatName;
+	private String bizId;
+	private String bizCode;
+	private String bizItemId;
+	private Date createTime;
+	
+	public String getCreateTimeTxt(){
+		return Global.sdfYMDHms.format(createTime);
+	}
+}

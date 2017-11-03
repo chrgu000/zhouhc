@@ -1,0 +1,319 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.enums.SpdGoodsSpecificationType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdReplenishFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 申领业务规则
+* @author zhengyf
+* @date 2017年6月20日 下午3:19:47
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_replenish_rule")
+public class SpdReplenishRule extends SpdAbstractBizRule<SpdReplenishFeedbackRule>{
+	
+	@Getter @Setter private String originRuleId;
+	
+	@Getter @Setter private String originItemCondition;
+	
+	@Embedded @NotNull(message="directionRule不能为空") @Valid
+	@Getter @Setter private SpdReplenishDirectionRule directionRule;
+	
+	@Embedded @NotNull(message="contractRule不能为空") @Valid
+	@Getter @Setter private SpdReplenishContractRule contractRule;
+	
+	@Embedded @NotNull(message="taskRule不能为空") @Valid
+	@Getter @Setter private SpdReplenishTaskRule taskRule;
+	
+	@Embedded @NotNull(message="goodsRule不能为空") @Valid
+	@Getter @Setter private SpdReplenishGoodsRule goodsRule;
+	
+	@SuppressWarnings("rawtypes") @Transient @Getter @Setter
+	private SpdAbstractBizRule originRule;
+
+	@SuppressWarnings("rawtypes") @Override
+	public void update(SpdAbstractBizRule theRule) {
+		SpdReplenishRule rule = (SpdReplenishRule)theRule;
+		setName(rule.getName());
+		setCustomName(rule.getCustomName());
+		setPrior(rule.getPrior());
+		setEnabled(rule.getEnabled());
+		setCanBeOriginRule(rule.getCanBeOriginRule());
+		setOriginItemCondition(rule.getOriginItemCondition());
+		taskRule.setAutoSetBizConfirmQty(rule.getTaskRule().getAutoSetBizConfirmQty());
+		taskRule.setAutoSetOffShelfTaskConfirmQty(rule.getTaskRule().getAutoSetOffShelfTaskConfirmQty());
+		taskRule.setUseTurnoverBox(rule.getTaskRule().getUseTurnoverBox());
+		setManualApply(rule.getManualApply());
+	}
+	
+	@Override
+	public String getDescription() {
+		return String.format("[%s];[%s];[%s]", getDirectionRule().getDescription(), getContractRule().getDescription(), getFeedbackRule().getDescription());
+	}
+	
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.replenish_biz;
+	}
+	
+	public boolean isRelateDepot(String depotId){
+		return getDirectionRule().getFromDepotId().equals(depotId) || getDirectionRule().getToDepotId().equals(depotId);
+	}
+	
+	@Override
+	public void checkRule(SpdBizRules<?> allRules, SpdPropertyChangeRules allPropertyChangeRules) {
+		//TODO 缺少收货方仓库和发起方仓库不能相同
+		boolean bothCanConfirm = getContractRule().getFromDepotCanConfirm() && getContractRule().getToDepotCanConfirm();
+		if(bothCanConfirm){
+			throw new InvalidDataException(YardExceptionType.invalid_both_can_confirm);
+		}
+		
+		if(StringUtils.isNotEmpty(originRuleId) && StringUtils.isEmpty(originItemCondition)){
+			throw new InvalidDataException(YardExceptionType.invalid_origin_item_condition_empty, SpdBizType.replenish_biz.getName());
+		}
+		
+		boolean sameGoodsType = getDirectionRule().getFromDepot().getGoodsType().equals(getDirectionRule().getToDepot().getGoodsType());
+		if(!sameGoodsType){
+			throw new InvalidDataException(YardExceptionType.invalid_depot_goods_type_different, 
+					SpdBizType.replenish_biz.getName(),
+					getDirectionRule().getFromDepot().getDepotName(),
+					getDirectionRule().getFromDepot().getGoodsType(),
+					getDirectionRule().getToDepot().getDepotName(),
+					getDirectionRule().getToDepot().getGoodsType());
+		}
+	}
+	
+	/**
+	 * 判断是否为调拨类型申领：
+	 * 发货方确认
+	 * 收方仓库获取都是合格货区
+	 * 批次级别
+	 */
+	@Transient @JsonIgnore
+	public boolean isAllocate(){
+		boolean isSenderAsConfirmor = getContractRule().getFromDepotCanConfirm();
+		
+		boolean isFromNormalAreaType = getDirectionRule().getFromDepotAreaType().equals(PcsAreaType.normal.getCode());
+		
+		boolean isToNormalAreaType = getDirectionRule().getToDepotAreaType().equals(PcsAreaType.normal.getCode());
+		
+		boolean isLotLevel = getGoodsRule().getSpecificationTypeCode().equals(SpdGoodsSpecificationType.lot.getCode());
+		
+		if(isSenderAsConfirmor && isFromNormalAreaType && isToNormalAreaType && isLotLevel){
+			return true;
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * 判断是否为发货方发起的调拨类型申领规则
+	 */
+	@Transient @JsonIgnore 
+	public boolean isFromDepotAllocate(){
+		boolean isSenderAsCreator = getContractRule().getFromDepotCanApply();
+		
+		if(isSenderAsCreator && isAllocate()){
+			return true;
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * 判断是否为收货方发起的调拨类型申领规则
+	 */
+	@Transient @JsonIgnore 
+	public boolean isToDepotAllocate(){
+		boolean isReceiverAsCreator = getContractRule().getToDepotCanApply();
+		
+		if(isReceiverAsCreator && isAllocate()){
+			return true;
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * 判断是否为请领类型申领：即由收货方发起，并且由发货方确认，发货方货区是合格货区，并且是产品级
+	 */
+	@Transient public boolean isApply() {
+		boolean isReceiverAsCreator = getContractRule().getToDepotCanApply();
+
+		boolean isSenderAsConfirmor = getContractRule().getFromDepotCanConfirm();
+		
+		boolean isFromNormalAreaType = getDirectionRule().getFromDepotAreaType().equals(PcsAreaType.normal.getCode());
+		
+		boolean isGoodsLevel = getGoodsRule().getSpecificationTypeCode().equals(SpdGoodsSpecificationType.goods.getCode());
+		
+		if(isReceiverAsCreator && isSenderAsConfirmor && isFromNormalAreaType && isGoodsLevel){
+			return true;
+		}
+		return false;
+	}
+	
+	@Transient public boolean isReturnApply(SpdReplenishRule rule) {
+		boolean isSenderDepot = getDirectionRule().getFromDepotId().equals(rule.getDirectionRule().getToDepotId());
+		
+		boolean isReceiveDepot = getDirectionRule().getToDepotId().equals(rule.getDirectionRule().getFromDepotId());
+
+		boolean isSenderAsCreator = getContractRule().getFromDepotCanApply();
+		
+		boolean isSenderAsConfirmor = getContractRule().getFromDepotCanConfirm();
+		
+		boolean isFromNormalAreaType = getDirectionRule().getFromDepotAreaType().equals(PcsAreaType.normal.getCode());
+		
+		boolean isToNormalAreaType = getDirectionRule().getToDepotAreaType().equals(PcsAreaType.normal.getCode());
+		
+		boolean isLotLevel = getGoodsRule().getSpecificationTypeCode().equals(SpdGoodsSpecificationType.lot.getCode());
+		
+		boolean isOriginRule = StringUtils.isNotEmpty(getOriginRuleId()) && getOriginRuleId().equals(rule.getId());
+		
+		if(isSenderDepot 
+				&& isReceiveDepot 
+				&& isSenderAsCreator
+				&& isSenderAsConfirmor
+				&& isFromNormalAreaType 
+				&& isToNormalAreaType 
+				&& isLotLevel 
+				&& isOriginRule){
+			return true;
+		}
+		
+		return false;
+	}
+
+	/**
+	 * 是否能被指定用户发起
+	 */
+	public boolean canApplyByUser(PcsUser user) {
+		if(!getEnabled()){
+			return false;
+		}
+		
+		boolean isFromDepotUser = getDirectionRule().getFromDepot().getManageDeptId().equals(user.getDeptId());
+		boolean isToDepotUser = getDirectionRule().getToDepot().getManageDeptId().equals(user.getDeptId());
+		
+		if((getContractRule().getFromDepotCanApply() && isFromDepotUser)
+				|| (getContractRule().getToDepotCanApply() && isToDepotUser)){
+			return true;
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * 是否能被指定用户确认
+	 */
+	public Boolean canConfirmByUser(PcsUser user) {
+		boolean isFromDepotUser = getDirectionRule().getFromDepot().getManageDeptId().equals(user.getDeptId());
+		boolean isToDepotUser = getDirectionRule().getToDepot().getManageDeptId().equals(user.getDeptId());
+		
+		if((getContractRule().getFromDepotCanConfirm() && isFromDepotUser)
+				|| (getContractRule().getToDepotCanConfirm() && isToDepotUser)){
+			return true;
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * 获取发起方仓库
+	 */
+	@JsonIgnore @Transient
+	public PcsDepot getApplyDepot() {
+		if(getContractRule().getFromDepotCanApply()){
+			return getDirectionRule().getFromDepot();
+		}else if(getContractRule().getToDepotCanApply()){
+			return getDirectionRule().getToDepot();
+		}
+		return null;
+	}
+	
+	/**
+	 * 获取确认方仓库
+	 */
+	@JsonIgnore @Transient
+	public PcsDepot getConfirmDepot(){
+		if(getContractRule().getFromDepotCanConfirm()){
+			return getDirectionRule().getFromDepot();
+		}else if(getContractRule().getToDepotCanConfirm()){
+			return getDirectionRule().getToDepot();
+		}
+		return null;
+	}
+	
+	@Transient
+	public String getDisplayName(){
+		String fromDepotName = directionRule.getFromDepot().getDepotName();
+		String toDepotName = directionRule.getToDepot().getDepotName();
+		return String.format("%s [%s>%s]", getName(), fromDepotName, toDepotName);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public boolean equalsRule(SpdAbstractBizRule rule){
+		if(rule.getBizType() != getBizType()){
+			return false;
+		}
+		SpdReplenishRule theRule = (SpdReplenishRule)rule;
+		
+		boolean sameOriginRuleId = (StringUtils.isEmpty(getOriginRuleId()) 
+											&& StringUtils.isEmpty(theRule.getOriginRuleId()))
+									 || (StringUtils.isNotEmpty(getOriginRuleId()) 
+											 && getOriginRuleId().equals(theRule.getOriginRuleId()));
+		
+		boolean sameOriginItemCondition = (StringUtils.isEmpty(getOriginItemCondition())
+				                                   && StringUtils.isEmpty(theRule.getOriginItemCondition())
+				                             || (StringUtils.isNotEmpty(getOriginItemCondition())
+				                            		 && getOriginItemCondition().equals(theRule.getOriginItemCondition())));
+		
+		if(getDirectionRule().equals(theRule.getDirectionRule())
+				&& getContractRule().equals(theRule.getContractRule())
+				&& getTaskRule().equals(theRule.getTaskRule())
+				&& getGoodsRule().equals(theRule.getGoodsRule())
+				&& getFeedbackRuleId().equals(theRule.getFeedbackRuleId())
+				&& sameOriginRuleId
+				&& sameOriginItemCondition){
+			return true;
+		}
+		return false;
+	}
+	
+	public boolean equals(Object object){
+		SpdReplenishRule rule = (SpdReplenishRule) object;
+		return equalsRule(rule) 
+				&& getEnabled().equals(rule.getEnabled())
+				&& getName().equals(rule.getName())
+				&& getPrior().equals(rule.getPrior())
+				&& getCanBeOriginRule().equals(rule.getCanBeOriginRule()
+				&& getManualApply().equals(rule.getManualApply()));
+	}
+	
+	@Override
+	public int hashCode() {
+		return super.hashCode();
+	}
+
+}

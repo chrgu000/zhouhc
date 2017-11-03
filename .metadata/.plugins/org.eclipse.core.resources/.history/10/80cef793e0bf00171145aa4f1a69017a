@@ -1,0 +1,268 @@
+package cn.ak4j.yard.yds.web;
+
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.utils.ExcelBuilder;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsIndexName;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfos;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsInfoRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import cn.ak4j.yard.yds.service.YdsGoodsService;
+import cn.ak4j.yard.yds.to.YdsPrepareGoodsTO;
+
+@RestController
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class YdsGoodsResource {
+	
+	@Autowired private YardExcelFormatFactory excelFormatFactory;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private YdsGoodsInfoRepository giRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private YdsGoodsService goodsService;
+	
+	@RequestMapping(value="/yard/yds/ydsGoodss/{id}", method=RequestMethod.GET)
+	public YdsGoods get(@PathVariable("id")String id){
+		return goodsRepository.findAll().findById(id);
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsGoodss", method = RequestMethod.GET)
+	public YdsGoodss list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		YdsGoodss result = new YdsGoodss(goodsRepository.findAll().findByPage(params, order, currentPage-1, pageSize));
+		return result;
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsGoodss/count", method = RequestMethod.GET)
+	public long count(@RequestParam(value = "params", required = false) String paramsStr) {
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		return goodsRepository.findAll().find(params).size();
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsPrepareGoods(orgId,{orgId})", method=RequestMethod.GET)
+	public List<YdsPrepareGoodsTO> listPrepareGoods(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			@PathVariable("orgId")String orgId){
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().findByPage(params, order, currentPage-1, pageSize));
+		
+		YdsEdsGoodsParams edsGoodsParams = new YdsEdsGoodsParams();
+		edsGoodsParams.setYardGoodsId(new ListParam<String>(goodss.getIds()));
+		edsGoodsParams.setOwnerOrgId(new ListParam<String>(orgId));
+		edsGoodsParams.setEnabled(new ListParam<Boolean>(true));
+		edsGoodsParams.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		Entities<YdsEdsGoods> edsGoodss = egRepository.findAll().find(edsGoodsParams);
+		
+		YdsPrepareGoodsAssember assember = new YdsPrepareGoodsAssember();
+		List<YdsPrepareGoodsTO> result = assember.build(orgId, goodss, edsGoodss);
+		return result;
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsPrepareGoods(orgId,{orgId})/count", method=RequestMethod.GET)
+	public int countPrepareGoods(@RequestParam(value = "params", required = false) String paramsStr){
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		return goodsRepository.findAll().find(params).size();
+	}
+	
+	/**
+	 * 获取指定仓库中没有账页的产品
+	 */
+	@RequestMapping(value="/yard/yds/ydsGoodss/withoutCardGoodss(depotId,{depotId})")
+	public Entities<YdsGoods> findWithoutCardGoodss(@PathVariable("depotId")String depotId,
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		YdsGoodss goodss = goodsService.findWithoutCardGoodss(depotId);
+		return goodss.findByPage(params, order, currentPage-1, pageSize);
+	}
+	
+	
+	/**
+	 * 获取指定仓库中没有账页的产品
+	 */
+	@RequestMapping(value="/yard/yds/ydsGoodss/withoutCardGoodss(depotId,{depotId})/count")
+	public int countWithoutCardGoodss(@PathVariable("depotId")String depotId,
+			@RequestParam(value = "params", required = false) String paramsStr){
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		YdsGoodss goodss = goodsService.findWithoutCardGoodss(depotId);
+		return goodss.find(params).size();
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsGoodss/ids,{ids}", method = RequestMethod.GET)
+	public YdsGoodss listByIds(@PathVariable(value = "ids", required = false) String ids) {
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsId(new ListParam<String>(Arrays.asList(ids.split(","))));
+		return new YdsGoodss(goodsRepository.findAll().find(params, depotRepository, dcRepository));
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsGoodss/indexNames", method = RequestMethod.GET)
+	public List<YdsGoodsIndexName> getAllIndexNames(){
+		return goodsRepository.findAll().getEnableGoodss().pluck("indexName");
+	}
+	
+	/**
+	 * 这个接口的用处是对应客户端的业务是：在物资价格维护里面，每一条价格维护数据关联标准产品，并且是唯一关联，每条数据对应唯一一个
+	 * 标准产品，所以在关联数据的获取时要过滤已经关联的标准产品
+	 */
+	@RequestMapping(value = "/yard/yds/ydsGoodss/notGoodsInfoYdsGoods", method = RequestMethod.GET)
+	public YdsGoodss findGoodsByGoodsIdPage(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		if(params == null){
+		     params = new YdsGoodsParams();	
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		YdsGoodsInfos ydsGoodsInfos = giRepository.getAll();
+		params.setGoodsId(new ListParam<String>(ydsGoodsInfos.pluck("goodsId"), QueryParam.operation_not_in));
+		params.setEnabled(new ListParam<Boolean>(true));
+		return new YdsGoodss(goodsRepository.findAll().findByPage(params, order, currentPage-1, pageSize));
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsGoodss/notGoodsInfoYdsGoods/count", method = RequestMethod.GET)
+	public long goodsIdCount(@RequestParam(value = "params", required = false) String paramsStr) {
+		YdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		if(params == null){
+			params = new YdsGoodsParams();
+		}
+		YdsGoodsInfos ydsGoodsInfos = giRepository.getAll();
+		params.setGoodsId(new ListParam<String>(ydsGoodsInfos.pluck("goodsId"), QueryParam.operation_not_in));
+		params.setEnabled(new ListParam<Boolean>(true));
+		return goodsRepository.findAll().find(params, depotRepository, dcRepository).size();
+	}
+	
+	@RequestMapping(value="/yard/yds/ydsGoodss/{id}/packageSpecifications", method = RequestMethod.PUT)
+	public YdsGoods updatePackageSpec(@RequestBody YdsGoods goods, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		return goodsService.setPackageSpecifications(goods, user);
+	}
+	
+	//TODO 暂未发现该接口的应用场景，[如果该接口未应用，则删除该接口，以及对应的count接口]
+	//查找仓库产品,/yard/spd/freeStockGoodss
+	@Deprecated
+	@RequestMapping(value="/yard/spd/depots/{depotId}/goodss", method = RequestMethod.GET)
+	public YdsGoodss getStockGoods(@PathVariable(value="depotId")String depotId,
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		YdsGoodsParams params = YdsGoodsParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		if(params == null){
+			params = new YdsGoodsParams();
+		}
+		params.setDepotId(new ListParam<String>(depotId));
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = new OrderParam();
+		}
+		
+		return new YdsGoodss(goodsRepository.findAll().findByPage(params, order, currentPage-1, pageSize));
+	}
+	
+	@Deprecated
+	@RequestMapping(value="/yard/spd/depots/{depotId}/goodss/count", method = RequestMethod.GET)
+	public int getStockGoods(@PathVariable(value="depotId")String depotId,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			HttpServletRequest request){
+		YdsGoodsParams params = YdsGoodsParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		if(params == null){
+			params = new YdsGoodsParams();
+		}
+		params.setDepotId(new ListParam<String>(depotId));
+		return goodsRepository.findAll().find(params, depotRepository, dcRepository).size();
+	}	
+
+	@ResponseBody
+	@RequestMapping(value = "/yard/yds/ydsGoodss/excel", method = RequestMethod.GET)
+	public void downloadExcelfile(@RequestParam(value = "params", required = false) String paramsStr,
+								@RequestParam(value = "whereMap", required = false) String whereMap,
+								HttpServletResponse response) throws Exception {
+		YdsGoodsParams params = YdsGoodsParams.buildParamsFromJson(paramsStr, YdsGoodsParams.class);
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(params, depotRepository, dcRepository));
+
+		ExcelBuilder exportExcel = new ExcelBuilder<YdsGoods>();
+		byte[] bytes = exportExcel.buildExcel("标准产品一览表", goodss, excelFormatFactory.getExcelFormats("goods"));
+		
+		response.reset();
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding(Global.defaultCharset.name());
+		response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode("标准产品.xls", Global.defaultCharset.name()));
+		IOUtils.write(bytes, response.getOutputStream());
+	}
+
+}
+
+class YdsPrepareGoodsAssember{
+	
+	public List<YdsPrepareGoodsTO> build(String orgId, Entities<YdsGoods> goodss, Entities<YdsEdsGoods> edsGoodss){
+		
+		List<YdsPrepareGoodsTO> result = new ArrayList<YdsPrepareGoodsTO>();
+		for(YdsGoods goods : goodss){
+			YdsPrepareGoodsTO prepareGoods = new YdsPrepareGoodsTO();
+			prepareGoods.setOrgId(orgId);
+			
+			BeanUtils.copyProperties(goods, prepareGoods);
+			YdsEdsGoods edsGoods = CollectionUtils.findWhere("yardGoodsId", goods.getGoodsId(), edsGoodss);
+			if(edsGoods != null){
+				prepareGoods.setEdsGoodsId(edsGoods.getEdsGoodsId());
+				prepareGoods.setEdsYdsUnitRatio(edsGoods.getEdsYdsUnitRatio());
+			}
+			result.add(prepareGoods);
+		}
+		return result;
+	}
+	
+}

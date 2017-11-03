@@ -1,0 +1,11 @@
+package cn.ak4j.yard.yds.service;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.extend.ICustomComponent;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+
+public interface IYdsEdsGoodsEventProcessor extends ICustomComponent{
+
+	public void process(YdsEdsGoods edsGoods, String userId, AmqpMsgType msgType);
+	
+}

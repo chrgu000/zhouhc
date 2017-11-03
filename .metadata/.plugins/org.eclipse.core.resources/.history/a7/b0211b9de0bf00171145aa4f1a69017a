@@ -1,0 +1,3 @@
+update spd_return_goods_biz set auto_assign_receive='0' where biz_id in('ff8080815f4cfab2015f4cfb86550000', 'ff8080815f4cfab2015f4cfb86bf0002');
+update spd_receive_biz set sale_completed=1 where biz_id in('ff8080815f33e225015f391511030b8d', 'ff8080815f33e225015f38a73fae090d');
+update spd_biz_item set return_qty=confirm_qty where biz_item_id in('ff8080815f33e225015f391511030b8e', 'ff8080815f33e225015f38a73fae090f');

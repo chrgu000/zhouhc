@@ -1,0 +1,33 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLogs;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizLogParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizLogRepository;
+
+@RestController
+public class SpdBizLogResource {
+	
+	@Autowired private SpdBizLogRepository blRepository;
+
+	@RequestMapping(value="/yard/spd/spdBizLogs", method = RequestMethod.GET)
+	public SpdBizLogs findBizLogs(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdBizLogParams params = SpdReplenishBizParams.buildParamsFromJson(paramsStr, SpdBizLogParams.class);
+		if(params == null){
+			params = new SpdBizLogParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return blRepository.find(params, order, currentPage-1, pageSize);
+	}
+}

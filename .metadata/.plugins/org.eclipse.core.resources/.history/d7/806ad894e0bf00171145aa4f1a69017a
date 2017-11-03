@@ -1,0 +1,66 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.Column;
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 收货业务反馈规则
+* @author zhengyf
+* @date 2017年6月14日 上午11:24:15
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity  
+@DiscriminatorValue("receive") 
+public class SpdReceiveFeedbackRule extends SpdAbstractFeedbackRule {
+
+	private Boolean autoCommitReceive;
+	
+	private Boolean autoReviewReceive;
+	
+	@Column(name="AUTO_CREATE_ON_SHELF_DISP")
+	private Boolean autoCreateOnShelfDispatcher;
+	
+	@Column(name="AUTO_REVIEW_ON_SHELF_DISP")
+	private Boolean autoReviewOnShelfDispatcher;
+	
+	private Boolean autoReviewOnShelfTask;
+	
+	@Transient private String description;
+	
+	@Override public SpdBizType getBizType() {
+		return SpdBizType.receive_biz;
+	}
+	
+	@Override @Transient
+	public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			buf.append(autoCommitReceive?auto_word:manual_word)
+			.append("提交收货业务").append(Global.generalSeparator)
+			.append(autoReviewReceive?auto_word:manual_word)
+			.append("审核收货业务").append(Global.generalSeparator)
+			.append(autoCreateOnShelfDispatcher?auto_word:manual_word)
+			.append("创建上架调度").append(Global.generalSeparator)
+			.append(autoReviewOnShelfDispatcher?auto_word:manual_word)
+			.append("审核上架调度").append(Global.generalSeparator)
+			.append(autoReviewOnShelfTask?auto_word:manual_word)
+			.append("审核上架作业");
+			
+			return this.description = buf.toString();
+		}
+		return description;
+	}
+	
+}

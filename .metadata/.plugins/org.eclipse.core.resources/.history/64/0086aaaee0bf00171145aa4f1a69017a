@@ -1,0 +1,77 @@
+package cn.ak4j.yard.extend.zhjw;
+
+import static org.junit.Assert.assertEquals;
+
+import javax.annotation.PostConstruct;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.ApplicationContext;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfo;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsInfoRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import cn.ak4j.yard.yds.service.IYdsGoodsEventProcessor;
+
+public class ZhjwGoodsEventProcessorTest extends BaseTest{
+	
+	private IYdsGoodsEventProcessor processor;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsRepository edsGoodsRepository;
+	@Autowired private YdsGoodsInfoRepository giRepository;
+	@Autowired private ApplicationContext context;
+	
+	@PostConstruct
+	public void init(){
+		DefaultListableBeanFactory defaultListableBeanFactory = (DefaultListableBeanFactory) context.getAutowireCapableBeanFactory();
+		
+		BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder.genericBeanDefinition(ZhjwGoodsEventProcessor.class);
+
+		//动态注册bean.
+		defaultListableBeanFactory.registerBeanDefinition("zhjwGoodsEventProcessor", beanDefinitionBuilder.getBeanDefinition());
+
+		//获取动态注册的bean.
+		processor = context.getBean(ZhjwGoodsEventProcessor.class);
+	}
+	
+	@Test public void testProcess(){
+		String goodsId = "goods_id_048";
+		String userId = "user_id_001";
+		AmqpMsgType msgType = AmqpMsgType.ADD_GOODS;
+		
+		YdsGoods goods = goodsRepository.getAll().findById(goodsId);
+		goods.setAthDoc("emtpy");
+		processor.process(goods, userId, msgType);
+		
+		YdsEdsGoodsParams params = new YdsEdsGoodsParams();
+		params.setYardGoodsId(new ListParam<String>(goodsId));
+		YdsEdsGoodss edsGoodss = new YdsEdsGoodss(edsGoodsRepository.findAll().find(params));
+		assertEquals(1, edsGoodss.size());
+	}
+
+	@Test public void testUpdatePrice(){
+		String goodsId = "goods_id_048";
+		String userId = "user_id_001";
+		AmqpMsgType msgType = AmqpMsgType.UPDATE_GOODS_PRICE;
+		float price = 4369f;
+		
+		YdsGoods goods = goodsRepository.getAll().findById(goodsId);
+		goods.setUnitPrice(price);
+		
+		processor.process(goods, userId, msgType);
+		
+		YdsGoodsInfo goodsInfo = giRepository.findOne(goodsId);
+		assertEquals(goods.getPreparePrice(), goodsInfo.getPreparePrice(), 0.0001);
+		assertEquals(goods.getConsumePrice(), goodsInfo.getConsumePrice(), 0.0001);
+		assertEquals(goods.getStorePrice(), goodsInfo.getStorePrice(), 0.0001);
+	}
+}

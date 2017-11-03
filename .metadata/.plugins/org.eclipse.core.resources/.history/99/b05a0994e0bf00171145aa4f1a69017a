@@ -1,0 +1,97 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.Date;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Past;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@NoArgsConstructor
+@Entity
+@Table(name="yds_goods_lot ")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class YdsGoodsLot extends YardMaintenceEntity {
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String goodsLotId;
+	
+	@NotEmpty(message = "产品不能为空") @Getter @Setter
+	private String goodsId;//产品ID
+	
+	@NotEmpty(message = "批号不能为空") @Getter @Setter
+	private String lotNo;//批号
+	
+	@NotNull(message = "有效期不能为空") @Getter @Setter
+	private Date lotValidity;//有效期
+	
+	@NotNull(message = "生产日期不能为空") @Getter @Setter
+	@Past(message = "生产日期必须是一个过去的时间")
+	private Date produceDate;//生产日期
+	
+	@Getter @Setter
+	private String sterilizeLotNo;//灭菌批次
+	
+	@Getter @Setter
+	private Date sterilizeTime;//灭菌日期
+	
+	@Getter @Setter
+	private boolean enabled;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Embedded  @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient  @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+	@Transient  @Getter @Setter
+	private YdsGoods goods;
+
+	public YdsGoodsLot(String goodsId, String lotNo, Date lotValidity, Date produceDate){
+		setGoodsId(goodsId);
+		setLotNo(lotNo);
+		setLotValidity(lotValidity);
+		setProduceDate(produceDate);
+		setEnabled(true);
+	}
+
+	//设置为是否
+	public String getYdsGoodsLotEnabled(){
+		return this.enabled?"是":"否";
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		YdsGoodsLot theLot = (YdsGoodsLot)obj;
+		return theLot.getGoodsId().equals(getGoodsId()) && theLot.getLotNo().equals(getLotNo());
+	}
+	
+	public String attachSN(String lotNo, String sn){
+		return String.format("%s[[%s]]", lotNo, sn);
+	}
+}

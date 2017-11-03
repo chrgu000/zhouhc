@@ -1,0 +1,44 @@
+package cn.ak4j.yard.spd.wrapper.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 包装物集合，表示一组包装物
+* @author zhengyf
+* @date 2017年7月13日 下午1:26:04
+* @version V1.0.0
+*/
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdWrappers extends ArrayList<SpdAbstractWrapper>{
+
+	public <T extends SpdAbstractWrapper> SpdWrappers(List<T> wrappers){
+		super(wrappers);
+	}
+	
+	public SpdAbstractWrapper findById(String id) {
+		return CollectionUtils.findWhere("id", id, this);
+	}
+
+	public <T extends SpdIWrappable> void fillItems(List<T> items) {
+		this.forEach(wrapper->{
+			List<T> theItems = CollectionUtils.find("parentWrapperId", wrapper.getId(), items);
+			wrapper.setItems(new SpdWrapperItems(theItems));
+		});
+	}
+
+	public void fillItems(SpdLogisticsTaskItems items) {
+		this.forEach(wrapper->{
+			List<SpdLogisticsTaskItem> theItems = CollectionUtils.find("parentWrapperId", wrapper.getId(), items);
+			wrapper.setItems(new SpdWrapperItems(theItems));
+		});
+	}
+
+}

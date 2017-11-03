@@ -1,0 +1,47 @@
+package cn.ak4j.yard.sys.domain;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.enums.YardExceptionType;
+
+public class YardCodeParser {
+
+	public static YardArbitraryCode parseArbitraryCode(String code){
+		if(StringUtils.isEmpty(code)){
+			throw new InvalidDataException(YardExceptionType.invalid_origin_code);
+		}
+		
+		if(code.length()<4||code.length()>15){
+			throw new InvalidDataException(YardExceptionType.invalid_origin_code);
+		}
+		
+		String sortCode = code.substring(0, 3);
+		String meterialCode = code.substring(3);
+		CodeSort codeSort = CodeSort.sortOf(sortCode);
+		if(codeSort == null){
+			throw new InvalidDataException(YardExceptionType.invalid_origin_code);
+		}
+		return new YardArbitraryCode(codeSort, meterialCode);
+	}
+	
+	public static YardTimeSequenceCode parseTimeSequenceCode(String code){
+		if(StringUtils.isEmpty(code)){
+			throw new InvalidDataException(YardExceptionType.invalid_origin_code);
+		}
+		
+		if(code.length()<4||code.length()>15){
+			throw new InvalidDataException(YardExceptionType.invalid_origin_code);
+		}
+		
+		String sortCode = code.substring(0, 3);
+		String dateCode = code.substring(3, 9);
+		Integer meterialCode = Integer.parseInt(code.substring(9));
+		CodeSort codeSort = CodeSort.sortOf(sortCode);
+		if(codeSort == null){
+			throw new InvalidDataException(YardExceptionType.invalid_origin_code);
+		}
+		return new YardTimeSequenceCode(codeSort, dateCode, meterialCode);
+	}
+	
+}

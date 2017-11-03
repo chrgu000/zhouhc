@@ -1,0 +1,210 @@
+package cn.ak4j.yard.yds.domain;
+
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="yds_eds_goods")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class YdsEdsGoods extends YardMaintenceEntity {
+	
+	@Id
+	@GeneratedValue(strategy=GenerationType.AUTO,generator="uuidGenerator")
+	@GenericGenerator(name="uuidGenerator",strategy="uuid")
+	@Getter @Setter
+	private String edsGoodsId;//商品ID
+	
+	@NotEmpty(message = "产品类型不能为空")
+	@Getter @Setter
+	private String edsGoodsType;//商品类型
+	
+	@NotEmpty(message = "名称不能为空")
+	@Getter @Setter
+	private String edsWareName;//产品名称
+	
+	@NotEmpty(message = "通用名不能为空")
+	@Getter @Setter
+	private String edsGoodsName;//通用名称
+	
+	@NotEmpty(message = "编码不能为空")
+	@Getter @Setter
+	private String edsGoodsCode;//产品编码
+	
+	@Getter @Setter
+	private String edsGoodsSpec;//产品规格
+	
+	@Getter @Setter
+	private String edsGoodsModel;//剂型
+	
+	@NotEmpty(message = "包装规格不能为空")
+	@Getter @Setter
+	private String edsPackingSpec;//包装规格
+	
+	@NotEmpty(message = "送货单位不能为空")
+	@Getter @Setter
+	private String deliveryUnitName;//送货单位
+	
+	@NotEmpty(message = "厂家不能为空")
+	@Getter @Setter
+	private String edsFactName;//生产企业
+	
+	@NotNull(message = "备货单位转换比不能为空")
+	@Min(value = 0,message = "备货单位转换比必须大于0")
+	@Getter @Setter
+	private float edsYdsUnitRatio;//备货单位转换比
+	
+	@NotNull(message = "企业定价不能为空")
+	@DecimalMin(value = "0",message = "企业定价必须大于等于0")	
+	@Getter @Setter
+	private float edsPrice;//企业定价
+	
+	@Column(name="EDS_GOODS_DESC")
+	@Getter @Setter
+	private String edsGoodsDesc;//产品描述
+	
+	@Column(name="EDS_M_CODE")
+	@Getter @Setter
+	private String edsMCode;//助记码
+	
+	@Getter @Setter
+	private String edsGoodsFormatName;//格式化名称
+	
+	@Getter @Setter
+	private String yardGoodsId;//标准产品ID
+	
+	@Getter @Setter
+	private String ownerOrgId;//所属机构
+	
+	@Getter @Setter
+	private boolean enabled;//禁用标记
+	
+	@Getter @Setter
+	private String edsRegDoc;//注册证号码
+	
+	@Getter @Setter
+	private String edsAthDoc;//批准文号
+	
+	@Getter @Setter
+	private String equipmentSortName;//器械分类
+	
+	@Getter @Setter
+	private String equipmentLevel;//器械类别
+	
+	@Getter @Setter
+	private Boolean checkValidity;//是否检查批次
+	
+	@Getter @Setter
+	private String edsStoreType;//存储类型
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();//审核状态
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @Getter @Setter @JsonIgnore
+	private YdsGoods goods;
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_c;
+	
+	public void updateFormatName(){
+		if(getEdsGoodsName().trim().equals(getEdsWareName().trim())){
+			setEdsGoodsFormatName("["+getEdsGoodsCode()+"] "+getEdsGoodsName()+" "+ getEdsGoodsSpec()+" "+getEdsGoodsModel()+"  "+ getEdsFactName());
+		}else{
+			setEdsGoodsFormatName("["+getEdsGoodsCode()+"] "+getEdsGoodsName()+" "+getEdsWareName()+" "+ getEdsGoodsSpec()+" "+getEdsGoodsModel()+"  "+ getEdsFactName());			
+		}
+	}
+	
+	public void checkData() {
+		String invalidMsg = getInvalidMsg();
+		
+		if(StringUtils.isNotEmpty(invalidMsg)){
+			throw new InvalidDataException(invalidMsg);
+		}
+		
+		if(getCheckStateCode() != CheckState.new_created.getCode()){
+			throw new InvalidDataException(YardExceptionType.forbid_add_not_new_create_state_data);
+		}
+	}
+	
+	@JsonProperty
+	public String getInvalidMsg(){
+		StringBuffer msg = new StringBuffer();
+		String validateMsg = getValidateMsg();
+		msg.append(validateMsg)
+		.append(StringUtils.isEmpty(validateMsg)?"":";");
+		
+		if(StringUtils.isEmpty(getEdsGoodsType())){
+			msg.append("类型不能为空;");
+			
+		}else{
+			if(getEdsGoodsType().equals(YdsGoodsType.drug.getCode())){
+				if(StringUtils.isEmpty(getEdsGoodsSpec())){
+					msg.append("规格不能为空;");
+				}
+				if(StringUtils.isEmpty(getEdsGoodsModel())){
+					msg.append("剂型不能为空;");
+				}
+				if(StringUtils.isEmpty(getEdsAthDoc())){
+					msg.append("批准文号不能为空;");
+				}
+			}else if(getEdsGoodsType().equals(YdsGoodsType.equipment.getCode())){
+				if(StringUtils.isEmpty(getEdsGoodsSpec())){
+					msg.append("型号不能为空;");
+				}
+				if(StringUtils.isEmpty(getEquipmentSortName())){
+					msg.append("器械分类不能为空;");
+				}
+				if(StringUtils.isEmpty(getEquipmentLevel())){
+					msg.append("器械类别不能为空;");
+				}
+			}	
+		}
+		
+		return msg.toString();
+	} 
+	
+	@Transient
+	public String getEdsGoodsTypeName(){
+		if(getEdsGoodsType() == null){
+			return "";
+		}
+		return YdsGoodsType.typeOf(getEdsGoodsType()).getName();
+	}
+	
+	//设置为是否
+	public String getYdsEdsGoodsEnabled(){
+		return this.enabled?"是":"否";
+	}
+
+}

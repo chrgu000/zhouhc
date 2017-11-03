@@ -1,0 +1,35 @@
+package cn.ak4j.yard.spd.task.web;
+
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+
+@Data
+@NoArgsConstructor
+public class LogisticTaskReport {
+
+	public static final String type_block_items = "block";
+	public static final String type_piece_items = "piece";
+	public static final String type_turnover_box_items = "turnover_box";
+
+	
+	private String type;
+	private String boxNo;
+	private JRBeanCollectionDataSource itemDs;
+	
+	public LogisticTaskReport(String type, SpdLogisticsTaskItems items){
+		setType(type);
+		setItemDs(new JRBeanCollectionDataSource(items));
+	}
+	
+	public LogisticTaskReport(String type, String boxNo){
+		setType(type);
+		setBoxNo(boxNo);
+	}
+
+	public void setItems(SpdLogisticsTaskItems theItems) {
+		setItemDs(new JRBeanCollectionDataSource(theItems));
+	} 
+	
+}

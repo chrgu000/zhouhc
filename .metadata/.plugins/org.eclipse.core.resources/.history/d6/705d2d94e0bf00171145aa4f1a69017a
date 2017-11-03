@@ -1,0 +1,27 @@
+package cn.ak4j.yard.sys.factory;
+
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.enums.YardBatchTaskType;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+
+@Component
+public class YardBatchTaskFactory {
+
+	public YardBatchTask<SpdDeliveryOrders> createDeliveryBatchTask(SpdDeliveryOrders deliveryOrders) throws JsonProcessingException{
+		YardBatchTaskTO<SpdDeliveryOrders> batchTaskTO = new YardBatchTaskTO<SpdDeliveryOrders>();
+		batchTaskTO.setData(deliveryOrders);
+		batchTaskTO.setTaskType(YardBatchTaskType.batch_create_delivery_order_task.getCode());
+		batchTaskTO.setNotifyUrl("http://www.aoka.net");
+		
+		String json = Global.defaultObjectMapper.writeValueAsString(batchTaskTO);
+		YardBatchTask<SpdDeliveryOrders> batchTask = new YardBatchTask<SpdDeliveryOrders>(YardBatchTaskType.batch_create_delivery_order_task, batchTaskTO.getData(), json, batchTaskTO.getNotifyUrl());
+		return batchTask;
+	}
+	
+}

@@ -1,0 +1,175 @@
+package cn.ak4j.yard.pcs.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+
+import org.junit.Test;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.to.NewPcsDepotTO;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+
+public class PcsDepotResourceTest extends BaseTest{
+
+	@Test public void testGetDepotAreaById() throws Exception{
+		String depotId = "depot_id_001";
+		PcsDepotParams params = new PcsDepotParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		
+		PcsDepots depots = mockMvcHelper.findList(PcsDepots.class, xykUserCode, params);
+		assertEquals(1, depots.size());
+		assertEquals(depotId, depots.get(0).getDepotId());
+	}
+	
+	@Test public void testFindWhichConfiguredReplenishRule() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/pcs/pcsDepots/whichConfiguredRule(bizType,{bizType})?accessToken={accessToken}";
+		
+		PcsDepots allReplenishRuleDepots = mockMvcHelper.mockGet(PcsDepots.class, url, SpdBizType.replenish_biz.getCode(), accessToken);
+		assertEquals(5, allReplenishRuleDepots.size());
+	}
+	
+
+	@Test public void testFindWhichConfiguredReceiveRule() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/pcs/pcsDepots/whichConfiguredRule(bizType,{bizType})?accessToken={accessToken}";
+		
+		PcsDepots allReceiveRuleDepots = mockMvcHelper.mockGet(PcsDepots.class, urlTemplate, SpdBizType.receive_biz.getCode(), accessToken);
+		assertEquals(4, allReceiveRuleDepots.size());
+	}
+
+	
+	@Test public void  testFindAll() throws Exception{
+		PcsDepots allDepots = mockMvcHelper.findList(PcsDepots.class, testUserCode, null);
+		assertEquals(8, allDepots.size());
+	}
+	
+	@Test public void getGetCount() throws Exception{
+		int count = mockMvcHelper.count(PcsDepots.class, testUserCode, null);
+		assertEquals(8, count);
+	}
+	
+	@Test public void testAdd() throws Exception{
+		PcsDepot depot = createDepot();
+		assertEquals("200test_code", depot.getDepotCode());
+	}
+	
+	@Test public void testError() throws Exception{		
+		NewPcsDepotTO depotTO = createNewPcsDepot("009");
+		mockMvcHelper.add(PcsDepot.class, testUserCode, depotTO, status().is4xxClientError(), YardExceptionType.invalid_resource_exist);
+	}
+	
+	@Test public void testModify() throws Exception{
+		String depotId001 = "depot_id_001";
+		
+		//执行撤回操作
+		updateCheckStateCode(depotId001, CheckState.new_created.getCode(), false);
+		PcsDepot originDepot = mockMvcHelper.findOne(PcsDepot.class, testUserCode, depotId001);
+		
+		String newDepotName = originDepot.getDepotName()+"test";
+		originDepot.setDepotName(newDepotName);
+		mockMvcHelper.modify(PcsDepot.class, testUserCode, depotId001, originDepot);
+		
+		PcsDepot newDepot = mockMvcHelper.findOne(PcsDepot.class, testUserCode, depotId001);
+		assertEquals(newDepotName, newDepot.getDepotName());
+	}
+	
+	@Test public void testModifyError() throws Exception{
+		String depotId001 = "depot_id_001";
+		
+		//执行撤回操作
+		updateCheckStateCode(depotId001, CheckState.new_created.getCode(), false);
+		
+		PcsDepot originDepot = getDepotById(depotId001);
+		String depotJson = Global.defaultObjectMapper.writeValueAsString(originDepot);
+		depotJson = depotJson.replace("200007", "009");
+		
+		mockMvcHelper.modify(PcsDepot.class, testUserCode, "pcs", "pcsDepots", depotId001, depotJson, status().is4xxClientError(), YardExceptionType.invalid_resource_exist);
+	}
+	
+	@Test public void testUpdateCheckState() throws Exception{
+		String depotId001 = "depot_id_001";
+		PcsDepot originDepot = getDepotById(depotId001);
+		
+		//执行撤回操作
+		updateCheckStateCode(depotId001, CheckState.new_created.getCode(), false);
+		PcsDepot newDepot = getDepotById(depotId001);
+		
+		assertEquals(CheckState.commited, originDepot.getCheckState());
+		assertEquals(CheckState.new_created, newDepot.getCheckState());
+	}
+
+	@Test public void testAddWhithCommitedError() throws Exception{
+		//先新增一个测试仓库
+		PcsDepot depot = createDepot();
+		
+		String depotId = depot.getDepotId();
+		PcsDepot originDepot = getDepotById(depotId);
+		CheckStateTO checkStateTO = new CheckStateTO();
+		checkStateTO.setCheckStateCode(CheckState.commited.getCode());
+		checkStateTO.setLastDate(originDepot.getLastUpdateTime());
+		
+		mockMvcHelper.updateCheckState(PcsDepot.class, testUserCode, checkStateTO, depotId, status().is4xxClientError(), YardExceptionType.not_found);
+	}
+	
+	@Test public void testDownloadExcelFile() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = getUrlTemplate("/pcs/pcsDepots/excel?accessToken={accessToken}");
+		
+		mockMvc.perform(get(urlTemplate,accessToken))
+//		.andDo(print())
+		.andExpect(status().isOk())
+		.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", URLEncoder.encode("部门仓库信息", Global.defaultCharset.name()))))
+		.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"));
+	}
+	
+	private PcsDepot createDepot() throws Exception{
+		NewPcsDepotTO depotTO = createNewPcsDepot("test_code");
+		PcsDepot depot = mockMvcHelper.add(PcsDepot.class, testUserCode, depotTO);
+		return depot;
+	}
+	
+	
+	private void updateCheckStateCode(String depotId, int checkStateCode, boolean stepForward) throws Exception{
+		PcsDepot originDepot = getDepotById(depotId);
+		
+		CheckStateTO checkStateTO = new CheckStateTO();
+		checkStateTO.setCheckStateCode(checkStateCode);
+		checkStateTO.setLastDate(originDepot.getLastUpdateTime());
+		mockMvcHelper.updateCheckState(PcsDepot.class, testUserCode, checkStateTO, stepForward, depotId);
+	}
+	
+	private PcsDepot getDepotById(String depotId) throws Exception {
+		return mockMvcHelper.findOne(PcsDepot.class, testUserCode, depotId);
+	}
+	
+	private NewPcsDepotTO createNewPcsDepot(String depotCode){
+		NewPcsDepotTO depotTO = new NewPcsDepotTO();
+		depotTO.setDepotName("测试仓库");
+		depotTO.setDepotCode(depotCode);
+		depotTO.setDepotType("1");
+		depotTO.setDepotAddress("广州市天河区");
+		depotTO.setCentral(true);
+		depotTO.setLinkMan("张三");
+		depotTO.setLinkTel("13569845878");
+		depotTO.setManageDeptId("dept_id_001");
+		depotTO.setManageOrgId("626");
+		depotTO.setEnabled(true);
+		depotTO.setGoodsType(YdsGoodsType.drug.getCode());
+		return depotTO;
+	}
+}

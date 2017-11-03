@@ -1,0 +1,309 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.ISupplierProxy;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReturnGoodsBizSteps;
+import cn.ak4j.yard.spd.bizplan.params.SpdReturnGoodsBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReturnGoodsBizRepository;
+import cn.ak4j.yard.spd.bizplan.vo.SpdReturnGoodsQty;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.service.SpdGeneralLedgerService;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SpdReturnGoodsBizService extends IYardService<SpdReturnGoodsBiz>{
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdReturnGoodsBizRepository rgbRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdGeneralLedgerService glService;
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private SpdReceiveBizService rbService;
+	@Autowired private MGProxy mgProxy;
+	@Autowired private NotifyMsgBuilder msgBuilder;
+	@Autowired private ApplicationContext context;
+	
+	@Override @Transactional
+	public SpdReturnGoodsBiz add(SpdReturnGoodsBiz returnGoods, IUser user) {
+		if(!returnGoods.isValid()){
+			throw new InvalidDataException(returnGoods.getValidateMsg());
+		}
+		
+		SpdReturnGoodsRule rule = (SpdReturnGoodsRule)brRepository.findAllWithRelations().findById(returnGoods.getBizRuleId());
+		if(rule == null){
+			throw new NotFoundException(YardExceptionType.not_found_consume_rule, returnGoods.getBizRuleId());
+		}
+		PcsUser createUser = returnGoods.determinCreateUser(rule, (PcsUser)user, userRepository.findAll());
+		returnGoods.setMaintenanceInfo(new MaintenanceInfo(createUser));
+		returnGoods.applyRule(rule, createUser);
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(returnGoods.getBizId(), null, createUser.getUserId(), AmqpMsgType.CREATE_RETURN_GOODS_BIZ);
+            }
+		});
+		
+		String bizCode = codeService.publishCode(CodeSort.tuihuodan).getCode();
+		returnGoods.setBizCode(bizCode);
+		
+		rgbRepository.saveWithItems(returnGoods);
+		
+		//对于手动设置收货业务的退货需要更新收货业务明细的退货数量
+		log.debug("rule:{} autoAssignReceive:{} hasItems:{}", rule.getRuleCode(), returnGoods.getAutoAssignReceive(), returnGoods.hasItems());
+		if(!returnGoods.getAutoAssignReceive() && returnGoods.hasItems()){
+			List<SpdReturnGoodsQty> returnGoodsQtys = returnGoods.getReturnGoodsQtys();
+			rbService.updateReturnGoodsQty(returnGoodsQtys);
+		}
+		
+		return returnGoods;
+	}
+
+	@Override
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException("不支持删除退货业务");
+	}
+
+	@Override
+	public SpdReturnGoodsBiz modify(SpdReturnGoodsBiz t, IUser user) {
+		throw new UnsupportedOperationException("不支持修改退货业务");
+	}
+
+	@Override  @Transactional
+	public SpdReturnGoodsBiz updateCheckState(String bizId, int checkStateCode, Date lastUpdateTime, IUser user) {
+		SpdReturnGoodsBiz returnGoods = rgbRepository.getWithItems(bizId);
+		fillAllRelations(returnGoods);
+		if(checkStateCode == CheckState.reviewed.getCode()){
+			return reviewReturnGoods(returnGoods, lastUpdateTime, user);
+		}
+		throw new OperateFailException(YardExceptionType.forbide_update_check_state, returnGoods.getCheckState().getName(), CheckState.stateOf(checkStateCode).getName());
+	}
+	
+	@Transactional public SpdReturnGoodsBiz reviewReturnGoods(SpdReturnGoodsBiz returnGoods, Date lastUpdateTime, IUser user) {
+		if(!returnGoods.hasItems()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("退货业务[%s]", returnGoods.getBizCode()));
+		}
+		
+		if(!returnGoods.getItems().isAllConfirmed()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("退货业务[%s]", returnGoods.getBizCode()));
+		}
+
+		List<SpdGoodsQty> prepareQtyByStoreUnit = returnGoods.getItems().getConfirmGoodsQtysByStoreUnit();
+		List<SpdGoodsQty> realQtyByStoreUnit = dsService.findRealShelfStoreUnitStocks(returnGoods.getFromDepotId(), returnGoods.getFromAreaType(), prepareQtyByStoreUnit);
+		
+		//根据实际可用产品数量更新申领明细的确认数量，防止在确认数量输入之后库存有变更
+		returnGoods.getItems().verifyConfirmQtyWithRealQty(realQtyByStoreUnit);
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(returnGoods.getBizId(), null, user.getUserId(), AmqpMsgType.REVIEW_RETURN_GOODS_BIZ);
+            }
+		});
+		
+		//根据实际可用产品数量增加货位预备库存/锁库存
+		returnGoods.getFromDepot().fillCards(dcRepository);
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges(returnGoods.getFromDepot(), returnGoods.getFromAreaType(), realQtyByStoreUnit);
+		dsService.scheduleDecrementShelfStocks(stockChanges, returnGoods.getBizId());
+		
+		returnGoods.updateCheckState(CheckState.reviewed.getCode(), lastUpdateTime, user.getOrgId(), user.getUserId());
+		rgbRepository.save(returnGoods);
+		log.info("审核退货, 仓库:{}, 单号:{}", returnGoods.getFromDepot().getDepotName(), returnGoods.getBizCode());
+		return returnGoods;
+	}
+	
+	public SpdReturnGoodsBiz informSupplier(SpdReturnGoodsBiz returnGoods, PcsUser user) throws Exception{
+		if(returnGoods.getCheckState() != CheckState.reviewed && returnGoods.getCurrentBizStep() != SpdReturnGoodsBizSteps.complete_off_shelf_task){
+			throw new OperateFailException(YardExceptionType.forbid_inform_supplier, returnGoods.getBizCode()); 
+		}
+		fillAllRelations(returnGoods);
+		
+		//如果定义了通知供应商组件(意味着是通过系统集成的方式通知供应商的)
+		if(StringUtils.isNotEmpty(returnGoods.getBizRule().getReturnGoodsComponent()) && !returnGoods.getItems().isAllConfirmEmpty()){
+			try {
+				ISupplierProxy supplierProxy = (ISupplierProxy)context.getBean(returnGoods.getBizRule().getReturnGoodsComponent());
+				supplierProxy.syncReturnGoods(returnGoods);
+			} catch (Exception e) {
+				mgProxy.sendMail(msgBuilder.buildSyncReturnGoodsFailEmail(returnGoods, e));
+				e.printStackTrace();
+				throw e;
+			} 
+		}
+		
+		rabbitProxy.sendBizMsg(returnGoods.getBizId(), null, user.getUserId(), AmqpMsgType.SYNC_RETURN_GOODS_BIZ_TO_SUPPLIER);
+		
+		return returnGoods;
+	}
+
+	@Transactional public SpdReturnGoodsBiz completeReturnGoods(SpdReturnGoodsBiz returnGoods, PcsUser user) {
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(returnGoods.getBizId(), null, user.getUserId(), AmqpMsgType.COMPLETE_RETURN_GOODS_BIZ);
+            }
+		});
+		
+		//完成库存扣减
+		SpdDepotStockChanges depotStockChanges = returnGoods.getStockChanges();
+		depotStockChanges.setToNegativeQty();
+		depotStockChanges.forEach(change->change.setDepot(returnGoods.getFromDepot()));
+		dsService.updateDepotStocks(depotStockChanges);
+		
+		returnGoods.updateCheckState(CheckState.completed.getCode(), returnGoods.getLastUpdateTime(), user.getOrgId(), user.getUserId());
+		rgbRepository.save(returnGoods);
+		
+		//对总账进行贷出
+		PcsDept supplierDept = pcrRepository.findAllWithRelations().findOwnerSupplierDept(returnGoods.getFromDepot());
+		if(supplierDept != null){
+			log.info("备货退货完成，进行总账的贷出");
+			glService.credit(supplierDept.getDeptId(), new SpdGoodsQtys(returnGoods.getItems().getConfirmGoodsQtysByStoreUnit()));
+		}
+		return returnGoods;
+	}
+
+	@Transactional public SpdBizItem addItem(SpdBizItem bizItem, PcsUser user) {
+		SpdReturnGoodsBiz returnGoods = rgbRepository.findOne(bizItem.getBizId());
+		if(!returnGoods.getAutoAssignReceive()){
+			if(StringUtils.isEmpty(bizItem.getOriginItemId())){
+				throw new InvalidDataException("当前退货为手动指定收货，而当前的退货明细中没有指定收货明细");
+			}else{
+				SpdReturnGoodsQty returnGoodsQty = new SpdReturnGoodsQty(bizItem.getOriginItemId(), bizItem.getConfirmQty(), bizItem.getUnitLv());
+				List<SpdReturnGoodsQty> returnGoodsQtys = new ArrayList<SpdReturnGoodsQty>();
+				returnGoodsQtys.add(returnGoodsQty);
+				rbService.updateReturnGoodsQty(returnGoodsQtys);
+			}
+		}
+		bizItem.initDateInfo();
+		biRepository.save(bizItem);
+		return bizItem;
+	}
+	
+	@Transactional public void deleteItem(String itemId, PcsUser user) {
+		SpdBizItem bizItem = biRepository.findOne(itemId);
+		if(StringUtils.isNotEmpty(bizItem.getOriginItemId())){
+			SpdReturnGoodsQty returnGoodsQty = new SpdReturnGoodsQty(bizItem.getOriginItemId(), -bizItem.getConfirmQty(), bizItem.getUnitLv());
+			List<SpdReturnGoodsQty> returnGoodsQtys = new ArrayList<SpdReturnGoodsQty>();
+			returnGoodsQtys.add(returnGoodsQty);
+			rbService.updateReturnGoodsQty(returnGoodsQtys);
+		}
+		biRepository.delete(bizItem);
+	}
+
+	@Transactional public SpdBizItem modifyItem(SpdBizItem bizItem, PcsUser user) {
+		SpdBizItem itemPO = biRepository.findOne(bizItem.getBizItemId());
+		if(StringUtils.isNotEmpty(bizItem.getOriginItemId()) && itemPO.getConfirmQty() != bizItem.getConfirmQty()){
+			int difference = bizItem.getConfirmQty() - itemPO.getConfirmQty();
+			SpdReturnGoodsQty returnGoodsQty = new SpdReturnGoodsQty(bizItem.getOriginItemId(), difference, bizItem.getUnitLv());
+			List<SpdReturnGoodsQty> returnGoodsQtys = new ArrayList<SpdReturnGoodsQty>();
+			returnGoodsQtys.add(returnGoodsQty);
+			rbService.updateReturnGoodsQty(returnGoodsQtys);
+		}
+		
+		if(itemPO.getPlanQty().intValue() != bizItem.getPlanQty() || itemPO.getConfirmQty().intValue() != bizItem.getConfirmQty()){
+			itemPO.setPlanQty(bizItem.getPlanQty());
+			itemPO.setConfirmQty(bizItem.getConfirmQty());
+			itemPO.updateLastUpdateTime();
+			biRepository.save(itemPO);
+		}
+		
+		return itemPO;
+	}
+	
+	public SpdReturnGoodsBizs findUncompleteReturnGoodss(PcsUser user, SpdReturnGoodsBizParams params, OrderParam order,
+			int pageNo, int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(CollectionUtils.isEmpty(depots)){
+			return new SpdReturnGoodsBizs();
+		}
+		params.setFromDepotId(new ListParam<String>(depots.getIds()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode(),QueryParam.operation_not_in));
+		return rgbRepository.find(params, order, pageNo, pageSize);
+	}
+	
+	public SpdReturnGoodsBizs findCompletedReturnGoodss(PcsUser user, SpdReturnGoodsBizParams params, OrderParam order,
+			int pageNo, int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(CollectionUtils.isEmpty(depots)){
+			return new SpdReturnGoodsBizs();
+		}
+		params.setFromDepotId(new ListParam<String>(depots.getIds()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode()));
+		return rgbRepository.find(params, order, pageNo, pageSize);
+	}
+
+	public void fillAllRelations(SpdReturnGoodsBiz returnGoods){
+		SpdReturnGoodsRule rule = (SpdReturnGoodsRule)brRepository.findAllWithRelations().findById(returnGoods.getBizRuleId());
+		returnGoods.setBizRule(rule);
+		
+		SpdBizItems bizItems = biRepository.findByBizId(returnGoods.getBizId());
+		returnGoods.setItems(bizItems);
+		returnGoods.getItems().fillGoods(goodsRepository);
+		returnGoods.getItems().fillGoodsLot(glRepository);
+		//TODO 有待优化
+		returnGoods.getItems().getAllSpecialGoodsLots().fillGoodss(returnGoods.getItems().getAllGoods());
+		
+		SpdDepotTasks depotTasks = dtRepository.findWithItemsByBizId(returnGoods.getBizId());
+		if(CollectionUtils.isNotEmpty(depotTasks)){
+			returnGoods.setOffShelfTask(depotTasks.get(0));
+		}
+	}
+
+}

@@ -1,0 +1,115 @@
+package cn.ak4j.yard.spd.bizplan.service.assistant;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdPrepareInformBizSteps;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdPrepareInformBizService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class SpdPrepareInformBizAssistantService extends SpdBizAssistantService<SpdPrepareInformBiz>{
+
+	@Autowired private SpdPrepareInformBizService pibService;
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private SpdBizItemRepository birepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private NotifyMsgBuilder notifyMsgBuilder;
+	
+	@Override public void process(SpdPrepareInformBiz prepareInform, String taskId, String userId, String action) {
+		if(prepareInform.isCompleted()){
+			log.warn("收到消息[{}]，但是备货通知业务[{}]已完成", action, prepareInform.getBizCode());
+			return ;
+		}
+		pibService.fillAllRelations(prepareInform);
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		prepareInform = forwardBizStep(prepareInform, taskId, action);
+		
+		try{
+			if(prepareInform.getCurrentBizStep().equals(SpdPrepareInformBizSteps.create_prepare_inform)){
+				if(prepareInform.getBizRule().getFeedbackRule().getAutoCommitPrepareInform() && prepareInform.hasItems()){
+					pibService.commitPrepareInform(prepareInform, prepareInform.getLastUpdateTime(), user);
+				}
+			}
+			
+			else if(prepareInform.getCurrentBizStep().equals(SpdPrepareInformBizSteps.commit_prepare_inform)){
+				if(prepareInform.getBizRule().getFeedbackRule().getAutoReviewPrepareInform()){
+					PcsUser executeUser = user;
+					if(!prepareInform.getBizRule().canConfirmByUser(user)){
+						String executeUserId = prepareInform.getBizRule().getConfirmDept().getDefaultUserId();
+						executeUser = userRepository.findAll().findById(executeUserId);
+						if(executeUser == null){
+							throw new NotFoundException(YardExceptionType.not_found_default_user, 
+									prepareInform.getBizRule().getConfirmDept().getDeptName(),
+									prepareInform.getBizRule().getConfirmDept().getDeptCode());
+						}
+					}
+					prepareInform.getItems().confirmAsPlan();
+					birepository.saveAll(prepareInform.getItems());
+					pibService.reviewPrepareInform(prepareInform, prepareInform.getLastUpdateTime(), executeUser);
+				}
+			}
+			
+			else if(prepareInform.getCurrentBizStep().equals(SpdPrepareInformBizSteps.review_prepare_inform)){
+				if(prepareInform.getBizRule().getFeedbackRule().getAutoInformSupplier() || prepareInform.getItems().isAllConfirmEmpty()){
+					pibService.informSupplier(prepareInform, user);
+				}
+				MailMsg mail = notifyMsgBuilder.buildPrepareInformMail(prepareInform);
+				mgProxy.sendMail(mail);
+			}
+			
+			else if(prepareInform.getCurrentBizStep().equals(SpdPrepareInformBizSteps.inform_supplier)){
+				if(prepareInform.getBizRule().getFeedbackRule().getAutoCompletePrepareInform() || prepareInform.getItems().isAllConfirmEmpty()){
+					pibService.completePrepareInform(prepareInform, prepareInform.getMaintenanceInfo().getLastDate(), user);
+				}
+			}
+		}catch(Exception e){
+			handleException(action, prepareInform, e);
+		}
+		
+		saveBizLog(prepareInform, user);
+		pibRepository.save(prepareInform);
+	}
+
+	@Override
+	protected SpdPrepareInformBiz forwardBizStep(SpdPrepareInformBiz biz, String taskId, String action) {
+		SpdBizStep currentStep = biz.getCurrentBizStep();
+		if(currentStep == null){
+			biz.setBizStatusCode(biz.getBizSteps().get(0).getStatusCode());
+		}else{
+			SpdBizStep nextStep = biz.getNextStep();
+			if(nextStep == null){
+				log.warn("已经完成了最后一个步骤，不需要步进");
+				return biz;
+			}
+			
+			if((nextStep == SpdPrepareInformBizSteps.commit_prepare_inform && action.equals(AmqpMsgType.COMMIT_PREPARE_INFORM_BIZ.getCode()))
+				|| (nextStep == SpdPrepareInformBizSteps.review_prepare_inform && action.equals(AmqpMsgType.REVIEW_PREPARE_INFORM_BIZ.getCode()))
+				|| (nextStep == SpdPrepareInformBizSteps.inform_supplier && action.equals(AmqpMsgType.INFORM_SUPPLIER_INFORM_BIZ.getCode()))
+				|| (nextStep == SpdPrepareInformBizSteps.complete_prepare_inform && action.equals(AmqpMsgType.COMPLETE_PREPARE_INFORM_BIZ.getCode()))){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else{
+				throw new OperateFailException(YardExceptionType.biz_forward_fail, action, nextStep.getStatusName());
+			}
+		}
+		
+		return biz;
+	}
+
+	
+	
+}

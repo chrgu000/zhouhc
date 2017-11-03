@@ -1,0 +1,75 @@
+package cn.ak4j.yard.spd.wrapper.service;
+
+import java.util.List;
+
+import javax.transaction.Transactional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.enums.SpdWrapperType;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdAbstractWrapper;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBoxs;
+import cn.ak4j.yard.spd.wrapper.domain.SpdWrappers;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.domain.YardCodeParser;
+
+@Service
+public class SpdWrapperService {
+
+	@Autowired private SpdTurnoverBoxService tbService;
+	@Autowired private SpdTurnoverBoxRepository tbRepository;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	
+	@Transactional public SpdAbstractWrapper addDepotTaskWrapper(String taskId, String wrapperNo) {
+		YardArbitraryCode arbitraryCode = YardCodeParser.parseArbitraryCode(wrapperNo);
+		if(arbitraryCode.getCodeSort().equals(CodeSort.zhouzhuanxiang)){
+			SpdDepotTask task = dtRepository.findOne(taskId);
+			SpdSceneType sceneType = task.getTaskType().equals(SpdDepotTaskType.off_shelf_task.getCode())?SpdSceneType.off_shelf_task:SpdSceneType.on_shelf_task;
+			return tbService.use(wrapperNo, taskId, sceneType);
+		}
+		return null;
+	}
+	
+	@Transactional public SpdAbstractWrapper removeDepotTaskWrapper(String taskId, String wrapperNo){
+		YardArbitraryCode arbitraryCode = YardCodeParser.parseArbitraryCode(wrapperNo);
+
+		SpdDepotTask task = dtRepository.findWithItemsByTaskId(taskId);
+		if(arbitraryCode.getCodeSort().equals(CodeSort.zhouzhuanxiang)){
+			SpdTurnoverBox turnoverBox = tbRepository.findAll().findByWrapperNo(wrapperNo);
+			task.removeWrapper(turnoverBox);
+			return tbService.release(wrapperNo);
+		}
+		
+		return null;
+	}
+	
+	@Transactional public void addLogisticTaskWraper(String taskId, List<String> parentWrapperIds) {
+		if(CollectionUtils.isEmpty(parentWrapperIds)){
+			return ;
+		}
+		//这里日后需要扩展，动态判断包装物是什么，现在假定一定是周转箱
+		SpdTurnoverBoxs turnoverBoxs = tbRepository.findAll().findByIds(parentWrapperIds);
+		turnoverBoxs.forEach(turnoverBox->{
+			tbService.use(turnoverBox.getWrapperNo(), taskId, SpdSceneType.logistic_task);
+		});
+	}
+
+	@Transactional public void releaseWrapper(SpdWrappers wrappers) {
+		if(CollectionUtils.isEmpty(wrappers)){
+			return ;
+		}
+		if(wrappers.get(0).getWrapperType() == SpdWrapperType.turnover_box){
+			tbService.release(CollectionUtils.pluck("wrapperNo", wrappers));
+		}
+	}
+
+}

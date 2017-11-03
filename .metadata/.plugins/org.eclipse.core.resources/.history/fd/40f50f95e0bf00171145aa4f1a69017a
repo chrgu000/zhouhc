@@ -1,0 +1,27 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+
+import cn.ak4j.utils.CollectionUtils;
+
+/**
+* @Description: 业务步骤集合
+* @author zhengyf
+* @date 2017年4月2日 下午4:24:19
+* @version V1.0.0
+*/
+@SuppressWarnings({"serial"})
+public class SpdBizSteps extends ArrayList<SpdBizStep>{
+
+	Comparator<SpdBizStep> comparator = new Comparator<SpdBizStep>() {
+		public int compare(SpdBizStep step1, SpdBizStep step2) {
+			return step1.getIndex() - step2.getIndex();
+		}
+	};
+
+	public SpdBizStep stepOf(String bizStatusCode) {
+		return CollectionUtils.findWhere("statusCode", bizStatusCode, this);
+	}
+	
+}

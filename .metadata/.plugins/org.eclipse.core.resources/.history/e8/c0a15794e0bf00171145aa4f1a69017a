@@ -1,0 +1,191 @@
+package cn.ak4j.yard.spd.task.web;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.params.SpdTaskItemParams;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.task.service.SpdLogisticsTaskService;
+import cn.ak4j.yard.spd.wrapper.domain.SpdAbstractWrapper;
+import cn.ak4j.yard.sys.domain.ReportConfig;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.web.PdfExportHelper;
+
+@RestController
+public class SpdLogisticsTaskItemResource {
+	
+	@Autowired private SpdLogisticsTaskService ltService;
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private SpdLogisticsTaskItemRepository ltiRepository;
+	@Autowired private PdfExportHelper pdfExportHelper;
+	@Autowired private YardGlobalInfoRepository giRepository;
+
+	@RequestMapping(value = "/yard/spd/spdLogisticsTaskItems", method = RequestMethod.GET)
+	public SpdLogisticsTaskItems getItems(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		
+		SpdTaskItemParams params = SpdTaskItemParams.buildParamsFromJson(paramsStr, SpdTaskItemParams.class);
+        if(params == null){
+        	params = new SpdTaskItemParams();
+        }
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = new OrderParam();
+		}
+		return ltiRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdLogisticsTaskItems/count", method = RequestMethod.GET)
+	public int getItemCount(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdTaskItemParams params = SpdTaskItemParams.buildParamsFromJson(paramsStr, SpdTaskItemParams.class);
+        if(params == null){
+        	params = new SpdTaskItemParams();
+        }
+		return ltiRepository.count(params);
+	}
+	
+	@RequestMapping(value = {"/yard/spd/spdLogisticsTaskItems/taskId,{taskId}"}, method = RequestMethod.GET)
+	public SpdLogisticsTaskItems getByTaskId(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			@PathVariable("taskId") String taskId){
+		
+		SpdTaskItemParams params = SpdTaskItemParams.buildParamsFromJson(paramsStr, SpdTaskItemParams.class);
+        if(params == null){
+        	params = new SpdTaskItemParams();
+        }
+        params.setTaskId(new ListParam<String>(taskId));
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = new OrderParam();
+		}
+		SpdLogisticsTaskItems logisticsTaskItems = ltiRepository.find(params, order, currentPage-1, pageSize);
+		logisticsTaskItems = logisticsTaskItems.removeNonePlanQtyItems();
+		
+		return logisticsTaskItems;
+	}
+	
+	@RequestMapping(value = {"/yard/spd/spdLogisticsTaskItems/taskId,{taskId}/count"}, method = RequestMethod.GET)
+	public int countByTaskId(@RequestParam(value = "params", required = false) String paramsStr,
+			@PathVariable("taskId") String taskId){
+		SpdTaskItemParams params = SpdTaskItemParams.buildParamsFromJson(paramsStr, SpdTaskItemParams.class);
+        if(params == null){
+        	params = new SpdTaskItemParams();
+        }
+		params.setTaskId(new ListParam<String>(taskId));
+		SpdLogisticsTaskItems logisticsTaskItems = ltiRepository.find(params);
+		logisticsTaskItems = logisticsTaskItems.removeNonePlanQtyItems();
+		return logisticsTaskItems.size();
+	}
+	
+	@RequestMapping(value = {"/yard/spd/spdLogisticsTaskItems/{taskItemId}"}, method = RequestMethod.PUT)
+	public SpdLogisticsTaskItem modify(@PathVariable("taskItemId") String taskItemId, 
+			@RequestBody(required = true) SpdLogisticsTaskItem spdLogisticsTaskItem){
+		
+		spdLogisticsTaskItem = ltService.modifyItem(spdLogisticsTaskItem);
+		
+		return spdLogisticsTaskItem;
+	}
+	
+	//TODO 需要做测试用例
+	@RequestMapping(value = "/yard/spd/spdLogisticsTaskItems/code,{code}", method = RequestMethod.GET)
+	public SpdLogisticsTaskItems getByCode(
+				 @RequestParam(value = "params", required = false) String paramStr,
+	             @RequestParam(value = "orders", required = false) String orders,
+	             @PathVariable("code") String code,
+	             HttpServletRequest request){
+		SpdTaskItemParams params = SpdTaskItemParams.buildParamsFromJson(paramStr, SpdTaskItemParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdTaskItemParams();
+		}
+		if(order == null){
+			order = new OrderParam();
+		}
+		return ltiRepository.findByCode(params, order, code);
+	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/yard/spd/spdLogisticsTaskItems/taskId,{taskId}/pdf", method = RequestMethod.GET)
+	public void getPdf(@PathVariable("taskId")String taskId, HttpServletRequest request, HttpServletResponse response)throws Exception{
+		SpdLogisticsTask task = ltRepository.findOne(taskId);
+		ltService.fillAllRelations(task);
+		task.setItems(task.getItems().removeNonePlanQtyItems());
+		
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		parameters.put("taskCode", task.getTaskCode());
+		parameters.put("fromDeptName", task.getFromDepot().getManageDept().getDeptName());
+		parameters.put("toDeptName", task.getToDepot().getManageDept().getDeptName());
+		parameters.put("deliveryUserName", task.getCreateUser().getUserName());
+		parameters.put("deliveryTime", task.getMaintenanceInfo().getCreateDate());
+		//去除周转箱明细，并按parentItemCode排序
+		ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.delivery_task_report).getConfig();
+		pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, transfer(task), "inline", response);
+	}
+	
+	private List<LogisticTaskReport> transfer(SpdLogisticsTask task){
+		List<LogisticTaskReport> reports = new ArrayList<LogisticTaskReport>();
+		
+		SpdLogisticsTaskItems blockItems = new SpdLogisticsTaskItems();
+		SpdLogisticsTaskItems pieceItems = new SpdLogisticsTaskItems();
+		
+		for(SpdLogisticsTaskItem item : task.getItems()){
+			if(item.getPlanQtyByStoreUnit() % item.getGoods().getPrepareToStoreRatio() == 0){
+				blockItems.add(item);
+			}else{
+				if(StringUtils.isEmpty(item.getParentWrapperId())){
+					pieceItems.add(item);
+				}
+			}
+		}
+		if(CollectionUtils.isNotEmpty(blockItems)){
+			reports.add(new LogisticTaskReport(LogisticTaskReport.type_block_items, blockItems));
+		}
+		if(CollectionUtils.isNotEmpty(pieceItems)){
+			reports.add(new LogisticTaskReport(LogisticTaskReport.type_piece_items, pieceItems));
+		}
+		
+		for(SpdAbstractWrapper wrapper : task.getWrappers()){
+			LogisticTaskReport report = new LogisticTaskReport(LogisticTaskReport.type_turnover_box_items, wrapper.getWrapperNo());
+			SpdLogisticsTaskItems theItems = new SpdLogisticsTaskItems();
+			wrapper.getItems().forEach(item->{
+				theItems.add((SpdLogisticsTaskItem)item);
+			});
+			if(CollectionUtils.isNotEmpty(theItems)){
+				report.setItems(theItems);
+				reports.add(report);
+			}
+		}
+
+		return reports;
+	}
+	
+	
+}
+

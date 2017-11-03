@@ -1,0 +1,23 @@
+package cn.ak4j.yard.enums;
+
+import java.io.IOException;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+
+public class CommonEnumJsonSerializer extends JsonSerializer<ITypeEnum>{
+
+	@Override
+	public void serialize(ITypeEnum iTypeEnum, JsonGenerator generator, SerializerProvider serializers)
+			throws IOException, JsonProcessingException {
+		generator.writeStartObject();
+		if(iTypeEnum != null){
+			generator.writeStringField(iTypeEnum.getName(), iTypeEnum.getCode());
+		}
+		
+		generator.writeEndObject();
+	}
+
+}

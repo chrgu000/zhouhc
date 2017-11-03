@@ -1,0 +1,8 @@
+package cn.ak4j.yard.pcs.domain;
+
+import cn.ak4j.entity.Entities;
+
+@SuppressWarnings("serial")
+public class PcsRoleApis extends Entities<PcsRoleApi>{
+
+}

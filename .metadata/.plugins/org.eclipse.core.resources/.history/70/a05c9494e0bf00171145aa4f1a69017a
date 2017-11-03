@@ -1,0 +1,238 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.DateRange;
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAllBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizPlan;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReturnGoodsBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+import cn.ak4j.yard.spd.bizrule.domain.SpdBizRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsItems;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.factory.SpdPropertyChangeRecordFactory;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRecordParams;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRuleParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRecordItemRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRecordRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRelationItemRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SpdPropertyChangeService {
+
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdPropertyChangeRecordItemRepository pcriRepository;
+	@Autowired private SpdPropertyChangeRecordRepository pcrRepository;
+	@Autowired private SpdPropertyChangeRuleRepository pcRuleRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdPropertyChangeRelationItemRepository relationItemRepository;
+	@Autowired private SpdGeneralLedgerService glService;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdReceiveBizService rbService;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdPropertyChangeRecordFactory pcrFactory;
+	@Autowired private SpdAllBizSteps allBizSteps;
+	@Autowired private SpdDepotTaskItemRepository dtiRepository;
+	@Autowired private SpdLogisticsTaskItemRepository ltiRepository;
+	
+	@Autowired @Qualifier("propertyChangePoints") Map<SpdBizType, SpdBizStep[]> propertyChangePoints;
+	
+	/**
+	 * 根据特定的物权规则发生物权变更，物权变更的三个行为
+	 * 1）收货核销/冲账：这是一个模拟核销，按照时间顺序对数量进行核销，并且是一个缓存式核销，正真的核销在最后同步业务总账给供应商由供应商进行核销操作
+	 * 2）更新总账交易
+	 * 3）记录物权变更
+	 */
+	@SuppressWarnings({"rawtypes" })
+	@Transactional public SpdPropertyChangeRecord change(SpdPropertyChangeRule rule, SpdBizPlan biz, String taskId){
+		SpdPropertyChangeRecord record = pcrFactory.buildRecord(rule, biz, taskId);
+
+		//物权变更的来源明细，可能是业务明细，可能是作业明细
+		SpdGoodsItems originItems = findGoodsItems(rule, biz, taskId);
+		log.debug("items size:{}", originItems.size());
+		
+		//使用SpdGoodsQty来表达物权变更数量
+		SpdGoodsQtys changeQtys = originItems.getGoodsQtys();
+		if(changeQtys.isTotalZero()){
+			log.info("因为业务或作业没有产生实际的数量，所以不做物权变更记录");
+			return null;
+		}
+		
+		record = pcrRepository.save(record);
+		
+		//交易明细，对贷出和借入的统称
+		SpdReceiveBizs dealReceives = null;
+		SpdPropertyChangeRecordItems recordItems = null;
+		//主机构借入，即医院借入供应商贷出
+		if(rule.isMainOrgDebit()){
+			dealReceives = rbService.verification(rule.getLedgerDeptId(), changeQtys); //收货记录做核销
+			glService.credit(rule.getLedgerDeptId(), changeQtys); //业务总账贷出
+			//log.debug("根据{}个作业明细创建物权变更记录明细", originItems.size());
+			recordItems = pcrFactory.createPropertyChangeItems(record, originItems, true);
+		}
+		//主机构贷出，即医院贷出供应商借入
+		else{
+			dealReceives = rbService.chargeOff(rule.getLedgerDeptId(), changeQtys); //收货记录做冲账
+			glService.chargeOff(rule.getLedgerDeptId(), changeQtys); //业务总账做冲账
+			
+			recordItems = pcrFactory.createPropertyChangeItems(record, originItems, false);
+		}
+		
+		pcriRepository.saveAll(recordItems);
+		
+		//创建物权变更明细的收货关联明细
+		log.debug("biz[{}] {} occur change", biz.getBizType().getCode(), biz.getBizCode());
+		SpdPropertyChangeRelationItems relationItems = pcrFactory.createAndSaveReceiveRelationItems(rule.getDealPriceStratage(), recordItems, dealReceives);
+		relationItemRepository.saveAll(relationItems);
+		
+		return record;
+	}
+
+	@SuppressWarnings({"rawtypes" })
+	private SpdGoodsItems findGoodsItems(SpdPropertyChangeRule rule, SpdBizPlan biz, String taskId){
+		boolean changeByTask = StringUtils.isNotEmpty(taskId);
+		SpdGoodsItems goodsItems = null;
+		if(changeByTask){
+			SpdBizStep bizStep = allBizSteps.get(rule.getBizType()).stepOf(rule.getTriggerStepCode());
+			if(bizStep == SpdReceiveBizSteps.complete_on_shelf_task 
+				|| bizStep == SpdReturnGoodsBizSteps.complete_off_shelf_task
+				|| bizStep == SpdReplenishBizSteps.complete_on_shelf_task){
+				goodsItems = dtiRepository.findByTaskId(taskId);
+			}else if(bizStep == SpdReplenishBizSteps.review_delivery_task){
+				goodsItems = ltiRepository.findByTaskId(taskId);
+				((SpdLogisticsTaskItems)(goodsItems)).forEach(taskItem->{
+					log.debug("taskItem: {} {} {} {}", taskItem.getTaskId(), taskItem.getGoodsId(), taskItem.getPlanQty(), taskItem.getConfirmQty());
+				});
+			}
+			goodsItems.fillGoods(goodsRepository);
+		}else{
+			goodsItems = biRepository.findWithGoodsByBizId(biz.getBizId());
+		}
+
+		goodsItems.fillSpecialGoodsLot(glRepository);
+		return goodsItems;
+	}
+
+	/**
+	 * 对物权变更做日清
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public void dailyClean(SpdDailyCleanBiz dailyClean) {
+		//查询目标日期的所有物权变更记录
+		SpdPropertyChangeRecordParams params = new SpdPropertyChangeRecordParams();
+		Date start = dailyClean.getTargetDate();
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(dailyClean.getTargetDate());
+		cal.add(Calendar.DAY_OF_YEAR, 1);
+		Date end = cal.getTime();
+		params.setTargetDate(new DateRangeParam(new DateRange(start, end)));
+		
+		SpdBizRules bizRules = brRepository.getAll().findByBizTypesAndDepotIds(propertyChangePoints.keySet(), dailyClean.getDepotId());
+		SpdPropertyChangeRules propertyChangeRules = null;
+		if(CollectionUtils.isNotEmpty(bizRules)){
+			SpdPropertyChangeRuleParams ruleParams = new SpdPropertyChangeRuleParams();
+			ruleParams.setBizRuleId(new ListParam<String>(CollectionUtils.pluck("id", bizRules)));
+			propertyChangeRules = new SpdPropertyChangeRules(pcRuleRepository.findAllWithRelations().find(ruleParams));
+		}
+		params.setPropertyChangeRuleId(new ListParam<String>(propertyChangeRules.getIds()));
+		
+		SpdPropertyChangeRecords propertyChangeRecords = pcrRepository.find(params);
+		
+		
+		//propertyChangeRecords = propertyChangeRecords.findByDepot(dailyClean.getDepotId());
+		if(CollectionUtils.isEmpty(propertyChangeRecords)){
+			throw new NotFoundException(YardExceptionType.not_found_property_change_record, Global.sdfYMD.format(dailyClean.getTargetDate()), dailyClean.getDepot().getDepotCode());
+		}
+
+		//更新物权变更记录的日清业务id
+		propertyChangeRecords.forEach(record->record.setDailyCleanId(dailyClean.getBizId()));
+		pcrRepository.saveAll(propertyChangeRecords);
+	}
+
+	/**
+	 * 查询与当前用户相关的物权变更记录：
+	 * 1）当前用户所属部门的物权变更，即当前部门作为贷出部门或借入部门
+	 * 2）当前用户所管理的仓库的物权变更
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public SpdPropertyChangeRecords findMyRelatedRecords(PcsUser user, SpdPropertyChangeRecordParams params,
+			OrderParam order, int pageNo, int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		List<String> depotIds = depots.pluck("depotId");
+		
+		//根据仓库查询业务规则
+		SpdBizRules bizRules = brRepository.getAll().findByBizTypesAndDepotIds(propertyChangePoints.keySet(), depotIds);
+		
+		//根据业务规则查询相关的物权变更规则
+		SpdPropertyChangeRules changeRules = null;
+		if(CollectionUtils.isNotEmpty(bizRules)){
+			SpdPropertyChangeRuleParams ruleParams = new SpdPropertyChangeRuleParams();
+			ruleParams.setBizRuleId(new ListParam<String>(CollectionUtils.pluck("id", bizRules)));
+			changeRules = new SpdPropertyChangeRules(pcRuleRepository.findAllWithRelations().find(ruleParams));
+		}
+		SpdPropertyChangeRecords records = pcrRepository.findByDeptOrDepots(user.getDeptId(), depotIds, changeRules==null?null:changeRules.pluck("id"), params, order, pageNo, pageSize);
+		
+		return records;
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public int countMyRelatedRecords(PcsUser user, SpdPropertyChangeRecordParams params) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		List<String> depotIds = depots.pluck("depotId");
+		
+		//根据仓库查询业务规则
+		SpdBizRules bizRules = brRepository.getAll().findByBizTypesAndDepotIds(propertyChangePoints.keySet(), depotIds);
+		
+		//根据业务规则查询相关的物权变更规则
+		SpdPropertyChangeRules changeRules = null;
+		if(CollectionUtils.isNotEmpty(bizRules)){
+			SpdPropertyChangeRuleParams ruleParams = new SpdPropertyChangeRuleParams();
+			ruleParams.setBizRuleId(new ListParam<String>(CollectionUtils.pluck("id", bizRules)));
+			changeRules = new SpdPropertyChangeRules(pcRuleRepository.findAllWithRelations().find(ruleParams));
+		}
+		int count = pcrRepository.countByDeptOrDepots(user.getDeptId(), depotIds, changeRules==null?null:changeRules.pluck("id"), params);
+		return count;
+	}	
+}

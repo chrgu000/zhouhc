@@ -1,0 +1,23 @@
+package cn.ak4j.yard.extend;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+
+public interface ISupplierProxy extends ICustomComponent{
+	
+	public SpdDeliveryOrders syncDeliveryOrders() throws Exception;
+	
+	public SpdPrepareInformBiz syncPrepareInform(SpdPrepareInformBiz prepareInform, YdsEdsGoodsRepository egRepository) throws OperateFailException;
+	
+	public SpdReturnGoodsBiz syncReturnGoods(SpdReturnGoodsBiz returnGoods) throws Exception;
+	
+	public void receiveCallback(SpdReceiveBiz receive) throws Exception;
+	
+	public SpdFinacialReconciliationBiz syncFinacialReconciliationBiz(SpdFinacialReconciliationBiz reconciliationBiz) throws Exception;
+	
+}

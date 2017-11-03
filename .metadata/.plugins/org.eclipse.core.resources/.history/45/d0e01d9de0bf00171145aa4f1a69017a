@@ -1,0 +1,14 @@
+-- 修改申领规则
+update spd_replenish_rule set name = '半自动请领' where name = '科室半自动请领';
+update spd_replenish_rule set name = '自动请领' where name = '科室自动请领';
+
+--修改备货收货规则
+update spd_receive_rule set name = '自动备货收货' where name = '自动收货';
+
+--修改库内移仓规则
+update spd_move_area_rule set name = '隔离' where name = '默认移仓';
+update spd_move_area_rule set name = '自动隔离' where name = '自动移仓';
+
+--修改库存调节规则
+update spd_adjust_stock_rule set name = '库存报溢' where name = '默认库存调节';
+update spd_adjust_stock_rule set name = '自动库存报溢' where name = '自动库存调节';

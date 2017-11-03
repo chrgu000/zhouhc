@@ -1,0 +1,27 @@
+package cn.ak4j.yard.vo;
+
+import cn.ak4j.yard.enums.YdsUnitLv;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * 单位转换比对象
+* @Description: 用于描述从一个源单位级别转换到一个目标单位级别的对象
+* @author zhengyf
+* @date 2017年4月4日 下午6:00:19
+* @version V1.0.0
+ */
+@Data
+@NoArgsConstructor
+public class UnitExchangeRatio {
+	
+	private YdsUnitLv sourceLv;
+	private YdsUnitLv targetLv;
+	private float ratio;
+	
+	public UnitExchangeRatio(YdsUnitLv sourceLv, YdsUnitLv targetLv){
+		setSourceLv(sourceLv);
+		setTargetLv(targetLv);
+	}
+	
+}

@@ -1,0 +1,134 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRefRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="SPD_DISPATCHER")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"unchecked", "serial"})
+public class SpdDispatcher extends YardMaintenceEntity{
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String dispatcherId; //调度单ID
+	
+	@Getter @Setter
+	private String dispatcherCode; //调度编码
+	
+	@Getter @Setter
+	private String dispatcherType;	
+	
+	@Getter @Setter
+	private String dispatcherOrgId;	//调度机构
+	
+	@NotEmpty(message="调度部门不能为空") @Getter @Setter
+	private String dispatcherDeptId;  //调度部门
+	
+	@Getter @Setter
+	private String dispatcherDepotId;  //调度仓库
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_r;//新增_审核
+	
+	@Embedded @NotNull(message="维护信息对象不能为空") @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDispatcherRefs refs = new SpdDispatcherRefs();
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot depot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotTasks tasks;
+	
+	public void addRef(SpdDispatcherRef ref){
+		refs.add(ref);
+	}
+	
+	public void updateRefId(){
+		for(SpdDispatcherRef ref : refs){
+			ref.setDispatcherId(getDispatcherId());
+		}
+	}
+
+	public void fillDepot(PcsDepotRepository pcsDepotRepository, SpdDepotCardRepository dcRepository) {
+		PcsDepot depot = pcsDepotRepository.findAllWithRelations().findById(getDispatcherDepotId());
+		depot.fillCards(dcRepository);
+		setDepot(depot);
+	}
+
+	public void fillTasksWithItems(SpdDepotTaskRepository taskRepository) {
+		SpdDepotTasks tasks = taskRepository.findWithItemsByDispatcherId(getDispatcherId());
+		setTasks(tasks);
+	}
+
+	public void fillRefsWithGoodsItems(SpdDispatcherRefRepository drRepository, SpdBizItemRepository biRepository, SpdLogisticsTaskItemRepository ltiRepository) {
+		SpdDispatcherRefs refs = drRepository.findByDispacherId(dispatcherId);	
+		String refObjectType = refs.get(0).getRefObjectType();
+		if(refObjectType.equals(SpdDispatcherRef.ref_object_type_biz)){
+			SpdBizItems bizItems = biRepository.findWithGoodsByBizIds(refs.pluck("refObjectId"));
+			refs.forEach(ref->{
+				SpdBizItems theBizItems = new SpdBizItems(CollectionUtils.find("bizId", ref.getRefObjectId(), String.class, bizItems));
+				ref.setGoodsItems(theBizItems);
+			});
+		}else if(refObjectType.equals(SpdDispatcherRef.ref_object_type_logistics_task)){
+			SpdLogisticsTaskItems taskItems = ltiRepository.findByTaskIds(refs.pluck("refObjectId"));
+			refs.forEach(ref->{
+				SpdLogisticsTaskItems theTaskItems = new SpdLogisticsTaskItems(CollectionUtils.find("taskId", ref.getRefObjectId(), String.class, taskItems));
+				ref.setGoodsItems(theTaskItems);
+			});
+		}
+		
+		setRefs(refs);
+	}
+	
+	public void verifyGoodsCard(){
+		getRefs().forEach(ref->{
+			YdsGoodss goodssWithoutCard = getDepot().whichHasNotCards(ref.getGoodsItems().getAllGoods(), ref.getAreaType());
+			if(CollectionUtils.isNotEmpty(goodssWithoutCard)){
+				String goodsCodes = StringUtils.join(goodssWithoutCard.pluck("goodsCode"), ",");
+				throw new OperateFailException("缺乏启用账页", YardExceptionType.forbid_without_depot_card, getDepot().getDepotName(), goodsCodes, PcsAreaType.typeOf(ref.getAreaType()).getName());
+			}
+		});
+	}
+}

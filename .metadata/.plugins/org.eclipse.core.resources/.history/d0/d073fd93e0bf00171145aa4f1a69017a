@@ -1,0 +1,19 @@
+package cn.ak4j.yard.yds.service;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.extend.CustomComponentDoc;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class YdsEdsGoodsEventProcessor implements IYdsEdsGoodsEventProcessor{
+
+	@Getter private CustomComponentDoc doc;
+	
+	@Override
+	public void process(YdsEdsGoods edsGoods, String userId, AmqpMsgType msgType) {
+		log.info("默认的企业产品消息事件处理器不做任何处理");
+	}
+
+}

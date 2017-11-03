@@ -1,0 +1,54 @@
+package cn.ak4j.yard.enums;
+
+import java.io.IOException;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using = SpdBizLogicStratageTypeSerializer.class)
+public enum SpdBizLogicStratageType implements ITypeEnum{
+
+	general_ledger_qty_stratage("general_ledger_qty_stratage", "业务总账库存数量策略", "业务总账中的数量均按产品的最小单位级别存储"),
+	general_ledger_credit_price_stratage("general_ledger_credit_price_stratage", "业务总账贷出价格策略", "根据当前总账中的单价进行贷出"),
+	general_ledger_unit_price_stratage("general_ledger_unit_price_stratage", "业务总账单价策略", "业务总账的单价采用加权平均价，根据当前库存总金额除以当前库存数量"),
+	general_ledger_unit_lv_stratage("general_ledger_unit_lv_stratage", "业务总账单位级别策略", "业务总账的库存数量、单价金额等均采用最小单位"),
+	general_ledger_return_apply_stratage("general_ledger_return_apply_stratage", "请领退货获取策略", "当前申领规则的流向取反，并且是批次级别的，以及来源规则是当前申领规则的申领退货规则"),
+	biz_unit_lv_stratage("biz_unit_lv_stratage", "业务单位级别策略", "业务单位级别遵循: 备货单位 >= 结算单位 >= 存储单位 >= 消耗单位"),
+	shelf_storage_stratage("shelf_storage_stratage", "货位存储策略", "同一货区类型下的品种只能存放于一个货位中，如果需要从A货位变更到B货位，需要先从A货位上全部下架，然后全部上架到B货位"),
+	excess_delivery_stratage("excess_delivery_stratage","超额送货策略","不允许超额送货:备货确认数量>=已收货数量(收货已确认取确认数量,收货未确认取计划数量)+送货数量"),
+	daily_clean_stratage("daily_clean_stratage", "日清对账策略", "目前只能在第二天以后对前一天的物权变更记录进行日清对账"),
+	goods_mapping_stratage("goods_mapping_stratage", "产品对码策略", "允许多个已启用的企业产品对应同一个标准产品，但是同时只允许其中的一个企业产品已提交"),
+	property_change_rule_constraint("property_change_rule_constraint", "物权变更规则约束", "正反向物权变更规则必须相对应，即从供应商销售部1贷出到中心药房的物权变更如果做反向变更必须再由销售部1借入而不能是销售部2借入");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SpdBizLogicStratageType (String code,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+}
+
+class SpdBizLogicStratageTypeSerializer extends JsonSerializer<ITypeEnum>{
+
+	@Override
+	public void serialize(ITypeEnum iTypeEnum, JsonGenerator generator, SerializerProvider serializers)
+			throws IOException, JsonProcessingException {
+		generator.writeStartObject();
+		if(iTypeEnum != null){
+			generator.writeStringField(iTypeEnum.getName(), iTypeEnum.getDescription());
+		}
+		
+		generator.writeEndObject();
+	}
+
+}

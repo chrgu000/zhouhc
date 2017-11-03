@@ -1,0 +1,8 @@
+package cn.ak4j.yard.sys.domain.params;
+
+import cn.ak4j.entity.query.param.QueryParams;
+
+@SuppressWarnings("serial")
+public class YardCodeSequenceParams extends QueryParams{
+
+}

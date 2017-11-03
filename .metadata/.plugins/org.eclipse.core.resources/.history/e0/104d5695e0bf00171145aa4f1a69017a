@@ -1,0 +1,26 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class B2BOrderBillItem {
+
+	private String outContractNo;
+	private String outGdsFormatName;
+	private String outGdsId;
+	private int outGdsPacksize;
+	private int outGdsQty;
+	private String outGdsUnit;
+	private float outGdsUnitprice;
+	private String outLotExpDate;
+	private String outLotNo;
+	private String outLotProDate;
+	private String outOrderItemId;
+	private String outOrlordId;
+	private String outOrlordItemId;
+	private String outOrlordType;
+	
+}

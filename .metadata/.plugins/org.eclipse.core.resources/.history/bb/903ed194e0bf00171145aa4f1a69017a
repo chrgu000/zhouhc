@@ -1,0 +1,25 @@
+package cn.ak4j.yard.spd.bizrule.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdAbstractFeedbackRule;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdFeedbackRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdFeedbackRuleParams;
+import lombok.Getter;
+
+@Repository
+public class SpdFeedbackRuleRepository extends BaseRepository<SpdAbstractFeedbackRule, SpdFeedbackRules, SpdFeedbackRuleParams, String>{
+	
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Cacheable(value="longTimeCache", key="\"allFeedbackRules\"")
+	public SpdFeedbackRules findAll(){
+		return getAll();
+	}
+	
+}

@@ -1,0 +1,2 @@
+alter table pcs_depot_area add(primary char(1 byte));
+alter table pcs_depot_shelf add(primary char(1 byte));

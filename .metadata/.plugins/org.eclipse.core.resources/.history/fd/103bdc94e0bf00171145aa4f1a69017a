@@ -1,0 +1,111 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.Column;
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 申领反馈规则
+* @author zhengyf
+* @date 2017年6月14日 上午11:25:20
+* @version V1.0.0
+*/
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity  
+@DiscriminatorValue("replenish") 
+public class SpdReplenishFeedbackRule extends SpdAbstractFeedbackRule {
+
+	private static final long serialVersionUID = -3918154241491479798L;
+
+	private Boolean autoCommitReplenish;
+	
+	private Boolean autoReviewReplenish;
+	
+	@Column(name="AUTO_CREATE_OFF_SHELF_DISP")
+	private Boolean autoCreateOffShelfDispatcher;
+	
+	@Column(name="AUTO_REVIEW_OFF_SHELF_DISP")
+	private Boolean autoReviewOffShelfDispatcher;
+	
+	private Boolean autoReviewOffShelfTask;
+	
+	private Boolean autoCommitDeliveryTask;
+	
+	private Boolean autoReviewDeliveryTask;
+	
+	@Column(name="AUTO_CREATE_ON_SHELF_DISP")
+	private Boolean autoCreateOnShelfDispatcher;
+	
+	@Column(name="AUTO_REVIEW_ON_SHELF_DISP")
+	private Boolean autoReviewOnShelfDispatcher;
+	
+	private Boolean autoReviewOnShelfTask;
+	
+	/**
+	 * 下架数量全部为0，则后续业务全部自动完成
+	 */
+	private Boolean emptyBizAutoFeedback;
+	
+	@Transient private String description;
+	
+	@Override public SpdBizType getBizType() {
+		return SpdBizType.replenish_biz;
+	}
+	
+	@Override @Transient
+	public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			buf.append(autoCommitReplenish?auto_word:manual_word)
+				.append("提交申领业务").append(Global.generalSeparator)
+				.append(autoReviewReplenish?auto_word:manual_word)
+				.append("审核申领业务").append(Global.generalSeparator)
+				.append(autoCreateOffShelfDispatcher?auto_word:manual_word)
+				.append("创建下架调度").append(Global.generalSeparator)
+				.append(autoReviewOffShelfDispatcher?auto_word:manual_word)
+				.append("审核下架调度").append(Global.generalSeparator)
+				.append(autoReviewOffShelfTask?auto_word:manual_word)
+				.append("审核下架作业").append(Global.generalSeparator)
+				.append(autoCommitDeliveryTask?auto_word:manual_word)
+				.append("提交送货作业").append(Global.generalSeparator)
+				.append(autoReviewDeliveryTask?auto_word:manual_word)
+				.append("审核送货作业").append(Global.generalSeparator)
+				.append(autoCreateOnShelfDispatcher?auto_word:manual_word)
+				.append("创建上架调度").append(Global.generalSeparator)
+				.append(autoReviewOnShelfDispatcher?auto_word:manual_word)
+				.append("审核上架调度").append(Global.generalSeparator)
+				.append(autoReviewOnShelfTask?auto_word:manual_word)
+				.append("审核上架作业");
+			
+			return this.description = buf.toString();
+		}
+		
+		return description;
+	}
+
+	@Transient @JsonIgnore
+	public boolean isTotalAuto() {
+		return getAutoCommitDeliveryTask() 
+				&& getAutoCommitReplenish() 
+				&& getAutoCreateOffShelfDispatcher()
+				&& getAutoCreateOnShelfDispatcher()
+				&& getAutoReviewDeliveryTask()
+				&& getAutoReviewOffShelfDispatcher()
+				&& getAutoReviewOffShelfTask()
+				&& getAutoReviewOnShelfDispatcher()
+				&& getAutoReviewOnShelfTask()
+				&& getAutoReviewReplenish();
+	}
+	
+}

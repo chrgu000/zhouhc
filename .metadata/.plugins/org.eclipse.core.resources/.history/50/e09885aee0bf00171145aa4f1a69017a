@@ -1,0 +1,29 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+public class SpdShelfStocksTest extends BaseTest{
+
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	@Test public void testGetGoodsShelfStocks(){
+		SpdShelfStocks allShelfStocks = ssRepository.getAll();
+		allShelfStocks.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		
+		SpdShelfStocks goodsShelfStocks = allShelfStocks.mergeByGoods();
+		assertEquals(34, goodsShelfStocks.size());
+		goodsShelfStocks.forEach(goodsShelfStock->{
+			assertNull(goodsShelfStock.getLotId());
+		});
+		
+	}
+}

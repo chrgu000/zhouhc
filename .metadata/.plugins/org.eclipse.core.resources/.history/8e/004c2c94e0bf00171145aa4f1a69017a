@@ -1,0 +1,9 @@
+package cn.ak4j.yard.sys.logging.domain;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.yard.sys.logging.domain.SysLoggingEvent;
+
+@SuppressWarnings({"serial"})
+public class SysLoggingEvents extends Entities<SysLoggingEvent>{
+
+}

@@ -1,0 +1,21 @@
+package cn.ak4j.yard.spd.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewSpdInventoryItemTO {
+
+	private String inventoryId;//盘点单ID
+	private String goodsId;//产品
+	private String stockGoodsLotId;//批号ID
+	private Integer planQty;//目标数量
+	private Integer showQty;//显示数量
+	private Integer checkQty;//盘点数量
+	private Integer unqualifiedQty;
+	private String depotId;//所在仓库
+	private String shelfId;//货位ID
+	
+}

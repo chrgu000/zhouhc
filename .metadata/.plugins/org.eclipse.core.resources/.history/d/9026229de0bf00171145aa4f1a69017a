@@ -1,0 +1,4 @@
+update spd_prepare_inform_rule set can_be_origin_rule = 1;
+update spd_receive_rule set origin_rule_id = 'ff8080815e570b07015e59df7e33000d' where id = 'ff8080815e570b07015e59e220d3000e';
+update spd_receive_rule set origin_rule_id = 'ff8080815e60f283015e701079d20047' where id = 'ff8080815e60f283015e7012a4180048';
+update spd_receive_rule set origin_rule_id = 'ff8080815dc6f86f015dc6fb5b830000' where id = 'ff8080815dc6f86f015dc6fc8ed00001';

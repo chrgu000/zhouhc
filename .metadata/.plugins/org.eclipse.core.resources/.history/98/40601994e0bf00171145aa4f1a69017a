@@ -1,0 +1,110 @@
+package cn.ak4j.yard.sys.web;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.Entities;
+import javassist.NotFoundException;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import net.sf.ehcache.Element;
+
+@RestController
+@Slf4j
+public class YardCacheResource {
+
+	@Autowired private CacheManager cacheManager;
+	
+	@SuppressWarnings({ "unchecked"})
+	@RequestMapping("/yard/sys/caches")
+	public List<CacheElement> listCaches(){
+		Iterator<String> cacheNames = cacheManager.getCacheNames().iterator();
+
+		List<CacheElement> elememts = new ArrayList<CacheElement>();
+		while(cacheNames.hasNext()){
+			String cacheName = cacheNames.next();
+			Cache cache = cacheManager.getCache(cacheName);
+			net.sf.ehcache.Cache nativeCache = (net.sf.ehcache.Cache) cache.getNativeCache();
+			
+			nativeCache.getKeys().forEach(key->{
+				Element elememt = nativeCache.get(key);
+				elememts.add(new CacheElement(cacheName, elememt));
+				
+			});
+
+		}
+		
+		return elememts;
+	}
+	
+	@RequestMapping(value = "/yard/sys/caches/{cacheName}/{key}/clear", method = RequestMethod.PUT)
+	public CacheElement listCaches(@PathVariable(value="cacheName") String cacheName,
+			@PathVariable(value="key") String key) throws NotFoundException{
+		Iterator<String> cacheNames = cacheManager.getCacheNames().iterator();
+		while(cacheNames.hasNext()){
+			String theCacheName = cacheNames.next();
+			if(theCacheName.equals(cacheName)){
+				Cache cache = cacheManager.getCache(theCacheName);
+				net.sf.ehcache.Cache nativeCache = (net.sf.ehcache.Cache) cache.getNativeCache();
+				if(nativeCache.get(key) != null){
+					Element elememt = nativeCache.get(key);
+					CacheElement cacheElement = new CacheElement(theCacheName, elememt);
+					log.info("清除缓存[{}][{}]", cacheName, key);
+					nativeCache.remove(key);
+					return cacheElement;
+				}
+
+			}
+		}
+		
+		throw new NotFoundException(String.format("没有找到[%s][%s]的缓存数据", cacheName, key));
+	}
+
+}
+
+class CacheElement {
+	
+	@Setter @Getter 
+	private String cacheName;
+	
+	@Setter @Getter 
+	private String key;
+	
+	@Setter @Getter 
+	private Date creationTime;
+	
+	@Setter @Getter 
+	private Date lastUpdateTime;
+	
+	@Setter @Getter 
+	private Date lastAccessTime;
+	
+	@Setter @Getter 
+	private int cacheEntitiesCount;
+	
+	@SuppressWarnings("rawtypes")
+	public CacheElement(String cacheName, Element element){
+
+		this.cacheName = cacheName;
+		this.key = element.getObjectKey().toString();
+		this.creationTime = new Date(element.getCreationTime());
+		this.lastAccessTime = new Date(element.getLastAccessTime());
+		this.lastUpdateTime = new Date(element.getLastUpdateTime());
+		this.cacheEntitiesCount = ((Entities)(element.getObjectValue())).size();
+		
+	}
+	
+}
+
+

@@ -1,0 +1,195 @@
+package cn.ak4j.yard.spd.task.web;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.task.assember.SpdOffShelfTaskItemAssember;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskItemParams;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdOffShelfTaskItemRepository;
+import cn.ak4j.yard.spd.task.service.SpdDepotTaskService;
+import cn.ak4j.yard.spd.task.to.NewSpdTurnoverBoxItemTO;
+import cn.ak4j.yard.sys.domain.ReportConfig;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.web.PdfExportHelper;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@RestController
+public class SpdOffShelfTaskItemResource {
+
+	@Autowired private SpdOffShelfTaskItemRepository ostiRepository;
+	@Autowired private SpdDepotTaskService dtService;
+	@Autowired private PdfExportHelper pdfExportHelper;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@RequestMapping(value = "/yard/spd/spdOffShelfTaskItems/taskId,{taskId}", method = RequestMethod.GET)
+	public SpdOffShelfTaskItems findByTaskId(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			@PathVariable("taskId")String taskId){
+		SpdDepotTaskItemParams params = SpdDepotTaskItemParams.buildParamsFromJson(paramsStr, SpdDepotTaskItemParams.class);
+		if(params == null){
+			params = new SpdDepotTaskItemParams();
+		}
+		params.setTaskId(new ListParam<String>(taskId));
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdOffShelfTaskItems taskItems = ostiRepository.findByTask(params, order, currentPage-1, pageSize, taskId);
+		if(order == null){
+			String depotId = dtRepository.findOne(taskId).getTaskDepotId();
+			PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+			taskItems.orderByDepotShelfInx(depot);
+		}
+		taskItems.fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		
+		return taskItems;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdOffShelfTaskItems/taskId,{taskId}/count", method = RequestMethod.GET)
+	public int countByTaskId(
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@PathVariable("taskId")String taskId){
+		SpdDepotTaskItemParams params = SpdDepotTaskItemParams.buildParamsFromJson(paramsStr, SpdDepotTaskItemParams.class);
+		if(params == null){
+			params = new SpdDepotTaskItemParams();
+		}
+		params.setTaskId(new ListParam<String>(taskId));
+		return ostiRepository.count(params);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdOffShelfTaskItems",method=RequestMethod.POST)
+	public SpdOffShelfTaskItem add(@RequestBody NewSpdTurnoverBoxItemTO newSpdTurnoverBoxItemTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdOffShelfTaskItem offShelfTaskItem = SpdOffShelfTaskItemAssember.buildSpdOffShelfTaskItem(newSpdTurnoverBoxItemTO, user);
+		return dtService.addOffShelfTaskItem(offShelfTaskItem, user);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdOffShelfTaskItems/{taskItemId}", method = RequestMethod.PUT)
+	public SpdOffShelfTaskItem update(@Valid @RequestBody SpdOffShelfTaskItem item, HttpServletRequest request) {
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		item = dtService.modifyOffShelfItem(item, user);
+		return item;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdOffShelfTaskItems/ids,{ids}", method = RequestMethod.GET)
+	public SpdOffShelfTaskItems listByIds(@PathVariable(value = "ids", required = false) String ids, HttpServletRequest request) {
+		SpdDepotTaskItemParams params = new SpdDepotTaskItemParams();
+		params.setTaskItemId(new ListParam<String>(Arrays.asList(ids.split(","))));
+		OrderParam order = new OrderParam();
+		return ostiRepository.find(params, order, - 1, -1);
+	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/yard/spd/spdOffShelfTaskItems/wholeItemsLable/taskId,{taskId}/pdf", method = RequestMethod.GET)
+	public void getWholeItemsLablePdf(@PathVariable("taskId")String taskId, HttpServletRequest request, HttpServletResponse response)throws Exception{
+		SpdDepotTask task = dtService.getTaskForReport(taskId).removeNoneItems();
+		Map<String, SpdDepotTaskItems<SpdDepotTaskItem>> map = pickItems(task.getItems());
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		
+		//如果有整件明细
+		if(CollectionUtils.isNotEmpty(map.get("block"))){
+			ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.off_shelf_block_item_lables_report).getConfig();
+			pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, map.get("block"), "inline", response);
+		}else{
+			//如果没有则返回提示文本
+			response.setCharacterEncoding(Global.defaultCharset.name());
+			response.setContentType("text/html;charset=UTF-8");
+			response.getWriter().println("<h1>当前拣配单中无整件可拣配</h1>");
+			response.flushBuffer();
+		}
+	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/yard/spd/spdOffShelfTaskItems/taskId,{taskId}/pdf", method = RequestMethod.GET)
+	public void getPdf(@PathVariable("taskId")String taskId, HttpServletRequest request, HttpServletResponse response)throws Exception{
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		
+		SpdDepotTask task = dtService.getTaskForReport(taskId);
+		task.getItems().fillGoodsLots(glRepository);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(CollectionUtils.pluck("goodsId", task.getItems()));
+		task.getItems().getAllSpecialGoodsLots().fillGoodss(goodss);
+		
+		SpdReplenishBiz replenish = rbRepository.findOne(task.getBizId());
+		replenish.getMaintenanceInfo().setCreateUser(userRepository.findAll().findById(replenish.getMaintenanceInfo().getCreateUserId()));
+		String applyDeptName = depotRepository.findAllWithRelations().findById(replenish.getToDepotId()).getManageDept().getDeptName();
+		
+		Map<String, SpdDepotTaskItems<SpdDepotTaskItem>> map = pickItems(task.getItems());
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		parameters.put("taskCode", task.getTaskCode());
+		parameters.put("replenishUserName", replenish.getMaintenanceInfo().getCreateUser().getUserName());
+		parameters.put("applyDeptName", applyDeptName);
+		parameters.put("depotNm", task.getDepotArea().getDepot().getDepotName());
+		parameters.put("taskUserName", user.getUserName());
+
+		List<SpdOffShelfTaskReport> reports = new ArrayList<SpdOffShelfTaskReport>();
+		if(CollectionUtils.isNotEmpty(map.get("block"))){
+			reports.add(new SpdOffShelfTaskReport(SpdOffShelfTaskReport.type_block_report, map.get("block")));
+		}
+		if(CollectionUtils.isNotEmpty(map.get("piece"))){
+			reports.add(new SpdOffShelfTaskReport(SpdOffShelfTaskReport.type_piece_report, map.get("piece")));
+		}
+		ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.off_shelf_task_report).getConfig();
+		pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, reports, "inline", response);
+	}
+	
+	private Map<String, SpdDepotTaskItems<SpdDepotTaskItem>> pickItems(SpdDepotTaskItems<SpdDepotTaskItem> taskItems){
+		Map<String, SpdDepotTaskItems<SpdDepotTaskItem>> map = new HashMap<>();
+		SpdDepotTaskItems<SpdDepotTaskItem> pieceItems = new SpdDepotTaskItems<SpdDepotTaskItem>();
+		SpdDepotTaskItems<SpdDepotTaskItem> blockItems = new SpdDepotTaskItems<SpdDepotTaskItem>();
+		taskItems.forEach(item->{
+			if(((SpdOffShelfTaskItem)item).isBlockItem()){
+				blockItems.add(item);
+			}else{
+				pieceItems.add(item);
+			}
+		});
+		map.put("piece", pieceItems);
+		map.put("block", blockItems);
+		
+		return map;
+	}
+	
+}

@@ -1,0 +1,63 @@
+package cn.ak4j.yard.spd.task.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItems;
+import cn.ak4j.yard.spd.task.repository.SpdOnShelfTaskItemRepository;
+
+public class SpdOnShelfTaskItemResourceTest extends BaseTest{
+
+	@Autowired private SpdOnShelfTaskItemRepository ostiRepository;
+
+	@Test public void testList() throws Exception{
+		String taskId = "task_id_003";
+		String urlTemplate = "/spd/spdOnShelfTaskItems/taskId,{taskId}?accessToken={accessToken}&pageSize=-1";
+		String accessToken = getAccessToken(xykUserCode);
+		
+		SpdOnShelfTaskItems items = mockMvcHelper.mockGet(SpdOnShelfTaskItems.class, urlTemplate, taskId, accessToken);
+		assertEquals(2, items.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String taskId = "task_id_003";
+		String urlTemplate = "/spd/spdOnShelfTaskItems/taskId,{taskId}/count?accessToken={accessToken}";
+		String accessToken = getAccessToken(xykUserCode);
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, taskId, accessToken);
+		assertEquals(2, count);
+	}
+	
+	@Test public void testGetOnShelfTaskPdf() throws Exception{
+		String taskId = "task_id_011";
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdOnShelfTaskItems/taskId,{taskId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, taskId, accessToken))
+//				.andDo(print())
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("拣配作业单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+		
+	}
+	
+	@Test public void testUpdateOnShelfTaskItem() throws Exception{
+		String taskItemId = "task_item_id_005";
+		SpdOnShelfTaskItem onShelfItem = ostiRepository.findOne(taskItemId);
+		onShelfItem.setConfirmQty(45);
+
+		onShelfItem = mockMvcHelper.modify(SpdOnShelfTaskItem.class, xykUserCode, taskItemId, onShelfItem);
+		assertEquals(45, onShelfItem.getConfirmQty().intValue());
+	}
+	
+}

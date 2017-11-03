@@ -1,0 +1,96 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdMoveAreaBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdMoveAreaRule;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@NoArgsConstructor
+@Entity
+@Table(name="spd_move_area_biz")
+@SuppressWarnings({"serial"})
+public class SpdMoveAreaBiz extends SpdGoodsBizPlan<SpdMoveAreaRule>{
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_c_r;
+	
+	@Getter @Setter
+	private String depotId;
+	
+	@Getter @Setter
+	private String fromAreaType;
+	
+	@Getter @Setter
+	private String toAreaType;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot depot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotTasks onShelfTasks;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotTasks offShelfTasks;
+	
+	public SpdMoveAreaBiz(String depotId, String fromAreaType, String toAreaType){
+		this.depotId = depotId;
+		this.fromAreaType = fromAreaType;
+		this.toAreaType = toAreaType;
+		this.setCreatorDepotId(depotId);
+	}
+
+	public SpdBizType getBizType() {
+		return SpdBizType.move_area_biz;
+	}
+	
+	@Transient @JsonIgnore
+	public PcsDepot getStockChangeDepot() {
+		return getDepot();
+	}
+	
+	@Transient @JsonIgnore
+	public String getTargetAreaType(){
+		if(getCurrentBizStep().equals(SpdMoveAreaBizSteps.confirm_move_area)){
+			return fromAreaType;
+		}else{
+			return toAreaType;
+		}
+	}
+
+	@Override
+	public void applyRule(SpdMoveAreaRule rule, PcsUser user) {
+		if(!rule.canApplyByUser(user)){
+			throw new OperateFailException(YardExceptionType.forbid_can_not_apply_biz, user.getDeptId(), rule.getDisplayName());
+		}
+		
+		setBizRule(rule);
+		
+		setBizRuleId(rule.getId());
+		setDepotId(rule.getDirectionRule().getDepotId());
+		setFromAreaType(rule.getDirectionRule().getFromAreaType());
+		setToAreaType(rule.getDirectionRule().getToAreaType());
+		setCreatorDepotId(rule.getDirectionRule().getDepotId());
+	}
+	
+	public void setBizRule(SpdMoveAreaRule bizRule){
+		super.setBizRule(bizRule);
+		if(bizRule == null){
+			return ;
+		}
+		setDepot(bizRule.getDirectionRule().getDepot());
+	}
+}

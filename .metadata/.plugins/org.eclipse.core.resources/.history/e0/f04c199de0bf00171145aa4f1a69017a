@@ -1,0 +1,18 @@
+update yds_eds_goods set eds_yds_unit_ratio = 1;
+update yds_eds_goods set eds_yds_unit_ratio = 10 where eds_goods_id ='ff8080815e3b3c14015e3b4f595101b9';
+update yds_eds_goods set eds_yds_unit_ratio = 5 where eds_goods_id ='ff8080815e3b3c14015e3b3dc966000e';
+update yds_eds_goods set eds_yds_unit_ratio = 5 where eds_goods_id ='ff8080815e3b3c14015e3b44275f00db';
+update yds_eds_goods set eds_yds_unit_ratio = 10 where eds_goods_id ='ff8080815e3b3c14015e3b3fa5c40096';
+update yds_eds_goods set eds_yds_unit_ratio = 6 where eds_goods_id ='ff8080815e3b3c14015e3b8b2c0f02b2';
+update yds_eds_goods set eds_yds_unit_ratio = 5 where eds_goods_id ='ff8080815e3b3c14015e3b809d0b0235';
+update yds_eds_goods set eds_yds_unit_ratio = 2 where eds_goods_id ='ff8080815e3b3c14015e3b8b1f1a0259';
+update yds_eds_goods set eds_yds_unit_ratio = 6 where eds_goods_id ='ff8080815e3b3c14015e3b90c7a402c2';
+update yds_eds_goods set eds_yds_unit_ratio = 10 where eds_goods_id ='ff8080815e3b3c14015e3c276b0f0466';
+update yds_eds_goods set eds_yds_unit_ratio = 5 where eds_goods_id ='ff8080815e3b3c14015e3c2a510e04df';
+update yds_eds_goods set eds_yds_unit_ratio = 3 where eds_goods_id ='ff8080815e3b3c14015e3c2c3ce40523';
+update yds_eds_goods set eds_yds_unit_ratio = 5 where eds_goods_id ='ff8080815e3b3c14015e3c2c43fb0547';
+update yds_eds_goods set eds_yds_unit_ratio = 30 where eds_goods_id ='ff8080815e3b3c14015e3c2c3f0a052e';
+update yds_eds_goods set eds_yds_unit_ratio = 50 where eds_goods_id ='ff8080815e3b3c14015e3c2a568f04fb';
+update yds_eds_goods set eds_yds_unit_ratio = 6 where eds_goods_id ='ff8080815e70a6db015e78f474bc0011';
+update yds_eds_goods set eds_yds_unit_ratio = 10 where eds_goods_id ='ff8080815e803093015e849d49f60001';
+update yds_eds_goods set eds_yds_unit_ratio = 10 where eds_goods_id ='ff8080815ea3eace015eb85ce6ea0009';

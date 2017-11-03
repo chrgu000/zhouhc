@@ -1,0 +1,115 @@
+package cn.ak4j.yard.extend.zsy;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.extend.zsy.domain.B2BSettleBill;
+import cn.ak4j.yard.extend.zsy.domain.B2BSettleBillItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+@Component
+public class SpdZsyFinacialReconciliationAssember {
+	
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	public final String SALES = "SALES";//销售结算
+	public final String SALES_RETRUN = "SALES_RETRUN";//销售退回结算
+	public final String SALES_REJECT = "SALES_REJECT";//销售拒收结算
+	public final String STOCK_UP = "STOCK_UP";//备货拒收结算
+	public final String STOCK_UP_RETRUN = "STOCK_UP_RETRUN";//备货拒收结算
+	public final String STOCK_UP_REJECT = "STOCK_UP_REJECT";//备货拒收结算
+
+	public B2BSettleBill build(SpdFinacialReconciliationBiz reconciliationBiz){
+		B2BSettleBill settleBill = new B2BSettleBill();
+		settleBill.setSettleId(reconciliationBiz.getBizCode());
+		settleBill.setSettleNo(reconciliationBiz.getBizCode());
+		
+		List<B2BSettleBillItem> items = new ArrayList<B2BSettleBillItem>();
+		
+		SpdDailyCleanBizs dailyCleans = reconciliationBiz.getDailyCleans();
+		SpdPropertyChangeRecordItems recordItems = dailyCleans.getAllPropertyChangeItems();
+		recordItems.fillGoodsAndGoodsLot(glRepository);
+		
+		String orgId = dailyCleans.get(0).getPropertyChangeRecords().get(0).getCreditOrgId();
+		
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", recordItems);
+		YdsEdsGoodss edsGoodsList = egRepository.findAll().findSupplierUseabledWithGoodsIds(goodsIds, orgId);
+		
+		recordItems.forEach(recordItem->{
+			List<B2BSettleBillItem> billItems = buildItems(recordItem, edsGoodsList);
+			items.addAll(billItems);
+		});
+		
+		settleBill.setItems(items);
+		return settleBill;
+		
+	}
+	
+	private List<B2BSettleBillItem> buildItems(SpdPropertyChangeRecordItem recordItem, YdsEdsGoodss edsGoodsList){
+		List<B2BSettleBillItem> billItems = new ArrayList<B2BSettleBillItem>();
+		recordItem.getItems().forEach(relationItem->{
+			B2BSettleBillItem billItem = new B2BSettleBillItem();
+			
+			YdsGoods goods = recordItem.getGoods();
+			
+			YdsEdsGoodss edsGoodss = new YdsEdsGoodss(CollectionUtils.find("yardGoodsId", goods.getGoodsId(), edsGoodsList));
+			if(CollectionUtils.isEmpty(edsGoodss)){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_without_butting_code, goods.getFormatName());
+			}else if(edsGoodss.size() > 1){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_relation_many_usable_eds_goods, goods.getFormatName());
+			} 
+			
+			YdsEdsGoods edsGoods = edsGoodss.get(0);
+			billItem.setOutSettleItemId(relationItem.getId());
+			billItem.setOutUnitprice(relationItem.getUnitPrice());
+			String outGdsExp = Global.sdfYMDHms.format(recordItem.getGoodsLot().getLotValidity());
+			billItem.setOutGdsExp(outGdsExp);
+			billItem.setOutGdsFormatName(edsGoods.getEdsGoodsName());
+			billItem.setOutGdsId(edsGoods.getEdsGoodsCode());
+			billItem.setOutGdsLotNo(recordItem.getGoodsLot().getLotNo());
+			String outGdsPro = Global.sdfYMDHms.format(recordItem.getGoodsLot().getProduceDate());
+			billItem.setOutGdsPro(outGdsPro);
+			
+			float baseToPrepareUnitLvRatio = SpdUnitUtils.computeUnitExchange(recordItem.getGoods(),  goods.getPrepareUnitLv(), YdsUnitLv.base.getLv()).getRatio();
+			
+			int tempQty = (int) (relationItem.getDealQty()/baseToPrepareUnitLvRatio);
+			
+			float outQty = tempQty/edsGoods.getEdsYdsUnitRatio();
+			if(outQty != (int)outQty){
+				throw new InvalidDataException(YardExceptionType.invalid_integration_supplier_qty_error, goods.getGoodsCode(), tempQty, edsGoods.getEdsGoodsCode(), edsGoods.getEdsYdsUnitRatio());
+			}
+			
+			billItem.setOutQty((int)outQty);
+			billItem.setOutTaskId(relationItem.getSendId());
+			billItem.setOutTaskItemId(relationItem.getSendItemCode());
+			billItem.setOutAmount(relationItem.getUnitPrice() * relationItem.getDealQty());
+			if(relationItem.getDealQty() >= 0){
+				billItem.setOutTaskType(SALES);
+			}else{
+				billItem.setOutTaskType(SALES_RETRUN);
+			}
+			
+			billItems.add(billItem);
+		});
+		return billItems;
+	}
+	
+}

@@ -1,0 +1,182 @@
+package cn.ak4j.yard.spd.web;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.utils.ExcelBuilder;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.service.SpdDepotCardService;
+import cn.ak4j.yard.spd.to.SpdDepotCardExcelTO;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@RestController
+public class SpdDepotCardResource {
+	
+	@Autowired private YardExcelFormatFactory excelFormatFactory;
+	@Autowired SpdDepotCardService dcService;
+	@Autowired SpdDepotCardRepository dcRepository;
+	@Autowired PcsDepotRepository depotRepository;
+	@Autowired YdsGoodsRepository goodsRepository;
+	
+	@RequestMapping(value="/yard/spd/spdDepotCards/{id}", method=RequestMethod.GET)
+	public SpdDepotCard get(@PathVariable("id")String id){
+		return dcRepository.findAll().findById(id);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotCards", method = RequestMethod.GET)
+	public SpdDepotCards list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdDepotCardParams params = SpdDepotCardParams.buildParamsFromJson(paramsStr, SpdDepotCardParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdDepotCardParams();
+		}
+		if(order == null){
+			order = new OrderParam("maintenanceInfo.createDate", "desc");
+		}
+		return dcService.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotCards/count", method = RequestMethod.GET)
+	public long count(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdDepotCardParams params = SpdDepotCardParams.buildParamsFromJson(paramsStr, SpdDepotCardParams.class);
+		if(params == null){
+			params = new SpdDepotCardParams();
+		}
+		return dcService.find(params, OrderParam.getDefaultOrder(), -1, -1).size();
+	}
+	
+	@RequestMapping(value = "/yard/pcs/spdDepotCards/ids,{ids}", method = RequestMethod.GET)
+	public SpdDepotCards listByIds(@PathVariable(value = "ids", required = false) String ids) {
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		params.setDepotId(new ListParam<String>(Arrays.asList(ids.split(","))));
+		return new SpdDepotCards(dcRepository.findAll().find(params));
+	}
+	
+	/**
+	 * 查找当前用户所属部门，所管理的仓库的帐页
+	 */
+	@RequestMapping(value = "/yard/spd/spdDepotCards/mine", method = RequestMethod.GET)
+	public SpdDepotCards findByAbteilung(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdDepotCardParams params = SpdDepotCardParams.buildParamsFromJson(paramsStr, SpdDepotCardParams.class);
+		if(params == null){
+			params = new SpdDepotCardParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(CollectionUtils.isEmpty(depots)){
+			return new SpdDepotCards();
+		}
+
+		if(params.getDepotId() == null || params.getDepotId().isEmpty()){
+			params.setDepotId(new ListParam<String>(depots.getIds()));
+		}
+		
+		return dcService.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotCards/mine/count", method = RequestMethod.GET)
+	public long findByAbteilungCount( @RequestParam(value="params",required=false)String paramsStr, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdDepotCardParams params = SpdDepotCardParams.buildParamsFromJson(paramsStr, SpdDepotCardParams.class);
+		
+		if(params == null){
+			params = new SpdDepotCardParams();
+		}
+		
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.size()<=0){
+			return 0;
+		}
+		
+		if(params.getDepotId() == null || params.getDepotId().isEmpty()){
+			params.setDepotId(new ListParam<String>(depots.getIds()));
+		}
+		return dcService.find(params, new OrderParam(), -1, -1).size();
+	}
+
+	@RequestMapping(value="/yard/spd/spdDepotCards/{depotId}/initDepotCardTask", method=RequestMethod.POST)
+	public int initPcsDepot(@PathVariable("depotId") String depotId,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		return dcService.initDepotCards(depotId, user);
+	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@ResponseBody
+	@RequestMapping(value = "/yard/spd/spdDepotCards/mine/excel", method = RequestMethod.GET)
+	public void downloadExcelfile(@RequestParam(value = "params", required = false) String paramsStr,
+								@RequestParam(value = "whereMap", required = false) String whereMap,
+								HttpServletResponse response, HttpServletRequest request) throws Exception {
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdDepotCardParams params = SpdDepotCardParams.buildParamsFromJson(paramsStr, SpdDepotCardParams.class);
+		if(params == null){
+			params = new SpdDepotCardParams();
+		}
+		SpdDepotCards allDepotCards = dcRepository.findAll();
+		allDepotCards.fillDepot(depotRepository.findAllWithRelations());
+		allDepotCards.fillGoodss(goodsRepository.findAll());
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		SpdDepotCards depotCards = null;
+		
+		if(CollectionUtils.isEmpty(depots)){
+			depotCards = new SpdDepotCards();
+		}else{
+			if(params.getDepotId() == null || params.getDepotId().isEmpty()){
+				params.setDepotId(new ListParam<String>(depots.getIds()));
+			}
+			depotCards = new SpdDepotCards(allDepotCards.find(params));
+		}
+		
+		List<SpdDepotCardExcelTO> depotCardExcels = new ArrayList<SpdDepotCardExcelTO>();
+		depotCards.forEach(depotCard->{
+			SpdDepotCardExcelTO depotCardExcel = new SpdDepotCardExcelTO();
+			BeanUtils.copyProperties(depotCard, depotCardExcel);
+			depotCardExcels.add(depotCardExcel);
+		});
+
+		ExcelBuilder exportExcel = new ExcelBuilder<SpdDepotCardExcelTO>();
+		byte[] bytes = exportExcel.buildExcel("仓库帐页表", depotCardExcels, excelFormatFactory.getExcelFormats("depotCard"));
+		
+		response.reset();
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding(Global.defaultCharset.name());
+		response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode("仓库帐页信息.xls", Global.defaultCharset.name()));
+		IOUtils.write(bytes, response.getOutputStream());
+	}
+	
+}

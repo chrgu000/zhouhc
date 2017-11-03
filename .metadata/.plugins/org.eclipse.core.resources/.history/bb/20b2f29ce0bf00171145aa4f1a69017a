@@ -1,0 +1,2 @@
+alter table spd_daily_clean_rule add (can_be_origin_rule char(1));
+alter table spd_fin_rec_rule add (can_be_origin_rule char(1));

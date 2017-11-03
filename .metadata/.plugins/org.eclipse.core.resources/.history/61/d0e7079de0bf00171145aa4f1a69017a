@@ -1,0 +1,7 @@
+--业务规则表新增feedback_rule_id字段，反馈规则表删除biz_rule_id字段
+
+ALTER TABLE spd_feedback_rule drop(biz_rule_id);
+ALTER TABLE spd_adjust_stock_rule ADD(feedback_rule_id VARCHAR2(32));
+ALTER TABLE spd_move_area_rule ADD(feedback_rule_id VARCHAR2(32));
+ALTER TABLE spd_receive_rule ADD(feedback_rule_id VARCHAR2(32));
+ALTER TABLE spd_replenish_rule ADD(feedback_rule_id VARCHAR2(32));

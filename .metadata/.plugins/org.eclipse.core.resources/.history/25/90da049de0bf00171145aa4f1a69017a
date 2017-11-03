@@ -1,0 +1,1 @@
+alter table spd_return_goods_rule add(AUTO_ASSIGN_RECEIVE char(1) default '0');

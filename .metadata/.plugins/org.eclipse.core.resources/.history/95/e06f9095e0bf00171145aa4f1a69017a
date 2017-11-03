@@ -1,0 +1,55 @@
+package cn.ak4j.yard.configuration;
+
+import java.util.List;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.SchedulingConfigurer;
+import org.springframework.scheduling.config.ScheduledTaskRegistrar;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.utils.AKStringUtils;
+import cn.ak4j.yard.domain.IScheduleTask;
+import cn.ak4j.yard.domain.ScheduleTaskDefine;
+import lombok.extern.slf4j.Slf4j;
+
+@Configuration
+@Slf4j
+public class ScheduleConfiguration  implements SchedulingConfigurer{
+
+	@Autowired private ApplicationContext context;
+	
+	@Value("${ak.scheduleConfFile}")
+	private String scheduleConfFile;
+	
+	@SuppressWarnings({ "rawtypes"})
+	@Override
+	public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
+		if(StringUtils.isEmpty(scheduleConfFile)){
+			log.info("未找到定时任务配置文件，不定义任何定时任务");
+			return ;
+		}
+		
+		try{
+			String json = new String(IOUtils.toByteArray(this.getClass().getResource("/"+scheduleConfFile)), Global.defaultCharset);
+			List<ScheduleTaskDefine> scheduleTaskDefines = Global.defaultObjectMapper.readValue(json, new TypeReference<List<ScheduleTaskDefine>>() {});
+			for(ScheduleTaskDefine taskDefine : scheduleTaskDefines){
+				Class taskClass = Class.forName(taskDefine.getClassName());
+				IScheduleTask scheduleTask = (IScheduleTask)context.getBean(AKStringUtils.lowerCaseFirstChar(taskClass.getSimpleName()));
+				
+				taskRegistrar.addCronTask(scheduleTask, taskDefine.getSchedule());
+				log.info("添加定时任务:{}, {}", taskDefine.getTaskName(), taskDefine.getSchedule());
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+
+}

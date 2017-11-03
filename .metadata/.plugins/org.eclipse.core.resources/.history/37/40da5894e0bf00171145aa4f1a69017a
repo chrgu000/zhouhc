@@ -1,0 +1,26 @@
+package cn.ak4j.yard.spd.task.web;
+
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+
+@SuppressWarnings({"serial"})
+public class SpdTurnoverBoxReport extends SpdTurnoverBox{
+	private JRBeanCollectionDataSource taskItemDs;
+	
+	public SpdTurnoverBoxReport(){}
+	
+	public SpdTurnoverBoxReport(String boxCode, SpdLogisticsTaskItems taskItems){
+		setWrapperNo(boxCode);
+		this.taskItemDs = new JRBeanCollectionDataSource(taskItems);
+	}
+
+	public JRBeanCollectionDataSource getTaskItemDs() {
+		return taskItemDs;
+	}
+
+	public void setTaskItemDs(JRBeanCollectionDataSource taskItemDs) {
+		this.taskItemDs = taskItemDs;
+	}
+	
+}

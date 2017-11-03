@@ -1,0 +1,107 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import static org.junit.Assert.*;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Test;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdReturnGoodsBizServiceTest extends BaseTest{
+	
+	@Autowired private SpdReturnGoodsBizService rgbService;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	@Autowired private YardCodeService codeService;
+
+	@Test public void addReturnGoodsFromReceive(){
+		String ruleId = "ret_rule_id_06";
+		SpdReturnGoodsRule rule = (SpdReturnGoodsRule)brRepository.findAllWithRelations().findById(ruleId);
+		
+		SpdReturnGoodsBiz returnGoods = new SpdReturnGoodsBiz();
+		returnGoods.setBizRuleId(rule.getId());
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		returnGoods.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		/**
+		 * 收货单 1041703314 
+		 * biz_item_id_015 478
+		 * biz_item_id_014 45
+		 * 收货单 1041703311
+		 * biz_item_id_005 400
+		 * biz_item_id_008 100
+		 * biz_item_id_006 60
+		 */
+		Map<String, Integer> returnQtyParams = new HashMap<String, Integer>();
+		returnQtyParams.put("biz_item_id_015", 478);
+		returnQtyParams.put("biz_item_id_014", 45);
+		returnQtyParams.put("biz_item_id_005", 400);
+		returnQtyParams.put("biz_item_id_008", 100);
+		returnQtyParams.put("biz_item_id_006", 60);
+		
+		List<String> bizItemIds = new ArrayList<String>();
+		bizItemIds.addAll(returnQtyParams.keySet());
+		SpdBizItems items = biRepository.findByIds(bizItemIds);
+		
+		SpdBizItems returnItems = new SpdBizItems();
+		items.forEach(item->{
+			SpdBizItem returnItem = new SpdBizItem();
+			BeanUtils.copyProperties(item, returnItem, "bizItemId", "bizId");
+			returnItem.setOriginId(item.getBizId());
+			returnItem.setOriginItemId(item.getBizItemId());
+			returnItem.setPlanQty(returnQtyParams.get(item.getBizItemId()));
+			returnItem.setConfirmQty(returnQtyParams.get(item.getBizItemId()));
+			returnItems.add(returnItem);
+		});
+		returnGoods.setItems(returnItems);
+		
+		returnGoods.setCreatorDepotId(rule.getDirectionRule().getFromDepotId());
+		returnGoods = rgbService.add(returnGoods, user);
+		
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.tuihuodan);
+		assertEquals(CodeSort.tuihuodan.getCode()+getCurrentDateCode()+sequenceCode, returnGoods.getBizCode());
+		wait(1);
+		
+		SpdBizItems returnGoodsItems = biRepository.findByBizId(returnGoods.getBizId());
+		assertEquals(returnGoodsItems.size(), bizItemIds.size());
+		returnGoodsItems.forEach(item->{
+			assertEquals(item.getConfirmQty(), returnQtyParams.get(item.getOriginItemId()));
+		});
+		
+		SpdBizItems receiveItems = biRepository.findByIds(bizItemIds);
+		receiveItems.forEach(item->{
+			SpdReceiveItem receiveItem = (SpdReceiveItem)item;
+			assertEquals(receiveItem.getReturnQty(), returnQtyParams.get(receiveItem.getBizItemId()));
+		});
+		
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setBizCode(new ListParam<String>("1041703314"));
+		SpdReceiveBiz receive = rbRepository.find(params).get(0);
+		assertTrue(receive.getSaleCompleted());
+	}
+	
+}

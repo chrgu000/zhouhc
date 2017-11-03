@@ -1,0 +1,62 @@
+package cn.ak4j.yard.pcs.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.domain.PcsAuthorityAssets;
+import cn.ak4j.yard.pcs.domain.PcsMixedOperations;
+import cn.ak4j.yard.pcs.domain.PcsRoleOp;
+import cn.ak4j.yard.pcs.domain.PcsRoleOps;
+import cn.ak4j.yard.pcs.params.PcsMixedOperationParams;
+import cn.ak4j.yard.pcs.params.PcsRoleOpParams;
+import lombok.Getter;
+
+@Repository
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class PcsRoleOpRepository extends BaseRepository<PcsRoleOp, PcsRoleOps, PcsRoleOpParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private PcsAuthorityAssets authorityAssets;
+	
+	@Cacheable(value="longTimeCache", key="\"allRoleOps\"")
+	public PcsRoleOps findAll(){
+		return getAll();
+	}
+	
+	public PcsRoleOps find(PcsRoleOpParams params, OrderParam order, int pageNo, int pageSize){
+		ListParam listParam = null;
+		if (params.getFunctionName() != null || params.getMenuName() != null || params.getOpName() != null || params.getMenuParentName() != null
+				|| params.getSystemName() != null){
+			PcsMixedOperationParams opParams = new PcsMixedOperationParams();
+			opParams.setFunctionName(params.getFunctionName());
+			opParams.setMenuName(params.getMenuName());
+			opParams.setOpName(params.getOpName());
+			opParams.setParentMenuName(params.getMenuParentName());
+			opParams.setSystemName(params.getSystemName());
+			PcsMixedOperations mixedOperations = (PcsMixedOperations)authorityAssets.getAllMixedOperations().find(opParams);
+			listParam = new ListParam(mixedOperations.find(opParams).pluck("opId"));
+		}
+		if (listParam !=null ){
+			if(listParam.getValue().size() >0){
+				params.setOpId(listParam);
+			}else{
+				params.setOpId(new ListParam<String>(""));
+			}
+		}
+		return new PcsRoleOps(findAll().findByPage(params, order, pageNo, pageSize));
+	}
+	
+	public void delete(String roleId){
+		PcsRoleOpParams params = new PcsRoleOpParams();
+		params.setRoleId(new ListParam<String>(roleId));
+		PcsRoleOps roleOps = find(params);
+		delete(roleOps);
+	}
+	
+}

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.3.1.final using JasperReports Library version 6.3.1  -->
+<!-- 2017-08-10T14:58:19 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="offShelfTaskReport" pageWidth="595" pageHeight="842" columnWidth="595" leftMargin="0" rightMargin="0" topMargin="10" bottomMargin="0" uuid="4511daa4-9458-4a94-983d-5c606c3917ea">
+	<parameter name="taskCode" class="java.lang.String"/>
+	<parameter name="replenishUserName" class="java.lang.String"/>
+	<parameter name="applyDeptName" class="java.lang.String"/>
+	<parameter name="depotNm" class="java.lang.String"/>
+	<parameter name="taskUserName" class="java.lang.String"/>
+	<parameter name="logo" class="java.io.InputStream"/>
+	<parameter name="printTime" class="java.lang.String"/>
+	<field name="type" class="java.lang.String"/>
+	<field name="itemDs" class="net.sf.jasperreports.engine.data.JRBeanCollectionDataSource"/>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<detail>
+		<band height="250">
+			<subreport isUsingCache="true" runToBottom="true">
+				<reportElement stretchType="RelativeToBandHeight" x="0" y="0" width="595" height="250" uuid="e603d3b1-0941-4743-a1c6-99b196519702"/>
+				<subreportParameter name="taskCode">
+					<subreportParameterExpression><![CDATA[$P{taskCode}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="replenishUserName">
+					<subreportParameterExpression><![CDATA[$P{replenishUserName}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="applyDeptName">
+					<subreportParameterExpression><![CDATA[$P{applyDeptName}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="depotNm">
+					<subreportParameterExpression><![CDATA[$P{depotNm}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="taskUserName">
+					<subreportParameterExpression><![CDATA[$P{taskUserName}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="logo">
+					<subreportParameterExpression><![CDATA[$P{logo}]]></subreportParameterExpression>
+				</subreportParameter>
+				<subreportParameter name="printTime">
+					<subreportParameterExpression><![CDATA[$P{printTime}]]></subreportParameterExpression>
+				</subreportParameter>
+				<dataSourceExpression><![CDATA[$F{itemDs}]]></dataSourceExpression>
+				<subreportExpression><![CDATA[net.sf.jasperreports.engine.util.JRLoader.loadObject(getClass().getResource("/reports/spd/task/subreport/off_shelf_task_"+($F{type})+"_item_01.jasper"))]]></subreportExpression>
+			</subreport>
+		</band>
+	</detail>
+</jasperReport>

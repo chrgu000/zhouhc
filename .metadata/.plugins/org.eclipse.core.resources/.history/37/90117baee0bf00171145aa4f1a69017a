@@ -1,0 +1,314 @@
+package cn.ak4j.yard.spd.task.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskParams;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBoxs;
+
+@SuppressWarnings({"unchecked"})
+public class SpdDepotTaskResourceTest extends BaseTest{
+
+	private String accessToken;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotTaskItemRepository dtiRepository;
+	
+	private SpdDepotTasks findITakeChargeUncompleteTasks(String accessToken, SpdDepotTaskParams params) throws Exception{
+		String urlTemplate = "/spd/spdDepotTasks/iTakeChargeOfTasks/uncompleteTasks?accessToken={accessToken}&params={params}";
+		
+		String paramsJson = Global.defaultObjectMapper.writeValueAsString(params);
+		SpdDepotTasks tasks = mockMvcHelper.mockGet(SpdDepotTasks.class, urlTemplate, accessToken, paramsJson);
+		return tasks;
+	}
+	
+	@Test public void findITakeChargeUncompleteTasksError() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdDepotTasks/iTakeChargeOfTasks/uncompleteTasks?accessToken={accessToken}&params={params}");
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskType(new ListParam<String>(SpdDepotTaskType.off_shelf_task.getCode()));
+		params.setBizType(new ListParam<String>(SpdBizType.move_area_biz.getCode()));
+		String paramsJson = Global.defaultObjectMapper.writeValueAsString(params);
+
+		mockMvc.perform(get(urlTemplate, accessToken, paramsJson))
+				.andExpect(status().is5xxServerError());
+	}
+	
+	@Test public void testfindITakeChargeUncompleteTasks() throws Exception{
+		testFindByTaskId();
+		testFindOffShelfTask();
+	}
+	
+	private void testFindByTaskId() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String taskId = "task_id_019";
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskId(new ListParam<String>(taskId));
+		SpdDepotTasks tasks = findITakeChargeUncompleteTasks(accessToken, params);
+		
+		assertEquals(1, tasks.size());
+		assertEquals(taskId, tasks.get(0).getTaskId());
+	}
+	
+	
+	/**
+	 * 查找散件上架作业
+	 */
+	private void testFindOffShelfTask() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+		
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskType(new ListParam<String>(SpdDepotTaskType.on_shelf_task.getCode()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		
+		SpdDepotTasks spdDepotTasks = findITakeChargeUncompleteTasks(accessToken, params);
+		assertEquals(2, spdDepotTasks.size());
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setManageDeptId(new ListParam<String>(user.getDeptId()));
+		PcsDepots depots = mockMvcHelper.findList(PcsDepots.class, testUserCode, depotParams);
+		List<String> depotIds = depots.getIds();
+		spdDepotTasks.forEach(task->{
+			assertEquals(CheckState.new_created, task.getCheckState());
+			assertEquals(SpdDepotTaskType.on_shelf_task.getCode(), task.getTaskType());
+			assertTrue(depotIds.contains(task.getTaskDepotId()));
+		});
+	}
+	
+	@Test public void testFindSpdTaskByOffShelf() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+		
+		String urlTemplate = "/spd/spdDepotTasks/iTakeChargeOfTasks/uncompleteTasks?params={params}&accessToken={accessToken}";
+		
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskType(new ListParam<String>(SpdDepotTaskType.off_shelf_task.getCode()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		params.setBizType(new ListParam<String>(SpdBizType.replenish_biz.getCode()));
+		
+		SpdDepotTasks depotTasks = mockMvcHelper.mockGet(SpdDepotTasks.class, urlTemplate, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		
+		assertEquals(2, depotTasks.size());
+		
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		PcsDepots depots = new PcsDepots(CollectionUtils.find("manageDeptId", user.getDeptId(), depotRepository.getAll()));
+		List<String> depotIds = depots.getIds();
+		depotTasks.forEach(task->{
+			assertEquals(SpdDepotTaskType.off_shelf_task.getCode(), task.getTaskType());
+			assertEquals(CheckState.new_created, task.getCheckState());
+			assertTrue(depotIds.contains(task.getTaskDepotId()));
+		});
+	}
+	
+	@Test public void testFindSpdDepotTaskByHis() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+		
+		String urlTemplate = "/spd/spdDepotTasks/iTakeChargeOfTasks/completedTasks?params={params}&accessToken={accessToken}";
+		
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		List<String> taskTypes = new ArrayList<String>();
+		taskTypes.add(SpdDepotTaskType.on_shelf_task.getCode());
+		taskTypes.add(SpdDepotTaskType.off_shelf_task.getCode());
+		params.setTaskType(new ListParam<String>(taskTypes));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()));
+		
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setManageDeptId(new ListParam<String>(user.getDeptId()));
+		PcsDepots depots = mockMvcHelper.findList(PcsDepots.class, testUserCode, depotParams);
+		List<String> depotIds = depots.getIds();
+		
+		SpdDepotTasks depotTasks = mockMvcHelper.mockGet(SpdDepotTasks.class, urlTemplate, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(13, depotTasks.size());
+		
+		depotTasks.forEach(task->{
+			assertEquals(CheckState.reviewed, task.getCheckState());
+			assertTrue(depotIds.contains(task.getTaskDepotId()));
+		});
+	}
+	
+	@Test public void testFindSpdTaskByPutawayCount() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdDepotTasks/iTakeChargeOfTasks/uncompleteTasks/count?params={params}&accessToken={accessToken}";
+		
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskType(new ListParam<String>(SpdDepotTaskType.on_shelf_task.getCode()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(2, count);
+	}
+	
+	@Test public void testFindSpdDepotTaskByOffShelfCount() throws Exception {
+		accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdDepotTasks/iTakeChargeOfTasks/uncompleteTasks/count?params={params}&accessToken={accessToken}";
+		
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskType(new ListParam<String>(SpdDepotTaskType.off_shelf_task.getCode()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		params.setBizType(new ListParam<String>(SpdBizType.replenish_biz.getCode()));
+		
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(2, count);
+	}
+	
+	@Test public void testGetTaskByCode() throws Exception{
+		String taskCode = "1021704071";
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskCode(new ListParam<String>(taskCode));
+
+		SpdDepotTasks task = mockMvcHelper.findList(SpdDepotTasks.class, xykUserCode, params);
+		assertEquals(1, task.size());
+		assertEquals(taskCode, task.get(0).getTaskCode());
+	}
+	
+	@Test public void testFindSpdDepotTaskByHisCount() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+		
+		String urlTemplate = "/spd/spdDepotTasks/iTakeChargeOfTasks/completedTasks/count?params={params}&accessToken={accessToken}";
+		
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		List<String> taskTypes = new ArrayList<String>();
+		taskTypes.add(SpdDepotTaskType.on_shelf_task.getCode());
+		taskTypes.add(SpdDepotTaskType.off_shelf_task.getCode());
+		params.setTaskType(new ListParam<String>(taskTypes));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()));
+		
+		int count =  mockMvcHelper.mockGet(Integer.class, urlTemplate, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(13, count);
+		
+	}
+	
+	@Test public void testReviewSpdTask() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+		
+		String taskId = "task_id_007";
+		SpdDepotTask depotTask = dtRepository.findWithItemsByTaskId(taskId);
+		depotTask.getItems().forEach(item->{
+			item.confirmAsPlaned();
+		});
+		dtiRepository.saveAll(depotTask.getItems());
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.reviewed.getCode(), depotTask.getLastUpdateTime());
+		
+		wait(2);
+		
+		CheckStateTO checkState = mockMvcHelper.updateCheckState(SpdDepotTask.class, xykUserCode, checkStateTO, taskId);
+		assertEquals(CheckState.reviewed.getCode(), checkState.getCheckStateCode().intValue());
+		
+		depotTask = dtRepository.findOne(taskId);
+		assertEquals(CheckState.reviewed, depotTask.getCheckState());
+		assertNotNull(depotTask.getTaskUser());
+		assertNotNull(depotTask.getFinishTime());
+	}
+	
+	@Test public void testFindByBizId() throws Exception{
+		String bizId = "rep_biz_id_009";
+		
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskType(new ListParam<String>(SpdDepotTaskType.on_shelf_task.getCode()));
+		params.setBizId(new ListParam<String>(bizId));
+		
+		String paramsStr = Global.defaultObjectMapper.writeValueAsString(params);
+		String urlTemplate = "/spd/spdDepotTasks/iTakeChargeOfTasks/completedTasks?params={params}&accessToken={accessToken}";
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		
+		SpdDepotTasks depotTasks = mockMvcHelper.mockGet(SpdDepotTasks.class, urlTemplate, paramsStr, accessToken);
+		
+		assertEquals(1, depotTasks.size());
+		depotTasks.forEach(depotTask->{
+			assertEquals(SpdDepotTaskType.on_shelf_task.getCode(), depotTask.getTaskType());
+			assertEquals(bizId, depotTask.getBizId());
+		});
+	}
+
+	/**
+	 * 三个细分场景
+	 * 1）添加周转箱
+	 * 2）删除周转箱
+	 * 3）添加一个没有被启用的周转箱
+	 */
+	@Test public void testAddAndDeleteWrapper() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+		String taskId = "task_id_007";
+		String wrapperNo = "600002";
+		String urlTemplate = "/spd/spdDepotTasks/{taskId}/wrappers?&accessToken={accessToken}";
+		Map<String, String> params = new HashMap<String, String>();
+		params.put("wrapperNo", wrapperNo);
+		
+		//为下架作业添加一个周转箱		
+		SpdTurnoverBox turnoverBox = mockMvcHelper.mockPost(SpdTurnoverBox.class, params, urlTemplate, taskId, accessToken);
+		assertEquals(wrapperNo, turnoverBox.getWrapperNo());
+		assertEquals(SpdSceneType.off_shelf_task, turnoverBox.getSceneType());
+		assertEquals(taskId, turnoverBox.getOwnerId());
+		
+		//重复添加返回一致
+		turnoverBox = mockMvcHelper.mockPost(SpdTurnoverBox.class, params, urlTemplate, taskId, accessToken);
+		assertEquals(wrapperNo, turnoverBox.getWrapperNo());
+		
+		
+		//删除刚才添加的周转箱
+		urlTemplate = getUrlTemplate("/spd/spdDepotTasks/{taskId}/wrappers/{wrapperNo}?&accessToken={accessToken}");
+		String json = mockMvc.perform(delete(urlTemplate, taskId, wrapperNo, accessToken))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		assertEquals("SUCCESS", json);
+		
+		//重新获取周转箱并检查
+		turnoverBox = mockMvcHelper.findOne(SpdTurnoverBox.class, testUserCode, turnoverBox.getId());
+		assertEquals(Constant.none, turnoverBox.getOwnerId());
+		assertEquals(SpdSceneType.idle, turnoverBox.getSceneType());
+		
+		//添加一个没有被启用的周转箱
+		wrapperNo = "600006";
+		urlTemplate = "/spd/spdDepotTasks/{taskId}/wrappers?&accessToken={accessToken}";
+		params = new HashMap<String, String>();
+		params.put("wrapperNo", wrapperNo);
+		
+		//为下架作业添加一个周转箱
+		mockMvcHelper.mockPost(SpdTurnoverBox.class, params, urlTemplate, status().is4xxClientError(), YardExceptionType.forbide_use_turnover_box,  taskId, accessToken);
+	}
+
+	@Test public void testGetDepotTaskWrappers() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+		String taskId = "task_id_007";
+		
+		String urlTemplate = "/spd/spdDepotTasks/{taskId}/wrappers?&accessToken={accessToken}";
+		SpdTurnoverBoxs turnoverBoxs = mockMvcHelper.mockGet(SpdTurnoverBoxs.class, urlTemplate, taskId, accessToken);
+		assertEquals(1, turnoverBoxs.size());
+	}
+
+	
+}

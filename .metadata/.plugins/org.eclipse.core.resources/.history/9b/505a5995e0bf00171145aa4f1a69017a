@@ -1,0 +1,15 @@
+package cn.ak4j.yard.extend.zsy;
+
+import cn.ak4j.exception.BaseException;
+
+public class RestAccessException extends BaseException{
+
+	private static final long serialVersionUID = 6697288195329185640L;
+
+	public RestAccessException(){}
+	
+	public RestAccessException(String msg, int code, String description){
+		super(msg, code, description);
+	}
+	
+}

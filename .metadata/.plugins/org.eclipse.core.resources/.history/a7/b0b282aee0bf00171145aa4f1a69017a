@@ -1,0 +1,513 @@
+package cn.ak4j.yard.spd.stock.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStock;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChange;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdStockChange;
+import cn.ak4j.yard.spd.stock.repository.SpdDepotStockRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdDepotStockServiceTest extends BaseTest{
+
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdDepotStockRepository dsRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+
+
+	private static String depotId = "depot_id_001";
+	private static String lotId1 = "goods_lot_id_001";
+	private static String lotId2 = "goods_lot_id_002";
+	private static String lotId3 = "goods_lot_id_003";
+	private static List<String> lotIds = new ArrayList<String>();
+	static{
+		lotIds.add(lotId1);
+		lotIds.add(lotId2);
+		lotIds.add(lotId3);
+		
+		Collections.reverse(lotIds);
+	}
+	
+	@Test public void testGetLockStocksByBizId(){
+		String bizId = "rep_biz_id_011";
+		SpdShelfLockStocks lockStocks = dsService.getLockStockByBizId(bizId);
+		for(SpdShelfLockStock lockStock : lockStocks){
+			assertNotNull(lockStock);
+			assertNotNull(lockStock.getShelfStock());
+			assertEquals(bizId, lockStock.getBizId());
+			assertNotNull(lockStock.getShelfStock().getGoodsLot());
+		}
+	}
+	
+	//测试更新仓库库存
+	@Test public void testUpdateDepotStocks(){
+//		int[] increments = new int[]{1000, 1500, 1900};
+		
+		Map<String, Integer> increments = new HashMap<String, Integer>();
+		increments.put(lotId1, 1000);
+		increments.put(lotId2, 1500);
+		increments.put(lotId3, 1900);
+		
+		testUpdateDepotStock(increments);
+		
+//		increments = new int[]{-10, -150, -190};
+		increments.put(lotId1, -10);
+		increments.put(lotId2, -150);
+		increments.put(lotId3, -190);
+		testUpdateDepotStock(increments);
+	}
+	
+	private void testUpdateDepotStock(Map<String, Integer> increments){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		YdsGoodsLots lots = glRepository.findAllWithGoods().findByIds(lotIds);
+		
+		SpdDepotStocks stocks = dsRepository.findByDepotAndGoodsLots(depotId, lotIds);
+		
+		//构造库存增加变更集
+		SpdDepotStockChanges stockChanges = new SpdDepotStockChanges();
+		for(Entry<String, Integer> entry : increments.entrySet()){
+			stockChanges.add(new SpdDepotStockChange(lots.findById(entry.getKey()), depot, entry.getValue().intValue()));
+		}
+		
+		//执行库存变更
+		dsService.updateDepotStocks(stockChanges);
+		
+		//检查库存变更结果
+		SpdDepotStocks newStocks = dsRepository.findByDepotAndGoodsLots(depotId, lotIds);
+		for(Entry<String, Integer> entry : increments.entrySet()){
+			SpdStockChange stockChange = null;
+			for(SpdStockChange theStockChange : stockChanges){
+				if(theStockChange.getGoodsLot().getGoodsLotId().equals(entry.getKey())){
+					stockChange = theStockChange;
+					break;
+				}
+			}
+			
+			YdsGoods goods = stockChange.getGoodsLot().getGoods();
+	 		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), YdsUnitLv.base.getLv());
+			int minUnitIncrement = (int)(entry.getValue()*unitRatio);
+			//log.debug("lotId:{}, increment:{}", lotIds.get(i), increments[i]);
+			assertStock(stocks, newStocks, entry.getKey(), entry.getValue(), minUnitIncrement);
+		}
+	}
+	
+	private void assertStock(SpdDepotStocks stocks, SpdDepotStocks newStocks, String lotId, int increment, int minUnitIncrement){
+		SpdDepotStock stock = stocks.findByGoodsLot(lotId);
+		SpdDepotStock newStock = newStocks.findByGoodsLot(lotId);
+		assertEquals((stock==null?0:stock.getMinStockQty())+minUnitIncrement, newStock.getMinStockQty().intValue());
+	}
+	
+	
+	
+	/**
+	 * 根据无特定批次的一组产品数量集合查询实际可用货位库存
+	 * 0) 1个产品: 0个可用批次
+	 * 1) 1个产品: 一个可用批次，库存足够
+	 * 2) 1个产品: 一个可用批次，库存不足
+	 * 3) 2个产品: 产品A两个可用批次，一个足够，一个不足;产品B有一个批次，库存足够
+	 * 4) 2个产品: 产品A两个可用批次，一个不足，一个足够;产品B有两个批次，两个均不足
+	 * 5) 3个产品：产品A三个可用批次，2个库存不足，一个库存足够;产品B有3个可用批次，3个库存均不足;产品C有三个可用批次，第一个批次足够
+	 * 6) 3个产品：产品A三个可用批次，1个库存不足，2个库存足够;产品B有两个可用批次，两个均不足;产品C无可用批次
+	 * 7) 3个产品：产品A无可用批次；产品B有1个可用批次，库存不足;产品C无可用批次
+	 */
+	@Test public void testFindRealShelfStoreUnitStocksWithGoodsLv(){
+		String depotId = "depot_id_001";
+		
+		List<SpdGoodsQty> planGoodsQtys = new ArrayList<SpdGoodsQty>();
+		List<String> goodsIds = new ArrayList<String>();
+		
+		//准备产品
+		String goodsId018 = "goods_id_018";
+		String goodsId002 = "goods_id_002";
+		String goodsId003= "goods_id_003";
+		
+		String goodsId007 = "goods_id_007";
+		String goodsId011 = "goods_id_011";
+		String goodsId012 = "goods_id_012";
+		
+		String goodsId014 = "goods_id_014";
+		String goodsId015 = "goods_id_015";
+		String goodsId016 = "goods_id_016";
+		
+		String goodsId020 = "goods_id_020";
+		
+		goodsIds.add(goodsId018);
+		goodsIds.add(goodsId002);
+		goodsIds.add(goodsId003);
+		goodsIds.add(goodsId007);
+		goodsIds.add(goodsId011);
+		goodsIds.add(goodsId012);
+		goodsIds.add(goodsId014);
+		goodsIds.add(goodsId015);
+		goodsIds.add(goodsId016);
+		goodsIds.add(goodsId020);
+		
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds).fillUsableLots(glRepository, ssRepository);
+		
+		String goodsId002_lotId024_2100 = "goods_lot_id_024";
+		String goodsId003_lotId018_360 = "goods_lot_id_018";
+		
+		String goodsId007_lotId014_2743 = "goods_lot_id_014";
+		String goodsId007_lotId023_1339 = "goods_lot_id_023";
+		
+		
+		String goodsId012_lotId031_10 = "goods_lot_id_031";
+		String goodsId012_lotId047_5 = "goods_lot_id_047";
+		
+		String goodsId014_lotId059_2 = "goods_lot_id_059";
+		String goodsId014_lotId045_997 = "goods_lot_id_045";
+		String goodsId014_lotId039_900 = "goods_lot_id_039";
+		
+		String goodsId015_lotId007_54 = "goods_lot_id_007";
+		String goodsId015_lotId029_18 = "goods_lot_id_029";
+		String goodsId015_lotId053_5865 = "goods_lot_id_053";
+		
+		String goodsId016_lotId052_10 = "goods_lot_id_052";
+		String goodsId016_lotId042_30 = "goods_lot_id_042";
+		String goodsId016_lotId012_90 = "goods_lot_id_012";
+
+		Map<String, SpdGoodsQty> allGoodsQtys = new HashMap<String, SpdGoodsQty>();
+		goodsIds.forEach(goodsId->{
+			allGoodsQtys.put(goodsId, new SpdGoodsQty(goodss.findById(goodsId), null, goodss.findById(goodsId).getStoreUnitLv()));
+		});
+
+		List<SpdGoodsQty> realGoodsQtys = null;
+		//0) 1个产品: 0个可用批次
+		SpdGoodsQty goodsQty018 = allGoodsQtys.get(goodsId018);
+		goodsQty018.setQty(10);
+		planGoodsQtys.add(goodsQty018);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		assertEquals(0, realGoodsQtys.get(0).getQty());
+		
+		planGoodsQtys.clear();
+		
+		
+		//1个产品: 一个可用批次，库存足够
+		SpdGoodsQty goodsQty002 = allGoodsQtys.get(goodsId002);
+		goodsQty002.setQty(500);
+		planGoodsQtys.add(goodsQty002);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertEquals(500, realGoodsQtys.get(0).getQty());
+		planGoodsQtys.clear();
+		
+		//1个产品: 一个可用批次，库存不足
+		goodsQty002.setQty(5000);
+		planGoodsQtys.add(goodsQty002);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+
+		assertEquals(2066, realGoodsQtys.get(0).getQty());
+		planGoodsQtys.clear();
+		
+		//1个产品: 3个可用批次，2个批次库存不足（其中一个无库存），一个批次库存足够
+		SpdGoodsQty goodsQty014 = allGoodsQtys.get(goodsId014);
+		goodsQty014.setQty(1100);
+		planGoodsQtys.add(goodsQty014);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+
+		assertNull(findByGoodsLot(realGoodsQtys, goodsId014_lotId059_2));
+		assertEquals(997, findByGoodsLot(realGoodsQtys, goodsId014_lotId045_997).getQty());
+		assertEquals(103, findByGoodsLot(realGoodsQtys, goodsId014_lotId039_900).getQty());
+		
+
+		//2个产品: 产品A两个可用批次，一个足够，一个不足;产品B有一个批次，库存足够
+		SpdGoodsQty goodsQty007 = allGoodsQtys.get(goodsId007);
+		goodsQty007.setQty(2000);
+		planGoodsQtys.add(goodsQty007);
+		SpdGoodsQty goodsQtys002 = allGoodsQtys.get(goodsId002);
+		goodsQtys002.setQty(1000);
+		planGoodsQtys.add(goodsQtys002);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+
+		assertEquals(2000, findByGoodsLot(realGoodsQtys, goodsId007_lotId014_2743).getQty());
+		assertNull(findByGoodsLot(realGoodsQtys, goodsId007_lotId023_1339));
+		assertEquals(1000, findByGoodsLot(realGoodsQtys, goodsId002_lotId024_2100).getQty());
+		planGoodsQtys.clear();
+		
+		//2个产品: 产品A两个可用批次，一个不足，一个足够;产品B有两个批次，两个均不足
+		goodsQty007.setQty(3000);
+		planGoodsQtys.add(goodsQty007);
+		SpdGoodsQty goodsQtys012 = allGoodsQtys.get(goodsId012);
+		goodsQtys012.setQty(100);
+		planGoodsQtys.add(goodsQtys012);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+
+		assertEquals(2743, findByGoodsLot(realGoodsQtys, goodsId007_lotId014_2743).getQty());
+		assertEquals(257, findByGoodsLot(realGoodsQtys, goodsId007_lotId023_1339).getQty());
+		
+		assertEquals(10, findByGoodsLot(realGoodsQtys, goodsId012_lotId031_10).getQty());
+		assertEquals(5, findByGoodsLot(realGoodsQtys, goodsId012_lotId047_5).getQty());
+		planGoodsQtys.clear();
+		
+		//3个产品：产品A三个可用批次，2个库存不足（其中一个无库存），一个库存足够;产品B有3个可用批次，3个库存均不足（其中2个无库存）;产品C有三个可用批次，第一个批次足够
+		goodsQty014.setQty(1100);
+		planGoodsQtys.add(goodsQty014);
+		SpdGoodsQty goodsQty015 = allGoodsQtys.get(goodsId015);
+		goodsQty015.setQty(6200);
+		planGoodsQtys.add(goodsQty015);
+		SpdGoodsQty goodsQty016 = allGoodsQtys.get(goodsId016);
+		goodsQty016.setQty(5);
+		planGoodsQtys.add(goodsQty016);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertNull(findByGoodsLot(realGoodsQtys, goodsId014_lotId059_2));
+		assertEquals(997, findByGoodsLot(realGoodsQtys, goodsId014_lotId045_997).getQty());
+		assertEquals(103, findByGoodsLot(realGoodsQtys, goodsId014_lotId039_900).getQty());
+		
+		assertNull(findByGoodsLot(realGoodsQtys, goodsId015_lotId007_54));
+		assertEquals(60, findByGoodsLot(realGoodsQtys, goodsId015_lotId029_18).getQty());
+		assertEquals(5865, findByGoodsLot(realGoodsQtys, goodsId015_lotId053_5865).getQty());
+		
+		assertEquals(5, findByGoodsLot(realGoodsQtys, goodsId016_lotId052_10).getQty());
+		assertNull(findByGoodsLot(realGoodsQtys, goodsId016_lotId012_90));
+		assertNull(findByGoodsLot(realGoodsQtys, goodsId016_lotId042_30));
+		
+		planGoodsQtys.clear();
+		
+		//3个产品：产品A三个可用批次，1个库存不足，2个库存足够;产品B有两个可用批次，两个均不足;产品C无可用批次
+		goodsQty014.setQty(1802);
+		planGoodsQtys.add(goodsQty014);
+		goodsQtys012.setQty(20);
+		planGoodsQtys.add(goodsQtys012);
+		goodsQty018.setQty(10);
+		planGoodsQtys.add(goodsQty018);
+
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertNull(findByGoodsLot(realGoodsQtys, goodsId014_lotId059_2));
+		assertEquals(997, findByGoodsLot(realGoodsQtys, goodsId014_lotId045_997).getQty());
+		assertEquals(805, findByGoodsLot(realGoodsQtys, goodsId014_lotId039_900).getQty());
+		
+		assertEquals(10, findByGoodsLot(realGoodsQtys, goodsId012_lotId031_10).getQty());
+		assertEquals(5, findByGoodsLot(realGoodsQtys, goodsId012_lotId047_5).getQty());
+		
+		assertEquals(0, findByGoods(realGoodsQtys, goodsId018).getQty());
+		assertNull(findByGoods(realGoodsQtys, goodsId018).getSpecialGoodsLot());
+		planGoodsQtys.clear();
+		
+		//3个产品：产品A无可用批次；产品B有1个可用批次，库存不足;产品C无可用批次
+		goodsQty018.setQty(10);
+		SpdGoodsQty goodsQty003 = allGoodsQtys.get(goodsId003);
+		goodsQty003.setQty(361);
+		SpdGoodsQty goodsQty020 = allGoodsQtys.get(goodsId020);
+		goodsQty020.setQty(100);
+
+		planGoodsQtys.add(goodsQty018);
+		planGoodsQtys.add(goodsQty003);
+		planGoodsQtys.add(goodsQty020);
+		
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		assertEquals(0, findByGoods(realGoodsQtys, goodsId018).getQty());
+		assertNull(findByGoods(realGoodsQtys, goodsId020).getSpecialGoodsLot());
+		assertNull(findByGoodsLot(realGoodsQtys, goodsId003_lotId018_360));
+		assertEquals(0, findByGoods(realGoodsQtys, goodsId020).getQty());
+		assertNull(findByGoods(realGoodsQtys, goodsId020).getSpecialGoodsLot());
+		
+		planGoodsQtys.clear();
+	}
+	
+	/**
+	 * 根据特定批次的一组产品数量集合查询实际可用货位库存
+	 * 0) 1个产品:无可用库存
+	 * 1) 2个产品: 1个足够一个不足，两个足够，两个不足
+	 * 2) 3个产品：1个足够2个不足，3个不足，3个足够
+	 */
+	@Test public void testFindRealShelfStoreUnitStocksWithLotLv(){
+		String depotId = "depot_id_001";
+		
+		List<SpdGoodsQty> planGoodsQtys = new ArrayList<SpdGoodsQty>();
+		List<String> goodsIds = new ArrayList<String>();
+		List<String> lotIds = new ArrayList<String>();
+		
+		//准备产品
+		String goodsId018 = "goods_id_018";//无库存
+		String goodsId012 = "goods_id_012";//库存不足
+		String goodsId014 = "goods_id_014";//库存不足
+		String goodsId001 = "goods_id_001";//库存足够
+		String goodsId002 = "goods_id_002";//库存足够
+		String goodsId005 = "goods_id_005";//库存足够
+		goodsIds.add(goodsId018);
+		goodsIds.add(goodsId012);
+		goodsIds.add(goodsId014);
+		goodsIds.add(goodsId001);
+		goodsIds.add(goodsId002);
+		goodsIds.add(goodsId005);
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(goodsIds);
+		
+		//准备批次
+		String goodsId018_lotId009 = "goods_lot_id_009";
+		String goodsId012_lotId047  = "goods_lot_id_047";
+		String goodsId014_lotId059 = "goods_lot_id_059";
+		String goodsId001_lotId019 = "goods_lot_id_019";
+		String goodsId002_lotId024 = "goods_lot_id_024";
+		String goodsId005_lotId021 = "goods_lot_id_021";
+		lotIds.add(goodsId018_lotId009);
+		lotIds.add(goodsId012_lotId047);
+		lotIds.add(goodsId014_lotId059);
+		lotIds.add(goodsId001_lotId019);
+		lotIds.add(goodsId002_lotId024);
+		lotIds.add(goodsId005_lotId021);
+		YdsGoodsLots lots = glRepository.findAll().findByIds(lotIds);
+		
+		//准备产品数量
+		SpdGoodsQty planQty018 = new SpdGoodsQty(goodss.findById(goodsId018), lots.findById(goodsId018_lotId009), goodss.findById(goodsId018).getStoreUnitLv());
+		SpdGoodsQty planQty012 = new SpdGoodsQty(goodss.findById(goodsId012), lots.findById(goodsId012_lotId047), goodss.findById(goodsId012).getStoreUnitLv());
+		SpdGoodsQty planQty014 = new SpdGoodsQty(goodss.findById(goodsId014), lots.findById(goodsId014_lotId059), goodss.findById(goodsId014).getStoreUnitLv());
+		SpdGoodsQty planQty001 = new SpdGoodsQty(goodss.findById(goodsId001), lots.findById(goodsId001_lotId019), goodss.findById(goodsId001).getStoreUnitLv());
+		SpdGoodsQty planQty002 = new SpdGoodsQty(goodss.findById(goodsId002), lots.findById(goodsId002_lotId024), goodss.findById(goodsId002).getStoreUnitLv());
+		SpdGoodsQty planQty005 = new SpdGoodsQty(goodss.findById(goodsId005), lots.findById(goodsId005_lotId021), goodss.findById(goodsId005).getStoreUnitLv());
+		
+		//测试1个无可用库存产品的情况
+		planQty018.setQty(10);
+		planGoodsQtys.add(planQty018);
+		List<SpdGoodsQty> realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertEquals(1, realGoodsQtys.size());
+		assertEquals(0, realGoodsQtys.get(0).getQtyByStoreUnit());
+		goodsIds.clear();
+		lotIds.clear();
+		planGoodsQtys.clear();
+		
+		//测试2个产品的情况，一个足够，一个不足
+		planQty014.setQty(1000);
+		planGoodsQtys.add(planQty014);
+		planQty001.setQty(20);
+		planGoodsQtys.add(planQty001);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertEquals(20, findByGoods(realGoodsQtys, goodsId001).getQty());
+		assertEquals(0, findByGoods(realGoodsQtys, goodsId014).getQty());
+		
+		goodsIds.clear();
+		lotIds.clear();
+		planGoodsQtys.clear();
+		
+		//测试2个产品的情况，两个都足够
+		planQty001.setQty(200);
+		planGoodsQtys.add(planQty001);
+		planQty002.setQty(500);
+		planGoodsQtys.add(planQty002);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertEquals(200, findByGoods(realGoodsQtys, goodsId001).getQty());
+		assertEquals(500, findByGoods(realGoodsQtys, goodsId002).getQty());
+		
+		goodsIds.clear();
+		lotIds.clear();
+		planGoodsQtys.clear();
+		
+		//测试2个产品的情况，两个都不足
+		planQty012.setQty(500);
+		planGoodsQtys.add(planQty012);
+		planQty014.setQty(500);
+		planGoodsQtys.add(planQty014);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertEquals(5, findByGoods(realGoodsQtys, goodsId012).getQty());
+		assertEquals(0, findByGoods(realGoodsQtys, goodsId014).getQty());
+		
+		goodsIds.clear();
+		lotIds.clear();
+		planGoodsQtys.clear();
+
+		//测试3个产品的情况，三个都足够
+		planQty001.setQty(50);
+		planGoodsQtys.add(planQty001);
+		planQty002.setQty(50);
+		planGoodsQtys.add(planQty002);
+		planQty005.setQty(50);
+		planGoodsQtys.add(planQty005);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertEquals(50, findByGoods(realGoodsQtys, goodsId001).getQty());
+		assertEquals(50, findByGoods(realGoodsQtys, goodsId002).getQty());
+		assertEquals(50, findByGoods(realGoodsQtys, goodsId005).getQty());
+		
+		goodsIds.clear();
+		lotIds.clear();
+		planGoodsQtys.clear();
+		
+		//测试3个产品的情况，三个都不足
+		planQty012.setQty(100);
+		planGoodsQtys.add(planQty012);
+		planQty014.setQty(100);
+		planGoodsQtys.add(planQty014);
+		planQty018.setQty(100);
+		planGoodsQtys.add(planQty018);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertEquals(5, findByGoods(realGoodsQtys, goodsId012).getQty());
+		assertEquals(0, findByGoods(realGoodsQtys, goodsId014).getQty());
+		assertEquals(0, findByGoods(realGoodsQtys, goodsId018).getQty());
+		
+		goodsIds.clear();
+		lotIds.clear();
+		planGoodsQtys.clear();
+		
+		//测试3个产品的情况，1个足够，2个不足
+		planQty001.setQty(100);
+		planGoodsQtys.add(planQty001);
+		planQty012.setQty(100);
+		planGoodsQtys.add(planQty012);
+		planQty014.setQty(100);
+		planGoodsQtys.add(planQty014);
+		realGoodsQtys = dsService.findRealShelfStoreUnitStocks(depotId, PcsAreaType.normal.getCode(), planGoodsQtys);
+		
+		assertEquals(100, findByGoods(realGoodsQtys, goodsId001).getQty());
+		assertEquals(5, findByGoods(realGoodsQtys, goodsId012).getQty());
+		assertEquals(0, findByGoods(realGoodsQtys, goodsId014).getQty());
+
+	}
+	
+	private SpdGoodsQty findByGoods(List<SpdGoodsQty> goodsQtys, String goodsId){
+		for(SpdGoodsQty goodsQty : goodsQtys){
+			if(goodsQty.getGoods().getGoodsId().equals(goodsId)){
+				return goodsQty;
+			}
+		}
+		return null;
+	}
+	
+	private SpdGoodsQty findByGoodsLot(List<SpdGoodsQty> goodsQtys, String goodsLotId){
+		for(SpdGoodsQty goodsQty : goodsQtys){
+			if(goodsQty.getSpecialGoodsLot() == null){
+				continue;
+			}
+			if(goodsQty.getSpecialGoodsLot().getGoodsLotId().equals(goodsLotId)){
+				return goodsQty;
+			}
+		}
+		return null;
+	}
+}

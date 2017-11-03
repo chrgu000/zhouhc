@@ -1,0 +1,24 @@
+package cn.ak4j.yard.yds.to;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewYdsEdsGoodsLotTO {
+	
+	private String yardGoodsLotId;
+	private String edsGoodsId;
+	private String edsLotNo;
+	private Date edsLotValidity;
+	private String ownerOrgId;
+	private Date produceDate;//生产日期
+	private String sterilizeLotNo;//灭菌批次
+	private Date sterilizeTime;//灭菌日期
+	
+	private boolean enabled;
+	
+}

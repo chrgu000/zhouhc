@@ -1,0 +1,169 @@
+package cn.ak4j.yard.spd.task.web;
+
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskParams;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.service.SpdDepotTaskService;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.spd.wrapper.domain.SpdAbstractWrapper;
+import cn.ak4j.yard.spd.wrapper.domain.SpdWrappers;
+import cn.ak4j.yard.spd.wrapper.service.SpdWrapperService;
+
+@RestController
+public class SpdDepotTaskResource {
+
+	@Autowired private SpdDepotTaskRepository taskRepository;
+	@Autowired private SpdDepotTaskService taskService;
+	@Autowired private SpdWrapperService wrapperService;
+	
+	@RequestMapping(value = "/yard/spd/spdDepotTasks/iTakeChargeOfTasks/uncompleteTasks", method = RequestMethod.GET)
+	public SpdDepotTasks findITakeChargeUncompleteTasks(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdDepotTaskParams params = SpdDepotTaskParams.buildParamsFromJson(paramsStr, SpdDepotTaskParams.class);
+		if(params == null){
+			params = new SpdDepotTaskParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = new OrderParam("maintenanceInfo.createDate", "desc");
+		}
+		
+		return taskService.findITakeChargeOfUncompleteTasks(user, params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotTasks/iTakeChargeOfTasks/uncompleteTasks/count", method = RequestMethod.GET)
+	public int countITakeChargeUncompleteTasks(@RequestParam(value = "params", required = false) String paramsStr, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdDepotTaskParams params = SpdDepotTaskParams.buildParamsFromJson(paramsStr, SpdDepotTaskParams.class);
+		if(params == null){
+			params = new SpdDepotTaskParams();
+		}
+		SpdDepotTasks depotTasks = taskService.findITakeChargeOfUncompleteTasks(user, params, null, -1, -1);
+		
+		return depotTasks.size();
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotTasks/iTakeChargeOfTasks/completedTasks", method = RequestMethod.GET)
+	public SpdDepotTasks findITakeChargeCompletedTasks(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdDepotTaskParams params = SpdDepotTaskParams.buildParamsFromJson(paramsStr, SpdDepotTaskParams.class);
+		if(params == null){
+			params = new SpdDepotTaskParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		return taskService.findITakeChargeOfCompletedTasks(user, params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotTasks/iTakeChargeOfTasks/completedTasks/count", method = RequestMethod.GET)
+	public Integer countITakeChargeCompletedTasks(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdDepotTaskParams params = SpdDepotTaskParams.buildParamsFromJson(paramsStr, SpdDepotTaskParams.class);
+		if(params == null){
+			params = new SpdDepotTaskParams();
+		}
+		return taskService.countITakeChargeOfCompletedTasks(user, params);
+	}
+
+	@RequestMapping(value = "/yard/spd/spdDepotTasks", method = RequestMethod.GET)
+	public List<SpdDepotTask> findSpdTaskByPage(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		SpdDepotTaskParams params = SpdDepotTaskParams.buildParamsFromJson(paramsStr, SpdDepotTaskParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdDepotTaskParams();
+		}
+		return taskRepository.find(params, order, currentPage-1, pageSize);
+	}
+
+	@RequestMapping(value = "/yard/spd/spdDepotTasks/count", method = RequestMethod.GET)
+	public long spdTaskCount(@RequestParam(value = "params", required = false) String paramsStr,HttpServletRequest request) {
+		SpdDepotTaskParams params = SpdDepotTaskParams.buildParamsFromJson(paramsStr, SpdDepotTaskParams.class);
+		if(params == null){
+			params = new SpdDepotTaskParams();
+		}
+		return taskRepository.count(params);
+	}
+	
+	
+	/**
+	 * 该接口没有根据用户所属部门查找
+	 */
+	@RequestMapping(value = "/yard/spd/spdDepotTasks/bizId,{bizId}", method = RequestMethod.GET)
+	public List<SpdDepotTask> findSpdTaskByBizId(
+			@PathVariable(value = "bizId") String bizId,
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		SpdDepotTaskParams params = SpdDepotTaskParams.buildParamsFromJson(paramsStr, SpdDepotTaskParams.class);
+		if(params == null){
+			params = new SpdDepotTaskParams();
+		}
+		params.setBizId(new ListParam<String>(bizId));
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return taskRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdDepotTasks/{taskId}/checkState/reviewed", method = RequestMethod.PUT)
+	public CheckStateTO updateReviewed(@PathVariable("taskId") String taskId,
+			@RequestBody CheckStateTO checkStateTO, HttpServletRequest request) {
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		SpdDepotTask spdTask = taskService.updateCheckState(taskId, checkStateTO.getCheckStateCode(),
+				checkStateTO.getLastDate(), user);
+		return new CheckStateTO(spdTask.getCheckStateCode(), spdTask.getMaintenanceInfo().getLastDate());
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotTasks/{taskId}/wrappers", method=RequestMethod.GET)
+	public SpdWrappers getWrappers(@PathVariable("taskId")String taskId){
+		SpdDepotTask task = taskRepository.findWithItemsByTaskId(taskId);
+		return task.getWrappers();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotTasks/{taskId}/wrappers", method=RequestMethod.POST)
+	public SpdAbstractWrapper addWrapper(@PathVariable("taskId")String taskId, @RequestBody Map<String, String> map){
+		String wrapperNo = map.get("wrapperNo");
+		SpdAbstractWrapper wrapper = wrapperService.addDepotTaskWrapper(taskId, wrapperNo);
+		return wrapper;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDepotTasks/{taskId}/wrappers/{wrapperNo}", method=RequestMethod.DELETE)
+	public String removeWrapper(@PathVariable("taskId")String taskId, @PathVariable("wrapperNo")String wrapperNo){
+		taskService.removeWrapper(taskId, wrapperNo);
+		return "SUCCESS";
+	}
+	
+}

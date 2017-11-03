@@ -1,0 +1,252 @@
+package cn.ak4j.yard.amqp;
+
+import java.util.List;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+
+import com.rabbitmq.client.Channel;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.spd.bizplan.domain.ISpdReceiveEventProcessor;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdGoodsBizPlan;
+import cn.ak4j.yard.spd.bizplan.domain.SpdMoveAreaBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizPlanRepository;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdAdjustStockBizAssistantService;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdConsumeBizAssistantService;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdMoveAreaBizAssistantService;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdPrepareInformBizAssistantService;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdReceiveBizAssistantService;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdReplenishBizAssistantService;
+import cn.ak4j.yard.spd.bizplan.service.assistant.SpdReturnGoodsBizAssistantService;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdReconciliationBizPlan;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdReconciliationBizRepository;
+import cn.ak4j.yard.spd.reconciliation.service.SpdDailyCleanAssistantService;
+import cn.ak4j.yard.spd.reconciliation.service.SpdReconciliationAssistantService;
+import cn.ak4j.yard.spd.service.ISpdDepotCardEventProcessor;
+import cn.ak4j.yard.sys.service.YardBatchTaskService;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import cn.ak4j.yard.yds.service.IYdsEdsGoodsEventProcessor;
+import cn.ak4j.yard.yds.service.IYdsGoodsEventProcessor;
+
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class SpdAMQPMsgListener extends AbstractAMQPMsgListener implements ChannelAwareMessageListener{
+
+	private Logger logger = LoggerFactory.getLogger(SpdAMQPMsgListener.class);
+	@Autowired private YardBatchTaskService batchTaskService;
+	@Autowired private SpdBizPlanRepository bpRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private SpdReconciliationBizRepository rbRepository;
+	@Autowired private MGProxy mgProxy;
+	
+	@Autowired private SpdReceiveBizAssistantService rbaService;
+	@Autowired private SpdReplenishBizAssistantService repbaService;
+	@Autowired private SpdAdjustStockBizAssistantService asbaService;
+	@Autowired private SpdMoveAreaBizAssistantService mabaService;
+	@Autowired private SpdPrepareInformBizAssistantService pibaService;
+	@Autowired private SpdConsumeBizAssistantService cbaService;
+	@Autowired private SpdReturnGoodsBizAssistantService rgbaService;
+	@Autowired private SpdReconciliationAssistantService raService;
+	@Autowired private SpdDailyCleanAssistantService dcaService;
+	
+	@Autowired @Qualifier(value="defaultGoodsEventProcessor") 
+	private IYdsGoodsEventProcessor goodsEventProcessor;
+	
+	@Autowired @Qualifier(value="defaultEdsGoodsEventProcessor")
+	private IYdsEdsGoodsEventProcessor edsGoodsEventProcessor;
+	
+	@Autowired @Qualifier(value="defaultDepotCardEventProcessor")
+	private ISpdDepotCardEventProcessor depotCardEventProcessor;
+	
+	@Autowired @Qualifier(value="defaultReceiveEventProcessor")
+	private ISpdReceiveEventProcessor receiveEventProcessor;
+	
+
+	public void onMessage(Message message, Channel channel) throws Exception {
+		try{
+			String json = new String(message.getBody(), Global.defaultCharset);
+			String msgType = (String)message.getMessageProperties().getHeaders().get(Constant.AMQP_MSG_TYPE);
+			logger.info("spd listener receive message:{}, msgType:{}", json, msgType);
+			AmqpMsgType amqpMsgType = AmqpMsgType.typeOf(msgType);
+
+			//执行批处理任务
+			if(amqpMsgType.equals(AmqpMsgType.CREATE_BATCH_TASK)){
+				batchTaskService.processBatchTask((String)getResourceId(json, "taskId"));
+			}
+			
+			//处理标准产品相关事件
+			else if(amqpMsgType.equals(AmqpMsgType.ADD_GOODS) || msgType.equals(AmqpMsgType.COMMIT_GOODS)){
+				String goodsId = (String)getResourceId(json, "goodsId");
+				String userId = (String)getResourceId(json, "userId");
+				YdsGoods goods = getGoods(goodsId);
+				goodsEventProcessor.process(goods, userId, amqpMsgType);
+			}
+			
+			//处理企业产品相关事件
+			else if(amqpMsgType.equals(AmqpMsgType.ADD_EDS_GOODS) || amqpMsgType.equals(AmqpMsgType.UPDATE_EDS_GOODS)){
+				String edsGoodsId = (String)getResourceId(json, "edsGoodsId");
+				String userId = (String)getResourceId(json, "userId");
+				YdsEdsGoods edsGoods = egRepository.findOne(edsGoodsId);
+				edsGoodsEventProcessor.process(edsGoods, userId, amqpMsgType);
+			}
+			
+			//处理缺乏账页事件
+			else if(amqpMsgType.equals(AmqpMsgType.LACK_DEPOT_CARD)){
+				String depotId = (String)getResourceId(json, "depotId");
+				String userId = (String)getResourceId(json, "userId");
+				List<String> goodsIds = (List<String>)getResourceId(json, "goodsIds");
+				depotCardEventProcessor.process(depotId, goodsIds, userId, amqpMsgType);
+			}
+			
+			//处理收货缺乏相关备货业务
+			else if(amqpMsgType.equals(AmqpMsgType.RECEIVE_LACK_RELATION_PREPARE_INFORM)){
+				String receiveJson = (String)getResourceId(json, "receiveJson");
+				SpdReceiveBiz receive = Global.defaultObjectMapper.readValue(receiveJson, SpdReceiveBiz.class);
+				String userId = (String)getResourceId(json, "userId");
+				receiveEventProcessor.process(receive, userId, amqpMsgType);
+			}
+			
+			//处理各类业务计划事件消息和作业事件消息
+			else if(isGoodsBizMsg(amqpMsgType)){
+				String bizId = (String)getResourceId(json, "bizId");
+				String taskId = (String)getResourceId(json, "taskId");
+				String userId = (String)getResourceId(json, "userId");
+				SpdGoodsBizPlan biz = getGoodsBizPlan(bizId);
+				String action = msgType;
+				
+				switch (biz.getBizType()) {
+				
+				case receive_biz:
+					rbaService.process((SpdReceiveBiz)biz, taskId, userId, action);
+					break;
+					
+				case replenish_biz:
+					repbaService.process((SpdReplenishBiz)biz, taskId, userId, action);
+					break;
+					
+				case adjust_stock_biz:
+					asbaService.process((SpdAdjustStockBiz)biz, taskId, userId, action);
+					break;
+				
+				case move_area_biz:
+					mabaService.process((SpdMoveAreaBiz)biz, taskId, userId, action);
+					break;
+					
+				case prepare_inform_biz:
+					pibaService.process((SpdPrepareInformBiz)biz, taskId, userId, action);
+					break;
+				
+				case consume_biz:
+					cbaService.process((SpdConsumeBiz)biz, taskId, userId, action);
+					break;
+				case return_goods_biz:
+					rgbaService.process((SpdReturnGoodsBiz)biz, taskId, userId, action);
+					break;
+				default:
+					break;
+				}
+			}
+			
+			else if(isReconciliationBizMsg(amqpMsgType)){
+				String bizId = (String)getResourceId(json, "bizId");
+				String userId = (String)getResourceId(json, "userId");
+				SpdReconciliationBizPlan biz = getReconciliationBizPlan(bizId);
+				String action = msgType;
+				switch (biz.getBizType()) {
+				case finacial_reconciliation_biz:
+					SpdFinacialReconciliationBiz reconciliation = (SpdFinacialReconciliationBiz)getReconciliationBizPlan(bizId);
+					raService.process(reconciliation, null, userId, action);
+					break;
+				case daily_clean_biz:
+					SpdDailyCleanBiz dailyClean = (SpdDailyCleanBiz)getReconciliationBizPlan(bizId);
+					dcaService.process(dailyClean, null, userId, action);
+					break;
+				default:
+					break;	
+				}
+			}
+			
+		}catch(Exception e){
+			logger.error("消息处理失败", e);
+			if(Conf.isSendExceptionMail()){
+				mgProxy.sendMail(getErrorMailTitle(), ExceptionUtils.getStackTrace(e), "spd@1ycloud.net");
+			}
+			throw e;
+		}finally{
+			channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);	
+		}
+	}
+	
+//	private void delay(){
+//		if(Conf.getAmqpMsgDelay() > 0){
+//			try {
+//				TimeUnit.MILLISECONDS.sleep(Conf.getAmqpMsgDelay());
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
+//		}
+//	}
+
+	private SpdGoodsBizPlan getGoodsBizPlan(String bizId) throws InterruptedException {
+		int getEntityRetry = 20;
+		SpdGoodsBizPlan biz = bpRepository.findOne(bizId);
+		while(biz == null && getEntityRetry > 0){
+			Thread.sleep(50);
+			biz = bpRepository.findOne(bizId);
+			getEntityRetry--;
+		}
+		if(biz == null){
+			throw new OperateFailException("未找到业务对象:"+bizId);
+		}
+		return biz;
+	}
+	
+	private SpdReconciliationBizPlan getReconciliationBizPlan(String bizId) throws InterruptedException {
+		int getEntityRetry = 20;
+		SpdReconciliationBizPlan biz = rbRepository.findOne(bizId);
+		while(biz == null && getEntityRetry > 0){
+			Thread.sleep(50);
+			biz = rbRepository.findOne(bizId);
+			getEntityRetry--;
+		}
+		if(biz == null){
+			throw new OperateFailException("未找到业务对象:"+bizId);
+		}
+		return biz;
+	}
+
+	private YdsGoods getGoods(String goodsId) throws InterruptedException {
+		int getEntityRetry = 20;
+		YdsGoods goods = goodsRepository.findAll().findById(goodsId);
+		while(goods == null && getEntityRetry > 0){
+			Thread.sleep(50);
+			goods = goodsRepository.findAll().findById(goodsId);
+			getEntityRetry--;
+		}
+		return goods;
+	}
+	
+	
+}

@@ -1,0 +1,2 @@
+insert into spd_feedback_rule (id, name, auto_commit_receive, auto_review_receive, auto_create_on_shelf_disp, auto_review_on_shelf_disp, auto_review_on_shelf_task, biz_type, empty_biz_auto_feedback, create_time, last_update_time) 
+values ('rec_fb_id_20', '收货半自动反馈03', '1', '0', '1', '1', '0', 'receive', '1', sysDate, sysDate);

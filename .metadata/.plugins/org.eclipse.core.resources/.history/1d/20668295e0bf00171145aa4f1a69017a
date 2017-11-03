@@ -1,0 +1,46 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 数据类型
+* @author zhengyf
+* @date 2017年9月10日 上午10:50:58
+* @version V1.0.0
+*/
+
+@JsonSerialize(using = CommonEnumJsonSerializer.class)
+public enum YardDataType implements ITypeEnum{
+
+	goods_lot("goods_lot", "标准产品批次",""),
+	eds_goods_lot("eds_goods_lot", "企业产品批次",""),
+	depot_card("depot_card", "仓库账页",""),
+	initial_stock("initial_stock","初始库存",""),
+	initial_ending("initial_ending", "初始对账期末", ""),
+	prepare_inform_item("prepare_inform_item", "备货计划", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private YardDataType (String code,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static YardDataType typeOf(String typeCode){
+		for(YardDataType type : YardDataType.values()){
+			if(type.getCode().equals(typeCode)){
+				return type;
+			}
+		}
+		
+		return null;
+	}
+	
+	
+}

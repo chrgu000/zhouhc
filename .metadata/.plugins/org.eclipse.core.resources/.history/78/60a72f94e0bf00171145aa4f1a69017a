@@ -1,0 +1,21 @@
+package cn.ak4j.yard.sys.domain.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+@SuppressWarnings("serial")
+public class YardGlobalInfoParams extends QueryParams{
+
+	private ListParam<String> key;
+	private ListParam<String> name;
+	private ListParam<String> value;
+	private ListParam<String> description;
+	private DateRangeParam createTime;
+	private DateRangeParam lastUpdateTime;
+ 	
+}

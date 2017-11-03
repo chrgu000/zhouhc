@@ -1,0 +1,206 @@
+package cn.ak4j.yard.spd.bizplan.service.assistant;
+
+import org.apache.commons.lang.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.service.SpdDepotGoodsConfigService;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.factory.SpdDispatcherFactory;
+
+/**
+* @Description: 收货业务助理
+* @author zhengyf
+* @date 2017年3月29日 下午8:03:21
+* @version V1.0.0
+*/
+@Component
+public class SpdReceiveBizAssistantService extends SpdBizAssistantService<SpdReceiveBiz>{
+	
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdReceiveBizService rbService;
+	@Autowired private NotifyMsgBuilder notifyMsgBuilder;
+	@Autowired private MGProxy mgProxy;
+	@Autowired private SpdDispatcherFactory dispatcherFactory;
+	@Autowired private SpdReplenishBizService replenishService;
+	@Autowired private SpdDepotGoodsConfigService dgcService;
+	
+	public void process(SpdReceiveBiz receive, String taskId, String userId, String action) {
+		if(receive.isCompleted()){
+			return ;
+		}
+		rbService.fillAllRelations(receive);
+		PcsUser user = userRepository.findAll().findById(userId);
+
+		receive = forwardBizStep(receive, taskId, action);
+		
+		try{
+			if(receive.getCurrentBizStep().equals(SpdReceiveBizSteps.create_receive)){
+				if(receive.getBizRule().getFeedbackRule().getAutoCommitReceive() && receive.hasItems()){
+					rbService.commitReceive(receive, receive.getMaintenanceInfo().getLastDate(), user);
+				}
+			}
+			
+			else if(receive.getCurrentBizStep().equals(SpdReceiveBizSteps.commite_receive)){
+				if(receive.getBizRule().getFeedbackRule().getAutoReviewReceive()){
+					receive.getItems().forEach(item->item.confirmAsPlaned());
+					biRepository.saveAll(receive.getItems());
+					rbService.reviewReceive(receive, receive.getMaintenanceInfo().getLastDate(), user);
+				}
+			}
+			
+			else if(receive.getCurrentBizStep().equals(SpdReceiveBizSteps.review_receive)){
+				processReceiveConfirmed(receive, user);
+			}
+			
+			else if(receive.getCurrentBizStep().equals(SpdReceiveBizSteps.create_dispatcher)){
+				if(receive.getBizRule().getFeedbackRule().getAutoReviewOnShelfDispatcher()){
+					reviewDispatcher(receive, user, SpdDispatcherType.on_shelf);
+				}
+			}
+			
+			else if(receive.getCurrentBizStep().equals(SpdReceiveBizSteps.create_on_shelf_task)){
+				if(receive.getBizRule().getFeedbackRule().getAutoReviewOnShelfTask()){
+					reviewOnShelfDepotTask(receive, user);
+				}
+			}
+			
+			else if(receive.getCurrentBizStep().equals(SpdReceiveBizSteps.complete_on_shelf_task)){
+				//当不是从eis同步过来的收货单才发送收货单同步通知
+				if(receive.getChannelType() != YardChannelType.eis){
+					rabbitProxy.sendCreateSyncTaskMsg("receive");
+				}
+				receive.updateCheckState(CheckState.completed.getCode(), receive.getMaintenanceInfo().getLastDate());
+				
+				//如果全部按零收货则不产生补货
+				if(!receive.getItems().isAllConfirmEmpty()){
+					//尝试对代收收货进行自动补货
+					createReplenish(receive, user);	
+				}
+			}
+		}catch(Exception e){
+			handleException(action, receive, e);
+		}
+		
+		saveBizLog(receive, user);
+		rbRepository.save(receive);
+		if(receive.getCheckState() == CheckState.completed){
+			dgcService.decrementUncompletedPrepareQty(receive);
+			rabbitProxy.sendBizMsg(receive.getBizId(), null, receive.getMaintenanceInfo().getLastUserId(), AmqpMsgType.COMPLETE_RECEIVE_BIZ);
+		}
+	}
+
+	/**
+	 * 业务助理处理收货审核的后续行为：
+	 * 1）尝试是否自动创建调度作业
+	 * 2）发送确认收货的运营通知
+	 */
+	private void processReceiveConfirmed(SpdReceiveBiz receive, PcsUser user) {
+		//尝试创建调度作业
+		if(receive.getBizRule().getFeedbackRule().getAutoCreateOnShelfDispatcher()){
+			SpdDispatcher dispatcher = dispatcherFactory.buildDispatcherFromBiz(receive, SpdDispatcherType.on_shelf, user);
+			dispatcherService.add(dispatcher, user);
+		}
+
+		//发送业务事件消息，包括短信和邮件
+		MailMsg notifyEmail = notifyMsgBuilder.buildConfirmReceiveNotifyEmail(receive);
+		notifyEmail.setToEmail(Conf.getDepotNotifyEmails());
+		mgProxy.sendMail(notifyEmail);
+		
+		//mgProxy.sendMail("[南州社区]SPD系统收货同步通知", spdReceiveService.receiveMailTxt(receiveId), "zhengyf@1ycloud.net,wuyw@1ycloud.net,zhouhc@1ycloud.net");
+		//费钱，先注释掉，完成短信内容构造和目标手机号码获取后集成调试时再打开
+		//mgProxy.sendSMS("[南州社区]SPD系统通知您，新增了2个产品，修改了2个产品，查看详情请点击http://www.aoka.cn", "18601330839");
+	}
+	
+	/**
+	 * 如果该收货业务是一个代收收货业务，则尝试查找是否又相关的"补货"业务,
+	 * 所谓相关的补货业务是指，补货业务的来源规则是该收货业务的业务规则
+	 */
+	private void createReplenish(SpdReceiveBiz receive, PcsUser user){
+		if(StringUtils.isNotEmpty(receive.getFinalDepotId())){
+			SpdReplenishRules rules = brRepository.findAllWithRelations().getAllReplenishRules();
+			SpdReplenishRule rule = rules.findByOriginRuleId(receive.getBizRuleId());
+			if(rule == null){
+				throw new NotFoundException(YardExceptionType.not_found_auto_allocate_replenish_rule, receive.getBizCode(), receive.getBizRule().getDisplayName(), receive.getBizRule().getId());
+			}
+			SpdReplenishBiz replenish = new SpdReplenishBiz();
+			replenish.applyRule(rule, user);
+			replenish.setMaintenanceInfo(new MaintenanceInfo(user));
+			String receiveId = receive.getBizId();
+			SpdBizItems replenishItems = new SpdBizItems();
+			receive.getItems().forEach(receiveItem->{
+				SpdBizItem replenishItem = new SpdBizItem();
+				BeanUtils.copyProperties(receiveItem, replenishItem, "bizItemId", "originId", "originItemId", "bizId");
+				replenishItem.setOriginId(receiveId);
+				replenishItem.setOriginItemId(receiveItem.getBizItemId());
+				replenishItems.add(replenishItem);
+			});
+			replenish.setItems(replenishItems);
+			replenishService.add(replenish, user);
+		}
+	}
+	
+	protected SpdReceiveBiz forwardBizStep(SpdReceiveBiz biz, String taskId, String action){
+		if(biz.isCompleted()){
+			return biz;
+		}
+		
+		SpdBizStep currentStep = biz.getCurrentBizStep();
+		if(currentStep == null){
+			biz.setBizStatusCode(biz.getBizSteps().get(0).getStatusCode());
+		}else{
+			SpdBizStep nextStep = CollectionUtils.findWhere("index", currentStep.getIndex()+1, Integer.class, biz.getBizSteps());
+			if(nextStep == null){
+				return biz;
+			}
+			
+			if(nextStep == SpdReceiveBizSteps.create_receive && action.equals(AmqpMsgType.CREATE_RECEIVE_BIZ.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdReceiveBizSteps.commite_receive && action.equals(AmqpMsgType.COMMIT_RECEIVE_BIZ.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdReceiveBizSteps.review_receive && action.equals(AmqpMsgType.CONFIRM_RECEIVE_BIZ.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdReceiveBizSteps.create_dispatcher && action.equals(AmqpMsgType.CREATE_ON_SHELF_DISPATCHER.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdReceiveBizSteps.create_on_shelf_task && action.equals(AmqpMsgType.CREATE_ON_SHELF_TASK.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdReceiveBizSteps.complete_on_shelf_task){
+				if(biz.getOnShelfTasks().isAllReviewed()){
+					biz.setBizStatusCode(nextStep.getStatusCode());
+				}
+			}else{
+				throw new OperateFailException(String.format("业务事务步骤步进失败:%s=>%s", action, nextStep.getStatusName()));
+			}
+		}
+		return biz;
+	}
+	
+}

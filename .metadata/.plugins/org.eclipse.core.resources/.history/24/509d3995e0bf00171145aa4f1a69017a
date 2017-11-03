@@ -1,0 +1,28 @@
+package cn.ak4j.yard.pcs.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class PcsUserParams extends QueryParams{
+
+	private ListParam<String> userId;
+	private ListParam<String> userName;
+	private ListParam<String> userCode;
+	private ListParam<String> gender;
+	private ListParam<String> email;
+	private ListParam<Boolean> enabled;
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	private ListParam<String> linkTel;
+	private ListParam<String> deptId;
+	private ListParam<String> orgId;
+	private ListParam<String> deptName;
+	private ListParam<String> orgName;
+	private ListParam<Integer> checkStateCode;
+
+}

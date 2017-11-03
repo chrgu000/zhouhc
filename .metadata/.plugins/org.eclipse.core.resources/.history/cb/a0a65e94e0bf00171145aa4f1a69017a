@@ -1,0 +1,223 @@
+package cn.ak4j.yard.spd.task.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsDepotAreaParams;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotAreaRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskParams;
+import cn.ak4j.yard.spd.wrapper.domain.SpdWrappers;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import lombok.Getter;
+
+@Repository
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class SpdDepotTaskRepository extends BaseRepository<SpdDepotTask, SpdDepotTasks, SpdDepotTaskParams,String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsDepotAreaRepository daRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotTaskItemRepository tiRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdTurnoverBoxRepository tbRepository;
+	
+	public SpdDepotTasks find(SpdDepotTaskParams params, OrderParam order, int pageNo, int pageSize, PcsUser user){
+	    if(setRelationParams(params, user)){
+	    	return find(params, order, pageNo, pageSize);
+	    }
+	    return new SpdDepotTasks();
+	}
+	
+	public int countByParams(SpdDepotTaskParams params, PcsUser user){
+		if(setRelationParams(params,user)){
+			return super.count(params);
+		}
+		return 0;
+	} 
+	
+	public void saveAll(SpdDepotTasks tasks){
+		for(SpdDepotTask task : tasks){
+			task = save(task);
+			task.updateItemsId();
+			tiRepository.saveAll(task.getItems());
+		}
+	}
+	
+	public boolean setRelationParams(SpdDepotTaskParams params,PcsUser user){
+		//当指定用户名称，则需要先筛选用户
+		if(params == null){
+			return true;
+		}
+		
+		PcsUserParams userParams = new PcsUserParams();
+		userParams.setUserName(params.getUserName());
+		if(!userParams.isEmpty()){
+			PcsUsers users = userRepository.find(userParams);
+			if(users.size() == 0){
+				return false;
+			}
+			params.setTaskUser(new ListParam<String>(users.getIds()));
+		}
+		
+		//当指定了仓库名称，则需要先筛选仓库
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setManageDeptId(new ListParam<String>(user.getDeptId()));
+		depotParams.setDepotName(params.getDepotName());
+		if(!depotParams.isEmpty()){
+			PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+			if(depots.size() == 0){
+				return false;
+			}
+			params.getTaskDepotId().getValue().addAll(depots.getIds());
+		}
+		
+		//当指定了货区名称，则需要先筛选货区
+		PcsDepotAreaParams depotAreaParams = new PcsDepotAreaParams();
+		depotAreaParams.setAreaName(params.getAreaName());
+		if(!depotAreaParams.isEmpty()){
+			Entities<PcsDepotArea> areas = daRepository.findAllWithRelation().find(depotAreaParams);
+			if(CollectionUtils.isEmpty(areas)){
+				return false;
+			}
+			params.setTaskAreaId(new ListParam<String>(areas.getIds()));
+		}
+		
+		//当指定了机构名称，则需要先筛选机构
+		PcsOrgParams orgParams = new PcsOrgParams();
+		orgParams.setOrgName(params.getOrgName());
+		if(!orgParams.isEmpty()){
+			PcsOrgs orgs = new PcsOrgs(orgRepository.findAll().find(orgParams));
+			if(orgs.size() == 0){
+				return false;
+			}
+			params.setTaskOrgId(new ListParam<String>(orgs.getIds()));
+		}
+		
+		//当指定部门名称，则需要先筛选部门
+		PcsDeptParams deptParams = new PcsDeptParams();
+		deptParams.setDeptName(params.getDeptName());
+		if(!deptParams.isEmpty()){
+			PcsDepts depts = new PcsDepts(deptRepository.findAll().find(deptParams));
+			if(depts.size() == 0){
+				return false;
+			}
+			params.setTaskDeptId(new ListParam<String>(depts.getIds()));
+		}
+		
+		//当指定业务类型的编码，需先筛选编码
+		SpdReplenishBizParams replenishParams = new SpdReplenishBizParams();
+		replenishParams.setBizCode(params.getBizCode());
+		if(!replenishParams.isEmpty()){
+			SpdReplenishBizs replenishs = rbRepository.find(replenishParams);
+			if(replenishs.size() == 0){
+				return false;
+			}
+			params.setBizId(new ListParam<String>(replenishs.getIds()));
+		}
+		
+		return true;
+	}
+
+
+	public SpdDepotTasks findWithItemsByDispatcherId(String dispatcherId) {
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setDispatcherId(new ListParam<String>(dispatcherId));
+		SpdDepotTasks tasks = find(params);
+		SpdDepotTaskItems items = tiRepository.findByTaskIds(tasks.getIds());
+		tasks.fillItems(items);
+		return tasks;
+	}
+	
+	public SpdDepotTasks findWithItemsByDispatcherIds(List<String> ids){
+		String hql = "from SpdDepotTask where dispatcherId in :ids";
+		Query query = entityManager.createQuery(hql);
+		query.setParameter("ids", ids);
+		SpdDepotTasks tasks = new SpdDepotTasks(query.getResultList());
+		SpdDepotTaskItems items = tiRepository.findByTaskIds(tasks.getIds());
+		tasks.fillItems(items);
+		return tasks;
+	}
+
+	public SpdDepotTasks findWithItemsByBizId(String bizId) {
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setBizId(new ListParam<String>(bizId));
+		SpdDepotTasks tasks = find(params);
+		SpdDepotTaskItems items = tiRepository.findByTaskIds(tasks.getIds());
+		items.fillGoodsLots(glRepository);
+		tasks.fillItems(items);
+		
+		tasks.forEach(task->{
+			SpdWrappers wrappers = tbRepository.findAll().findByOwnerId(task.getTaskId());
+			wrappers.fillItems(items);
+			task.setWrappers(wrappers);
+		});
+		
+		return tasks;
+	}
+	
+	public SpdDepotTask findWithItemsByTaskId(String taskId){
+		SpdDepotTask task = findOne(taskId);
+		SpdDepotTaskItems items = tiRepository.findByTaskId(task.getTaskId());
+		items.fillGoodsLots(glRepository);
+		task.setItems(items);
+		
+		SpdWrappers wrappers = tbRepository.findAll().findByOwnerId(taskId);
+		wrappers.fillItems(items);
+		task.setWrappers(wrappers);
+		
+		return task;
+	}
+
+	public boolean findUncompleteDepotTask(String depotId, String goodsId) {
+		SpdDepotTaskParams params = new SpdDepotTaskParams();
+		params.setTaskDepotId(new ListParam<String>(depotId));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		SpdDepotTasks tasks = find(params);
+		
+		SpdDepotTaskItems items = tiRepository.findByTaskIds(tasks.getIds());
+		SpdDepotTaskItems theItems = new SpdDepotTaskItems(CollectionUtils.find("goodsId", goodsId, items));
+		if(CollectionUtils.isNotEmpty(theItems)){
+			return true;
+		}
+		
+		return false;
+	}
+	
+}

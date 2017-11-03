@@ -1,0 +1,233 @@
+package cn.ak4j.yard.configuration;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.SpringApplicationRunListener;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+import cn.ak4j.yard.pcs.service.PcsRoleService;
+import cn.ak4j.yard.pcs.service.PcsUserService;
+import cn.ak4j.yard.web.RequestType;
+import cn.ak4j.yard.web.ResourceDefine;
+import cn.ak4j.yard.web.ResourceDefines;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.CtMethod;
+import javassist.LoaderClassPath;
+import javassist.NotFoundException;
+import javassist.bytecode.AnnotationsAttribute;
+import javassist.bytecode.ClassFile;
+import javassist.bytecode.ConstPool;
+import javassist.bytecode.annotation.Annotation;
+import javassist.bytecode.annotation.ArrayMemberValue;
+import javassist.bytecode.annotation.EnumMemberValue;
+import javassist.bytecode.annotation.MemberValue;
+import javassist.bytecode.annotation.StringMemberValue;
+
+public class CommonResourceConfiguration implements SpringApplicationRunListener{
+	private final SpringApplication application;
+	private ResourceDefines allResources = ResourceDefines.getAllResources();
+	private Logger logger = LoggerFactory.getLogger(CommonResourceConfiguration.class);
+	
+	public CommonResourceConfiguration(SpringApplication application, String[] args) {
+		super();
+		this.application = application;
+		this.initAllResources();
+	}
+	
+	@Override
+	public void started() {
+		try{
+			configResourceMapping();
+		}catch(Exception e){
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+	
+
+	//动态配置资源映射
+	public void configResourceMapping() throws Exception{
+		ClassPool pool = ClassPool.getDefault();
+		pool.appendClassPath(new LoaderClassPath(application.getClassLoader()));
+		CtClass ct = pool.get("cn.ak4j.yard.web.CommonResource");
+		ct.setName("cn.ak4j.yard.web.CommonResourceEnhanced");
+		ct.setSuperclass(pool.get("cn.ak4j.yard.web.CommonResource"));
+		ClassFile ccFile = ct.getClassFile();
+		ConstPool constPool = ccFile.getConstPool();
+		
+		for(RequestType requestType : RequestType.values()){
+			configResourceMapping(constPool, ct, requestType);
+		}
+		
+		//类文件添加RestController注解
+		AnnotationsAttribute classAnnoAttr = new AnnotationsAttribute(constPool, AnnotationsAttribute.visibleTag);
+		Annotation annoRestController = new Annotation(constPool, pool.get("org.springframework.web.bind.annotation.RestController"));
+		classAnnoAttr.setAnnotation(annoRestController);
+		ccFile.addAttribute(classAnnoAttr);
+		
+		ct.toClass();
+		ct.detach();
+	}
+	
+	private void configResourceMapping(ConstPool constPool, CtClass ct, RequestType requestType) throws NotFoundException {
+		if(allResources.size() == 0){
+			logger.warn("当前没有定义资源，请注意");
+			return ;
+		}
+		
+		//根据请求类型获取相应的方法
+		CtMethod method = ct.getDeclaredMethod(requestType.getType());
+		
+		//创建RequestMapping注解
+		Annotation rmAnnotation = new Annotation("org.springframework.web.bind.annotation.RequestMapping", constPool);
+		
+		//设置RequestMapping注解的value属性，即注入url映射
+		ArrayMemberValue urlValueArray = new ArrayMemberValue(constPool);
+		List<MemberValue> urlValueList = new ArrayList<MemberValue>();
+
+		for(ResourceDefine resource : allResources){
+			if(resource.isSupportRequest(requestType)){
+				if(requestType == RequestType.updateCheckState){
+					urlValueList.add(new StringMemberValue("/yard"+resource.getResourceUri(requestType)+"/commited", constPool));
+					urlValueList.add(new StringMemberValue("/yard"+resource.getResourceUri(requestType)+"/reviewed", constPool));
+					urlValueList.add(new StringMemberValue("/yard"+resource.getResourceUri(requestType)+"/completed", constPool));
+				}else{
+					urlValueList.add(new StringMemberValue("/yard"+resource.getResourceUri(requestType), constPool));
+				}
+			}
+		}
+		urlValueArray.setValue(urlValueList.toArray(new MemberValue[0]));
+		rmAnnotation.addMemberValue("value", urlValueArray);
+	
+		//设置RequestMapping注解的method属性
+		MemberValue[] methodValueArray = new MemberValue[1];
+		EnumMemberValue methodValue = new EnumMemberValue(constPool);
+		methodValue.setType("org.springframework.web.bind.annotation.RequestMethod");
+		RequestMethod requestMethod = getCorrespondingRequestMethod(requestType);
+		methodValue.setValue(requestMethod.toString());
+		methodValueArray[0] = methodValue;
+		ArrayMemberValue arrayMemberValue = new ArrayMemberValue(constPool);
+		arrayMemberValue.setValue(methodValueArray);
+		rmAnnotation.addMemberValue("method", arrayMemberValue);
+		
+		//创建注解属性，并添加到方法上
+		AnnotationsAttribute annotationAttr = new AnnotationsAttribute(constPool, AnnotationsAttribute.visibleTag);
+		annotationAttr.addAnnotation(rmAnnotation);
+		method.getMethodInfo().addAttribute(annotationAttr);
+	}
+
+	private void initAllResources(){
+		allResources.add(new ResourceDefine("pcs", "Org", new RequestType[]{RequestType.delete, RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get}, true));
+		allResources.add(new ResourceDefine("pcs", "Dept", new RequestType[]{RequestType.delete, RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get}, true));
+		allResources.add(new ResourceDefine("pcs", "Depot", new RequestType[]{RequestType.delete, RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get}, true));
+		allResources.add(new ResourceDefine("pcs", "DepotArea", new RequestType[]{RequestType.delete, RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get, RequestType.updateCheckState}, true));
+		allResources.add(new ResourceDefine("pcs", "DepotShelf", new RequestType[]{RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get, RequestType.updateCheckState}, true));
+		allResources.add(new ResourceDefine("pcs", "RoleOp", PcsRoleService.class, new RequestType[]{RequestType.updateCheckState, RequestType.modify}, true));
+		allResources.add(new ResourceDefine("pcs", "Role", new RequestType[]{}, true));
+		allResources.add(new ResourceDefine("pcs", "RoleApi", new RequestType[]{RequestType.updateCheckState, RequestType.getByIds}, true));
+		allResources.add(new ResourceDefine("pcs", "User", new RequestType[]{RequestType.count, RequestType.list, RequestType.getByIds, RequestType.get}, true));
+		allResources.add(new ResourceDefine("pcs", "UserRole", PcsUserService.class, new RequestType[]{RequestType.list, RequestType.add, RequestType.delete, RequestType.updateCheckState}, false));
+	    
+		allResources.add(new ResourceDefine("yds", "Goods",new RequestType[]{RequestType.delete, RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get}, true));
+		allResources.add(new ResourceDefine("yds", "GoodsLot",new RequestType[]{RequestType.updateCheckState, RequestType.delete, RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get}, true));
+		allResources.add(new ResourceDefine("yds", "GoodsInfo",new RequestType[]{RequestType.list, RequestType.count, RequestType.getByIds}, true));
+		allResources.add(new ResourceDefine("yds", "EdsGoods",new RequestType[]{RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get}, true));
+		allResources.add(new ResourceDefine("yds", "EdsGoodsLot",new RequestType[]{RequestType.get, RequestType.list, RequestType.count, RequestType.getByIds}, true));
+		allResources.add(new ResourceDefine("yds", "WorkBook",new RequestType[]{RequestType.delete, RequestType.get, RequestType.list, RequestType.count, RequestType.getByIds}, true));
+		
+		allResources.add(new ResourceDefine("spd", "DepotCard",new RequestType[]{RequestType.delete, RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get}, true));
+		allResources.add(new ResourceDefine("spd", "DepotRoute",new RequestType[]{RequestType.delete}, true));
+		allResources.add(new ResourceDefine("spd", "stock", "DepotStock", "DepotStock", new RequestType[]{RequestType.list, RequestType.count}, false));
+		
+		allResources.add(new ResourceDefine("spd", "InventoryItem", new RequestType[]{RequestType.modify, RequestType.add, RequestType.delete, RequestType.getByIds, RequestType.get}, false));
+		allResources.add(new ResourceDefine("spd", "Inventory", new RequestType[]{RequestType.list, RequestType.count, RequestType.add}, true));
+		allResources.add(new ResourceDefine("spd", "LackGoods", new RequestType[]{}, true));
+		allResources.add(new ResourceDefine("spd", "wrapper", "TurnoverBox", "TurnoverBox", new RequestType[]{RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get},true));
+		
+		allResources.add(new ResourceDefine("spd", "bizplan", "AdjustStock", "AdjustStockBiz",new RequestType[]{RequestType.list, RequestType.count, RequestType.getByIds}, true));
+		allResources.add(new ResourceDefine("spd", "bizplan", "PlItem", "BizItem",new RequestType[]{}, true));
+		allResources.add(new ResourceDefine("spd", "bizplan", "Receive", "ReceiveBiz", new RequestType[]{RequestType.getByIds,RequestType.add}, true));
+		allResources.add(new ResourceDefine("spd", "bizplan", "ReceiveItem", "ReceiveItem", new RequestType[]{RequestType.list, RequestType.count,}, true));
+		allResources.add(new ResourceDefine("spd", "bizplan", "MoveArea", "MoveAreaBiz", new RequestType[]{RequestType.list, RequestType.count, RequestType.getByIds}, true));
+	    allResources.add(new ResourceDefine("spd", "bizplan", "PrepareInform", "PrepareInformBiz", new RequestType[]{RequestType.getByIds}, true));
+		allResources.add(new ResourceDefine("spd", "bizplan", "IsolationItem", "BizItem", new RequestType[]{}, true));
+		allResources.add(new ResourceDefine("spd", "bizplan", "BizItem", "BizItem", new RequestType[]{RequestType.modify, RequestType.add, RequestType.delete, RequestType.list},false));
+	    allResources.add(new ResourceDefine("spd", "bizplan", "Replenish", "ReplenishBiz", new RequestType[]{RequestType.get}, false));
+	    allResources.add(new ResourceDefine("spd", "bizplan", "Consume", "ConsumeBiz", new RequestType[]{RequestType.add}, true));
+	    allResources.add(new ResourceDefine("spd", "bizplan", "ReturnGoods", "ReturnGoodsBiz", new RequestType[]{RequestType.add,RequestType.getByIds}, true));
+	    
+		allResources.add(new ResourceDefine("spd", "task", "Dispatcher", "Dispatcher",new RequestType[]{RequestType.getByIds},true));
+		allResources.add(new ResourceDefine("spd", "task", "DispatcherRef","DispatcherRef",new RequestType[]{RequestType.getByIds},true));
+		allResources.add(new ResourceDefine("spd", "task", "DepotTask" ,"DepotTask" ,new RequestType[]{RequestType.updateCheckState, RequestType.list, RequestType.count, RequestType.add, RequestType.modify, RequestType.delete}, true));
+		allResources.add(new ResourceDefine("spd", "task", "TaskItem", "DepotTaskItem", new RequestType[]{RequestType.updateCheckState, RequestType.add, RequestType.modify, RequestType.delete}, true));
+		allResources.add(new ResourceDefine("spd", "task", "OnShelfTaskItem", "OnShelfTaskItem", new RequestType[]{}, false));
+		allResources.add(new ResourceDefine("spd", "task", "OffShelfTaskItem", "OffShelfTaskItem", new RequestType[]{}, false));
+		allResources.add(new ResourceDefine("spd", "task", "LogisticsTask", "LogisticsTask", new RequestType[]{RequestType.updateCheckState, RequestType.get}, false));
+		
+		allResources.add(new ResourceDefine("spd", "reconciliation", "PropertyChangeRule", "PropertyChangeRule", new RequestType[]{RequestType.delete,RequestType.add, RequestType.modify, RequestType.list, RequestType.count, RequestType.getByIds, RequestType.get}, true));
+	    allResources.add(new ResourceDefine("spd", "reconciliation", "GeneralLedgerItem", "GeneralLedgerItem", new RequestType[]{RequestType.list, RequestType.count}, true));
+	    allResources.add(new ResourceDefine("spd", "reconciliation", "PropertyChangeRecord", "PropertyChangeRecord", new RequestType[]{RequestType.list, RequestType.count, RequestType.get}, false));
+	    allResources.add(new ResourceDefine("spd", "reconciliation", "PropertyChangeRecordItem", "PropertyChangeRecordItem", new RequestType[]{RequestType.list, RequestType.count}, false));
+	    allResources.add(new ResourceDefine("spd", "reconciliation", "PropertyChangeRelationItem", "PropertyChangeRelationItem", new RequestType[]{RequestType.list, RequestType.count}, false));
+	    allResources.add(new ResourceDefine("spd", "reconciliation", "DailyClean", "DailyCleanBiz", new RequestType[]{RequestType.add, RequestType.modify, RequestType.updateCheckState, RequestType.get, RequestType.list, RequestType.count, RequestType.getByIds}, false));
+	    allResources.add(new ResourceDefine("spd", "reconciliation", "FinacialReconciliation", "FinacialReconciliationBiz", new RequestType[]{RequestType.add, RequestType.modify, RequestType.delete, RequestType.updateCheckState, RequestType.get, RequestType.list, RequestType.count, RequestType.getByIds}, false));
+	}
+	
+	private RequestMethod getCorrespondingRequestMethod(RequestType requestType){
+		RequestMethod requestMethod = null;
+		switch (requestType) {
+		case add:
+			requestMethod = RequestMethod.POST;
+			break;
+		case count:
+			requestMethod = RequestMethod.GET;
+			break;
+		case delete:
+			requestMethod = RequestMethod.DELETE;
+			break;
+		case get:
+			requestMethod = RequestMethod.GET;
+			break;
+		case getByIds:
+			requestMethod = RequestMethod.GET;
+			break;
+		case list:
+			requestMethod = RequestMethod.GET;
+			break;
+		case modify:
+			requestMethod = RequestMethod.PUT;
+			break;
+		case updateCheckState:
+			requestMethod = RequestMethod.PUT;
+			break;
+
+		default:
+			break;
+		}
+		return requestMethod;
+	}
+	
+	@Override
+	public void environmentPrepared(ConfigurableEnvironment environment) {
+	}
+
+	@Override
+	public void contextPrepared(ConfigurableApplicationContext context) {
+	}
+
+	@Override
+	public void contextLoaded(ConfigurableApplicationContext context) {
+	}
+
+	@Override
+	public void finished(ConfigurableApplicationContext context, Throwable exception) {
+	}
+	
+}

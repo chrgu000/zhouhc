@@ -1,0 +1,139 @@
+package cn.ak4j.yard.enums;
+
+import java.io.IOException;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using = AmqpMsgEnumJsonSerializer.class)
+public enum AmqpMsgType {
+
+	CREATE_BATCH_TASK("创建批量任务", "taskId", ""),
+	
+	//业务计划事件消息
+	CREATE_RECEIVE_BIZ("创建收货业务", "bizId,taskId,userId", ""),
+	COMMIT_RECEIVE_BIZ("提交收货业务", "bizId,taskId,userId", ""),
+	CONFIRM_RECEIVE_BIZ("确认收货业务", "bizId,taskId,userId", ""),
+	COMPLETE_RECEIVE_BIZ("完成收货业务", "bizId,taskId,userId", ""),
+
+	CREATE_REPLENISH_BIZ("创建申领业务", "bizId,taskId,userId", ""),
+	COMMIT_REPLENISH_BIZ("提交申领业务", "bizId,taskId,userId", ""),
+	REVIEW_REPLENISH_BIZ("确认申领业务", "bizId,taskId,userId", ""),
+	
+	CREATE_ADJUST_STOCK_BIZ("创建库存调节业务", "bizId,taskId,userId", ""),
+	COMMIT_ADJUST_STOCK_BIZ("提交库存调节业务", "bizId,taskId,userId", ""),
+	REVIEW_ADJUST_STOCK_BIZ("审核库存调节业务", "bizId,taskId,userId", ""),
+	
+	CREATE_MOVE_AREA_BIZ("创建移仓业务", "bizId,taskId,userId", ""),
+	COMMIT_MOVE_AREA_BIZ("提交移仓业务", "bizId,taskId,userId", ""),
+	REVIEW_MOVE_AREA_BIZ("审核移仓业务", "bizId,taskId,userId", ""),
+	
+	CREATE_PREPARE_INFORM_BIZ("创建备货通知业务", "bizId,taskId,userId", ""),
+	COMMIT_PREPARE_INFORM_BIZ("提交备货通知业务", "bizId,taskId,userId", ""),
+	REVIEW_PREPARE_INFORM_BIZ("审核备货通知业务", "bizId,taskId,userId", ""),
+	INFORM_SUPPLIER_INFORM_BIZ("通知供应商", "bizId,taskId,userId", ""),
+	COMPLETE_PREPARE_INFORM_BIZ("完成备货通知业务", "bizId,taskId,userId", ""),
+	
+	CREATE_CONSUME_BIZ("创建消耗业务", "bizId,taskId,userId", ""),
+	REVIEW_CONSUME_BIZ("审核消耗业务", "bizId,taskId,userId", ""),
+	COMPLETE_CONSUME_BIZ("完成消耗业务", "bizId,taskId,userId", ""),
+	
+	CREATE_RETURN_GOODS_BIZ("创建退货业务", "bizId,taskId,userId", ""),
+	REVIEW_RETURN_GOODS_BIZ("审核退货业务", "bizId,taskId,userId", ""),
+	SYNC_RETURN_GOODS_BIZ_TO_SUPPLIER("同步退货业务", "bizId,taskId,userId", ""),
+	COMPLETE_RETURN_GOODS_BIZ("完成退货业务", "bizId,taskId,userId", ""),
+	
+	CREATE_DAILY_CLEAN_BIZ("创建日清对账业务", "bizId", ""),
+	//COMMIT_DAILY_CLEAN_BIZ("提交日清对账业务", "bizId", ""),
+	REVIEW_DAILY_CLEAN_BIZ("审核日清对账业务", "bizId", ""),
+	
+	CREATE_FINACIAL_RECONCILIATION_BIZ("创建财务对账业务", "bizId", ""),
+	COMMIT_FINACIAL_RECONCILIATION_BIZ("提交财务对账业务", "bizId", ""),
+	REVIEW_FINACIAL_RECONCILIATION_BIZ("审核财务对账业务", "bizId", ""),
+	SYNC_FINACIAL_RECONCILIATION_TO_SUPPLIER("同步日清对账业务", "bizId", ""),
+	COMPLETE_FINACIAL_RECONCILIATION_BIZ("完成财务对账业务", "bizId", ""),
+	GENERATE_FINACIAL_RECONCILIATION_ITEMS("生成财务对账明细", "bizId", ""),
+	
+	//作业事件消息
+	CREATE_ON_SHELF_DISPATCHER("创建上架调度", "bizId,taskId,userId", ""),
+	CREATE_ON_SHELF_TASK("创建上架作业", "bizId,taskId,userId", ""),
+	CONFIRM_ON_SHELF_TASK("确认上架作业", "bizId,taskId,userId", ""),
+	
+	CREATE_OFF_SHELF_DISPATCHER("创建下架调度", "bizId,taskId,userId", ""),
+	CREATE_OFF_SHELF_TASK("创建下架作业", "bizId,taskId,userId", ""),
+	CONFIRM_OFF_SHELF_TASK("确认下架作业", "bizId,taskId,userId", ""),
+	
+	CREATE_DELIVERY_TASK("创建送货作业", "bizId,taskId,userId", ""),
+	COMMIT_DELIVERY_TASK("提交送货作业", "bizId,taskId,userId", ""),
+	CONFIRM_DELIVERY_TASK("确认送货作业", "bizId,taskId,userId", ""),
+	
+	
+	ADD_GOODS("新增标准产品", "goodsId,userId", ""),
+	COMMIT_GOODS("提交标准产品", "goodsId,userId", ""),
+	UPDATE_GOODS_PRICE("修改标准产品价格", "goodsId,userId", ""),
+	
+	ADD_EDS_GOODS("新增企业产品", "edsGoodsId,userId", ""),
+	UPDATE_EDS_GOODS("更新企业产品","edsGoodsId,userId",""),
+	
+	LACK_DEPOT_CARD("缺乏账页", "depotId,goodsIds", ""),
+	
+	RECEIVE_LACK_RELATION_PREPARE_INFORM("收货缺乏相关备货业务", "receiveJson,userId", ""),
+
+	//同步消息
+	SYNC_GOODS("sync_goods", "", "同步标准产品"),
+	SYNC_EDS_GOODS("sync_edsGoods", "", "同步企业产品"),
+	SYNC_RECEIVE("sync_receive", "", "同步收货单"),
+	SYNC_WORKBOOK("sync_workbook", "", "同步字典数据"),
+	SYNC_GOODS_LOT("sync_goodsLot", "", "同步产品批次"),
+	SYNC_APPLY("sync_apply", "", "同步请领单"),
+	SYNC_USED_TYPE("sync_usedType", "", "同步消耗类型"),
+	SYNC_USED("sync_used", "", "同步消耗单"),
+	SYNC_DEPOT("sync_depot", "", "同步仓库"),
+	SYNC_DEPT("sync_dept", "", "同步部门"),
+	SYNC_SUPPLIER("sync_supplier", "", "同步供应商"),
+	SYNC_SHELF("sync_shelf", "", "同步货位"),
+	SYNC_DEPOT_CARD("sync_depotCard", "", "同步账页"),
+	SYNC_RETURN_GOODS("sync_returnGoods", "", "同步备货退货");
+	
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String params;
+	@Getter @Setter private String description;
+	
+	private AmqpMsgType (String code,String params, String description){
+		this.code = code;
+		this.params = params;
+		this.description = description;
+	}
+	
+	public static AmqpMsgType typeOf(String typeCode){
+		for(AmqpMsgType type : AmqpMsgType.values()){
+			if(type.getCode().equals(typeCode)){
+				return type;
+			}
+		}
+		
+		return null;
+	}
+}
+
+class AmqpMsgEnumJsonSerializer extends JsonSerializer<AmqpMsgType>{
+
+	@Override
+	public void serialize(AmqpMsgType iTypeEnum, JsonGenerator generator, SerializerProvider serializers)
+			throws IOException, JsonProcessingException {
+		generator.writeStartObject();
+		if(iTypeEnum != null){
+			generator.writeStringField(iTypeEnum.getCode(), iTypeEnum.getParams());
+		}
+		
+		generator.writeEndObject();
+	}
+
+}

@@ -1,0 +1,100 @@
+package cn.ak4j.yard.extend.gep;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
+import javax.xml.bind.JAXBException;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.gep.domain.InmAllotNotice;
+import cn.ak4j.yard.extend.gep.domain.SpdGepBillItem;
+import cn.ak4j.yard.extend.gep.domain.InmAllotNotices;
+import cn.ak4j.yard.extend.gep.wsdl.AddInmAllotNotice;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+public class SpdGepPrepareInformAssember {
+	
+	private static final String PROP_NAME_ORG_ID = "orgId";
+	private static final String PROP_NAME_USER_NAME = "userName";
+	private static final String PROP_NAME_PASSWORD = "password";
+	
+	private Properties conf;
+	
+	public SpdGepPrepareInformAssember(Properties conf){
+		this.conf = conf;
+	}
+	
+	public AddInmAllotNotice build(SpdPrepareInformBiz prepareInform, YdsEdsGoodsRepository egRepository) throws JAXBException, IOException{
+		AddInmAllotNotice pmsOrder = new AddInmAllotNotice();
+		pmsOrder.setUser(conf.getProperty(PROP_NAME_USER_NAME).toString());
+		pmsOrder.setPwd(conf.getProperty(PROP_NAME_PASSWORD).toString());
+		
+		InmAllotNotices allotNotices = new InmAllotNotices();
+		InmAllotNotice inmAllotNotice = new InmAllotNotice();
+		inmAllotNotice.setSrcBill(prepareInform.getBizCode());
+		String reqSendDateStr = prepareInform.getRequestedDeliveryTime()==null?"":Global.sdfYMDSlash.format(prepareInform.getRequestedDeliveryTime());
+		inmAllotNotice.setReqSendDate(reqSendDateStr);
+		inmAllotNotice.setOrgId(conf.getProperty(PROP_NAME_ORG_ID).toString());
+		//科室编码
+		if(prepareInform.getBizRule().getDirectionRule().getCollectDepot() != null){
+			inmAllotNotice.setGetAbteilung(prepareInform.getBizRule().getDirectionRule().getCollectDepot().getManageDeptId());
+		}else{
+			inmAllotNotice.setGetAbteilung("");
+		}
+		inmAllotNotice.setAbteilung(prepareInform.getBizRule().getDirectionRule().getToDepot().getManageDeptId());
+		List<SpdGepBillItem> items = new ArrayList<SpdGepBillItem>();
+		
+		YdsGoodss goodsList = prepareInform.getItems().getAllGoods();
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", goodsList);
+		YdsEdsGoodss edsGoodsList = egRepository.findAll().findSupplierUseabledWithGoodsIds(goodsIds, prepareInform.getFromOrgId());
+		
+		for(SpdBizItem item : prepareInform.getItems()){
+			if(item.getConfirmQty() <=0 ){
+				continue;
+			}
+			SpdGepBillItem allotItem = new SpdGepBillItem();
+			//YdsEdsGoods edsGoods = CollectionUtils.findWhere("yardGoodsId", item.getGoods().getGoodsId(), edsGoodsList);
+			
+			YdsEdsGoodss edsGoodss = new YdsEdsGoodss(CollectionUtils.find("yardGoodsId", item.getGoods().getGoodsId(), edsGoodsList));
+			if(CollectionUtils.isEmpty(edsGoodss)){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_without_butting_code, item.getGoods().getFormatName());
+			}else if(edsGoodss.size() > 1){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_relation_many_usable_eds_goods,item.getGoods().getFormatName());
+			} 
+			
+			YdsEdsGoods edsGoods = edsGoodss.get(0);
+			
+			float num = item.getConfirmQty()/edsGoods.getEdsYdsUnitRatio();
+			if(num != (int)num){
+				throw new InvalidDataException(YardExceptionType.invalid_integration_supplier_qty_error, item.getGoods().getGoodsCode(), item.getConfirmQty(), edsGoods.getEdsGoodsCode(), edsGoods.getEdsYdsUnitRatio());
+			}
+			
+			float price = item.getGoods().getPreparePrice() * edsGoods.getEdsYdsUnitRatio();
+			
+			allotItem.setCode(edsGoods.getEdsGoodsCode());
+			allotItem.setProd(edsGoods.getEdsGoodsName());
+			allotItem.setInStorage(prepareInform.getBizRule().getReceiveDepot().getDepotId());
+			allotItem.setNum((int)num);
+			allotItem.setPrice(price);
+			items.add(allotItem);
+		};
+		inmAllotNotice.setItems(items);
+		allotNotices.add(inmAllotNotice);
+		pmsOrder.setOrderXml(XmlBeanConverter.getXmlFromBean(allotNotices, InmAllotNotices.class));
+		return pmsOrder;
+	}
+	
+
+}

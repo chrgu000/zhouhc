@@ -1,0 +1,52 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import java.math.BigDecimal;
+
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+public class SpdDailyCleanBizReport {
+
+	private String key;//作为标识
+	private String goodsId;
+	private String goodsName;
+	private String packingSpec;
+	private String unitName;
+	private String lotId;
+	private String lotNo;
+	private Float price;
+	private Integer qty;
+	private String receiveCode;
+	private String sendCode;
+	
+	
+	
+	private SpdPropertyChangeRule rule;
+	
+	public String getCreditDisplay(){
+		StringBuilder creditDisplay = new StringBuilder();
+		creditDisplay.append(rule.getCreditOrg().getOrgName())
+					 .append(rule.getCreditDept()==null?"":"/"+rule.getCreditDept().getDeptName())
+					 .append(rule.getCreditDepot()==null?"":"/"+rule.getCreditDepot().getDepotName());
+		return creditDisplay.toString();
+	}
+	
+	public String getDebitDisplay(){
+		StringBuilder debitDisplay = new StringBuilder();
+		debitDisplay.append(rule.getDebitOrg().getOrgName())
+					.append(rule.getDebitDept()==null?"":"/"+rule.getDebitDept().getDeptName())
+					.append(rule.getDebitDepot()==null?"":"/"+rule.getDebitDepot().getDepotName());
+		return debitDisplay.toString();
+	}
+	
+	public float getAmount(){
+		BigDecimal amount = new BigDecimal(Float.toString(getPrice()));
+		return amount.multiply(new BigDecimal(getQty())).floatValue();
+	}
+	
+}

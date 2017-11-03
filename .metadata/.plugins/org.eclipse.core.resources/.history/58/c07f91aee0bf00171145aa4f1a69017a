@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.bizrule.repository;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdFeedbackRules;
+
+public class SpdFeedbackRuleRepositoryTest extends BaseTest{
+
+	@Autowired private SpdFeedbackRuleRepository fbrRepository;
+	
+	@Test public void testFindAll(){
+		SpdFeedbackRules rules = fbrRepository.findAll();
+		assertEquals(35, rules.size());
+	}
+	
+}

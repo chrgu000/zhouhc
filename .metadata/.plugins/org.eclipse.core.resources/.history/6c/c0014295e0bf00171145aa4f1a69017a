@@ -1,0 +1,41 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.pcs.params.PcsOperationParams;
+
+@SuppressWarnings({"serial"})
+public class PcsOperations extends Entities<PcsOperation>{
+
+	public List<String> getAllElementClasses(){
+		List<String> result = new ArrayList<String>();
+		for(PcsOperation op : this){
+			if(!StringUtils.isEmpty(op.getElementClass())){
+				result.addAll(Arrays.asList(op.getElementClass().split(",")));	
+			}
+		}
+		return result;
+	}
+	
+	public PcsOperations findByOpIds(List<String> opIds){
+		PcsOperationParams params = new PcsOperationParams();
+		params.setOpId(new ListParam<String>(opIds));
+		return (PcsOperations)find(params);
+	}
+	
+	public PcsWebApis getAllWebApis(){
+		PcsWebApis result = new PcsWebApis();
+		for(PcsOperation operation : this){
+			result.addAll(operation.getWebApis());
+		}
+		
+		return result;
+	}
+	
+}

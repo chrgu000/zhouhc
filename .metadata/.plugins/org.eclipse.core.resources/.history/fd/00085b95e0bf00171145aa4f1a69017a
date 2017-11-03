@@ -1,0 +1,47 @@
+package cn.ak4j.yard.extend.zsy;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.AbstractScheduleTask;
+import cn.ak4j.yard.extend.zsy.domain.B2BTaskBillAffirms;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@NoArgsConstructor
+public class SyncDeliveryOrderTask extends AbstractScheduleTask{
+
+	@Autowired private SpdZsyProxy zsyProxy;
+	
+	@Getter @Setter private String name;
+	
+	public SyncDeliveryOrderTask(String name) {
+		this.name = name;
+	}
+	
+	@Override
+	public void executeTask() throws Exception {
+		SpdDeliveryOrders deliveryOrders = zsyProxy.syncDeliveryOrders();
+		
+		log.info("执行定时同步送货单任务 :{}", CollectionUtils.isEmpty(deliveryOrders) ? "无" : deliveryOrders);
+		
+		if(CollectionUtils.isNotEmpty(deliveryOrders)){
+			B2BTaskBillAffirms taskBills = new B2BTaskBillAffirms(deliveryOrders);
+
+			zsyProxy.confirmTaskBills(taskBills);
+		}
+	}
+
+	@Override
+	public String getDescription() {
+		String description = "执行定时同步送货单任务, 定时从中山医接口获取收货单";
+		return description;
+	}
+
+	
+}
+

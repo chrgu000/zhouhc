@@ -1,0 +1,28 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class B2BOrderBill {
+
+	private String outOrderId;
+	private String outOrderNo;
+	private String memo;
+	private String outAddressId;
+	private String outAddressName;
+	private String outClientId;
+	private String outClientNo;
+	private String outClientName;
+	private String outOrderCredate;
+	private String outOrderPickDate;
+	private String outOrderType;
+	private String synRemarks;
+	private String synVersion;
+	
+	private List<B2BOrderBillItem> items;
+}

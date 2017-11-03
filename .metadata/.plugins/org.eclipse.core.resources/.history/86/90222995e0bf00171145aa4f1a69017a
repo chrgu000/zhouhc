@@ -1,0 +1,18 @@
+package cn.ak4j.yard.pcs.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewPcsDepotAreaTO {
+	
+	private String depotId;//仓库Id
+	private String areaCode;//货区编码
+	private String areaName;//货区名称
+	private String areaType;// 区域类型
+	private String linkMan;//联系人
+	private String linkTel;//联系电话
+	private boolean primary;
+}

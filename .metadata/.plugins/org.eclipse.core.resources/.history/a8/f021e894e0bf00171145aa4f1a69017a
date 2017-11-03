@@ -1,0 +1,54 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings({ "serial", "rawtypes" })
+@NoArgsConstructor
+public class SpdBizRules<T extends SpdAbstractBizRule> extends Entities<T>{
+	
+	public SpdBizRules(List<T> rules){
+		super(rules);
+	}
+	
+	public boolean containsRule(T theRule) {
+		for(T rule : this){
+			if(rule.getBizType() != theRule.getBizType()){
+				continue;
+			}
+			if(rule.equalsRule(theRule)){
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public SpdBizRules<T> findByIds(List<String> ids) {
+		SpdBizRules<T> result = new SpdBizRules<T>();
+		this.forEach(rule->{
+			if(ids.contains(rule.getId())){
+				result.add(rule);
+			}
+		});
+		return result;
+	}
+	
+	public List<T> getEnabledRules(){
+		return CollectionUtils.find("enabled", true, Boolean.class, this);
+	}
+	
+	public SpdBizRules<T> whichCanApplyByUser(PcsUser user) {
+		SpdBizRules<T> result = new SpdBizRules<T>();
+		this.forEach(rule->{
+			if(rule.canApplyByUser(user)){
+				result.add(rule);
+			}
+		});
+		return result;
+	}
+	
+}

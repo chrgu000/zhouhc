@@ -1,0 +1,221 @@
+package cn.ak4j.yard.pcs.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.exception.common.UnAuthorizatedException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.utils.MD5Util;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUserRole;
+import cn.ak4j.yard.pcs.domain.PcsUserToken;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRoleRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserTokenRepository;
+
+@Service("pcsUserService")
+public class PcsUserService extends IYardService<PcsUser>{
+
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsUserTokenRepository utRepository;
+	@Autowired private PcsUserRoleRepository urRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	
+	public String createAccessToken(String userCode, String password, String clientType){
+		if(!PcsUserToken.isValidClientType(clientType)){
+			throw new InvalidDataException(YardExceptionType.invalid_client_type);
+		}
+		PcsUsers users = userRepository.findAll();
+		PcsUser user = users.findByUserCode(userCode);
+		if (user == null || user.isEnabled()==false){
+			throw new NotFoundException(YardExceptionType.not_found_user, userCode);
+		}
+		if(!user.checkPassword(password)){
+			throw new InvalidDataException(YardExceptionType.invalid_password);
+		}
+		PcsUserToken userToken = utRepository.findByUserIdAndClientType(user.getUserId(), clientType);
+		if(userToken == null){
+			userToken = PcsUserToken.newInstance(user.getUserId(), user.getMaintenanceInfo().getYardId(), clientType);
+		}else{
+			userToken.refresh();
+		}
+		utRepository.save(userToken);
+		return user.buildAccessToken(userToken);
+	}
+	
+	public PcsUser getUserWithAccessToken(String accessToken){
+		String userId = PcsUserToken.getUserIdFromAccessToken(accessToken);
+		String clientType = PcsUserToken.getClientTypeFromAccessToken(accessToken);
+		PcsUsers users = userRepository.findAll();
+		PcsUser user = users.findById(userId);
+		if(user == null){
+			throw new UnAuthorizatedException(YardExceptionType.unauthorized_invalid_access_token);
+		}
+		
+		PcsUserToken userToken = utRepository.findByUserIdAndClientType(userId, clientType);
+		if(userToken == null || !user.buildAccessToken(userToken).equals(accessToken)){
+			throw new UnAuthorizatedException(YardExceptionType.unauthorized_invalid_access_token);
+		}else{
+			if(userToken.isExpired()){
+				throw new UnAuthorizatedException(YardExceptionType.unauthorized_expired_access_token);
+			}
+		}
+		return user;
+	}
+	
+	public void updateTokenRefreshTime(String userId, String clientType){
+		PcsUserToken userToken = utRepository.findByUserIdAndClientType(userId, clientType);
+		if(userToken.isNeedUpdateRefreshTime()){
+			userToken.setRefreshLastTime(new Date());
+			utRepository.save(userToken);
+		}
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allUserRoles\"")
+	public PcsUserRole updateUserRoleCheckState(String id, Integer checkStateCode,Date lastDate,PcsUser user){
+		PcsUserRole pcsUserRole=urRepository.findOne(id);
+		pcsUserRole.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		urRepository.save(pcsUserRole);
+		return pcsUserRole;
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allPcsUsers\""), @CacheEvict(value="countCache", key="\"allUserCount\"")})
+	public PcsUser add(@Valid PcsUser user, IUser iUser){
+		if(!user.isValid()){
+			throw new InvalidDataException(user.getValidateMsg());
+		}
+		
+		user.setPassword(MD5Util.md5(user.getOriginPassword()));
+		//业务校验逻辑，例如验证部门是否存在是否可以添加
+		//判断当前用户和账号是否已经存在
+		user.verify(userRepository);
+		
+		userRepository.save(user);
+		return user;
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allPcsUsers\"")
+	public PcsUser modify(@Valid PcsUser user, IUser currentUser){
+		if(!user.isValid()){
+			throw new InvalidDataException(user.getValidateMsg());
+		}
+		
+		PcsUser userPO = userRepository.findAll().findById(user.getUserId());
+		//判断当前用户和账号是否已经存在
+		user.verify(userRepository);
+		
+		userPO.update(user, (PcsUser)currentUser);
+		userRepository.save(userPO);
+		return userPO;
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allPcsUsers\"")
+	public PcsUser updateCheckState(String userId, int checkStateCode, Date lastDate, IUser user){
+		PcsUser pcsUserPO = userRepository.findAll().findById(userId);
+		pcsUserPO.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		userRepository.save(pcsUserPO);
+		return pcsUserPO;
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allPcsUsers\""), @CacheEvict(value="countCache", key="\"allUserCount\"")})
+	public void delete(String userId, IUser currentUser){
+		PcsUser userPO = userRepository.findAll().findById(userId);
+		if(!userPO.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, userPO.getUserName());
+		}
+		if(userPO.isPrimary()){
+			throw new OperateForbiddenException(YardExceptionType.forbid_delete_default_user, userPO.getUserName());
+		}
+		userRepository.delete(userPO);
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allUserRoles\""), 
+			@CacheEvict(value="userWebApisCache", allEntries=true)})
+	public PcsUserRole addUserRole(PcsUserRole pcsUserRole, IUser user){
+		return urRepository.save(pcsUserRole);
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allUserRoles\""), 
+			@CacheEvict(value="userWebApisCache", allEntries=true)})
+	public void deleteUserRole(String id, IUser user){
+		PcsUserRole pcsUserRole=urRepository.findOne(id);
+		if (!pcsUserRole.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, "id:" + pcsUserRole.getId());
+		}
+		urRepository.delete(pcsUserRole);
+	}
+	
+	public PcsUser getDeptDefaultUser(String deptId){
+		PcsDept dept = deptRepository.findAll().findById(deptId);
+		PcsUser user = userRepository.findAll().findById(dept.getDefaultUserId());
+		if(user == null){
+			throw new InvalidDataException(YardExceptionType.not_found_default_user, dept.getDeptCode(), dept.getDeptName());
+		}
+		return user;
+	}
+	
+	public PcsUsers findUsers(PcsUserParams params, OrderParam order, int currentPage, int pageSize){
+		if(!fillRelationParams(params)){
+			return new PcsUsers();
+		}
+		return new PcsUsers(userRepository.findAll().findByPage(params, order, currentPage, pageSize));
+	}
+
+	public int count(PcsUserParams params){
+		if(!fillRelationParams(params)){
+			return 0;
+		}
+		return userRepository.findAll().find(params).size();
+	}
+	
+	private boolean fillRelationParams(PcsUserParams params){
+		if(params.getOrgName() != null && !params.getOrgName().isEmpty()){
+			PcsOrgParams orgParams = new PcsOrgParams();
+			orgParams.setOrgName(params.getOrgName());
+			PcsOrgs orgs = new PcsOrgs(orgRepository.findAll().find(orgParams));
+			if(CollectionUtils.isEmpty(orgs)){
+				return false;
+			}else{
+				params.setOrgId(new ListParam<String>(orgs.getIds()));
+			}
+		}
+		
+		if(params.getDeptName() != null && !params.getDeptName().isEmpty()){
+			PcsDeptParams deptParams = new PcsDeptParams();
+			deptParams.setDeptName(params.getDeptName());
+			PcsDepts depts = new PcsDepts(deptRepository.findAll().find(deptParams));
+			if(CollectionUtils.isEmpty(depts)){
+				return false;
+			}else{
+				params.setDeptId(new ListParam<String>(depts.getIds()));
+			}
+		}
+		
+		return true;
+	}
+	
+}

@@ -1,0 +1,52 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.ArrayList;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+
+/**
+* @Description: 库存变更集
+* @author zhengyf
+* @date 2017年3月23日 下午4:40:41
+* @version V1.0.0
+*/
+@SuppressWarnings({"serial"})
+public class SpdStockChanges<T extends SpdStockChange> extends ArrayList<T>{
+
+	public YdsGoodsLots getGoodsLots() {
+		YdsGoodsLots lots = new YdsGoodsLots();
+		this.forEach((stockChange)->lots.add(stockChange.getGoodsLot()));
+		return lots;
+	}
+	
+	public T findByGoodsLot(YdsGoodsLot goodsLot){
+		for(T stockChange : this){
+			if(stockChange.getGoodsLot().getGoodsLotId().equals(goodsLot.getGoodsLotId())){
+				return stockChange;
+			}
+		}
+		return null;
+	}
+	
+	public T findByDepotAndGoodsLot(String depotId, String goodsLotId) {
+		for(T change : this){
+			if(change.getDepot().getDepotId().equals(depotId)
+					&& change.getGoodsLot().getGoodsLotId().equals(goodsLotId)){
+				return change;
+			}
+		}
+		return null;
+	}
+
+	public void add(PcsDepot depot, YdsGoodsLot goodsLot, int change){
+//		SpdStockChange stockChange = findByGoodsLot(depot, goodsLot);
+//		if(stockChange != null){
+//			stockChange.setChange(stockChange.getChange()+change);
+//		}else{
+//			add(new SpdStockChange(depot, goodsLot, change));
+//		}
+	}
+	
+}

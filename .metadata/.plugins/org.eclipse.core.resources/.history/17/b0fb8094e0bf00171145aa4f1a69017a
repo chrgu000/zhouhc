@@ -1,0 +1,17 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.domain;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.yard.spd.stock.to.SpdStockReportItem;
+
+/**
+ * @Description: 库存报表
+ * @author wuyw
+ * @date 2017年10月23日下午8:49:33
+ *
+ */
+@SuppressWarnings("serial")
+public class SpdStockReport extends Entities<SpdStockReportItem>{
+
+}

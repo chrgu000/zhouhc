@@ -1,0 +1,118 @@
+package cn.ak4j.yard.pcs.web;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.pcs.service.PcsDeptService;
+import cn.ak4j.yard.pcs.to.PcsDeptExcelTO;
+import cn.ak4j.utils.ExcelBuilder;
+
+@RestController
+public class PcsDeptResource {
+
+	@Autowired private YardExcelFormatFactory excelFormatFactory;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsDeptService deptService;
+	@Autowired private PcsUserRepository userRepository;
+
+	@RequestMapping(value = "/yard/pcs/pcsDepts", method = RequestMethod.GET)
+	public PcsDepts list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		PcsDeptParams params = QueryParams.buildParamsFromJson(paramsStr, PcsDeptParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		PcsDepts depts = new PcsDepts(deptRepository.findAll().findByPage(params, order, currentPage - 1, pageSize));
+		depts.fillDefaultUser(userRepository.findAll());
+		return depts;
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepts/count", method = RequestMethod.GET)
+	public long count(@RequestParam(value = "params", required = false) String paramsStr) {
+		PcsDeptParams params = QueryParams.buildParamsFromJson(paramsStr, PcsDeptParams.class);
+		return deptRepository.findAll().find(params).size();
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepts/ids,{ids}", method = RequestMethod.GET)
+	public PcsDepts listByIds(@PathVariable(value = "ids", required = false) String ids) {
+		PcsDeptParams params = new PcsDeptParams();
+		params.setDeptId(new ListParam<String>(Arrays.asList(ids.split(","))));
+		return new PcsDepts(deptRepository.findAll().find(params));
+	}
+	
+	@RequestMapping(value="/yard/pcs/pcsDepts/{id}", method=RequestMethod.GET)
+	public PcsDept get(@PathVariable("id")String id){
+		return deptRepository.findAllWithRelations().findById(id);
+	}
+	
+	@RequestMapping(value = "/yard/pcs/pcsDepts/orgId,{orgId}", method = RequestMethod.GET)
+	public PcsDepts findByOrg(@PathVariable("orgId") String orgId,
+			@RequestParam(value = "params", required = false) String paramsStr) {
+		PcsDeptParams params = PcsDeptParams.buildParamsFromJson(paramsStr, PcsDeptParams.class);
+		if(params == null){
+			params = new PcsDeptParams();
+		}
+		params.setOrgId(new ListParam<String>(orgId));
+		PcsDepts depts = new PcsDepts(deptRepository.findAll().find(params));
+		depts.fillDefaultUser(userRepository.findAll());
+		return depts;
+	}
+
+	@ResponseBody
+	@RequestMapping(value = "/yard/pcs/PCSDept/pdf", method = RequestMethod.GET)
+	public ResponseEntity<byte[]> downloadPdf() throws Exception {
+		return deptService.downloadPdf();
+	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@ResponseBody
+	@RequestMapping(value = "/yard/pcs/pcsDepts/excel", method = RequestMethod.GET)
+	public void downloadExcelfile(@RequestParam(value = "params", required = false) String paramsStr,
+								@RequestParam(value = "whereMap", required = false) String whereMap,
+								HttpServletResponse response) throws Exception {
+		PcsDeptParams params = PcsDeptParams.buildParamsFromJson(paramsStr, PcsDeptParams.class);
+		PcsDepts depts = new PcsDepts(deptRepository.findAllWithRelations().find(params));
+		
+		List<PcsDeptExcelTO> deptExcels = new ArrayList<PcsDeptExcelTO>();
+		depts.forEach(dept->{
+			PcsDeptExcelTO deptExcel = new PcsDeptExcelTO();
+			BeanUtils.copyProperties(dept, deptExcel);
+			deptExcel.setParentDept(deptRepository.findAllWithRelations().findById(dept.getParentId()));
+			deptExcels.add(deptExcel);
+		});
+
+		ExcelBuilder exportExcel = new ExcelBuilder<PcsDeptExcelTO>();
+		byte[] bytes = exportExcel.buildExcel("部门信息表", deptExcels, excelFormatFactory.getExcelFormats("dept"));
+		
+		response.reset();
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding(Global.defaultCharset.name());
+		response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode("部门信息.xls", Global.defaultCharset.name()));
+		IOUtils.write(bytes, response.getOutputStream());
+	}
+}

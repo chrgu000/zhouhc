@@ -1,0 +1,32 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SpdWrapperType implements ITypeEnum{
+
+	turnover_box("turnover_box", "周转箱", "多用于院内科室间的配送");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SpdWrapperType(String code ,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdWrapperType typeOf(String code){
+		for(SpdWrapperType state : SpdWrapperType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+	
+}

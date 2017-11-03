@@ -1,0 +1,287 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReturnGoodsBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStock;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdDepotStockRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdReturnGoodsBizResourceTest extends BaseTest{
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdDepotStockRepository dsRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdReturnGoodsBizRepository rgRepository;
+	
+	@Test public void testAdd() throws Exception{
+		String ruleId = "ret_rule_id_03";
+		String accessToken = getAccessToken(xykUserCode);
+		SpdReturnGoodsRule rule = (SpdReturnGoodsRule)brRepository.findAllWithRelations().findById(ruleId);
+		
+		SpdReturnGoodsBiz returnGoods = addReturnGoods(accessToken, rule);
+		
+		assertNotNull(returnGoods.getBizId());
+		assertEquals(ruleId, returnGoods.getBizRuleId());
+		assertEquals(rule.getDirectionRule().getFromAreaType(), returnGoods.getFromAreaType());
+		assertEquals(rule.getDirectionRule().getFromDepotId(), returnGoods.getFromDepotId());
+		assertEquals(rule.getDirectionRule().getFromDepotId(), returnGoods.getCreatorDepotId());
+		assertEquals(rule.getDirectionRule().getToDeptId(), returnGoods.getToDeptId());
+		assertEquals(rule.getDirectionRule().getToOrgId(), returnGoods.getToOrgId());
+		assertEquals(CheckState.new_created, returnGoods.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.tuihuodan);
+		assertEquals(CodeSort.tuihuodan.getCode()+getCurrentDateCode()+sequenceCode, returnGoods.getBizCode());
+		wait(1);
+	}
+	
+	@Test public void testAddByEis() throws Exception{
+		String ruleId = "ret_rule_id_03";
+		String accessToken = getAccessToken(eisUserCode);
+		SpdReturnGoodsRule rule = (SpdReturnGoodsRule)brRepository.findAllWithRelations().findById(ruleId);
+		
+		SpdReturnGoodsBiz returnGoods = addReturnGoods(accessToken, rule);
+		
+		assertNotNull(returnGoods.getBizId());
+		assertEquals(ruleId, returnGoods.getBizRuleId());
+		assertEquals(rule.getDirectionRule().getFromAreaType(), returnGoods.getFromAreaType());
+		assertEquals(rule.getDirectionRule().getFromDepotId(), returnGoods.getFromDepotId());
+		assertEquals(rule.getDirectionRule().getFromDepotId(), returnGoods.getCreatorDepotId());
+		assertEquals(rule.getDirectionRule().getToDeptId(), returnGoods.getToDeptId());
+		assertEquals(rule.getDirectionRule().getToOrgId(), returnGoods.getToOrgId());
+		assertEquals(CheckState.new_created, returnGoods.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.tuihuodan);
+		assertEquals(CodeSort.tuihuodan.getCode()+getCurrentDateCode()+sequenceCode, returnGoods.getBizCode());
+		assertEquals("user_id_002", returnGoods.getMaintenanceInfo().getCreateUserId());
+		wait(1);
+	}
+	
+	@Test public void testAddWithReview() throws Exception{
+		String ruleId = "ret_rule_id_03";
+		SpdReturnGoodsRule rule = (SpdReturnGoodsRule)brRepository.findAllWithRelations().findById(ruleId);
+		
+		//新增一个没有明细的消耗业务
+		SpdReturnGoodsBiz returnGoods = addReturnGoods(getAccessToken(xykUserCode), rule);
+		
+		//审核后进行异常断言
+		CheckStateTO checkStateTo = new CheckStateTO(CheckState.reviewed.getCode(), returnGoods.getLastUpdateTime());
+		String reviewUrl = "/spd/spdReturnGoodss/{id}/checkState/reviewed?accessToken={accessToken}";
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, reviewUrl, status().is4xxClientError(), YardExceptionType.invalid_item_not_data, returnGoods.getBizId(), getAccessToken(xykUserCode));
+		//增加明细
+		SpdBizItems items = new SpdBizItems(createBizItems(returnGoods.getBizId()));
+		items.fillGoods(goodsRepository);
+		List<SpdBizItem> newItems = new ArrayList<SpdBizItem>();
+		for(SpdBizItem item : items){
+			item = mockMvcHelper.add(SpdBizItem.class, xykUserCode, item);
+			newItems.add(item);
+		}
+		
+		//审核后进行异常断言
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, reviewUrl, status().is4xxClientError(), YardExceptionType.invalid_item_not_confirm, returnGoods.getBizId(), getAccessToken(xykUserCode));
+		//确认明细
+		for(SpdBizItem item : newItems){
+			item.confirmAsPlaned();
+			mockMvcHelper.modify(SpdBizItem.class, xykUserCode, item.getBizItemId(), item);
+		}
+		
+		SpdDepotStocks originDepotStocks = dsRepository.findByDepotAndGoodsLots(returnGoods.getFromDepotId(), CollectionUtils.pluck("lotId", items));
+		
+		//审核消耗
+		SpdBizItemParams itemParams = new SpdBizItemParams();
+		itemParams.setBizId(new ListParam<String>(returnGoods.getBizId()));
+		SpdBizItems bizItems = mockMvcHelper.mockGet(SpdBizItems.class, "/spd/spdBizItems?params={params}&accessToken={accessToken}", Global.defaultObjectMapper.writeValueAsString(itemParams), getAccessToken(xykUserCode));
+		returnGoods.setItems(bizItems);
+		
+		CheckStateTO to = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, reviewUrl, returnGoods.getBizId(), getAccessToken(xykUserCode));
+		assertTrue(CheckState.reviewed.getCode() == to.getCheckStateCode());
+		
+		wait(6);
+		returnGoods = mockMvcHelper.findOne(SpdReturnGoodsBiz.class, xykUserCode, "spd", "spdReturnGoodss", returnGoods.getBizId());
+		assertEquals(CheckState.completed, returnGoods.getCheckState());
+		
+		//断言仓库库存
+		SpdDepotStocks newDepotStocks = dsRepository.findByDepotAndGoodsLots(returnGoods.getFromDepotId(), CollectionUtils.pluck("lotId", items));
+		newDepotStocks.forEach(newDepotStock->{
+			SpdDepotStock originDepotStock = CollectionUtils.findWhere("goodsLotId", newDepotStock.getGoodsLotId(), originDepotStocks);
+			SpdBizItem bizItem = CollectionUtils.findWhere("lotId", newDepotStock.getGoodsLotId(), items);
+			int expectedDepotStockQty = originDepotStock.getMinStockQty() - bizItem.getPlanQtyByBaseUnit();
+			assertEquals(expectedDepotStockQty, newDepotStock.getMinStockQty().intValue());
+		});
+	}
+	
+	@Test public void testReviewByItemExistSameLot() throws Exception{
+		String bizId = "return_biz_id_002";
+		testDiversityReview(bizId);
+	}
+	
+	@Test public void testReviewByIsolationArea() throws Exception{
+		String bizId = "return_biz_id_001";
+		testDiversityReview(bizId);
+	}
+
+	private void testDiversityReview(String bizId) throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReturnGoodss/{id}/checkState/reviewed?accessToken={accessToken}";
+		SpdReturnGoodsBiz returnGoods = rgRepository.getWithItems(bizId);
+		SpdBizItems items = returnGoods.getItems();
+		CheckStateTO checkStateTo = new CheckStateTO(CheckState.reviewed.getCode(), returnGoods.getLastUpdateTime());
+		
+		SpdDepotStocks originDepotStocks = dsRepository.findByDepotAndGoodsLots(returnGoods.getFromDepotId(), CollectionUtils.pluck("lotId", items));
+		SpdShelfStocks originShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(returnGoods.getFromDepotId(), returnGoods.getFromAreaType(), CollectionUtils.pluck("lotId", items));
+		
+		//审核退货
+		CheckStateTO to = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, bizId, accessToken);
+		assertTrue(CheckState.reviewed.getCode() == to.getCheckStateCode());
+		
+		wait(6);
+		
+		url = "/spd/spdReturnGoodss/{id}?accessToken={accessToken}";
+		returnGoods = mockMvcHelper.mockGet(SpdReturnGoodsBiz.class, url, bizId, accessToken);
+		assertEquals(CheckState.completed, returnGoods.getCheckState());
+		
+		
+		//断言仓库库存
+		SpdDepotStocks newDepotStocks = dsRepository.findByDepotAndGoodsLots(returnGoods.getFromDepotId(), CollectionUtils.pluck("lotId", items));
+		
+		//断言货位库存
+		SpdShelfStocks newShelfStocks = ssRepository.findByShelfTypeAndGoodsLots(returnGoods.getFromDepotId(), returnGoods.getFromAreaType(), CollectionUtils.pluck("lotId", items));
+		
+		for(SpdDepotStock newDepotStock : newDepotStocks) {
+			SpdDepotStock originDepotStock = CollectionUtils.findWhere("goodsLotId", newDepotStock.getGoodsLotId(), originDepotStocks);
+			SpdBizItem bizItem = CollectionUtils.findWhere("lotId", newDepotStock.getGoodsLotId(), items);
+			int expectedDepotStockQty = originDepotStock.getMinStockQty() - bizItem.getConfirmQtyByBaseUnit();
+			assertEquals(expectedDepotStockQty, newDepotStock.getMinStockQty().intValue());
+		}
+		
+		for(SpdShelfStock newShelfStock : newShelfStocks){
+			SpdShelfStock originShelfStock = CollectionUtils.findWhere("lotId", newShelfStock.getLotId(), originShelfStocks);
+			SpdBizItem bizItem = CollectionUtils.findWhere("lotId", newShelfStock.getLotId(), items);
+			int expectedShelfStockQty = originShelfStock.getQtyByMinUnit() - bizItem.getConfirmQtyByBaseUnit();
+			assertEquals(expectedShelfStockQty, newShelfStock.getQtyByMinUnit().intValue());
+			assertNotNull(newShelfStock.getShelfId());
+		}
+	}
+	
+ 	@Test public void testFind() throws Exception{
+		findAll();
+		countAll();
+		
+		findUncompleteReturnGoodss();
+		countUncompleteReturnGoodss();
+		
+		findCompletedReturnGoodss();
+		countCompletedReturnGoodss();
+	}
+	
+	private  void findAll() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReturnGoodss?accessToken={accessToken}";
+		SpdReturnGoodsBizs returnGoodss = mockMvcHelper.mockGet(SpdReturnGoodsBizs.class, url, accessToken);
+		assertEquals(2, returnGoodss.size());
+	}
+	
+	private void countAll() throws Exception {
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReturnGoodss/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(2, count);
+	}
+	
+	private void findUncompleteReturnGoodss() throws Exception {
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReturnGoodss/iTakeChargeOfReturnGoodss/uncompleteReturnGoodss?accessToken={accessToken}";
+		SpdReturnGoodsBizs returnGoodss = mockMvcHelper.mockGet(SpdReturnGoodsBizs.class, url, accessToken);
+		assertEquals(2, returnGoodss.size());
+		
+		PcsUser user =  mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		
+		returnGoodss.forEach(returnGoods->{
+			assertNotNull(CollectionUtils.findWhere("depotId", returnGoods.getFromDepotId(), depots));
+		});
+	}
+
+	private void countUncompleteReturnGoodss() throws Exception {
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReturnGoodss/iTakeChargeOfReturnGoodss/uncompleteReturnGoodss/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(2, count);
+	}
+	
+	
+	private void findCompletedReturnGoodss() throws Exception {
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReturnGoodss/iTakeChargeOfReturnGoodss/completedReturnGoodss?accessToken={accessToken}";
+		SpdReturnGoodsBizs returnGoodss = mockMvcHelper.mockGet(SpdReturnGoodsBizs.class, url, accessToken);
+		assertEquals(0, returnGoodss.size());
+		
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		
+		returnGoodss.forEach(returnGoods->{
+			assertNotNull(CollectionUtils.findWhere("depotId", returnGoods.getFromDepotId(), depots));
+		});
+	}
+
+	private void countCompletedReturnGoodss() throws Exception {
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReturnGoodss/iTakeChargeOfReturnGoodss/completedReturnGoodss/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(0, count);
+	}
+
+	private SpdReturnGoodsBiz addReturnGoods(String accessToken, SpdReturnGoodsRule rule) throws Exception{
+		String url = "/spd/spdReturnGoodss?accessToken={accessToken}";
+		SpdReturnGoodsBiz returnGoods = new SpdReturnGoodsBiz();
+		returnGoods.setBizRuleId(rule.getId());
+		returnGoods.setCreatorDepotId(rule.getDirectionRule().getFromDepotId());
+		returnGoods = mockMvcHelper.mockPost(SpdReturnGoodsBiz.class, returnGoods, url, accessToken);
+		return returnGoods;
+	}
+	
+	private List<SpdBizItem> createBizItems(String bizId){
+		List<SpdBizItem> result = new ArrayList<SpdBizItem>();
+		SpdBizItem item1 = new SpdBizItem("goods_id_011", "goods_lot_id_030", YdsUnitLv.min.getLv(), 120, -1, 88.0f);
+		SpdBizItem item2 = new SpdBizItem("goods_id_010", "goods_lot_id_002", YdsUnitLv.min.getLv(), 131, -1, 48.0f);
+		item1.setBizId(bizId);
+		item2.setBizId(bizId);
+		result.add(item1);
+		result.add(item2);
+		return result;
+	}
+}

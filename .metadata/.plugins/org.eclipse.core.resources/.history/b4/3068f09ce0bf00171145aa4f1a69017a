@@ -1,0 +1,6 @@
+--调整未按计划执行的明细的标识
+update spd_biz_item set as_planned = '' where biz_item_id in(select biz_item_id from spd_biz_item where confirm_qty = -1);
+update spd_biz_item set as_planned = '0' where biz_item_id in(select biz_item_id from spd_biz_item where confirm_qty != plan_qty and confirm_qty>=0);
+
+--更新origin_item_condition字段，值应为0
+update spd_replenish_rule set origin_item_condition = '0' where id in(select id from spd_replenish_rule where origin_rule_id is not null);

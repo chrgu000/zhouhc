@@ -1,0 +1,43 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 场景类型
+* @author zhengyf
+* @date 2017年7月13日 下午1:27:55
+* @version V1.0.0
+*/
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SpdSceneType implements ITypeEnum{
+
+	off_shelf_task("off_shelf_task", "下架作业", ""),
+	on_shelf_task("on_shelf_task", "上架作业", ""),
+	logistic_task("logistic_task", "送货作业", ""),
+	storage("storage", "存储", "例如存放在仓库中"),
+	idle("idle", "闲置", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SpdSceneType(String code ,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdSceneType typeOf(String code){
+		for(SpdSceneType state : SpdSceneType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+	
+}

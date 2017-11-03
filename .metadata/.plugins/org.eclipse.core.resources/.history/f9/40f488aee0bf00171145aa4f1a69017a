@@ -1,0 +1,80 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.Arrays;
+import java.util.List;
+
+import org.junit.Test;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+
+public class SpdPropertyChangeRecordResourceTest extends BaseTest{
+
+	
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRecords?accessToken={accessToken}";
+		SpdPropertyChangeRecords records = mockMvcHelper.mockGet(SpdPropertyChangeRecords.class, url, accessToken);
+		assertEquals(3, records.size());
+	}
+	
+	@Test public void testGetMyRelatedRecords() throws Exception{
+		SpdPropertyChangeRecords records = mockMvcHelper.findList(SpdPropertyChangeRecords.class, testUserCode, "spd", "spdPropertyChangeRecords/myRelated", null, status().isOk(), null);
+		assertEquals(0, records.size());
+		
+		records = mockMvcHelper.findList(SpdPropertyChangeRecords.class, mzmanagerUserCode, "spd", "spdPropertyChangeRecords/myRelated", null, status().isOk(), null);
+		assertEquals(3, records.size());
+		
+		records = mockMvcHelper.findList(SpdPropertyChangeRecords.class, zsyUserCode, "spd", "spdPropertyChangeRecords/myRelated", null, status().isOk(), null);
+		assertEquals(3, records.size());
+	}
+	
+	@Test public void testCountMyRelatedRecords() throws Exception{
+		int count = mockMvcHelper.count(SpdPropertyChangeRecords.class, testUserCode, "spd", "spdPropertyChangeRecords/myRelated", null, status().isOk(), null);
+		assertEquals(0, count);
+		
+		count = mockMvcHelper.count(SpdPropertyChangeRecords.class, mzmanagerUserCode, "spd", "spdPropertyChangeRecords/myRelated", null, status().isOk(), null);
+		assertEquals(3, count);
+		
+		count = mockMvcHelper.count(SpdPropertyChangeRecords.class, zsyUserCode, "spd", "spdPropertyChangeRecords/myRelated", null, status().isOk(), null);
+		assertEquals(3, count);
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRecords/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(3, count);
+	}
+	
+	@Test public void testGet() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRecords/{id}?accessToken={accessToken}";
+		String id = "prp_change_id_001";
+		SpdPropertyChangeRecord record = mockMvcHelper.mockGet(SpdPropertyChangeRecord.class, url, id, accessToken);
+		assertNotNull(record);
+		assertEquals(id, record.getId());
+	}
+	
+	@Test public void testByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRecords/ids,{ids}?accessToken={accessToken}";
+		String ids = "prp_change_id_001,prp_change_id_002,prp_change_id_003";
+		SpdPropertyChangeRecords records = mockMvcHelper.mockGet(SpdPropertyChangeRecords.class, url, ids, accessToken);
+		assertEquals(3, records.size());
+		List<String> idsList = Arrays.asList(ids.split(","));
+		idsList.forEach(id->{
+			SpdPropertyChangeRecord record = CollectionUtils.findWhere("id", id, records);
+			assertNotNull(record);
+		});
+		
+	}
+}

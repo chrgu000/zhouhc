@@ -1,0 +1,33 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum YdsGoodsType implements ITypeEnum{
+	drug("drug", "医疗药品", ""),
+	equipment("equipment", "器械耗材", ""),
+	other("other", "其他", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private YdsGoodsType (String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static YdsGoodsType typeOf(String code){
+		for(YdsGoodsType state : YdsGoodsType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+}
+

@@ -1,0 +1,81 @@
+package cn.ak4j.yard.web;
+
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URLEncoder;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.Global;
+import net.sf.jasperreports.engine.JRDataSource;
+import net.sf.jasperreports.engine.JasperExportManager;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.JasperReport;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.type.WhenNoDataTypeEnum;
+import net.sf.jasperreports.engine.util.JRLoader;
+
+/**
+* @Description: PDF导出助手
+* @author zhengyf
+* @date 2017年3月18日 下午4:54:54
+* @version V1.0.0
+*/
+@Component
+@SuppressWarnings({"rawtypes"})
+public class PdfExportHelper {
+	
+	/**
+	 * 根据jasper文件和相关数据将PDF文件输出到Http的响应中
+	 * @param jasperFile jasper文件的相对路径，例如/reports/spd/spdTasks.jasper
+	 * @param resourceFileName 由该参数确定pdf文件名
+	 * @param parameters jasper文件所需的参数对象
+	 * @param data 报表中的记录数据
+	 * @param inlineOrAttachment PDF文件作为内嵌显示还是附件下载，当为inline表示在浏览器中内嵌显示，当为attachment时则为附件下载
+	 */
+	public void export(String jasperFile, 
+					  String resourceFileName, 
+					  Map<String, Object> parameters, 
+					  List data, 
+					  String inlineOrAttachment,
+					  HttpServletResponse response)
+					  throws Exception{
+		parameters.put("printTime", Global.sdfYMDHms.format(Global.defaultCalendar.getTime()));
+		InputStream logoIn = PdfExportHelper.class.getResourceAsStream("/public/img/report_footer_logo.png");
+		parameters.put("logo", logoIn);
+
+		JRDataSource jrDataSource = new JRBeanCollectionDataSource(data);
+		
+		InputStream jasperStream = null;
+		try{
+			jasperStream = PdfExportHelper.class.getResourceAsStream(jasperFile);
+			parameters.put("subReportDir", "/reports");
+		    JasperReport jasperReport = (JasperReport) JRLoader.loadObject(jasperStream);
+		    if(data == null || data.size() == 0){
+		    	jasperReport.setWhenNoDataType(WhenNoDataTypeEnum.ALL_SECTIONS_NO_DETAIL);
+		    }
+		    JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, jrDataSource);
+	
+		    response.setContentType(MediaType.APPLICATION_PDF.toString());
+		    resourceFileName = URLEncoder.encode(resourceFileName, Global.defaultCharset.name());
+		    response.setHeader("Content-disposition", String.format("%s; filename=%s.pdf", inlineOrAttachment, resourceFileName));
+	
+		    final OutputStream outStream = response.getOutputStream();
+		    JasperExportManager.exportReportToPdfStream(jasperPrint, outStream);
+		}catch(Exception e){
+			throw e;
+		}finally{
+			if(jasperStream != null){
+				jasperStream.close();	
+			}
+			logoIn.close();
+		}
+	}
+	
+}

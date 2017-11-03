@@ -1,0 +1,15 @@
+package cn.ak4j.yard;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+
+import lombok.Data;
+
+@Data
+@Configuration
+public class TestConf {
+	
+	@Value("${ak.test.waitTimeRatio}")
+	public float waitTimeRatio;
+	
+}

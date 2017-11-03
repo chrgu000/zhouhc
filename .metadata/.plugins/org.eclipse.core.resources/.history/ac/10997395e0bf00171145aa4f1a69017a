@@ -1,0 +1,49 @@
+package cn.ak4j.yard.extend;
+
+import java.util.Map;
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@NoArgsConstructor
+public class CustomComponentDoc {
+	
+	public static final String doc_proxy_summary = "代理程序概述";
+	public static final String doc_sync_prepare_inform = "同步备货通知单";
+	public static final String doc_receive_callback = "收货单回传";
+	public static final String doc_get_delivery_orders = "获取收货单";
+	public static final String doc_sync_return_goods = "同步备货退货单";
+	public static final String doc_sync_finacial_reconciliation = "同步财务对账单";
+
+	@Setter @Getter
+	private String name;
+	
+	@Setter @Getter
+	private String summary;
+	
+	@Setter @Getter
+	private String beanName;
+	
+	@Setter @Getter
+	private String className;
+	
+	@Setter @Getter
+	private Map<String, String> properties;
+	
+	@Setter @Getter
+	private Map<String, String> methodDesc;
+
+	public CustomComponentDoc(String name, String summary, String beanName, String className,
+			Map<String, String> properties, Map<String, String> methodDesc) {
+		this.name = name;
+		this.summary = summary;
+		this.beanName = beanName;
+		this.className = className;
+		this.properties = properties;
+		this.methodDesc = methodDesc;
+	}
+	
+	
+	
+}

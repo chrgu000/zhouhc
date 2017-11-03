@@ -1,0 +1,40 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SpdUsedType implements ITypeEnum{
+
+	prescription("1", "处方消耗", ""),
+	doctor("2", "医嘱消耗", ""),
+	operation_room_used("3", "手术室使用", ""),
+	nurse_used("4", "护士使用", ""),
+	prescription_return("5", "处方退货", ""),
+	doctor_return("6", "医嘱退货", ""),
+	operation_room_return("7", "手术室退货", ""),
+	nurse_return("8", "护士退货", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SpdUsedType(String code ,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdUsedType typeOf(String code){
+		for(SpdUsedType state : SpdUsedType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+
+}

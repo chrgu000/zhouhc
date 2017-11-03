@@ -1,0 +1,75 @@
+package cn.ak4j.yard.spd.task.web;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskItemParams;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskItemRepository;
+import cn.ak4j.yard.spd.task.service.SpdDepotTaskService;
+import cn.ak4j.yard.sys.domain.ReportConfig;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.web.PdfExportHelper;
+
+@RestController
+@SuppressWarnings({"rawtypes"})
+public class SpdTaskItemResource {
+
+	@Autowired private SpdDepotTaskItemRepository tiRepository;
+	@Autowired private SpdDepotTaskService dtService;
+	@Autowired private PdfExportHelper pdfExportHelper;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@RequestMapping(value = "/yard/spd/spdTaskItems/taskId,{taskId}", method = RequestMethod.GET)
+	public SpdDepotTaskItems findByTask(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			@PathVariable("taskId")String taskId){
+		SpdDepotTaskItemParams params = SpdDepotTaskItemParams.buildParamsFromJson(paramsStr, SpdDepotTaskItemParams.class);
+		if(params == null){
+			params = new SpdDepotTaskItemParams();
+		}
+		params.setTaskId(new ListParam<String>(taskId, QueryParam.operation_in));
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return tiRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@ResponseBody
+	@RequestMapping(value = "/yard/spd/spdTaskItems/taskId,{taskId}/pdf", method = RequestMethod.GET)
+	public void getPdf(@PathVariable("taskId")String taskId,HttpServletRequest request,HttpServletResponse response)throws Exception{
+		SpdDepotTask task = dtService.getTaskForReport(taskId);
+		
+		Map<String,Object> parameters = new HashMap<String, Object>();
+		parameters.put("taskCode", task.getTaskCode());
+		parameters.put("typeNm", task.getTaskTypeName());
+		parameters.put("orgNm", task.getDepotArea().getDepot().getManageDept().getOrg().getOrgName());
+		parameters.put("deptNm", task.getDepotArea().getDepot().getManageDept().getDeptName());
+		parameters.put("depotNm", task.getDepotArea().getDepot().getDepotName());
+		parameters.put("areaNm", task.getDepotArea().getAreaName());
+		parameters.put("startTime", task.getMaintenanceInfo().getCreateDate());
+		parameters.put("finishTime", task.getFinishTime());
+		parameters.put("taskUser", task.getUser().getUserName());
+		
+		ReportConfig config = giRepository.findAll().findByKey(YardGlobalInfo.completed_depot_task_report).getConfig();
+		pdfExportHelper.export(config.getJasperFilePath()+".jasper", config.getPdfFileName(), parameters, task.getItems(), "inline", response);
+	}
+	
+}

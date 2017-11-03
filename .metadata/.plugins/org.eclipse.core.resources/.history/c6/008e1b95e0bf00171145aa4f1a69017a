@@ -1,0 +1,15 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdConsumeBizs extends Entities<SpdConsumeBiz>{
+
+	public SpdConsumeBizs (List<SpdConsumeBiz> entities){
+		super(entities);
+	}
+}

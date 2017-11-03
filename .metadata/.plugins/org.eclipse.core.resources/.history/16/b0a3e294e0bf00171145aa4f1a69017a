@@ -1,0 +1,103 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.io.Serializable;
+
+import javax.persistence.Embeddable;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.IDescribable;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 备货流向规则
+* @author zhengyf
+* @date 2017年7月21日 上午10:05:22
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Embeddable
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdPrepareInformDirectionRule implements Serializable, IChildRule, IDescribable {
+
+	@NotNull(message="备货机构不能为空") @Getter @Setter
+	private String fromOrgId;
+	
+	@NotNull(message="备货部门不能为空") @Getter @Setter
+	private String fromDeptId;
+
+	/**
+	 * 代收仓库id
+	 */
+	@Getter @Setter
+	private String collectDepotId;
+	
+	@Getter @Setter
+	private String collectAreaType;
+	
+	@NotNull(message="收货仓库不能为空") @Getter @Setter
+	private String toDepotId;
+	
+	@NotNull(message="收货仓库货区类型不能为空") @Getter @Setter
+	private String toAreaType;
+	
+	@Transient @Getter @Setter
+	private PcsDept fromDept;
+	
+	@Transient @Getter @Setter
+	private PcsDepot toDepot;
+	
+	@Transient @Getter @Setter
+	private PcsDepot collectDepot;
+	
+	@Override
+	public String getDescription() {
+		if(toDepot != null){
+			return String.format("[%s][%s]>[%s]", fromDept.getOrg().getOrgName(), fromDept.getDeptName(), toDepot.getDepotName());
+		}
+		
+		return null;
+	}
+	
+	public boolean equals(SpdPrepareInformDirectionRule directionRule) {
+		boolean sameCollectDepotId = (StringUtils.isEmpty(getCollectDepotId()) 
+											&& StringUtils.isEmpty(directionRule.getCollectDepotId()))
+										|| (StringUtils.isNotEmpty(getCollectDepotId()) 
+											&& getCollectDepotId().equals(directionRule.getCollectDepotId()));
+		
+		boolean sameCollectAreaId = (StringUtils.isEmpty(getCollectAreaType()) 
+											&& StringUtils.isEmpty(directionRule.getCollectAreaType()))
+										|| (StringUtils.isNotEmpty(getCollectAreaType()) 
+											&& getCollectAreaType().equals(directionRule.getCollectAreaType()));
+		
+		if(getFromOrgId().equals(directionRule.getFromOrgId())
+				&& getFromDeptId().equals(directionRule.getFromDeptId())
+				&& getToDepotId().equals(directionRule.getToDepotId())
+				&& getToAreaType().equals(directionRule.getToAreaType())
+				&& sameCollectDepotId 
+				&& sameCollectAreaId){
+			return true;
+		}
+		
+		return false;
+	}
+	
+
+	public void fillDepotRelations(PcsDepotRepository depotRepository) {
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		PcsDepot toDepot = allDepots.findById(getToDepotId());
+		PcsDepot collectDeopt = allDepots.findById(getCollectDepotId());
+		setToDepot(toDepot);
+		setCollectDepot(collectDeopt);
+	}
+	
+}

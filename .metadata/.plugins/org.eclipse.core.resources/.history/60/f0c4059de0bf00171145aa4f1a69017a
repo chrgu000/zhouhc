@@ -1,0 +1,12 @@
+--pcs模块
+alter table pcs_depot drop(depot_his_code);
+alter table pcs_depot_area drop(area_his_code);
+alter table pcs_org drop(weixin_code);
+--spd模块
+alter table spd_depot_stock drop(card_id,lock_qty,task_in_qty,task_out_qty,min_lock_qty,min_task_in_qty,min_task_out_qty,owner_org_id,owner_dept_id,shelf_id,check_state,create_yard,create_org,last_org,last_yard,sync_date,clean_date);
+alter table spd_depot_task drop(stock_begin_time,stock_end_time);
+alter table spd_off_shelf_task_item drop(task_user,task_time,ref_sheet_id,ref_sheet_item_id,ref_sheet_item_info,ref_sheet_type,turnover_box_code);
+alter table spd_on_shelf_task_item drop(task_user,task_time,ref_sheet_id,ref_sheet_item_id,ref_sheet_item_info,ref_sheet_type);
+alter table spd_inventory drop(inventory_state,inventory_date);
+alter table spd_inventory_item drop(card_id);
+alter table spd_logistics_task_item drop(turnover_box_code);

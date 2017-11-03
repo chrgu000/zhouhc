@@ -1,0 +1,2 @@
+update yds_eds_goods set eds_yds_unit_ratio = null;
+ALTER TABLE yds_eds_goods MODIFY(EDS_YDS_UNIT_RATIO NUMBER(20,4));

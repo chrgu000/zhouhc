@@ -1,0 +1,31 @@
+package cn.ak4j.yard.spd.bizplan.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=true)
+public class SpdReturnGoodsBizParams extends QueryParams{
+
+	private ListParam<String> bizId;
+	private ListParam<String> bizCode;
+	private ListParam<String> toOrgId;
+	private ListParam<String> toDeptId;
+	private ListParam<String> fromDepotId;
+	private ListParam<String> fromAreaType;
+	private ListParam<Integer> checkStateCode;
+	private ListParam<String> bizStatusCode;
+	private DateRangeParam maintenanceInfo_createDate;
+	
+	private ListParam<String> bizRuleId;//关联规则
+	private ListParam<String> displayName;//规则关联显示名称
+	
+	private ListParam<String> toOrgName;
+	private ListParam<String> toDeptName;
+	private ListParam<String> fromDepotName;
+}
+

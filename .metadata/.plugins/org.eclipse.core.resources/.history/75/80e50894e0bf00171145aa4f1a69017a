@@ -1,0 +1,100 @@
+package cn.ak4j.yard.yds.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="yds_goods_info")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class YdsGoodsInfo extends YardMaintenceEntity {
+
+	@Id
+	@NotEmpty(message = "产品不能为空")
+	@Getter @Setter
+	private String goodsId;//产品ID
+	
+	@NotEmpty(message = "物价码不能为空")
+	@Getter @Setter
+	private String wjCode;//物价码
+	
+	@NotEmpty(message = "平台码不能为空")
+	@Getter @Setter
+	private String ptCode;//平台码
+	
+	@NotEmpty(message = "医保码不能为空")
+	@Getter @Setter
+	private String ybCode;//医保码
+	
+	@NotNull(message = "备货单价不能为空")
+	@DecimalMin(value = "0", message = "备货单价无效")
+	@Getter @Setter
+	private float preparePrice;//备货单价
+	
+	@NotNull(message = "消耗单价不能为空")
+	@DecimalMin(value = "0", message = "消耗单价无效")
+	@Getter @Setter
+	private float consumePrice;//消耗单价
+	
+	@NotNull(message = "存储成本单价不能为空")
+	@DecimalMin(value = "0", message = "存储成本单价无效")
+	@Getter @Setter @Deprecated
+	private float storePrice;//存储成本单价
+	
+	@NotNull(message = "备货税率不能为空")
+	@DecimalMin(value = "0", message = "备货税率无效")
+	@Getter @Setter
+	private float prepareTaxRate;//备货税率
+	
+	@NotNull(message = "消耗税率不能为空")
+	@DecimalMin(value = "0", message = "消耗税率无效")
+	@Getter @Setter
+	private float consumeTaxRate;//消耗税率
+	
+
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private YdsGoods goods;
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+
+	public YdsGoodsInfo(){}
+	
+	public YdsGoodsInfo(YdsGoods ydsGoods) {
+		setGoodsId(ydsGoods.getGoodsId());
+		//这里的价格保留两位小数
+		setPreparePrice(ydsGoods.getPreparePrice());
+		setConsumePrice(ydsGoods.getConsumePrice());
+		setStorePrice(ydsGoods.getStorePrice());
+		setPtCode("-");
+		setWjCode("-");
+		setYbCode("-");
+		setPrepareTaxRate(0.17f);
+		setConsumeTaxRate(0.17f);
+		setMaintenanceInfo(ydsGoods.getMaintenanceInfo());
+	}
+	
+}

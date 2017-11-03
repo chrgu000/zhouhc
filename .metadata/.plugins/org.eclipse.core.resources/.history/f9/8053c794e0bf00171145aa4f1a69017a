@@ -1,0 +1,156 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformDirectionRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdPrepareInformRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.bizrule.service.SpdBizRuleService;
+import cn.ak4j.yard.spd.bizrule.to.SpdPrepareInformRuleTO;
+
+@RestController
+public class SpdPrepareInformRuleResouce {
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdBizRuleService brService;
+	@Autowired private PcsDepotRepository depotRepository;
+	private SpdPrepareInformRuleAssember assember = new SpdPrepareInformRuleAssember();
+
+	@RequestMapping(value="/yard/spd/spdPrepareInformRules", method=RequestMethod.GET)
+	public List<SpdPrepareInformRuleTO> list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdPrepareInformRuleParams params = SpdPrepareInformRuleParams.buildParamsFromJson(paramsStr, SpdPrepareInformRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdPrepareInformRules rules = brRepository.findAllWithRelations().getAllPrepareInformRules();
+		rules = new SpdPrepareInformRules(rules.findByPage(params, order, currentPage-1, pageSize));
+		return assember.buildList(rules);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInformRules/count", method=RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdPrepareInformRuleParams params = SpdPrepareInformRuleParams.buildParamsFromJson(paramsStr, SpdPrepareInformRuleParams.class);
+		
+		SpdPrepareInformRules rules = brRepository.findAllWithRelations().getAllPrepareInformRules();
+		rules = new SpdPrepareInformRules(rules.find(params));
+		return assember.buildList(rules).size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInformRules/ids,{ids}", method=RequestMethod.GET)
+	public List<SpdPrepareInformRuleTO> getByIds(@PathVariable("ids") String ids){
+		SpdPrepareInformRules rules = brRepository.findAllWithRelations().getAllPrepareInformRules();
+		return assember.buildList(rules.findByIds(Arrays.asList(ids.split(","))));
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInformRules", method = RequestMethod.POST)
+	public SpdPrepareInformRuleTO add(@RequestBody SpdPrepareInformRuleTO prepareInformRuleTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdPrepareInformRule prepareInformRule = assember.build(prepareInformRuleTO);
+		
+		prepareInformRule.getDirectionRule().fillDepotRelations(depotRepository);
+		
+		prepareInformRule = (SpdPrepareInformRule) brService.add(prepareInformRule, user);
+		
+		SpdPrepareInformRules rules = brRepository.findAllWithRelations().getAllPrepareInformRules();
+		prepareInformRuleTO = assember.build(CollectionUtils.findWhere("id", prepareInformRule.getId(), rules));
+		
+		return prepareInformRuleTO;
+	}
+
+	@RequestMapping(value="/yard/spd/spdPrepareInformRules/{id}", method = RequestMethod.PUT)
+	public SpdPrepareInformRuleTO update(@RequestBody SpdPrepareInformRuleTO prepareInformRuleTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdPrepareInformRule prepareInformRule = assember.build(prepareInformRuleTO);
+		
+		prepareInformRule.getDirectionRule().fillDepotRelations(depotRepository);
+		
+		prepareInformRule = (SpdPrepareInformRule) brService.modify(prepareInformRule, user);
+		
+		SpdPrepareInformRules rules = brRepository.findAllWithRelations().getAllPrepareInformRules();
+		prepareInformRuleTO = assember.build(CollectionUtils.findWhere("id", prepareInformRule.getId(), rules));
+		
+		return prepareInformRuleTO;
+	}
+
+	@RequestMapping(value="/yard/spd/spdPrepareInformRules/{id}", method = RequestMethod.GET)
+	public SpdPrepareInformRuleTO get(@PathVariable("id")String id){
+		SpdPrepareInformRules rules = brRepository.findAllWithRelations().getAllPrepareInformRules();
+		SpdPrepareInformRuleTO prepareInformRuleTO = assember.build(CollectionUtils.findWhere("id", id, rules));
+		return prepareInformRuleTO;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPrepareInformRules/whichICanApply", method = RequestMethod.GET)
+	public List<SpdPrepareInformRuleTO> whichICanApply(@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdPrepareInformRuleParams params = SpdPrepareInformRuleParams.buildParamsFromJson(paramsStr, SpdPrepareInformRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdPrepareInformRules whichCanApplyRules = new SpdPrepareInformRules(brRepository.findAllWithRelations().getAllPrepareInformRules().whichCanApplyByUser(user));
+		SpdPrepareInformRules rules = new SpdPrepareInformRules(whichCanApplyRules.findByPage(params, order, -1, -1));
+		return assember.buildList(rules);
+	}
+	
+}
+
+class SpdPrepareInformRuleAssember{
+	
+	public List<SpdPrepareInformRuleTO> buildList(List<SpdPrepareInformRule> rules){
+		List<SpdPrepareInformRuleTO> result = new ArrayList<SpdPrepareInformRuleTO>();
+		
+		rules.forEach(rule->{
+			SpdPrepareInformRuleTO to = build(rule);
+			result.add(to);
+		});
+		
+		return result;
+	}
+	
+	public SpdPrepareInformRuleTO build(SpdPrepareInformRule rule){
+		SpdPrepareInformRuleTO to = new SpdPrepareInformRuleTO();
+		
+		BeanUtils.copyProperties(rule.getDirectionRule(), to);
+		BeanUtils.copyProperties(rule, to);		
+		to.setFeedbackRule(rule.getFeedbackRule());
+		to.setPrimaryName(rule.getPrimaryName());
+		return to;
+	}
+
+	public SpdPrepareInformRule build(SpdPrepareInformRuleTO prepareInformRuleTO) {
+		SpdPrepareInformRule prepareInformRule = new SpdPrepareInformRule();
+		
+		SpdPrepareInformDirectionRule directionRule = new SpdPrepareInformDirectionRule();
+		BeanUtils.copyProperties(prepareInformRuleTO, directionRule);
+		
+		
+		prepareInformRule.setDirectionRule(directionRule);
+		
+		BeanUtils.copyProperties(prepareInformRuleTO, prepareInformRule);
+		prepareInformRule.setCreateTime(new Date());
+		prepareInformRule.setLastUpdateTime(new Date());
+		
+		return prepareInformRule;
+	}
+	
+}

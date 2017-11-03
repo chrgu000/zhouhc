@@ -1,0 +1,8 @@
+package cn.ak4j.yard.sys.datacheck.params;
+
+import cn.ak4j.entity.query.param.QueryParams;
+
+@SuppressWarnings("serial")
+public class SysDataCheckTypeParams extends QueryParams{
+
+}

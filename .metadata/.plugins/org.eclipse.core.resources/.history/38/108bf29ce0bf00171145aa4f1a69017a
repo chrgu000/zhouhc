@@ -1,0 +1,170 @@
+--新增业务帐明细表
+create table spd_general_ledger(
+	id varchar2(32 byte),
+    goods_id varchar2(32 byte),
+    lot_id varchar2(32 byte),
+    unit_price number(12,4),
+    total_amount number(15, 4),
+    unit_lv integer,
+    storage_count integer,
+    deal_count integer,
+	verification_count integer,
+	owner_org_id varchar2(32 byte),
+	owner_dept_id varchar2(32 byte),
+	create_time date,
+	last_update_time date,
+	primary key (id)
+);
+comment on table spd_general_ledger is '业务总账表';
+
+--物权变更记录表
+create table spd_property_change(
+    id varchar2(32 byte),
+    daily_clean_id varchar2(32 byte),
+    property_change_rule_id varchar2(32 byte),
+    biz_type_code varchar2(50 byte),
+    biz_id varchar2(32 byte),
+    task_id varchar2(32 byte),
+    trigger_biz_step_code varchar2(100 byte),
+    debit_org_id varchar2(32 byte),
+    debit_dept_id varchar2(32 byte),
+    debit_depot_id varchar2(32 byte),
+    credit_org_id varchar2(32 byte),
+    credit_dept_id varchar2(32 byte),
+    credit_depot_id varchar2(32 byte),
+    description varchar2(1000 byte),
+	create_time date,
+	last_update_time date,
+	primary key (id)
+);
+comment on table spd_property_change is '物权变更表';
+
+--物权变更明细表
+create table spd_property_change_item(
+    id varchar2(32 byte),
+    goods_id varchar2(32 byte),
+    lot_id varchar2(32 byte),
+    receive_id varchar2(32 byte),
+    receive_item_id varchar2(32 byte),
+    send_code varchar2(32 byte),
+    send_item_code varchar2(50 byte),
+    unit_name varchar2(20),
+    unit_price number(12, 4),
+    unit_lv integer,
+    qty integer,
+    origin_item_id varchar2(32 byte),
+	create_time date,
+	last_update_time date,
+	primary key (id)
+);
+comment on table spd_property_change_item is '物权变更明细表';
+
+--反馈规则字段扩展
+alter table spd_feedback_rule add(auto_review_daily_clean char(1 byte));
+alter table spd_feedback_rule add(auto_commit_fin_rec char(1 byte));
+alter table spd_feedback_rule add(auto_review_fin_rec char(1 byte));
+alter table spd_feedback_rule add(auto_sync_to_supplier char(1 byte));
+alter table spd_feedback_rule add(auto_complete_fin_rec char(1 byte));
+
+--日清对账规则表
+create table spd_daily_clean_rule(
+    id varchar2(32 byte),
+    name varchar2(200 byte),
+    rule_prior integer,
+    feedback_rule_id varchar2(32 byte),
+    depot_id varchar2(32 byte),
+    enabled char(1 byte),
+	create_time date,
+	last_update_time date,
+	primary key (id)
+);
+comment on table spd_daily_clean_rule is '日清对账规则';
+
+--日清对账业务表
+create table spd_daily_clean_biz(
+    biz_id              varchar2(32 byte),
+    biz_code            varchar2(50),
+    biz_rule_id         varchar2(32),
+    biz_status_code     varchar2(100),
+    channel_type_code   varchar2(32),
+    target_date         date,
+    confirm_user_id     varchar2(32),
+    depot_id            varchar2(32),
+    description         varchar2(1000),
+    yard_id             integer,
+    check_state_code    integer,
+    create_date         date,
+    last_date           date,
+    describe            varchar2(500),
+    create_user         varchar2(32),
+    create_org          varchar2(32),
+    last_user           varchar2(32),
+    last_org            varchar2(32),
+	primary key         (biz_id)
+);
+comment on table spd_daily_clean_biz is '日清对账业务';
+
+--财务对账规则表
+create table spd_fin_rec_rule(
+    id                   varchar2(32 byte),
+    name                 varchar2(200 byte),
+    rule_prior           integer,
+    feedback_rule_id     varchar2(32 byte),
+    apply_dept_id        varchar2(32 byte),
+    target_depot_ids     varchar2(2000),
+    enabled              char(1 byte),
+	create_time          date,
+	last_update_time     date,
+	primary key (id)
+);
+comment on table spd_fin_rec_rule is '财务对账规则';
+
+--财务对账业务表
+create table spd_fin_rec_biz(
+    biz_id              varchar2(32 byte),
+    biz_code            varchar2(50),
+    biz_rule_id         varchar2(32),
+    biz_status_code     varchar2(100),
+    channel_type_code   varchar2(32),
+    start_date          date,
+    end_date            date,
+    reconciliation_date date,
+    confirm_user_id     varchar2(32),
+    sync_date           date,
+    dept_id             varchar2(32),
+    description         varchar2(1000),
+    yard_id             integer,
+    check_state_code    integer,
+    create_date         date,
+    last_date           date,
+    describe            varchar2(500),
+    create_user         varchar2(32),
+    create_org          varchar2(32),
+    last_user           varchar2(32),
+    last_org            varchar2(32),
+	primary key         (biz_id)
+);
+comment on table spd_fin_rec_biz is '财务对账业务';
+
+--财务对账明细表
+create table spd_fin_rec_item(
+    id                   varchar2(32),
+    goods_id             varchar2(32),
+    lot_id               varchar2(32),
+    unit_lv              integer,
+    unit_name            varchar2(10),
+    unit_price           number(12,4),
+    reconciliation_qty   integer,
+    settlement_unit_lv   integer,
+    settlement_unit_name varchar2(10),
+    settlement_qty       integer,
+    beginning_qty        integer,
+    ending_qty           integer,
+    adjustment_qty       integer,
+	create_time          date,
+	last_update_time     date,
+	primary key (id)
+);
+comment on table spd_fin_rec_item is '财务对账明细';
+
+

@@ -1,0 +1,43 @@
+package cn.ak4j.yard.spd.bizplan.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdBizItemParams extends QueryParams{
+
+	private ListParam<String> bizId;
+	private ListParam<String> bizItemId;
+	private ListParam<String> goodsId;
+	private ListParam<String> lotId;
+	private IntegerRangeParam planQty;
+	private IntegerRangeParam confirmQty;
+	private FloatRangeParam unitPrice;
+	
+	private ListParam<String> formatName;
+	private ListParam<String> packingSpec;
+	private ListParam<String> lotNo;
+	private DateRangeParam lotValidity;
+	private DateRangeParam produceDate;
+	private ListParam<String> sterilizeLotNo;
+	private DateRangeParam sterilizeTime;
+	
+	private ListParam<String> bizCode;
+	private DateRangeParam refundLastDate;
+	private ListParam<String> depotName;
+	private ListParam<String> deptName;
+	private ListParam<String> createUserName;
+	private ListParam<String> describe;
+	private ListParam<Boolean> asPlanned;
+	
+	private ListParam<String> originId;
+	private ListParam<String> originItemId;
+	
+}

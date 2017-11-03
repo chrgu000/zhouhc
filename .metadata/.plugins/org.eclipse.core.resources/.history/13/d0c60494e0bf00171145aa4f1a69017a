@@ -1,0 +1,40 @@
+package cn.ak4j.yard.yds.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class YdsEdsGoodsParams extends QueryParams{
+
+	private static final long serialVersionUID = 3844610247954074805L;
+	
+	private ListParam<String> edsGoodsId;
+	private ListParam<String> yardGoodsId;
+	private ListParam<String> ownerOrgId;
+	private ListParam<String> edsGoodsType;
+	private ListParam<String> edsWareName;
+	private ListParam<String> edsGoodsName;
+	private ListParam<String> edsGoodsCode;
+	private ListParam<String> edsGoodsSpec;
+	private ListParam<String> edsGoodsModel;
+	private ListParam<String> edsFactName;
+	private ListParam<String> edsAthDoc;
+	private ListParam<String> edsRegDoc;
+	private FloatRangeParam edsPrice;
+	private ListParam<String> edsGoodsDesc;
+	private ListParam<Boolean> enabled;
+	private DateRangeParam maintenanceInfo_createDate;
+	private ListParam<String> edsGoodsFormatName;
+	private ListParam<Integer> checkStateCode;
+	private ListParam<String> formatName;
+	
+	private ListParam<String> equipmentSortName;//器械分类
+	private ListParam<String> equipmentLevel;//器械类别
+	private ListParam<Boolean> checkValidity;//是否检查批次
+	private ListParam<String> edsStoreType;//存储类型
+}

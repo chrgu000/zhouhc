@@ -1,0 +1,20 @@
+package cn.ak4j.yard.sys.datacheck.params;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SysDataCheckTaskItemParams extends QueryParams{
+
+	private ListParam<String> taskId;
+	private ListParam<String> reportId;
+	private ListParam<String> dataId;
+	private ListParam<String> level;
+	private ListParam<String> className;
+	private ListParam<String> description;
+		
+}

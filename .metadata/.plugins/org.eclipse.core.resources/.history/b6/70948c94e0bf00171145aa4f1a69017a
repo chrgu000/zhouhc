@@ -1,0 +1,127 @@
+package cn.ak4j.yard.spd.repository;
+
+import java.util.Arrays;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.params.PcsDepotShelfParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.spd.domain.SpdInventoryItem;
+import cn.ak4j.yard.spd.domain.SpdInventoryItems;
+import cn.ak4j.yard.spd.params.SpdInventoryItemParams;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdInventoryItemRepository extends BaseRepository<SpdInventoryItem, SpdInventoryItems, SpdInventoryItemParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	
+	public SpdInventoryItems findById(String inventoryId){
+		SpdInventoryItemParams params = new SpdInventoryItemParams();
+		params.setInventoryId(new ListParam<String>(inventoryId));
+		return find(params);
+	}
+	
+	public SpdInventoryItems find(SpdInventoryItemParams params,OrderParam order,int pageNo,int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = OrderParam.getDefaultOrder();
+			}
+			return new SpdInventoryItems(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdInventoryItems();
+	}
+	
+	public int count(SpdInventoryItemParams params) {
+		if(setRelationParams(params)){		
+			return super.count(params);	
+		}
+		return 0;
+	}
+	
+	private boolean setRelationParams(SpdInventoryItemParams params){
+		if(params == null){
+			params = new SpdInventoryItemParams();
+		}
+		
+		YdsGoodsParams goodsParams = new YdsGoodsParams();
+		goodsParams.setFormatName(params.getFormatName());
+		if(!goodsParams.isEmpty()){
+			YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams, depotRepository, dcRepository));
+			if(goodss.size() == 0){
+				return false;
+			}
+			params.setGoodsId(new ListParam<String>(goodss.getIds()));
+		}
+		
+		YdsGoodsLotParams lotParams = new YdsGoodsLotParams();
+		lotParams.setLotNo(params.getLotNo());
+		lotParams.setLotValidity(params.getLotValidityText());
+		lotParams.setGoodsLotId(params.getStockGoodsLotId());
+		lotParams.setSterilizeLotNo(params.getSterilizeLotNo());
+		lotParams.setSterilizeTime(params.getSterilizeTime());
+		lotParams.setProduceDate(params.getProduceDate());
+		if(!lotParams.isEmpty()){
+			YdsGoodsLots lots = new YdsGoodsLots(glRepository.findAll().find(lotParams));
+			if(lots.size() == 0){
+				return false;
+			}
+			params.setStockGoodsLotId(new ListParam<String>(lots.getIds()));
+		}
+		
+		PcsDepotShelfParams shelfParams = new PcsDepotShelfParams();
+		shelfParams.setShelfName(params.getShelfName());
+		shelfParams.setShelfCode(params.getShelfCode());
+		if(!shelfParams.isEmpty()){
+			PcsDepotShelfs shelfs = new PcsDepotShelfs(dsRepository.findAll().find(shelfParams));
+			if(CollectionUtils.isEmpty(shelfs)){
+				return false;
+			}
+			params.setShelfId(new ListParam<String>(shelfs.getIds()));
+		}
+		
+		return true;
+	}
+
+	public SpdInventoryItems findbyIdsArray(String ids) {
+		String[] idArray = ids.split(",");
+		List<String> idList = Arrays.asList(idArray);
+		SpdInventoryItemParams params = new SpdInventoryItemParams();
+		params.setInventoryItemId(new ListParam<String>(idList));
+		return this.find(params);
+	}
+
+	public SpdInventoryItems findByInventoryId(String inventoryId) {
+		SpdInventoryItemParams params = new SpdInventoryItemParams();
+		params.setInventoryId(new ListParam<String>(inventoryId));
+		
+		return find(params);
+	}
+
+	public SpdInventoryItems findWithGoods(SpdInventoryItemParams itemParams) {
+		SpdInventoryItems items = find(itemParams);
+		items.fillGoods(goodsRepository);
+		return items;
+	}
+}

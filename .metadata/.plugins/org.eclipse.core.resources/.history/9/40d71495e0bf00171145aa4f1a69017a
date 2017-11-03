@@ -1,0 +1,21 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+
+/**
+* @Description: 该接口描述了业务具备来源仓库作业的能力
+* 两个接口分别约束了作业的来源仓库和来源仓库作业时的货区类型
+* @author zhengyf
+* @date 2017年4月4日 下午12:27:17
+* @version V1.0.0
+*/
+public interface IFromDepotTask {
+
+	public PcsDepot getFromDepot();
+	
+	public String getFromAreaType();
+	
+	public SpdDepotTasks getOffShelfTasks();
+	
+}

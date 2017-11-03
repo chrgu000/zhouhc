@@ -1,0 +1,98 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdConsumeBizParams;
+import cn.ak4j.yard.spd.bizrule.domain.SpdConsumeRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdConsumeRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdConsumeBizRepository extends BaseRepository<SpdConsumeBiz, SpdConsumeBizs, SpdConsumeBizParams, String> {
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+
+
+	public SpdConsumeBizs find(SpdConsumeBizParams params,OrderParam order,int pageNo,int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			return new SpdConsumeBizs(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdConsumeBizs();
+	}
+
+	public int count(SpdConsumeBizParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdConsumeBizParams params){
+		if(params != null){
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			depotParams.setDepotId(params.getDepotId());
+			if(depotParams.isNotEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);	
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				params.setDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			SpdConsumeRuleParams consumeRuleParams = new SpdConsumeRuleParams();
+			consumeRuleParams.setName(params.getName());
+			if(consumeRuleParams.isNotEmpty()){
+				SpdConsumeRules consumeRules = new SpdConsumeRules(brRepository.findAllWithRelations().getAllConsumeRules().find(consumeRuleParams));
+				if(CollectionUtils.isEmpty(consumeRules)){
+					return false;
+				}
+				
+				params.setBizRuleId(new ListParam<String>(consumeRules.getIds()));
+			}
+			
+		}
+		return true;	
+	}
+	
+	public SpdConsumeBiz saveWithItems(SpdConsumeBiz consume) {
+		consume = save(consume);
+		consume.updateItemsBizIdAndTime();
+		biRepository.saveAll(consume.getItems());
+		return consume;
+	}
+	
+	public SpdConsumeBiz getWithItems(String bizId) {
+		SpdConsumeBiz consume = findOne(bizId);
+		SpdBizItems items = biRepository.findWithGoodsByBizId(bizId);
+		consume.setItems(items);
+		return consume;
+	}
+	
+	
+	
+}

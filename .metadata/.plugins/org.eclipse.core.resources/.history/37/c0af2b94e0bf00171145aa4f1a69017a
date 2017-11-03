@@ -1,0 +1,42 @@
+package cn.ak4j.yard.sys.logging.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+
+@Entity
+@Table(name="LOGGING_EVENT_EXCEPTION")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SysLoggingEventException implements IEntity{
+
+	@Id
+	private Integer eventId;
+	private Integer i;
+	private String traceLine;
+	
+	public Integer getEventId() {
+		return eventId;
+	}
+	public void setEventId(Integer eventId) {
+		this.eventId = eventId;
+	}
+	public Integer getI() {
+		return i;
+	}
+	public void setI(Integer i) {
+		this.i = i;
+	}
+	public String getTraceLine() {
+		return traceLine;
+	}
+	public void setTraceLine(String traceLine) {
+		this.traceLine = traceLine;
+	}
+	
+	
+}

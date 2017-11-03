@@ -1,0 +1,222 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdAdjustStockBizSteps;
+import cn.ak4j.yard.spd.bizplan.params.SpdAdjustStockBizParams;
+
+public class SpdAdjustStockBizResourceTest extends BaseTest{
+	
+	@Autowired private PcsDepotRepository depotRepository;
+	
+	@Test public void testAddWithoutItem() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		SpdAdjustStockBiz adjustStock = new SpdAdjustStockBiz();
+		adjustStock.setMaintenanceInfo(new MaintenanceInfo(user));
+		adjustStock.setBizRuleId("as_rule_id_01");
+		
+		//新增库存调节业务
+		adjustStock = mockMvcHelper.add(SpdAdjustStockBiz.class, xykUserCode, "spd", "spdAdjustStocks", adjustStock, status().isOk(), null);
+		
+		assertEquals(CheckState.new_created.getCode(), adjustStock.getCheckStateCode().intValue());
+		
+		wait(1);
+		
+		//检查新增的库存调节业务
+		adjustStock = mockMvcHelper.findOne(SpdAdjustStockBiz.class, xykUserCode, "spd", "spdAdjustStocks", adjustStock.getBizId(), status().isOk(), null);
+		assertEquals(SpdAdjustStockBizSteps.create_adjust_stock.getStatusCode(), adjustStock.getBizStatusCode());
+		
+		//检查明细
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdBizItems/bizId,{bizId}?accessToken={accessToken}";
+		SpdBizItems items = mockMvcHelper.mockGet(SpdBizItems.class, urlTemplate, adjustStock.getBizId(), accessToken);
+		assertEquals(0, items.size());
+	}
+
+	@Test public void testAddWithItem() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		SpdAdjustStockBiz newAdjustStock = createNewAdjustStockBiz(user);
+		newAdjustStock.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		PcsDepot depot = CollectionUtils.findWhere("manageDeptId", user.getDeptId(), depotRepository.findAllWithRelations());
+		newAdjustStock.setCreatorDepotId(depot.getDepotId());
+		
+		newAdjustStock = mockMvcHelper.add(SpdAdjustStockBiz.class, xykUserCode, "spd", "spdAdjustStocks", newAdjustStock, status().isOk(), null);
+		assertEquals(CheckState.new_created.getCode(), newAdjustStock.getCheckStateCode().intValue());
+		
+		wait(3);
+		
+		//检查新增的库存调节业务
+		SpdAdjustStockBiz createdAdjustStock = mockMvcHelper.findOne(SpdAdjustStockBiz.class, xykUserCode, "spd", "spdAdjustStocks", newAdjustStock.getBizId(), status().isOk(), null);
+		assertEquals(SpdAdjustStockBizSteps.create_adjust_stock.getStatusCode(), createdAdjustStock.getBizStatusCode());
+		
+		//检查明细
+		String urlTemplate = "/spd/spdBizItems/bizId,{bizId}?accessToken={accessToken}";
+		SpdBizItems items = mockMvcHelper.mockGet(SpdBizItems.class, urlTemplate, createdAdjustStock.getBizId(), getAccessToken(xykUserCode));
+		assertEquals(newAdjustStock.getItems().size(), items.size());
+		for(SpdBizItem item : newAdjustStock.getItems()){
+			SpdBizItem createdItem = CollectionUtils.findWhere("lotId", item.getLotId(), items);
+			assertEquals(createdAdjustStock.getBizId(), item.getBizId());
+			assertEquals(item.getPlanQty(), createdItem.getPlanQty());
+			assertEquals(item.getGoodsId(), createdItem.getGoodsId());
+			assertEquals(item.getConfirmQty(), createdItem.getConfirmQty());
+			assertEquals(item.getUnitLv(), createdItem.getUnitLv());
+			assertEquals(item.getUnitPrice(), createdItem.getUnitPrice());
+		}
+		
+	}
+	
+	@Test public void testGetCreatedList() throws Exception{
+		SpdAdjustStockBizParams params = new SpdAdjustStockBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		SpdAdjustStockBizs adjustStockBizs  = mockMvcHelper.findList(SpdAdjustStockBizs.class, xykUserCode, "spd", "spdAdjustStocks", params, status().isOk(), null);
+		assertEquals(1, adjustStockBizs.size());
+		
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		adjustStockBizs.forEach(adjustStockBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", adjustStockBiz.getDepotId(), depots));
+		});
+		
+		adjustStockBizs.forEach(biz->{
+			assertEquals(CheckState.new_created.getCode(), biz.getCheckStateCode().intValue());
+			assertEquals(SpdAdjustStockBizSteps.create_adjust_stock.getStatusCode(), biz.getBizStatusCode());
+		});
+	}
+	
+	@Test public void testGetCreatedListCount() throws Exception{
+		SpdAdjustStockBizParams params = new SpdAdjustStockBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		int count = mockMvcHelper.count(Integer.class, xykUserCode, "spd", "spdAdjustStocks", params, status().isOk(), null);
+		assertEquals(1, count);
+	}
+	
+	@Test public void testGetCommitedList() throws Exception{
+		SpdAdjustStockBizParams params = new SpdAdjustStockBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		SpdAdjustStockBizs adjustStockBizs = mockMvcHelper.findList(SpdAdjustStockBizs.class, xykUserCode, "spd", "spdAdjustStocks", params, status().isOk(), null);
+		assertEquals(1, adjustStockBizs.size());
+		
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		adjustStockBizs.forEach(adjustStockBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", adjustStockBiz.getDepotId(), depots));
+		});
+		
+		adjustStockBizs.forEach(biz->{
+			assertEquals(CheckState.commited.getCode(), biz.getCheckStateCode().intValue());
+			assertEquals(SpdAdjustStockBizSteps.commit_adjust_stock.getStatusCode(), biz.getBizStatusCode());
+		});
+	}
+	
+	@Test public void testGetCommitedListCount() throws Exception{
+		SpdAdjustStockBizParams params = new SpdAdjustStockBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		int count = mockMvcHelper.count(Integer.class, xykUserCode, "spd", "spdAdjustStocks", params, status().isOk(), null);
+		
+		assertEquals(1, count);
+	}
+	
+	@Test public void testGetReviewedList() throws Exception{
+		SpdAdjustStockBizParams params = new SpdAdjustStockBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()));
+		SpdAdjustStockBizs adjustStockBizs = mockMvcHelper.findList(SpdAdjustStockBizs.class, xykUserCode, "spd", "spdAdjustStocks", params, status().isOk(), null);
+		assertEquals(1, adjustStockBizs.size());
+		
+		PcsUser user =  mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		adjustStockBizs.forEach(adjustStockBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", adjustStockBiz.getDepotId(), depots));
+		});
+		
+		adjustStockBizs.forEach(biz->{
+			assertEquals(CheckState.reviewed.getCode(), biz.getCheckStateCode().intValue());
+			assertEquals(SpdAdjustStockBizSteps.complete_depot_task.getStatusCode(), biz.getBizStatusCode());
+		});
+	}
+	
+	@Test public void testGetReviewedListCount() throws Exception{
+		SpdAdjustStockBizParams params = new SpdAdjustStockBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()));
+		int count = mockMvcHelper.count(Integer.class, xykUserCode, "spd", "spdAdjustStocks", params, status().isOk(), null);
+		
+		assertEquals(1, count);
+	}
+	
+	@Test public void testGetListById() throws Exception{
+		String bizId = "adju_biz_id_001";
+		SpdAdjustStockBiz adjustStockBiz = mockMvcHelper.findOne(SpdAdjustStockBiz.class, xykUserCode, "spd", "spdAdjustStocks", bizId, status().isOk(), null);
+		assertNotNull(adjustStockBiz);
+		assertEquals(bizId, adjustStockBiz.getBizId());
+	}
+	
+	@Test public void testGetListByIds() throws Exception{
+		List<String> bizIds = new ArrayList<String>();
+		bizIds.add("adju_biz_id_001");
+		bizIds.add("adju_biz_id_002");
+		SpdAdjustStockBizs adjustStockBizs = mockMvcHelper.getByIds(SpdAdjustStockBizs.class, xykUserCode, "spd", "spdAdjustStocks", bizIds, status().isOk(), null);
+		assertEquals(bizIds.size(), adjustStockBizs.size());
+		adjustStockBizs.forEach(biz->{
+			assertTrue(bizIds.contains(biz.getBizId()));
+		});
+	}
+	
+	
+	@Test public void testPrintPdf() throws Exception{
+		String bizId = "adju_biz_id_002";
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdAdjustStocks/bizId,{bizId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, bizId, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("报损报溢单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+			
+	}
+	
+	private SpdAdjustStockBiz createNewAdjustStockBiz(PcsUser user) {
+		SpdAdjustStockBiz adjustStockBiz = new SpdAdjustStockBiz();
+		adjustStockBiz.setBizRuleId("as_rule_id_01");
+		adjustStockBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item1 = new SpdBizItem("goods_id_003", "goods_lot_id_018", YdsUnitLv.mid.getLv(), 300, null, 20.5f);
+		items.add(item1);
+		
+		SpdBizItem item2 = new SpdBizItem("goods_id_004", "goods_lot_id_011", YdsUnitLv.mid.getLv(), 400, null, 123.2f);
+		items.add(item2);
+		adjustStockBiz.setItems(items);
+		return adjustStockBiz;
+	}
+	
+	
+}

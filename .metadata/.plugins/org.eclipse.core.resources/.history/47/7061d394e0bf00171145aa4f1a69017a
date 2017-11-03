@@ -1,0 +1,31 @@
+package cn.ak4j.yard.spd.bizrule.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdFinacialReconciliationRuleParams extends QueryParams{
+	
+	private ListParam<String> id;
+	private IntegerRangeParam prior;
+	private ListParam<String> name;
+	private ListParam<String> primaryName;
+	private ListParam<String> ruleCode;
+	private ListParam<String> customName;
+	private ListParam<String> targetDepotIds;
+	private ListParam<String> applyDeptId;
+	private ListParam<String> displayName;
+	private ListParam<Boolean> canBeOriginRule;
+	private ListParam<Boolean> enabled;
+	private ListParam<Boolean> manualApply;
+	private DateRangeParam createTime;
+	
+	private ListParam<String> applyDept_deptName;
+	private ListParam<String> supplierDept_deptName;
+}

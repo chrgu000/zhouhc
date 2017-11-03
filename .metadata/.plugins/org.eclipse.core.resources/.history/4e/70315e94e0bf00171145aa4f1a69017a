@@ -1,0 +1,52 @@
+package cn.ak4j.yard.spd.task.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRef;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRefs;
+import cn.ak4j.yard.spd.task.params.SpdDispatcherRefParams;
+import lombok.Getter;
+
+
+@Repository
+@SuppressWarnings({"unchecked", "rawtypes"})
+public class SpdDispatcherRefRepository extends BaseRepository<SpdDispatcherRef, SpdDispatcherRefs, SpdDispatcherRefParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+	public SpdDispatcherRefs findByDispacherId(String dispatcherId) {
+		SpdDispatcherRefParams params = new SpdDispatcherRefParams();
+		params.setDispatcherId(new ListParam(dispatcherId));
+		return find(params, new OrderParam(), -1, -1);
+	}
+	
+	public SpdDispatcherRefs findByDispatcherIds(List<String> dispatcherIds){
+		SpdDispatcherRefParams params = new SpdDispatcherRefParams();
+		params.setDispatcherId(new ListParam(dispatcherIds));
+		return find(params, new OrderParam(), -1, -1);
+	}
+
+	public SpdDispatcherRefs findByRefObjectId(String refObjectId) {
+		SpdDispatcherRefParams refParams = new SpdDispatcherRefParams();
+		refParams.setRefObjectId(new ListParam<String>(refObjectId));
+		SpdDispatcherRefs refs = find(refParams, new OrderParam(), -1, -1);
+		return refs;
+	}
+	
+	public SpdDispatcherRefs findByRefObjectIds(List<String> refObjectIds) {
+		SpdDispatcherRefParams refParams = new SpdDispatcherRefParams();
+		refParams.setRefObjectId(new ListParam<String>(refObjectIds));
+		SpdDispatcherRefs refs = find(refParams, new OrderParam(), -1, -1);
+		return refs;
+	}
+
+}
+

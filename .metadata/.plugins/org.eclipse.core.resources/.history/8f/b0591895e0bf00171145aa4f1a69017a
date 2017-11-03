@@ -1,0 +1,69 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.vo.SpdReturnGoodsQty;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings("serial")
+@Entity 
+@DiscriminatorValue("receive") 
+public class SpdReceiveItem extends SpdBizItem{
+
+	@Getter @Setter
+	private String boxNo;
+	
+	@Getter @Setter
+	private Integer returnQty = 0;
+	
+	@Setter
+	private Integer dealQtyByBaseUnit = 0;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private Integer dealingQtyByBaseUnit = 0;
+	
+	@Getter @Setter
+	private String sendItemCode;
+	
+	public int getDealingQty(int unitLv){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(getGoods(), YdsUnitLv.base.getLv(), unitLv);
+		return (int)(dealingQtyByBaseUnit*unitRatio);
+	}
+	
+	public int getReturnQty(int unitLv){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(getGoods(), getUnitLv(), unitLv);
+		return (int)(returnQty*unitRatio);
+	}
+	
+	public Integer getDealQtyByBaseUnit(){
+		return dealQtyByBaseUnit == null?0:dealQtyByBaseUnit;
+	}
+	
+	@Transient
+	public float getDealQty(){
+		if(getGoods() == null){
+			return 0;
+		}
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(getGoods(), YdsUnitLv.base.getLv(), getUnitLv());
+		return dealQtyByBaseUnit*unitRatio;
+	}
+
+	public void incrementReturnGoodsQty(SpdReturnGoodsQty returnGoodsQty) {
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(getGoods(), returnGoodsQty.getUnitLv(), getUnitLv());
+		int incrementReturnQty = (int)(returnGoodsQty.getQty()*unitRatio);
+		if((incrementReturnQty + getReturnQty()) > getConfirmQty()){
+			throw new InvalidDataException(String.format("收货数量[%d]小于退货数量[%d]", getConfirmQty(), (incrementReturnQty + getReturnQty())));
+		}
+		setReturnQty(getReturnQty()+incrementReturnQty);
+		updateLastUpdateTime();
+	}
+	
+}

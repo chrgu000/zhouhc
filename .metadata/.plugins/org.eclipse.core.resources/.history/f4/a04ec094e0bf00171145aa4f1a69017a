@@ -1,0 +1,95 @@
+package cn.ak4j.yard.spd.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class SpdGoodsQtys extends ArrayList<SpdGoodsQty>{
+
+	public SpdGoodsQtys(List<SpdGoodsQty> goodsQtys){
+		super(goodsQtys);
+	}
+
+	public boolean isQtyEquals(SpdGoodsQtys theQtysByStoreUnit) {
+		for(SpdGoodsQty goodsQty : this){
+			SpdGoodsQty sameGoodsQty = null;
+			for(SpdGoodsQty theGoodsQty : theQtysByStoreUnit){
+				if(theGoodsQty.getSpecialGoodsLot() != null){
+					if(theGoodsQty.getSpecialGoodsLot().getGoodsLotId().equals(goodsQty.getSpecialGoodsLot().getGoodsLotId())){
+						sameGoodsQty = theGoodsQty;
+					}
+				}else{
+					if(theGoodsQty.getGoods().getGoodsId().equals(goodsQty.getGoods().getGoodsId())){
+						sameGoodsQty = theGoodsQty;
+					}
+				}
+			}
+			if(sameGoodsQty == null || sameGoodsQty.getQty() != goodsQty.getQty()){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public String diff(SpdGoodsQtys theQtysByStoreUnit){
+		StringBuffer buf = new StringBuffer();
+		for(SpdGoodsQty goodsQty : this){
+			SpdGoodsQty sameGoodsQty = null;
+			for(SpdGoodsQty theGoodsQty : theQtysByStoreUnit){
+				if(theGoodsQty.getSpecialGoodsLot() != null){
+					if(theGoodsQty.getSpecialGoodsLot().getGoodsLotId().equals(goodsQty.getSpecialGoodsLot().getGoodsLotId())){
+						sameGoodsQty = theGoodsQty;
+					}
+				}else{
+					if(theGoodsQty.getGoods().getGoodsId().equals(goodsQty.getGoods().getGoodsId())){
+						sameGoodsQty = theGoodsQty;
+					}
+				}
+			}
+			if(sameGoodsQty == null || sameGoodsQty.getQty() != goodsQty.getQty()){
+				buf.append(String.format("【药品:%s-%s-%s -现有库存:%d】 ", goodsQty.getGoods().getWareName(), goodsQty.getGoods().getFactName(),
+						goodsQty.getSpecialGoodsLot().getLotNo(), sameGoodsQty.getQty()));
+			}
+		}
+		return buf.toString();
+	}
+	
+	public List<String> getGoodsIds(){
+		List<String> goodsIds = new ArrayList<String>();
+		for(SpdGoodsQty goodsQty : this){
+			String goodsId = goodsQty.getGoods().getGoodsId();
+			if(!goodsIds.contains(goodsId)){
+				goodsIds.add(goodsId);
+			}
+		}
+		return goodsIds;
+	}
+	
+	public List<String> getLotIds(){
+		List<String> lotIds = new ArrayList<String>();
+		for(SpdGoodsQty goodsQty : this){
+			String lotId = goodsQty.getSpecialGoodsLot().getGoodsLotId();
+			if(!lotIds.contains(lotId)){
+				lotIds.add(lotId);
+			}
+		}
+		return lotIds;
+	}
+
+	public boolean isTotalZero() {
+		if(this.isEmpty()){
+			return true;
+		}
+		for(SpdGoodsQty goodsQty : this){
+			if(goodsQty.getQty() == 0){
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+}

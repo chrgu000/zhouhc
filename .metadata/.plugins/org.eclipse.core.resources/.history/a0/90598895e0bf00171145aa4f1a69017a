@@ -1,0 +1,39 @@
+package cn.ak4j.yard.domain;
+
+import java.util.Map;
+
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+
+public class Constant {
+
+	//AMQP Exchange名
+	public static final String AMQP_AK_TOPIC = "ak.topic";
+	
+	//路由键名
+//	public static final String BATCH_TASK_QUEUE_ROUTE = "create_batch_task";
+//	public static final String SPD_BIZ_QUEUE_ROUTE = "spd_biz";
+//	public static final String SYNC_TASK_QUEUE_ROUTE = "sync_task";
+	
+	public static final String AMQP_MSG_TYPE = "msgType";
+	
+	public static final String LOT_VALIDITY_PLACEHOLDER = "2099-12-31";
+	
+	public static final String none = "none";
+	public static final String access_token_attr_name = "accessToken";
+	public static final String user_attr_name = "user";
+	public static final String lot_no_empty = "EMPTY";
+	public static final String lot_no_validity = "2099-12-31 23:59:59";
+	public static final String lot_no_produce = "1999-01-01 00:00:00";
+	public static final String repository_method_not_support_msg = "不支持该方法，所有细粒度查询均通过集合类来完成查询";
+	public static final String service_method_not_support_msg = "service不支持[%s]方法";
+
+	public static Map<SpdBizType, SpdBizSteps> all_biz_steps = null;
+
+
+	public final static String lot_prior_strategy_create_time_prior = "create_time_prior";//创建时间优先
+	public final static String lot_prior_strategy_validity_prior = "validity_prior";//有效期优先
+
+	public static String lot_prior_strategy = lot_prior_strategy_create_time_prior; //批次优先策略
+	
+}

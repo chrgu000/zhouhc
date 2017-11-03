@@ -1,0 +1,125 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ *
+* @Description: 业务总账明细类
+* 该明细的所有数量均按产品的最小单位级别存储
+* @author zhengyf
+* @date 2017年8月12日 下午3:14:15
+* @version V1.0.0
+ */
+@SuppressWarnings("serial")
+@NoArgsConstructor
+@Entity
+@Table(name="spd_general_ledger")
+public class SpdGeneralLedgerItem extends YardEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String id;
+	
+	@NotNull(message="产品id不能为空") @Getter @Setter
+	private String goodsId;
+	
+	@NotNull(message="批次id不能为空") @Getter @Setter
+	private String lotId;
+	
+	@Getter @Setter
+	private Integer unitLv;
+
+	@NotNull(message="单价不能为空") @Getter @Setter
+	private Float unitPrice;
+	
+	/**
+	 * 库存总金额
+	 */
+	@Getter @Setter
+	private Float totalAmount;
+	
+	@Getter @Setter
+	private Integer currentStorageQty;
+	
+	@Getter @Setter
+	private Integer storageQty;
+	
+	@Getter @Setter
+	private Integer dealQty;
+	
+	@Getter @Setter
+	private Integer returnQty;
+	
+	/**
+	 * 核销数量
+	 */
+	@Getter @Setter
+	private Integer verificationQty;
+	
+	@NotNull(message="所属机构不能为空") @Getter @Setter
+	private String ownerOrgId;
+	
+	@NotNull(message="所属部门不能为空") @Getter @Setter
+	private String ownerDeptId;
+	
+	@Getter @Setter
+	private Date createTime;
+	
+	@Getter @Setter
+	private Date lastUpdateTime;
+	
+	/**
+	 * 借入需要更新当前库存数量、库存累计总量、单价、库存总金额
+	 */
+	public void debit(int qtyByBaseUnit, float priceByBaseUnit) {
+		float newTotalAmount = qtyByBaseUnit * priceByBaseUnit + totalAmount;
+		int newStorageQty = storageQty + qtyByBaseUnit;
+		int newCurrentStorageQty = currentStorageQty + qtyByBaseUnit;
+		float newUnitPrice = newTotalAmount/newCurrentStorageQty;
+		
+		this.totalAmount = newTotalAmount;
+		this.storageQty = newStorageQty;
+		this.currentStorageQty = newCurrentStorageQty;
+		this.unitPrice = newUnitPrice;
+		updateLastUpdateTime();
+	}
+	
+	public void returnDebit(int qtyByBaseUnit, float priceByBaseUnit){
+		setReturnQty(getReturnQty()+qtyByBaseUnit);
+		debit(qtyByBaseUnit, priceByBaseUnit);
+	}
+
+	/**
+	 * 交易需要更新当前库存数量、交易总量、当前库存金额
+	 */
+	public void credit(SpdGoodsQty goodsQty) {
+		int dealingQty = goodsQty.getQty(getUnitLv());
+		if(currentStorageQty < dealingQty){
+			throw new OperateFailException(YardExceptionType.general_ledger_not_enough, goodsQty.getGoods().getGoodsCode(), goodsQty.getSpecialGoodsLot().getLotNo(), currentStorageQty, dealingQty);
+		}
+		setDealQty(dealQty + dealingQty);
+		setCurrentStorageQty(currentStorageQty - dealingQty);
+		setTotalAmount(totalAmount - dealingQty*unitPrice);
+		updateLastUpdateTime();
+	}
+	
+}

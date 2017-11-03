@@ -1,0 +1,105 @@
+package cn.ak4j.yard.sys.web;
+
+import java.io.IOException;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.enums.YardBatchTaskType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.repository.YardBatchTaskRepository;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.domain.YardBatchTasks;
+import cn.ak4j.yard.sys.params.YardBatchTaskParams;
+import cn.ak4j.yard.sys.service.YardBatchTaskService;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@RestController
+public class YardBatchTaskResource {
+	
+	@Autowired private YardBatchTaskRepository btrepository;
+	@Autowired private YardBatchTaskService btService;
+	@Autowired private RabbitProxy rabbitProxy;
+	
+	@RequestMapping(value = "/yard/sys/yardBatchTasks", method = RequestMethod.GET)
+	public YardBatchTasks list(@RequestParam(value = "currentPage", required = false, defaultValue = "1")int currentPage,
+            @RequestParam(value = "pageSize", required = false, defaultValue = "20")int pageSize,
+            @RequestParam(value = "params", required = false) String paramsStr,
+            @RequestParam(value = "orders", required = false) String orders){
+		YardBatchTaskParams params = QueryParams.buildParamsFromJson(paramsStr, YardBatchTaskParams.class);
+		if(params == null){
+			params = new YardBatchTaskParams();
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		YardBatchTasks batckTasks = btrepository.find(params, order, currentPage - 1, pageSize);
+		
+		return batckTasks;
+	}
+	
+	@RequestMapping(value = "/yard/sys/yardBatchTasks/count", method = RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		YardBatchTaskParams params = QueryParams.buildParamsFromJson(paramsStr, YardBatchTaskParams.class);
+		int count = btrepository.count(params);
+		
+		return count;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	@RequestMapping(value = "/yard/sys/yardBatchTasks/{taskId}", method = RequestMethod.GET)
+	public YardBatchTask getOne(@PathVariable(value = "taskId", required = true) String taskId){
+		YardBatchTask batchTask = btrepository.findOne(taskId);
+		return batchTask;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	@RequestMapping(value = "/yard/sys/yardBatchTasks/{taskId}/data", method = RequestMethod.GET)
+	public SpdDeliveryOrders getData(@PathVariable(value = "taskId", required = true) String taskId) throws JsonParseException, JsonMappingException, IOException{
+		YardBatchTask batchTask = btrepository.findOne(taskId);
+		YardBatchTaskTO<SpdDeliveryOrders> taskTO = Global.defaultObjectMapper.readValue(batchTask.getJson(), new TypeReference<YardBatchTaskTO<SpdDeliveryOrders>>(){});
+		return taskTO.getData();
+	}
+	
+	@RequestMapping(value = "/yard/sys/yardBatchTasks/{taskId}", method = RequestMethod.POST)
+	public String process(@PathVariable(value = "taskId", required = true) String taskId) throws JsonParseException, JsonMappingException, IOException{
+		rabbitProxy.sendCreateBatchTaskMsg(taskId);
+		return "ok";
+	}
+	
+	@SuppressWarnings({"rawtypes" })
+	@RequestMapping(value = "/yard/sys/batchCreateDeliveryOrderTasks", method = RequestMethod.POST)
+	public YardBatchTask addBatchCreateDeliverySheetTask(HttpServletRequest request) throws Exception{
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		
+		byte[] buffer = IOUtils.toByteArray(request.getInputStream());
+		String json = new String(buffer, Global.defaultCharset);
+		YardBatchTaskTO<SpdDeliveryOrders> batchTaskTO = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTaskTO<SpdDeliveryOrders>>() {});
+		batchTaskTO.getData().forEach(order->{
+			log.info("delivery order prepare inform code: {}", order.getPrepareInformBizCode());
+		});
+		YardBatchTask<SpdDeliveryOrders> batchTask = new YardBatchTask<SpdDeliveryOrders>(YardBatchTaskType.batch_create_delivery_order_task, batchTaskTO.getData(), json, batchTaskTO.getNotifyUrl());
+		batchTask.getData().forEach(order->{
+			log.info("delivery order prepare inform code: {}", order.getPrepareInformBizCode());
+		});
+		return btService.createBatchTask(user, batchTask);
+	}
+	
+
+}

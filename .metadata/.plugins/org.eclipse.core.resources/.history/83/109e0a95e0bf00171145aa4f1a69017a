@@ -1,0 +1,37 @@
+package cn.ak4j.yard.spd.bizplan.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import cn.ak4j.yard.enums.CommonEnumJsonSerializer;
+import cn.ak4j.yard.enums.ITypeEnum;
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using = CommonEnumJsonSerializer.class)
+public enum SpdReplenishType implements ITypeEnum{
+
+	depot_allocation("depot_allocation", "库房调拨", "库房向科室进行调拨的行为"),
+	dept_allocation("dept_allocation", "科室调拨", "科室之间进行调拨的行为"),
+	depot_replenish("depot_replenish", "库房补货", ""),
+	dept_apply("dept_apply","科室请领",""),
+	refund("refund", "退货", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SpdReplenishType(String code, String name, String description){
+		this.code = code;
+		this.name= name;
+		this.description = description;
+	}
+	
+	public static SpdReplenishType typeOf(String code){
+		for(SpdReplenishType state : SpdReplenishType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+}

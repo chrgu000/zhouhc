@@ -1,0 +1,96 @@
+package cn.ak4j.yard.spd.domain;
+
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.DecimalMin;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+import org.hibernate.validator.constraints.ScriptAssert;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+import cn.ak4j.yard.domain.AbstractEntity;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name = "SPD_DEPOT_GOODS_CONFIG")
+@JsonIgnoreProperties(ignoreUnknown = true)
+@ScriptAssert(script="_this.upperLimit>=_this.lowerLimit", lang = "javascript", alias = "_this", message="备货上限要大于等于备货下限")
+public class SpdDepotGoodsConfig extends AbstractEntity implements IEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name = "uuidGenerator", strategy = "uuid")
+	@Column(name="id") @Getter @Setter
+	private String id;
+	
+	@NotEmpty(message = "仓库不能为空") @Getter @Setter
+	private String depotId;
+	
+	@NotEmpty(message = "产品不能为空")@Getter @Setter
+	private String goodsId;
+	
+	@Getter @Setter
+	private Date lastPrepareTime;
+	
+	@NotEmpty(message = "自动备货周期不能为空")@Getter @Setter
+	private String autoPrepareStratageCode;
+	
+	@Getter @Setter
+	@DecimalMin(value = "0",message = "配额数量是无效数据")
+	private Integer quotaQty;
+	
+	@NotEmpty(message = "配额周期不能为空")@Getter @Setter
+	private String quotaStratageCode;
+	
+	@Getter @Setter
+	@DecimalMin(value = "0",message = "备货上限是无效数据")
+	private Integer upperLimit;
+	
+	@Getter @Setter
+	@DecimalMin(value = "0",message = "备货下限是无效数据")
+	private Integer lowerLimit;
+	
+	@Getter @Setter
+	@DecimalMin(value = "0",message = "申领上限是无效数据")
+	private Integer replenishUpperLimit;
+	
+	@Getter @Setter
+	@DecimalMin(value = "0",message = "申领下限是无效数据")
+	private Integer replenishLowerLimit;
+	
+	@Getter @Setter
+	private Integer uncompletedPrepareQty;//伪在途数量
+	
+	@Transient @Getter @Setter 
+	private PcsDepot depot;
+	
+	@Transient @Getter @Setter
+	private YdsGoods goods;
+
+	public void update(SpdDepotGoodsConfig config) {
+		setLastPrepareTime(config.getLastPrepareTime());
+		setAutoPrepareStratageCode(config.getAutoPrepareStratageCode());
+		setQuotaQty(config.getQuotaQty());
+		setQuotaStratageCode(config.getQuotaStratageCode());
+		setUpperLimit(config.getUpperLimit());
+		setLowerLimit(config.getLowerLimit());
+		setReplenishUpperLimit(config.getReplenishUpperLimit());
+		setReplenishLowerLimit(config.getReplenishLowerLimit());
+	}
+	
+}

@@ -1,0 +1,133 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAllBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizPlans;
+import cn.ak4j.yard.spd.bizplan.domain.SpdGoodsBizPlans;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.params.SpdAdjustStockBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdConsumeBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdMoveAreaBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdPrepareInformBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReturnGoodsBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdAdjustStockBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizPlanRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdConsumeBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdMoveAreaBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReturnGoodsBizRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+
+@Service
+@SuppressWarnings({"unchecked"})
+public class SpdBizPlanService{
+
+	@Autowired private SpdBizPlanRepository bpRepository;
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	@Autowired private SpdReplenishBizRepository repBRepository;
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private SpdConsumeBizRepository cbRepository;
+	@Autowired private SpdReturnGoodsBizRepository rgbRepository;
+	@Autowired private SpdMoveAreaBizRepository mabRepository;
+	@Autowired private SpdAdjustStockBizRepository asbRepository;
+	
+	@Autowired
+	private SpdAllBizSteps allBizSteps;
+	
+	public SpdBizPlans findUncompleteBizPlans(SpdBizType bizType, String ruleId){
+		SpdBizSteps bizSteps = allBizSteps.get(bizType);
+		SpdBizStep lastStep = bizSteps.get(bizSteps.size()-1);
+		
+		switch (bizType) {
+		case receive_biz:
+			SpdReceiveBizParams receiveParams = new SpdReceiveBizParams();
+			receiveParams.setBizRuleId(new ListParam<String>(ruleId));
+			receiveParams.setBizStatusCode(new ListParam<String>(lastStep.getStatusCode(), QueryParam.operation_not_in));
+			return new SpdBizPlans(rbRepository.find(receiveParams));
+		
+		case replenish_biz:
+			SpdReplenishBizParams replenishParams = new SpdReplenishBizParams();
+			replenishParams.setBizRuleId(new ListParam<String>(ruleId));
+			replenishParams.setBizStatusCode(new ListParam<String>(lastStep.getStatusCode(), QueryParam.operation_not_in));
+			return new SpdBizPlans(repBRepository.find(replenishParams));
+		
+		case adjust_stock_biz:
+			SpdAdjustStockBizParams adjustStockBizParams = new SpdAdjustStockBizParams();
+			adjustStockBizParams.setBizRuleId(new ListParam<String>(ruleId));
+			adjustStockBizParams.setBizStatusCode(new ListParam<String>(lastStep.getStatusCode(), QueryParam.operation_not_in));
+			return new SpdBizPlans(asbRepository.find(adjustStockBizParams));
+		
+		case move_area_biz:
+			SpdMoveAreaBizParams moveAreaParams = new SpdMoveAreaBizParams();
+			moveAreaParams.setBizRuleId(new ListParam<String>(ruleId));
+			moveAreaParams.setBizStatusCode(new ListParam<String>(lastStep.getStatusCode(), QueryParam.operation_not_in));
+		    return new SpdBizPlans(mabRepository.find(moveAreaParams));
+		    
+		case prepare_inform_biz:
+			SpdPrepareInformBizParams prepareInformParams = new SpdPrepareInformBizParams();
+			prepareInformParams.setBizRuleId(new ListParam<String>(ruleId));
+			prepareInformParams.setBizStatusCode(new ListParam<String>(lastStep.getStatusCode(), QueryParam.operation_not_in));
+			return new SpdBizPlans(pibRepository.find(prepareInformParams));
+		
+		case return_goods_biz:
+			SpdReturnGoodsBizParams returnGoodsParam = new SpdReturnGoodsBizParams();
+			returnGoodsParam.setBizRuleId(new ListParam<String>(ruleId));
+			returnGoodsParam.setBizStatusCode(new ListParam<String>(lastStep.getStatusCode(), QueryParam.operation_not_in));
+			return new SpdBizPlans(rgbRepository.find(returnGoodsParam));
+		
+		case consume_biz:
+			SpdConsumeBizParams cunsumeParams = new SpdConsumeBizParams();
+			cunsumeParams.setBizRuleId(new ListParam<String>(ruleId));
+			cunsumeParams.setBizStatusCode(new ListParam<String>(lastStep.getStatusCode(), QueryParam.operation_not_in));
+			return new SpdBizPlans(cbRepository.find(cunsumeParams));
+		
+		case daily_clean_biz:
+			return new SpdBizPlans();
+		
+		case finacial_reconciliation_biz:
+			return new SpdBizPlans();
+			
+		default:
+			throw new UnsupportedOperationException("尚未支持，赶紧实现:"+bizType.getCode());
+		}	
+	}
+
+	public SpdGoodsBizPlans findDispatchableBizs(String dispatcherId) {
+//		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+//		
+//		//查询未创建调度任务的收货业务
+//		SpdReceiveBizs reviewdReceives = bpRepository.findByBizStatusCodeAndToDepotId(SpdReceiveBizSteps.review_receive.getStatusCode(), dispatcher.getDispatcherDepotId());
+//		
+//		//查询待调度的收货业务
+//		SpdBizPlans dispatcherRelationBizs = findDispatcherRelationBizs(dispatcherId);
+//		
+//		SpdBizPlans result = new SpdBizPlans();
+//		result.addAll(reviewdReceives);
+//		result.addAll(dispatcherRelationBizs);
+//		
+//		return result;
+		return null;
+	}
+
+	public SpdGoodsBizPlans findDispatcherRelationBizs(String dispatcherId) {
+		//查询当前调度明细关联的业务
+		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+		
+		SpdGoodsBizPlans bizs = new SpdGoodsBizPlans(bpRepository.findAll(dispatcher.getRefs().pluck("refObjectId")));
+		
+		return bizs;
+	}
+
+}

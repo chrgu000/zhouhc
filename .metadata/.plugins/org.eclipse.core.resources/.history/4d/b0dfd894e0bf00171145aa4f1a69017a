@@ -1,0 +1,48 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 日清对账反馈规则
+* @author zhengyf
+* @date 2017年8月15日 上午10:52:13
+* @version V1.0.0
+*/
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+@SuppressWarnings("serial")
+@Entity  
+@DiscriminatorValue("daily_clean") 
+public class SpdDailyCleanFeedbackRule extends SpdAbstractFeedbackRule{
+
+	private Boolean autoReviewDailyClean;
+	
+	@Transient private String description;
+
+	@Override
+	public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			buf.append(autoReviewDailyClean?auto_word:manual_word)
+				.append("审核日清对账").append(Global.generalSeparator);
+			this.description = buf.toString();
+		}
+		return description;
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.daily_clean_biz;
+	}
+
+}

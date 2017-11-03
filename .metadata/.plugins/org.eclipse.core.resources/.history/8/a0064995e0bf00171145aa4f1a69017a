@@ -1,0 +1,98 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class PcsOrgs extends Entities<PcsOrg>{
+
+	public PcsOrgs(List<PcsOrg> orgs){
+		super(orgs);
+	}
+	
+	public PcsOrg getMainOrg(){
+		for(PcsOrg org : this){
+			if(org.isMain()){
+				return org;
+			}
+		}
+		return null;
+	}
+	
+	public void fillDepts(PcsDepts depts){
+		for(PcsOrg org : this){
+			PcsDepts relationDepts = new PcsDepts(CollectionUtils.find("orgId", org.getOrgId(), String.class, depts));
+			org.setDepts(relationDepts);
+		}
+	}
+	
+	public void checkOrgExist(PcsOrg org) {
+		if(StringUtils.isNotEmpty(org.getOrgCode()) && !org.getOrgCode().equals(PcsOrg.default_org_code)){
+			if(CollectionUtils.findWhere("orgCode", org.getOrgCode(), this) != null && !CollectionUtils.findWhere("orgCode", org.getOrgCode(), this).getOrgId().equals(org.getOrgId())){
+				throw new InvalidDataException(YardExceptionType.invalid_resource_exist, String.format("机构:%s", org.getOrgCode()));
+			}
+		}
+		
+		Object[] valArray = new Object[]{org.getOrgName(), org.isSaler(), org.getOrgCode(), org.isBuyer(), org.isStorage(), org.isTrans(), org.isAgent(), org.isGov(), org.isBank()};
+		PcsOrg orgWithSameNameAndSort = CollectionUtils.findWhere(new String[]{"orgName", "orgCode", "saler", "buyer", "storage", "trans", "agent", "gov", "bank"},  this, valArray);	
+		if(orgWithSameNameAndSort != null && !orgWithSameNameAndSort.getOrgId().equals(org.getOrgId())){
+			throw new InvalidDataException(YardExceptionType.invalid_resource_exist, String.format("机构:%s, 销售商:%s, 采购商:%s, 仓库：%s, 配送企业:%s, 代理商:%s, 政府:%s, 银行:%s", valArray));
+		}
+	}
+	
+	public void checkForModify(PcsOrg org){
+		if(StringUtils.isNotEmpty(org.getOrgCode()) && !org.getOrgCode().equals(PcsOrg.default_org_code)){
+			PcsOrg theOrg = CollectionUtils.findWhere("orgCode", org.getOrgCode(), this);
+			if(theOrg != null && !theOrg.getOrgId().equals(org.getOrgId())){
+				throw new InvalidDataException(YardExceptionType.invalid_resource_exist, String.format("机构:%s", org.getOrgCode()));
+			}
+		}
+		
+		Object[] valArray = new Object[]{org.getOrgName(), org.getOrgCode(), org.isSaler(), org.isBuyer(), org.isStorage(), org.isTrans(), org.isAgent(), org.isGov(), org.isBank()};
+		PcsOrg orgWithSameNameAndSort = CollectionUtils.findWhere(new String[]{"orgName", "orgCode", "saler", "buyer", "storage", "trans", "agent", "gov", "bank"},  this, valArray);	
+		if(orgWithSameNameAndSort != null && !orgWithSameNameAndSort.getOrgId().equals(org.getOrgId())){
+			throw new InvalidDataException(YardExceptionType.invalid_resource_exist, String.format("机构:%s, 编码:%s, 销售商:%s, 采购商:%s, 仓库：%s, 配送企业:%s, 代理商:%s, 政府:%s, 银行:%s", valArray));
+		}
+	}
+
+	public PcsOrg findById(String id) {
+		return CollectionUtils.findWhere("orgId", id, this);
+	}
+
+	public PcsOrgs findByIds(List<String> ids) {
+		if(CollectionUtils.isEmpty(ids)){
+			return new PcsOrgs();
+		}
+		PcsOrgs orgs = new PcsOrgs();
+		this.forEach(org->{
+			if(ids.contains(org.getOrgId())){
+				orgs.add(org);
+			}
+		});
+		return orgs;
+	}
+	
+	public PcsOrgs findByOrgCodes(List<String> orgCodes){
+		if(CollectionUtils.isEmpty(orgCodes)){
+			return new PcsOrgs();
+		}
+		PcsOrgs orgs = new PcsOrgs();
+		orgCodes.forEach(orgCode->{
+			orgs.add(findByOrgCode(orgCode));
+		});
+		return orgs;
+	}
+	
+	public PcsOrg findByOrgCode(String orgCode){
+		return CollectionUtils.findWhere("orgCode", orgCode, this);
+	}
+	
+}

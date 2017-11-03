@@ -1,0 +1,19 @@
+package cn.ak4j.yard.sys.domain;
+
+import cn.ak4j.entity.Entities;
+
+/**
+* @Description: SPD编码序列集合
+* @author zhengyf
+* @date 2017年3月16日 下午2:40:40
+* @version V1.0.0
+*/
+@SuppressWarnings({"serial"})
+public class YardCodeSequences extends Entities<YardCodeSequence>{
+
+	public YardCodeSequences add(CodeSort codeSort){
+		add(new YardCodeSequence(codeSort));
+		return this;
+	}
+	
+}

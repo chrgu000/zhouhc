@@ -1,0 +1,152 @@
+package cn.ak4j.yard.spd.bizplan.factory;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.enums.SpdAdjustStockType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAdjustStockRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAdjustStockRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventoryItem;
+import cn.ak4j.yard.spd.domain.SpdInventoryItems;
+
+@Component
+public class SpdAdjustStockFactory {
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	
+	public SpdAdjustStockBizs buildAdjustStockFromInventory(SpdInventory inventory, PcsUser user){
+		SpdAdjustStockBizs result = new SpdAdjustStockBizs();
+
+		SpdAdjustStockRules rules = brRepository.findAllWithRelations().getAllAdjustStockRules();
+		Map<String, SpdInventoryItems> inventoryItems = getInventoryItems(inventory);
+		
+		SpdInventoryItems unqualifiedItems = inventoryItems.get("unqualified");
+		SpdInventoryItems incrementItems = inventoryItems.get("increment");
+		SpdInventoryItems decrementItems = inventoryItems.get("decrement");
+		
+		if(CollectionUtils.isNotEmpty(unqualifiedItems)){
+			SpdAdjustStockRules theRules = rules.find(inventory.getDepotId(), PcsAreaType.unqualified.getCode(), SpdAdjustStockType.increment.getCode(), "库存盘点");
+		    if(CollectionUtils.isEmpty(theRules)){
+		    	String exceptionMsg = String.format("条件是仓库为:[%s]，货区类型为:[%s]，调节类型为:[%s]，调节事由为:[%s]", 
+		    			                                                                                    inventory.getDepot().getDepotName(), 
+		    			                                                                                    PcsAreaType.unqualified.getName(), 
+		    			                                                                                    SpdAdjustStockType.increment.getName(),
+		    			                                                                                    "库存盘点");
+		    	throw new NotFoundException(YardExceptionType.not_found_adjust_stock_rule, exceptionMsg);
+		    }
+		    SpdAdjustStockRule rule = theRules.get(0);
+			SpdAdjustStockBiz adjustStock = buildAdjustStockBiz(rule, user, unqualifiedItems);
+		    result.add(adjustStock);
+		}
+		
+		if(CollectionUtils.isNotEmpty(incrementItems)){
+			SpdAdjustStockRules theRules = rules.find(inventory.getDepotId(), inventory.getDepotArea().getAreaType(), SpdAdjustStockType.increment.getCode(), "库存盘点");
+			if(CollectionUtils.isEmpty(theRules)){
+		    	String exceptionMsg = String.format("条件是仓库为:[%s]，货区类型为:[%s]，调节类型为:[%s]，调节事由为:[%s]", 
+		    			                                                                                    inventory.getDepot().getDepotName(), 
+		    			                                                                                    PcsAreaType.typeOf(inventory.getDepotArea().getAreaType()).getName(), 
+		    			                                                                                    SpdAdjustStockType.increment.getName(),
+		    			                                                                                    "库存盘点");
+		    	throw new NotFoundException(YardExceptionType.not_found_adjust_stock_rule, exceptionMsg);
+		    }
+			 SpdAdjustStockRule rule = theRules.get(0);
+			SpdAdjustStockBiz incrementAdjustStock = buildAdjustStockBiz(rule, user, incrementItems);
+			result.add(incrementAdjustStock);
+		}
+		
+		if(CollectionUtils.isNotEmpty(decrementItems)){
+			SpdAdjustStockRules theRules = rules.find(inventory.getDepotId(), inventory.getDepotArea().getAreaType(), SpdAdjustStockType.decrement.getCode(), "库存盘点");
+			
+			if(CollectionUtils.isEmpty(theRules)){
+		    	String exceptionMsg = String.format("条件是仓库为:[%s]，货区类型为:[%s]，调节类型为:[%s]，调节事由为:[%s]", 
+		    			                                                                                    inventory.getDepot().getDepotName(), 
+		    			                                                                                    PcsAreaType.typeOf(inventory.getDepotArea().getAreaType()).getName(), 
+		    			                                                                                    SpdAdjustStockType.decrement.getName(),
+		    			                                                                                    "库存盘点");
+		    	throw new NotFoundException(YardExceptionType.not_found_adjust_stock_rule, exceptionMsg);
+		    }
+			 SpdAdjustStockRule rule = theRules.get(0);
+			SpdAdjustStockBiz decrementAdjustStock = buildAdjustStockBiz(rule, user, decrementItems);
+			result.add(decrementAdjustStock);
+		}
+		
+		return result;
+	}
+	
+	private Map<String, SpdInventoryItems> getInventoryItems(SpdInventory inventory){
+		Map<String, SpdInventoryItems> items = new HashMap<String, SpdInventoryItems>();
+		
+		SpdInventoryItems unqualifiedItems = new SpdInventoryItems();
+		SpdInventoryItems incrementItems = new SpdInventoryItems();
+		SpdInventoryItems decrementItmes = new SpdInventoryItems();
+		for(SpdInventoryItem item : inventory.getItems()){
+			boolean isIncrement = item.getCheckQty()>item.getPlanQty();
+			boolean isDecrement = item.getCheckQty()<item.getPlanQty();
+			boolean isUnqualified = item.getUnqualifiedQty()>0;
+			if(isIncrement){
+				incrementItems.add(item);
+			}
+			if(isDecrement){
+				decrementItmes.add(item);
+			}
+			if(isUnqualified){
+				unqualifiedItems.add(item);
+			}
+		}
+		
+		items.put("increment", incrementItems);
+		items.put("decrement", decrementItmes);
+		items.put("unqualified", unqualifiedItems);
+		
+		return items;
+	}
+	
+	private SpdAdjustStockBiz buildAdjustStockBiz(SpdAdjustStockRule rule, PcsUser user, SpdInventoryItems items){
+		SpdAdjustStockBiz adjustStock = new SpdAdjustStockBiz();
+		SpdBizItems adjustStockitmes = new SpdBizItems();
+		boolean isNormalAreaType = rule.getAreaType().equals(PcsAreaType.normal.getCode());
+		int qty = 0;
+		for(SpdInventoryItem item : items){
+			if(isNormalAreaType){
+				qty = Math.abs((int)(item.getCheckQty()-item.getPlanQty()));
+			}else{
+				qty = (int)item.getUnqualifiedQty();
+			}
+			SpdBizItem adjustStockitem = buildBizItem(item, qty);
+			adjustStockitmes.add(adjustStockitem);
+		}
+		adjustStock.applyRule(rule, user);
+		adjustStock.setMaintenanceInfo(new MaintenanceInfo(user));
+		adjustStock.setItems(adjustStockitmes);
+		return adjustStock;
+	}
+	
+	private SpdBizItem buildBizItem(SpdInventoryItem item, int qty){
+		SpdBizItem adjustStockitem = new SpdBizItem();
+		adjustStockitem.setGoodsId(item.getGoodsId());
+		adjustStockitem.setLotId(item.getStockGoodsLotId());
+		adjustStockitem.setPlanQty(qty);
+		adjustStockitem.setUnitLv(item.getGoods().getStoreUnitLv());
+		adjustStockitem.setUnitPrice(item.getGoods().getStorePrice());
+		adjustStockitem.setCreateTime(new Date());
+		adjustStockitem.setLastUpdateTime(new Date());
+		return adjustStockitem;
+	}
+	
+}

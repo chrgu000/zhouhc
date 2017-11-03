@@ -1,0 +1,50 @@
+package cn.ak4j.yard.pcs.to;
+
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import lombok.Data;
+
+@Data
+public class PcsDepotExcelTO {
+
+	private String depotId;
+	private String manageOrgId;
+	private String manageDeptId;
+	private String depotType;
+	private boolean fixed;
+	private String depotName;
+	private String depotCode;
+	private String depotAddress;// 仓库地址
+	private boolean enabled;// 是否禁用
+	private boolean central;// 是否中心库
+	private String linkMan;// 联系人
+	private String linkTel;// 联系电话
+	private String goodsType;//产品类型
+	private PcsDept manageDept;
+	
+	public String getEnabledText(){
+		if(isEnabled()){
+			return "是";
+		}
+		return "否";
+	}
+	
+	public String getCentralText(){
+		if(isCentral()){
+			return "是";
+		}
+		return "否";
+	}
+	
+	public String getFixedText(){
+		if(isFixed()){
+			return "是";
+		}
+		return "否";
+	}
+	
+	public String getGoodsTypeText(){
+		return YdsGoodsType.typeOf(getGoodsType()).getName();
+	}
+	
+}

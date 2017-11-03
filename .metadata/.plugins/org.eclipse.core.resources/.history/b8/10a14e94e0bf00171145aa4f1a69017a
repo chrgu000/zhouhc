@@ -1,0 +1,21 @@
+package cn.ak4j.yard.spd.utils;
+
+public class MsgResult {
+
+	private Boolean result;
+	private String errMsg;
+	
+	public Boolean getResult() {
+		return result;
+	}
+	public void setResult(Boolean result) {
+		this.result = result;
+	}
+	public String getErrMsg() {
+		return errMsg;
+	}
+	public void setErrMsg(String errMsg) {
+		this.errMsg = errMsg;
+	}
+	
+}

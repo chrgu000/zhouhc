@@ -1,0 +1,96 @@
+package cn.ak4j.yard.web;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import lombok.Data;
+
+/**
+* @Description: 该对象用于描述对外曝露的Web资源
+* @author zhengyf
+* @date 2016年11月29日 上午10:16:35
+* @version V1.0.0
+*/
+@Data
+public class ResourceDefine {
+	
+	private Logger logger = LoggerFactory.getLogger(ResourceDefine.class);
+	
+	private String resourceName;
+	private String domainName;
+	private String moduleName;
+	private String subModuleName;
+	@SuppressWarnings("rawtypes")
+	private Class serviceType;
+	private RequestType[] supportRequests;
+	
+	
+	public ResourceDefine(String moduleName, String resourceName){
+		this(moduleName, resourceName, RequestType.values());
+	}
+	
+	public ResourceDefine(String moduleName, String resourceName, RequestType[] supportRequests){
+		this(moduleName, resourceName, supportRequests, false);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public ResourceDefine(String moduleName, String resourceName, Class serviceType, RequestType[] supportRequests, boolean exclusive){
+		this(moduleName, resourceName, supportRequests, exclusive);
+		setServiceType(serviceType);
+	}
+	
+	public ResourceDefine(String moduleName, String resourceName, RequestType[] supportRequests, boolean exclusive){
+		this.moduleName = moduleName;
+		this.resourceName = resourceName;
+		if(!exclusive){
+			this.supportRequests = supportRequests;
+		}else{
+			RequestType[] exclusiveRequests = supportRequests;
+			List<RequestType> includeSupportRequests = new ArrayList<RequestType>();
+			for(RequestType request : RequestType.values()){
+				if(!ArrayUtils.contains(exclusiveRequests, request)){
+					includeSupportRequests.add(request);
+				}
+			}
+			this.supportRequests = includeSupportRequests.toArray(new RequestType[includeSupportRequests.size()]);
+		}
+	}
+	
+	public ResourceDefine(String moduleName, String subModuleName, String resourceName, String domainName, RequestType[] supportRequests, boolean exclusive){
+		this.moduleName = moduleName;
+		this.subModuleName = subModuleName;
+		this.resourceName = resourceName;
+		this.domainName = domainName;
+		if(!exclusive){
+			this.supportRequests = supportRequests;
+		}else{
+			RequestType[] exclusiveRequests = supportRequests;
+			List<RequestType> includeSupportRequests = new ArrayList<RequestType>();
+			for(RequestType request : RequestType.values()){
+				if(!ArrayUtils.contains(exclusiveRequests, request)){
+					includeSupportRequests.add(request);
+				}
+			}
+			this.supportRequests = includeSupportRequests.toArray(new RequestType[includeSupportRequests.size()]);
+		}
+	}
+	
+	public String getResourceCollectionName(){
+		return this.moduleName+StringUtils.capitalize(this.resourceName)+"s";
+	}
+	
+	public String getResourceUri(RequestType requestType){
+		String resourceUri = String.format(requestType.getUriTemplate(), getModuleName(), getResourceCollectionName());
+		return resourceUri;
+	}
+	
+	public boolean isSupportRequest(RequestType requestType){
+		return ArrayUtils.contains(supportRequests, requestType);
+	}
+	
+}

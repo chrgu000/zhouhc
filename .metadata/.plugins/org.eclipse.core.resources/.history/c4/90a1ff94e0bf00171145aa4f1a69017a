@@ -1,0 +1,197 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import java.util.Arrays;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdReplenishRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdReplenishBizRepository extends BaseRepository<SpdReplenishBiz, SpdReplenishBizs, SpdReplenishBizParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	
+	public SpdReplenishBizs find(SpdReplenishBizParams params,OrderParam order,int pageNo,int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			 return new SpdReplenishBizs(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdReplenishBizs();
+	}
+
+	public int count(SpdReplenishBizParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdReplenishBizParams params){
+		if(params != null){
+			PcsDepotParams fromDepotParams = new PcsDepotParams();
+			fromDepotParams.setDepotName(params.getFromDepotName());
+			if(!fromDepotParams.isEmpty()){
+				PcsDepots fromDepots = depotRepository.findAll().find(fromDepotParams, orgRepository, deptRepository);
+				if(CollectionUtils.isEmpty(fromDepots)){
+					return false;
+				}
+				params.setFromDepotId(new ListParam<String>(fromDepots.getIds()));
+			}
+			
+			PcsDepotParams toDepotParams = new PcsDepotParams();
+			toDepotParams.setDepotName(params.getToDepotName());
+			if(!toDepotParams.isEmpty()){
+				PcsDepots toDepots = depotRepository.findAll().find(toDepotParams, orgRepository, deptRepository);
+				if(CollectionUtils.isEmpty(toDepots)){
+					return false;
+				}
+				params.setToDepotId(new ListParam<String>(toDepots.getIds()));
+			}
+			
+			PcsDeptParams fromDeptParams = new PcsDeptParams();
+			fromDeptParams.setDeptName(params.getFromDeptName());
+			if(fromDeptParams.isNotEmpty()){
+				PcsDepts fromDepts = new PcsDepts(deptRepository.findAll().find(fromDeptParams));
+				if(CollectionUtils.isEmpty(fromDepts)){
+					return false;
+				}
+				PcsDepotParams depotParams = new PcsDepotParams();
+				depotParams.setManageDeptId(new ListParam<String>(fromDepts.getIds()));
+				if(depotParams.isNotEmpty()){
+					PcsDepots fromDepots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+					if(CollectionUtils.isEmpty(fromDepots)){
+						return false;
+					}
+					params.setFromDepotId(new ListParam<String>(fromDepots.getIds()));
+				}
+			}
+			
+			PcsDeptParams toDeptParams = new PcsDeptParams();
+			toDeptParams.setDeptName(params.getToDeptName());
+			if(toDeptParams.isNotEmpty()){
+				PcsDepts toDepts = new PcsDepts(deptRepository.findAll().find(toDeptParams));
+				if(CollectionUtils.isEmpty(toDepts)){
+					return false;
+				}
+				PcsDepotParams depotParams = new PcsDepotParams();
+				depotParams.setManageDeptId(new ListParam<String>(toDepts.getIds()));
+				if(depotParams.isNotEmpty()){
+					PcsDepots toDepots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+					if(CollectionUtils.isEmpty(toDepots)){
+						return false;
+					}
+					params.setToDepotId(new ListParam<String>(toDepots.getIds()));
+				}
+			}
+			
+			PcsUserParams userParams = new PcsUserParams();
+			userParams.setUserName(params.getCreateUserName());
+			if(!userParams.isEmpty()){
+				PcsUsers users = userRepository.find(userParams);
+				if(CollectionUtils.isEmpty(users)){
+					return false;
+				}
+				params.setMaintenanceInfo_createUserId(new ListParam<String>(users.getIds()));
+			}
+			
+			SpdReplenishRuleParams replenishRuleParams = new SpdReplenishRuleParams();
+			replenishRuleParams.setName(params.getBizRuleName());
+			if(replenishRuleParams.isNotEmpty()){
+				SpdReplenishRules replenishRules = new SpdReplenishRules(brRepository.findAllWithRelations().getAllReplenishRules().find(replenishRuleParams));
+				if(CollectionUtils.isEmpty(replenishRules)){
+					return false;
+				}
+				
+				params.setBizRuleId(new ListParam<String>(replenishRules.getIds()));
+			}
+		}
+		return true;	
+	}
+	
+	public SpdReplenishBiz saveWithItems(SpdReplenishBiz replenish){
+		replenish = save(replenish);
+		replenish.updateItemsBizIdAndTime();
+		biRepository.saveAll(replenish.getItems());
+		return replenish;
+	}
+
+	public SpdReplenishBiz getWithItems(String bizId) {
+		SpdReplenishBiz replenish = findOne(bizId);
+		SpdBizItems items = biRepository.findWithGoodsByBizId(bizId);
+		replenish.setItems(items);
+		return replenish;
+	}
+
+	public SpdReplenishBizs findByBizStatusCodeAndFromDepotId(String statusCode, String fromDepotId) {
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		params.setBizStatusCode(new ListParam<String>(statusCode));
+		params.setFromDepotId(new ListParam<String>(fromDepotId));
+		return find(params);
+	}
+	
+	public SpdReplenishBizs getByIds(String ids) {
+		String[] idArray = ids.split(",");
+		List<String> idList = Arrays.asList(idArray);
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		params.setBizId(new ListParam<String>(idList));
+		SpdReplenishBizs replenishs = find(params);
+		PcsDepots depots = depotRepository.findAllWithRelations();
+		replenishs.forEach(replenish->{
+			replenish.setToDepot(depots.findById(replenish.getToDepotId()));
+		});
+		return replenishs;
+	}
+	
+	public SpdReplenishBizs findByBizRuleAndIncomplete(String ruleId){
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		params.setBizRuleId(new ListParam<String>(ruleId));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode(), QueryParam.operation_not_in));
+		return find(params);
+	}
+
+
+	public SpdReplenishBiz findByIdWithRule(String bizId) {
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		params.setBizId(new ListParam<String>(bizId));
+		SpdReplenishBizs replenishs = find(params);
+		replenishs.fillBizRules(brRepository.findAllWithRelations().getAllReplenishRules());
+		
+		return replenishs.get(0);
+	}
+	
+}

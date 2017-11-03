@@ -1,0 +1,128 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import java.util.Calendar;
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.entity.query.param.DateRange;
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.SpdOriginItemCondition;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+
+@Service
+public class SpdBizItemService extends IYardService<SpdBizItem>{
+	
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private YardGlobalInfoRepository giRepository;
+
+	@Override @Transactional
+	public SpdBizItem add(SpdBizItem bizItem, IUser user) {
+		SpdBizItems items = biRepository.findByBizId(bizItem.getBizId());
+		SpdBizItem theItem = items.getGoodsIdAndLotId(bizItem.getGoodsId(), bizItem.getLotId());
+		if(theItem != null){
+			throw new InvalidDataException("当前产品已存在，不能重复添加，请检查！");
+		};
+		bizItem.updateLastUpdateTime();
+		return biRepository.save(bizItem);
+	}
+
+	@Override @Transactional
+	public void delete(String bizItemId, IUser user) {
+		SpdBizItem bizItemPO = biRepository.findOne(bizItemId);
+		biRepository.delete(bizItemPO);
+	}
+
+	@Override @Transactional
+	public SpdBizItem modify(SpdBizItem bizItem, IUser user) {
+		SpdBizItem bizItemPO = biRepository.findOne(bizItem.getBizItemId());
+		
+		bizItemPO.update(bizItem);
+		bizItemPO = biRepository.save(bizItemPO);
+
+		return bizItemPO;
+	}
+	
+	/**
+	 * 根据业务规则查询申领业务明细，这里有一个限定，仅查询最新若干天的申领业务的明细
+	 */
+	public SpdBizItems findReviewedReplenishItemsByBizRuleId(String bizRuleId, String itemConditionCode, SpdBizItemParams params, OrderParam order, int pageNo,
+			int pageSize) {
+		if(params == null){
+			params = new SpdBizItemParams();
+		}
+		if(updateParamsWithBizRule(bizRuleId, itemConditionCode, params)){
+			return biRepository.findReplenishItems(params, order, pageNo-1, pageSize);
+		}
+		return new SpdBizItems();
+	}
+	
+	public int countReviewedReplenishItemsByBizRuleId(String bizRuleId, String itemConditionCode, SpdBizItemParams params){
+		if(params == null){
+			params = new SpdBizItemParams();
+		}
+		if(updateParamsWithBizRule(bizRuleId, itemConditionCode, params)){
+			return biRepository.countReplenishItems(params);
+		}
+		return 0;
+	}
+	
+	private boolean updateParamsWithBizRule(String bizRuleId, String itemConditionCode, SpdBizItemParams params){
+		SpdReplenishBizParams replenishParams = new SpdReplenishBizParams();
+		replenishParams.setBizRuleId(new ListParam<String>(bizRuleId));
+		ListParam<Integer> stateCodeParam = (new ListParam<Integer>()).addValue(CheckState.reviewed.getCode())
+																	  .addValue(CheckState.completed.getCode());
+		replenishParams.setCheckStateCode(stateCodeParam);
+		YardGlobalInfo globalInfo = giRepository.findAll().findByKey(YardGlobalInfo.find_replenish_items_by_biz_rule_id_recent_days);
+		int recentDays = Integer.parseInt(globalInfo.getValue());
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.DAY_OF_YEAR, 0-recentDays);
+		replenishParams.setMaintenanceInfo_createDate(new DateRangeParam(new DateRange(cal.getTime(), null)));
+		
+		OrderParam replenishOrder = new OrderParam("maintenanceInfo.createDate", "desc");
+		SpdReplenishBizs replenishs = rbRepository.find(replenishParams, replenishOrder, -1, -1);
+		
+		
+		SpdOriginItemCondition itemCondition = SpdOriginItemCondition.typeOf(itemConditionCode);
+		switch (itemCondition) {
+		case any:
+			params.setAsPlanned(new ListParam<Boolean>().addValue(true).addValue(false));
+			break;
+		case as_planned:
+			params.setAsPlanned(new ListParam<Boolean>().addValue(true));
+			break;
+		case not_as_planned:
+			params.setAsPlanned(new ListParam<Boolean>().addValue(false));
+			break;
+		default:
+			break;
+		}
+		params.setBizId(new ListParam<String>(replenishs.getIds()));
+		return CollectionUtils.isNotEmpty(replenishs);
+	}
+
+	@Override
+	public SpdBizItem updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+	
+}

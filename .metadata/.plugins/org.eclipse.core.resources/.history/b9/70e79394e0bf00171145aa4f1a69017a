@@ -1,0 +1,80 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedger;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedgerItems;
+import cn.ak4j.yard.spd.reconciliation.factory.SpdGeneralLedgerFactory;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdGeneralLedgerItemRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SpdGeneralLedgerService{
+
+	@Autowired private SpdGeneralLedgerItemRepository gliRepository;
+	@Autowired private SpdReceiveBizService rbService;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private SpdGeneralLedgerFactory generalLedgerFactory;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	
+	public SpdGeneralLedger getGeneralLedger(String deptId){
+		SpdGeneralLedgerItems items = gliRepository.findAll().findByDeptId(deptId);
+		PcsDept dept = deptRepository.findAll().findById(deptId);
+		SpdGeneralLedger generalLedger = new SpdGeneralLedger(dept, items);
+		return generalLedger;
+	}
+	
+	/**
+	 * 业务总账借入
+	 * 根据收货业务完成总账的借入
+	 */
+	@Transactional 
+	@CacheEvict(value = "longTimeCache", key = "\"allGeneralLedgerItems\"")
+	public SpdGeneralLedgerItems debit(String receiveId){
+		SpdReceiveBiz receive = rbService.getFullReceive(receiveId);
+		if(receive.getRecorded()){
+			log.warn("[{}, {}]已入账，此次总账借入操作将忽略", receive.getBizId(), receive.getBizCode());
+			return null;
+		}
+		
+		SpdGeneralLedger generalLedger = getGeneralLedger(receive.getFromDeptId());
+		SpdGeneralLedgerItems generalLedgerItems = generalLedger.debit(receive.getItems(), generalLedgerFactory);
+
+		gliRepository.saveAll(generalLedgerItems);
+		receive.recorded();
+		rbRepository.save(receive);
+		return generalLedgerItems;
+	}
+
+	/**
+	 * 业务总账冲账：本质上是一个借入行为，是院方退货造成的借入
+	 */
+	public SpdGeneralLedgerItems chargeOff(String ledgerDeptId, SpdGoodsQtys goodsQtys) {
+		SpdGeneralLedger generalLedger = getGeneralLedger(ledgerDeptId);
+		SpdGeneralLedgerItems generalLedgerItems = generalLedger.debit(goodsQtys, generalLedgerFactory);
+		gliRepository.saveAll(generalLedgerItems);
+
+		return generalLedgerItems;
+	}
+
+	/**
+	 * 业务总账贷出
+	 */
+	public void credit(String deptId, SpdGoodsQtys goodsQtys) {
+		SpdGeneralLedger generalLedger = getGeneralLedger(deptId);
+		SpdGeneralLedgerItems dealingItems = generalLedger.credit(goodsQtys);
+		gliRepository.saveAll(dealingItems);
+	}
+	
+	
+}

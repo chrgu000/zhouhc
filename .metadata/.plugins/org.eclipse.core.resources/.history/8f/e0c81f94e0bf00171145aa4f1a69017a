@@ -1,0 +1,108 @@
+package cn.ak4j.yard.sys.service.taskprocessor;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.sys.to.YdsEdsGoodsLotImportTO;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.service.YdsEdsGoodsLotService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class ImportEdsGoodsLotTaskProcessor implements IBatchTaskProcessor{
+
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private YdsEdsGoodsLotRepository eglRepository;
+	@Autowired private YdsEdsGoodsLotService eglService;
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public void process(YardBatchTask batchTask, PcsUser user, MailMsg hisMail, MailMsg supplyMail) throws Exception{
+		String json = batchTask.getJson();
+		YardBatchTaskTO<List<YdsEdsGoodsLotImportTO>> importEdsGoodsLotTaskTO = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTaskTO<List<YdsEdsGoodsLotImportTO>>>() {});
+		batchTask.setData(importEdsGoodsLotTaskTO.getData());
+		
+		List<YdsEdsGoodsLotImportTO> edsGoodsLotTOs = (List<YdsEdsGoodsLotImportTO>)batchTask.getData();
+		List<YdsEdsGoodsLotImportTO> withoutEdsGoodsLotTOs = new ArrayList<YdsEdsGoodsLotImportTO>();
+		
+		List<String> ownerOrgCodes = CollectionUtils.pluck("ownerOrgCode", edsGoodsLotTOs);
+		PcsOrgs ownerOrgs = orgRepository.findAll().findByOrgCodes(ownerOrgCodes);
+		
+		List<String> edsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", edsGoodsLotTOs);
+		YdsEdsGoodsParams edsGoodsParams = new YdsEdsGoodsParams();
+		edsGoodsParams.setEdsGoodsCode(new ListParam<String>(edsGoodsCodes));
+		YdsEdsGoodss edsGoodss = new YdsEdsGoodss(egRepository.findAll().find(edsGoodsParams));
+		
+		for(YdsEdsGoodsLotImportTO edsGoodsLotTO : edsGoodsLotTOs){
+			YdsEdsGoods exsitEdsGoods = edsGoodss.findByEdsGoodsCode(edsGoodsLotTO.getEdsGoodsCode());
+			if(exsitEdsGoods == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_goods, "企业产品编码:"+edsGoodsLotTO.getEdsGoodsCode());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			PcsOrg exsitOwnerOrg = ownerOrgs.findByOrgCode(edsGoodsLotTO.getOwnerOrgCode());
+			if(exsitOwnerOrg == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_org, "供应商机构编码:"+edsGoodsLotTO.getOwnerOrgCode());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			YdsEdsGoodsLots exsitEdsGoodsLots = eglRepository.findAll().findByLotNoAndOrgIdAndEdsGoodsId(edsGoodsLotTO.getEdsLotNo(), exsitOwnerOrg.getOrgId(), exsitEdsGoods.getEdsGoodsId());
+			if(CollectionUtils.isEmpty(exsitEdsGoodsLots)){
+				withoutEdsGoodsLotTOs.add(edsGoodsLotTO);
+			}else{
+				log.info(String.format("企业产品[%s:%s]的企业产品批次号[%s]已存在", edsGoodsLotTO.getEdsGoodsCode(), edsGoodsLotTO.getEdsGoodsName(), edsGoodsLotTO.getEdsLotNo()));
+			}
+		}
+		log.info("处理导入企业产品批次, 共{}个", withoutEdsGoodsLotTOs.size());
+		
+		int i = 0;
+		for(YdsEdsGoodsLotImportTO edsGoodsLotTO : withoutEdsGoodsLotTOs){
+			log.info("{}] 导入企业产品批次, edsLotNo: {}, edsGoodsCode: {}, ownerOrgCode: {}", i, edsGoodsLotTO.getEdsLotNo(), edsGoodsLotTO.getEdsGoodsCode(), edsGoodsLotTO.getOwnerOrgCode());
+			
+			PcsOrg ownerOrg = ownerOrgs.findByOrgCode(edsGoodsLotTO.getOwnerOrgCode());
+			
+			YdsEdsGoods edsGoods = edsGoodss.findByOrgIdAndCode(ownerOrg.getOrgId(), edsGoodsLotTO.getEdsGoodsCode()).get(0);
+			YdsEdsGoodsLot edsGoodsLot = new YdsEdsGoodsLot();
+			edsGoodsLot.setEdsGoodsId(edsGoods.getEdsGoodsId());
+			edsGoodsLot.setEdsLotNo(edsGoodsLotTO.getEdsLotNo());
+			edsGoodsLot.setProduceDate(edsGoodsLotTO.getProduceDate());
+			edsGoodsLot.setEdsLotValidity(edsGoodsLotTO.getEdsLotValidity());
+			edsGoodsLot.setSterilizeLotNo(edsGoodsLotTO.getSterilizeLotNo());
+			edsGoodsLot.setSterilizeTime(edsGoodsLotTO.getSterilizeTime());
+			edsGoodsLot.setOwnerOrgId(ownerOrg.getOrgId());
+			edsGoodsLot.setEnabled(true);
+			edsGoodsLot.setMaintenanceInfo(new MaintenanceInfo(user));
+			eglService.add(edsGoodsLot, user);
+			
+			i++;
+		}
+	}
+	
+}

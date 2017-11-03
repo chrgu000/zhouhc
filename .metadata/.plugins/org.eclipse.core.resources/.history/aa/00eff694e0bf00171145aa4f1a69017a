@@ -1,0 +1,174 @@
+package cn.ak4j.yard.spd.bizplan.service.assistant;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdAdjustStockBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.enums.SpdAdjustStockType;
+import cn.ak4j.yard.spd.bizplan.repository.SpdAdjustStockBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdAdjustStockBizService;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.factory.SpdDispatcherFactory;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class SpdAdjustStockBizAssistantService extends SpdBizAssistantService<SpdAdjustStockBiz>{
+
+	@Autowired private SpdAdjustStockBizService asbService;
+	@Autowired private SpdAdjustStockBizRepository asbRepository;
+	@Autowired private SpdDispatcherFactory dispatcherFactory;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdBizItemRepository biRepository;
+	
+	public void process(SpdAdjustStockBiz adjustStock, String taskId, String userId, String action) {
+		asbService.fillAllRelations(adjustStock);
+		PcsUser user = userRepository.findAll().findById(userId);
+		adjustStock = forwardBizStep(adjustStock, taskId, action);
+		
+		try{
+			if(adjustStock.getCurrentBizStep().equals(SpdAdjustStockBizSteps.create_adjust_stock)){
+				if(adjustStock.getBizRule().getFeedbackRule().getAutoCommitAdjustStock() && adjustStock.hasItems()){
+					asbService.commit(adjustStock, adjustStock.getLastUpdateTime(), user);
+				}
+			}
+			
+			else if(adjustStock.getCurrentBizStep().equals(SpdAdjustStockBizSteps.commit_adjust_stock)){
+				if(adjustStock.getBizRule().getFeedbackRule().getAutoReviewAdjustStock()){
+					if(adjustStock.getAdjustType() == SpdAdjustStockType.decrement){
+						SpdGoodsQtys planQtysByStoreUnit = new SpdGoodsQtys(adjustStock.getItems().getPlanGoodsQtysByStoreUnit());
+						SpdGoodsQtys realQtysByStoreUnit = new SpdGoodsQtys(dsService.findRealShelfStoreUnitStocks(adjustStock.getDepotId(), adjustStock.getAreaType(), planQtysByStoreUnit));
+						adjustStock.getItems().confirm(realQtysByStoreUnit);
+					}else{
+						adjustStock.getItems().confirmAsPlan();
+					}
+					biRepository.saveAll(adjustStock.getItems());
+					asbService.review(adjustStock, adjustStock.getLastUpdateTime(), user);
+				}
+			}
+			
+			else if(adjustStock.getCurrentBizStep().equals(SpdAdjustStockBizSteps.confirm_adjust_stock)){
+				processAdjustStockConfirmed(adjustStock, user);
+			}
+			
+			else if(adjustStock.getCurrentBizStep().equals(SpdAdjustStockBizSteps.create_dispatcher)){
+				if(adjustStock.getBizRule().getFeedbackRule().getAutoReviewDispatcher()){
+					if(adjustStock.getAdjustType() == SpdAdjustStockType.increment){
+						reviewDispatcher(adjustStock, user, SpdDispatcherType.on_shelf);
+					}else if(adjustStock.getAdjustType() == SpdAdjustStockType.decrement){
+						reviewDispatcher(adjustStock, user, SpdDispatcherType.off_shelf);
+					}
+				}
+			}
+			
+			else if(adjustStock.getCurrentBizStep().equals(SpdAdjustStockBizSteps.create_depot_task)){
+				processDepotTaskCreated(adjustStock, user);
+			}
+			
+			else if(adjustStock.getCurrentBizStep().equals(SpdAdjustStockBizSteps.complete_depot_task)){
+				processDepotTaskCompleted(adjustStock, user);
+			}
+		}catch(Exception e){
+			handleException(action, adjustStock, e);
+		}
+		
+		saveBizLog(adjustStock, user);
+		asbRepository.save(adjustStock);
+	}
+
+	//处理仓库作业后的逻辑：更新仓库库存
+	private void processDepotTaskCompleted(SpdAdjustStockBiz adjustStock, PcsUser user) {
+		SpdDepotStockChanges stockChanges = adjustStock.getStockChanges();
+		if(adjustStock.getAdjustType() == SpdAdjustStockType.decrement){
+			stockChanges.setToNegativeQty();
+		}
+		dsService.updateDepotStocks(stockChanges);
+	}
+
+	//处理确认库存调节后的逻辑：尝试自动创建调度
+	private void processAdjustStockConfirmed(SpdAdjustStockBiz adjustStock, PcsUser user) {
+		if(adjustStock.getBizRule().getFeedbackRule().getAutoCreateDispatcher()){
+			SpdDispatcher dispatcher = null;
+			SpdDispatcherType dispatcherType = null; 
+			if(adjustStock.getAdjustType() == SpdAdjustStockType.increment){
+				dispatcherType = SpdDispatcherType.on_shelf;
+			}else{
+				dispatcherType = SpdDispatcherType.off_shelf;
+			}
+			dispatcher = dispatcherFactory.buildDispatcherFromBiz(adjustStock, dispatcherType, user);
+			dispatcherService.add(dispatcher, user);
+		}
+	}
+
+	//处理仓库作业创建后的逻辑：尝试自动审核
+	private void processDepotTaskCreated(SpdAdjustStockBiz adjustStock, PcsUser user) {
+		if(adjustStock.getBizRule().getFeedbackRule().getAutoReviewDepotTask()){
+			SpdDepotTasks tasks = null;
+			if(adjustStock.getAdjustType() == SpdAdjustStockType.increment){
+				tasks = adjustStock.getOnShelfTasks();
+			}else{
+				tasks = adjustStock.getOffShelfTasks();
+			}
+			tasks.forEach(task->task.getItems().forEach(item->item.confirmAsPlaned()));
+			tiRepository.saveAll(tasks.getAllItems());
+			dtService.batchReview(tasks, user);
+		}
+		
+	}
+
+	@Override
+	protected SpdAdjustStockBiz forwardBizStep(SpdAdjustStockBiz biz, String taskId, String action) {
+		if(biz.isCompleted()){
+			return biz;
+		}
+		
+		SpdBizStep currentStep = biz.getCurrentBizStep();
+		if(currentStep == null){
+			biz.setBizStatusCode(biz.getBizSteps().get(0).getStatusCode());
+		}else{
+			SpdBizStep nextStep = CollectionUtils.findWhere("index", currentStep.getIndex()+1, Integer.class, biz.getBizSteps());
+			if(nextStep == null){
+				return biz;
+			}
+			if(nextStep == SpdAdjustStockBizSteps.create_adjust_stock && action.equals(AmqpMsgType.CREATE_ADJUST_STOCK_BIZ.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdAdjustStockBizSteps.commit_adjust_stock && action.equals(AmqpMsgType.COMMIT_ADJUST_STOCK_BIZ.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdAdjustStockBizSteps.confirm_adjust_stock && action.equals(AmqpMsgType.REVIEW_ADJUST_STOCK_BIZ.getCode())){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdAdjustStockBizSteps.create_dispatcher 
+					&& (action.equals(AmqpMsgType.CREATE_OFF_SHELF_DISPATCHER.getCode()) || action.equals(AmqpMsgType.CREATE_ON_SHELF_DISPATCHER.getCode()))){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdAdjustStockBizSteps.create_depot_task 
+					&& (action.equals(AmqpMsgType.CREATE_OFF_SHELF_TASK.getCode()) || action.equals(AmqpMsgType.CREATE_ON_SHELF_TASK.getCode()))){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else if(nextStep == SpdAdjustStockBizSteps.complete_depot_task
+					&& (action.equals(AmqpMsgType.CONFIRM_OFF_SHELF_TASK.getCode()) || action.equals(AmqpMsgType.CONFIRM_ON_SHELF_TASK.getCode()))){
+				if((CollectionUtils.isEmpty(biz.getOnShelfTasks()) || biz.getOnShelfTasks().isAllReviewed())
+					&& (CollectionUtils.isEmpty(biz.getOffShelfTasks()) || biz.getOffShelfTasks().isAllReviewed())){
+					biz.setBizStatusCode(nextStep.getStatusCode());
+				}
+			}else{
+				String msg = String.format("业务事务步骤步进失败:%s=>%s", action, nextStep.getStatusName());
+				log.error(msg);
+				throw new OperateFailException(msg);
+			}
+		}
+		
+		return biz;
+	}
+
+}

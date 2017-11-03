@@ -1,0 +1,137 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import java.util.Collections;
+import java.util.Comparator;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdGoodsBizPlan;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizPlanRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdBizItemService;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@RestController
+@SuppressWarnings({"rawtypes"})
+public class SpdBizItemResource {
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdBizItemService biService;
+	@Autowired private SpdBizPlanRepository bpRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	@RequestMapping(value="/yard/spd/spdBizItems/bizId,{bizId}", method = RequestMethod.GET)
+	public SpdBizItems findBizItems(@RequestParam(value = "currentPage", required = false, defaultValue="1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			@PathVariable("bizId") String bizId){
+		SpdBizItemParams params = SpdBizItemParams.buildParamsFromJson(paramsStr, SpdBizItemParams.class);
+		if(params == null){
+        	params = new SpdBizItemParams();
+        }
+        params.setBizId(new ListParam<String>(bizId));
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdBizItems result = biRepository.find(params, order, currentPage-1, pageSize);
+		
+		//排序参数为空的时候，根据库存不足进行优先排序
+		if(order == null){
+			SpdGoodsBizPlan biz = bpRepository.findOne(bizId);
+			if(biz != null && biz.getBizType().equals(SpdBizType.replenish_biz)){
+				result.fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+				SpdReplenishBiz replenish  = (SpdReplenishBiz)biz;
+				String fromDepotId = replenish.getFromDepotId();
+				
+				SpdShelfStocks goodsLotShelfStocks = ssRepository.findByShelfTypeAndGoodss(fromDepotId, replenish.getFromAreaType(), result.pluck("goodsId"), 0);
+				goodsLotShelfStocks.fillGoodsLots(glRepository);
+				
+				final SpdShelfStocks stocks = goodsLotShelfStocks.mergeByGoods();
+				Collections.sort(result, new Comparator<SpdBizItem>() {
+					@Override
+					public int compare(SpdBizItem item1, SpdBizItem item2) {
+						SpdShelfStock stock1 = CollectionUtils.findWhere("goodsId", item1.getGoodsId(), stocks);
+						SpdShelfStock stock2 = CollectionUtils.findWhere("goodsId", item2.getGoodsId(), stocks);
+						
+						int enough1 = (stock1!=null?stock1.getUseableQtyByStoreUnit():0) - item1.getPlanQtyByStoreUnit();
+						int enough2 = (stock2!=null?stock2.getUseableQtyByStoreUnit():0) - item2.getPlanQtyByStoreUnit();
+						
+						return enough1 - enough2;
+					}
+				});
+			}
+		}
+        return result;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdBizItems/bizId,{bizId}/count", method = RequestMethod.GET)
+	public int findBizItemsCount(@RequestParam(value = "params", required = false) String paramsStr,
+			@PathVariable("bizId") String bizId){
+		SpdBizItemParams params = SpdBizItemParams.buildParamsFromJson(paramsStr, SpdBizItemParams.class);
+        if(params == null){
+        	params = new SpdBizItemParams();
+        }
+        params.setBizId(new ListParam<String>(bizId));
+
+		return biRepository.count(params);
+	}
+
+	/**
+	 * 用于根据业务规则获取业务明细的接口，产品场景：补货申领挑选请领明细时
+	 */
+	@RequestMapping(value="/yard/spd/spdReviewedReplenishItems/bizRuleId,{bizRuleId}(itemConditionCode={itemConditionCode})", method = RequestMethod.GET)
+	public SpdBizItems findReplenishItemsByBizRuleId(@PathVariable("bizRuleId")String bizRuleId,
+			@PathVariable(value = "itemConditionCode") String itemConditionCode,
+			@RequestParam(value = "currentPage", required = false, defaultValue="1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdBizItemParams params = SpdBizItemParams.buildParamsFromJson(paramsStr, SpdBizItemParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+        SpdBizItems items = biService.findReviewedReplenishItemsByBizRuleId(bizRuleId, itemConditionCode, params, order, currentPage-1, pageSize);
+        return items;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReviewedReplenishItems/bizRuleId,{bizRuleId}(itemConditionCode={itemConditionCode})/count", method = RequestMethod.GET)
+	public int countReplenishItemsByBizRuleId(@PathVariable("bizRuleId")String bizRuleId,
+			@PathVariable(value = "itemConditionCode") String itemConditionCode,
+			@RequestParam(value = "params", required = false) String paramsStr){
+		SpdBizItemParams params = SpdBizItemParams.buildParamsFromJson(paramsStr, SpdBizItemParams.class);
+        int count = biService.countReviewedReplenishItemsByBizRuleId(bizRuleId, itemConditionCode, params);
+        return count;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdBizItems/bizCode,{bizCode}", method = RequestMethod.GET)
+	public SpdBizItems getByBizCode(
+				 @RequestParam(value = "params", required = false) String paramStr,
+	             @RequestParam(value = "orders", required = false) String orders,
+	             @PathVariable("bizCode") String bizCode,
+	             HttpServletRequest request){
+		SpdBizItemParams params = SpdBizItemParams.buildParamsFromJson(paramStr, SpdBizItemParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdBizItemParams();
+		}
+		return biRepository.findByBizCode(params,order,bizCode);
+	}
+
+}

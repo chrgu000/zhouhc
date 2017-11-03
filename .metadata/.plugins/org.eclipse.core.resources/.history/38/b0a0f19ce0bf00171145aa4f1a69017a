@@ -1,0 +1,1 @@
+ALTER TABLE spd_property_change_rule ADD(deal_price_stratage_code varchar2(32 byte));

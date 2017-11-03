@@ -1,0 +1,5 @@
+update spd_biz_item set unit_price = unit_price*10 where 
+goods_id='ff8080815e371d0c015e378a6f701020' and biz_item_type='receive';
+
+update spd_general_ledger set unit_price=unit_price*10,
+total_amount=total_amount*10 where goods_id='ff8080815e371d0c015e378a6f701020';

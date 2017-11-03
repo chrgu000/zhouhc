@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.to;
+
+import java.util.Date;
+
+import lombok.Getter;
+import lombok.Setter;
+
+public class CheckStateTO {
+
+	@Setter @Getter private Integer checkStateCode;
+	@Setter @Getter private Date lastDate;
+	
+	public CheckStateTO(){}
+	
+	public CheckStateTO(Integer checkStateCode, Date lastDate){
+		setCheckStateCode(checkStateCode);
+		setLastDate(lastDate);
+	}
+	
+}

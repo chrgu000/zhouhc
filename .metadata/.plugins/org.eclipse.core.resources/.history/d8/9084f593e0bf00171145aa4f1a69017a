@@ -1,0 +1,130 @@
+package cn.ak4j.yard.yds.web;
+
+import java.net.URLEncoder;
+import java.util.Arrays;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.utils.ExcelBuilder;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@RestController
+public class YdsEdsGoodsResource {
+
+	@Autowired private YardExcelFormatFactory excelFormatFactory;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+
+	@RequestMapping(value="/yard/yds/ydsEdsGoodss/{id}", method=RequestMethod.GET)
+	public YdsEdsGoods get(@PathVariable("id")String id){
+		return egRepository.findAll().findById(id);
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodss", method = RequestMethod.GET)
+	public YdsEdsGoodss list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		YdsEdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsEdsGoodsParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		YdsEdsGoodss allEdsGoodss = egRepository.findAll();
+		YdsEdsGoodss result = new YdsEdsGoodss(allEdsGoodss.findByPage(goodsRepository.findAll(), params, order, currentPage-1, pageSize));
+		return result;
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodss/count", method = RequestMethod.GET)
+	public long count(@RequestParam(value = "params", required = false) String paramsStr) {
+		YdsEdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsEdsGoodsParams.class);
+		YdsEdsGoodss allEdsGoodss = egRepository.findAll();
+		return allEdsGoodss.find(params).size();
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodss/ids,{ids}", method = RequestMethod.GET)
+	public YdsEdsGoodss listByIds(@PathVariable(value = "ids", required = false) String ids) {
+		YdsEdsGoodss allEdsGoodss = egRepository.findAll();
+		return allEdsGoodss.findByIds(Arrays.asList(ids.split(",")));
+	}
+	
+	/**
+	 * 获取当前用户所属机构的可用的企业产品信息
+	 */
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodss/mine", method = RequestMethod.GET)
+	public YdsEdsGoodss findEdsGoodsByEnabled(	
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1")int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20")int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		YdsEdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsEdsGoodsParams.class);
+		if(params == null){
+			params = new YdsEdsGoodsParams();
+		}
+		params.setOwnerOrgId(new ListParam<String>(user.getOrgId()));
+
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return new YdsEdsGoodss(egRepository.findAll().findByPage(goodsRepository.findAll(), params, order, currentPage-1, pageSize));
+	}
+	
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodss/mine/count", method = RequestMethod.GET)
+	public long findEdsGoodsByEnabledCount(@RequestParam(value = "params",required = false)String paramsStr,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		YdsEdsGoodsParams params = QueryParams.buildParamsFromJson(paramsStr, YdsEdsGoodsParams.class);
+		if(params == null){
+			params = new YdsEdsGoodsParams();
+		}
+		params.setOwnerOrgId(new ListParam<String>(user.getOrgId()));
+		
+		return new YdsEdsGoodss(egRepository.findAll().findByPage(goodsRepository.findAll(), params, new OrderParam(), -1, -1)).size();
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@ResponseBody           
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodss/excel", method = RequestMethod.GET)
+	public void downloadExcelStream(@RequestParam(value="params",required=false)String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request,HttpServletResponse response) throws Exception{
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		YdsEdsGoodsParams params = YdsEdsGoodsParams.buildParamsFromJson(paramsStr, YdsEdsGoodsParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new YdsEdsGoodsParams();
+		}
+		params.setOwnerOrgId(new ListParam<String>(user.getOrgId()));
+		
+		YdsEdsGoodss edsGoodss = new YdsEdsGoodss(egRepository.findAll().findByPage(params, order, -1, -1));
+		edsGoodss.fillGoods(goodsRepository.findAll());
+
+		ExcelBuilder exportExcel = new ExcelBuilder<YdsEdsGoods>();
+		byte[] bytes = exportExcel.buildExcel("企业产品一览表", edsGoodss, excelFormatFactory.getExcelFormats("edsGoods"));
+
+		response.reset();
+		response.setContentType("application/vnd.ms-excel");
+		response.setCharacterEncoding(Global.defaultCharset.name());
+		response.setHeader("Content-Disposition", "attachment;filename=" + URLEncoder.encode("企业产品.xls", Global.defaultCharset.name()));
+		IOUtils.write(bytes, response.getOutputStream());
+		
+	}
+	
+}

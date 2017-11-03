@@ -1,0 +1,1 @@
+alter table spd_biz_item modify(deal_qty_by_base_unit integer null);

@@ -1,0 +1,64 @@
+package cn.ak4j.yard.extend.z2;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.PostConstruct;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.ApplicationContext;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.extend.SpdDepotCardEventProcessor;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.service.ISpdDepotCardEventProcessor;
+
+@Ignore
+public class SpdZ2DepotCardEventProcessTest extends BaseTest{
+
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private ApplicationContext context;
+	
+	private ISpdDepotCardEventProcessor processor;
+	
+	@PostConstruct
+	public void init(){
+		DefaultListableBeanFactory defaultListableBeanFactory = (DefaultListableBeanFactory) context.getAutowireCapableBeanFactory();
+		
+		BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder.genericBeanDefinition(SpdDepotCardEventProcessor.class);
+
+		//动态注册bean.
+		defaultListableBeanFactory.registerBeanDefinition("z2DepotCardEventProcessor", beanDefinitionBuilder.getBeanDefinition());
+
+		//获取动态注册的bean.
+		processor = context.getBean(SpdDepotCardEventProcessor.class);
+	}
+	
+	@Test public void testProcess(){
+		String goodsId = "goods_id_048";
+		
+		String depotId = "depot_id_003";
+		String userId = "user_id_001";
+		List<String> goodsIds = new ArrayList<String>();
+		goodsIds.add(goodsId);
+		AmqpMsgType msgType = AmqpMsgType.LACK_DEPOT_CARD;
+		
+		processor.process(depotId, goodsIds, userId, msgType);
+		
+		SpdDepotCards depotCards = dcRepository.findAll().findByDepotAndGoodsIds(depotId, goodsIds);
+		assertNotNull(depotCards);
+		assertEquals(1, depotCards.size());
+		assertEquals(goodsId, depotCards.get(0).getGoodsId());
+		assertEquals(CheckState.commited, depotCards.get(0).getCheckState());
+	}
+}

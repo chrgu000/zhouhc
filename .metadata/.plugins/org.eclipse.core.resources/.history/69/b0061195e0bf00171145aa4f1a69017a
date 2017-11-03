@@ -1,0 +1,25 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.Collections;
+
+/**
+* @Description: 日清业务步骤
+* @author zhengyf
+* @date 2017年8月15日 上午10:53:08
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+public class SpdDailyCleanBizSteps extends SpdBizSteps{
+	
+	public static SpdBizStep create_daily_clean = new SpdBizStep(1, "创建日清对账业务", "作业步骤模板", "daily_clean_created", "日清对账已创建");
+	public static SpdBizStep review_daily_clean = new SpdBizStep(2, "审核日清对账业务", "作业步骤模板", "daily_clean_confirmed", "日清对账已确认");
+	
+	public SpdDailyCleanBizSteps(){
+		this.add(create_daily_clean);
+		this.add(review_daily_clean);
+		
+		Collections.sort(this, comparator);
+	}
+	
+}

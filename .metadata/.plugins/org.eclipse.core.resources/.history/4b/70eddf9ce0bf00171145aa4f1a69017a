@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.3.1.final using JasperReports Library version 6.3.1  -->
+<!-- 2017-08-25T17:26:02 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="pieceItemsReport" printOrder="Horizontal" pageWidth="595" pageHeight="842" whenNoDataType="NoPages" columnWidth="567" leftMargin="14" rightMargin="14" topMargin="4" bottomMargin="4" uuid="2e00469d-acb8-41d9-8307-d4a3aa683bc8">
+	<parameter name="taskCode" class="java.lang.String"/>
+	<parameter name="startTime" class="java.util.Date"/>
+	<parameter name="replenishUserName" class="java.lang.String"/>
+	<parameter name="applyDeptName" class="java.lang.String"/>
+	<parameter name="depotNm" class="java.lang.String"/>
+	<parameter name="taskUserName" class="java.lang.String"/>
+	<parameter name="logo" class="java.io.InputStream"/>
+	<parameter name="printTime" class="java.lang.String"/>
+	<field name="packingSpec" class="java.lang.String"/>
+	<field name="unitName" class="java.lang.String"/>
+	<field name="unitLvName" class="java.lang.String"/>
+	<field name="storePackageUnitLvName" class="java.lang.String"/>
+	<field name="planQty" class="java.lang.Integer"/>
+	<field name="specialGoodsLot.goods.goodsId" class="java.lang.String"/>
+	<field name="specialGoodsLot.goods.wareName" class="java.lang.String"/>
+	<field name="specialGoodsLot.goods.factName" class="java.lang.String"/>
+	<field name="specialGoodsLot.goods.prepareToStoreRatio" class="java.lang.Integer"/>
+	<field name="specialGoodsLot.lotNo" class="java.lang.String"/>
+	<field name="specialGoodsLot.lotValidity" class="java.util.Date"/>
+	<field name="shelf.sysCode.meterialCode" class="java.lang.String"/>
+	<field name="shelfStock.qtyByStoreUnit" class="java.lang.Integer"/>
+	<field name="itemCode" class="java.lang.String"/>
+	<variable name="V_CURRENT_PAGE_NUMBER" class="java.lang.Integer">
+		<variableExpression><![CDATA[1]]></variableExpression>
+		<initialValueExpression><![CDATA[$V{PAGE_NUMBER}]]></initialValueExpression>
+	</variable>
+	<variable name="itemCount" class="java.lang.Integer" calculation="Count">
+		<variableExpression><![CDATA[$F{itemCode}]]></variableExpression>
+	</variable>
+	<variable name="kindsSum" class="java.lang.Integer" incrementType="Report" calculation="DistinctCount">
+		<variableExpression><![CDATA[$F{specialGoodsLot.goods.goodsId}]]></variableExpression>
+		<initialValueExpression><![CDATA[new java.lang.Integer(0)]]></initialValueExpression>
+	</variable>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<pageHeader>
+		<band height="95" splitType="Stretch">
+			<staticText>
+				<reportElement x="387" y="60" width="56" height="15" uuid="d413618c-8a7a-477e-b2eb-9617a1a6ec3a"/>
+				<textElement>
+					<font fontName="微软雅黑" size="11" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[作业编码：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="190" y="60" width="56" height="15" uuid="a1c9977d-2fa9-4553-9c1c-e37f68281906"/>
+				<textElement>
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[请领部门：]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="439" y="60" width="125" height="15" uuid="99339d32-fb25-4812-9edb-4db278f95cfc"/>
+				<box>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement>
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{taskCode}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="244" y="60" width="125" height="15" uuid="fe0a0077-458c-4f0b-9ef0-319248c45417"/>
+				<box>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement>
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{applyDeptName}]]></textFieldExpression>
+			</textField>
+			<componentElement>
+				<reportElement stretchType="RelativeToTallestObject" x="423" y="-1" width="140" height="61" uuid="d728d8b6-cb21-4556-a392-12a8c9c2ad21"/>
+				<jr:Code128 xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" moduleWidth="1.0">
+					<jr:codeExpression><![CDATA[$P{taskCode}]]></jr:codeExpression>
+				</jr:Code128>
+			</componentElement>
+			<staticText>
+				<reportElement x="36" y="6" width="230" height="36" uuid="419e7a46-73c6-4875-a2db-9eb84fc3754e"/>
+				<box>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Center" verticalAlignment="Middle" markup="none">
+					<font fontName="微软雅黑" size="24" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[散件拣配单]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="60" width="56" height="15" uuid="ff4c9e0c-93dc-4426-9ab8-0b853f5e2807">
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+				</reportElement>
+				<textElement>
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[作业仓库：]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="52" y="60" width="125" height="15" uuid="17b3597e-1d09-406c-b226-fcb11704a490"/>
+				<box>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement>
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{depotNm}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="190" y="76" width="50" height="15" uuid="0cbc8f08-4cb7-47e2-88e5-8be62727f58c">
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement>
+					<font fontName="微软雅黑" size="11" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[品类数量:]]></text>
+			</staticText>
+			<textField evaluationTime="Report">
+				<reportElement x="243" y="76" width="125" height="15" uuid="681747a0-9d3d-411e-a408-8772205d04ad">
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+				<box>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement>
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{kindsSum}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="0" y="76" width="39" height="15" uuid="b3df9ca7-2e6b-4d22-8df2-4a47a4e1069e">
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+				<textElement>
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[拣配人:]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="41" y="76" width="125" height="15" uuid="fc0ae5b1-88a0-46a3-854e-11f552f5f72e"/>
+				<box>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement>
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{taskUserName}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageHeader>
+	<columnHeader>
+		<band height="30" splitType="Stretch">
+			<staticText>
+				<reportElement x="30" y="10" width="80" height="18" uuid="28c9a0c1-1128-4fa8-bbe5-506b27bc19a1">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[产品]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="112" y="10" width="61" height="18" uuid="4117e011-535c-4b0e-b76d-22eaf1f69cd2">
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[包装规格]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="503" y="10" width="59" height="18" uuid="56d39565-06d3-41b8-b017-ecb4267e0fdc"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[货位]]></text>
+			</staticText>
+			<line>
+				<reportElement x="0" y="28" width="567" height="1" uuid="5fe01345-6cc4-4c6b-a5d6-e8794413ffeb"/>
+			</line>
+			<staticText>
+				<reportElement x="367" y="10" width="60" height="18" uuid="f0733d27-71d4-44f0-bd10-4f9c262a8c59">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[批号]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="10" width="30" height="18" uuid="0ccced2d-8693-41be-982f-84c7c070cc71"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[序号]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="244" y="10" width="84" height="18" uuid="6848621b-b35d-4c70-83c2-d506a9aeb28e"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[生产厂商]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="172" y="10" width="30" height="18" uuid="8bd8bf92-a18f-4b2b-a7d6-6ca87cf87c59">
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[单位]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="200" y="10" width="46" height="18" uuid="e639da06-9d2b-400d-aab6-58e0aef176a6"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[数量]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="432" y="10" width="70" height="18" uuid="e4c70aee-85f5-44df-9bd4-68f5868ffd21">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[有效期]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="329" y="10" width="40" height="18" uuid="3d10af7a-b2d7-4298-a9c5-aa1ffdcbfc8f">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="11" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[库存数]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="28" splitType="Stretch">
+			<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+			<rectangle>
+				<reportElement x="0" y="-1" width="567" height="28" backcolor="#EEEEEE" uuid="f48124be-baa9-46b9-a036-d19d4c5cb5af">
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+					<printWhenExpression><![CDATA[$V{REPORT_COUNT}%2==0]]></printWhenExpression>
+				</reportElement>
+				<graphicElement>
+					<pen lineWidth="1.0" lineColor="#FFFFFF"/>
+				</graphicElement>
+			</rectangle>
+			<textField isStretchWithOverflow="true">
+				<reportElement stretchType="RelativeToTallestObject" x="112" y="1" width="58" height="15" isPrintWhenDetailOverflows="true" uuid="a42960a2-4e26-4c5c-83f3-4cca92c9408a">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{packingSpec}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true">
+				<reportElement stretchType="RelativeToTallestObject" x="505" y="1" width="58" height="15" isPrintWhenDetailOverflows="true" uuid="f6c30620-c069-4b08-aa66-f7f27d5ba053"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{shelf.sysCode.meterialCode}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true">
+				<reportElement stretchType="RelativeToTallestObject" x="30" y="1" width="80" height="15" isPrintWhenDetailOverflows="true" uuid="8500a977-d5ca-4690-88a6-4efa26e34166"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{specialGoodsLot.goods.wareName}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" pattern="" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="368" y="1" width="60" height="15" isPrintWhenDetailOverflows="true" uuid="efb2e8de-e8c1-4168-8a73-e010edb4e82d">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{specialGoodsLot.lotNo}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true">
+				<reportElement stretchType="RelativeToTallestObject" x="-2" y="1" width="30" height="15" isPrintWhenDetailOverflows="true" uuid="be382e7a-0063-4488-9196-bf979c0c3cef"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{itemCount}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true">
+				<reportElement stretchType="RelativeToTallestObject" x="244" y="1" width="85" height="15" isPrintWhenDetailOverflows="true" uuid="bf1cb448-58ed-47a4-842c-9fc735edcbad"/>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{specialGoodsLot.goods.factName}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true">
+				<reportElement stretchType="RelativeToTallestObject" x="170" y="1" width="30" height="15" isPrintWhenDetailOverflows="true" uuid="28a1e0b1-1fbc-497d-92b8-6e828043c126">
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{storePackageUnitLvName}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true">
+				<reportElement stretchType="RelativeToTallestObject" x="200" y="1" width="43" height="15" isPrintWhenDetailOverflows="true" uuid="9c4cfeec-2b9f-4ea5-a840-bf61507f9098"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{planQty}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" pattern="yyyy-MM-dd" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="432" y="1" width="70" height="15" isPrintWhenDetailOverflows="true" uuid="85e4feac-7d90-48a5-b385-2a05dcc7bb99">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{specialGoodsLot.lotValidity}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" pattern="" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="329" y="1" width="40" height="15" isPrintWhenDetailOverflows="true" uuid="679ff10a-f6f6-4fdd-a353-3edcfbebda49">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="微软雅黑" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{shelfStock.qtyByStoreUnit}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="46" splitType="Stretch">
+			<textField>
+				<reportElement mode="Opaque" x="0" y="11" width="38" height="15" forecolor="rgba(0, 0, 0, 0.39215687)" uuid="8c2cfee1-732a-4f50-98e0-17c6602b5b2a"/>
+				<textElement textAlignment="Left">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[msg("第{0}页，", $V{PAGE_NUMBER})]]></textFieldExpression>
+			</textField>
+			<textField evaluationTime="Report">
+				<reportElement x="38" y="11" width="35" height="15" forecolor="rgba(0, 0, 0, 0.39215687)" uuid="90d27ab8-fbf3-42aa-b1f5-45ef37edd3c0"/>
+				<textElement textAlignment="Left">
+					<font fontName="微软雅黑" pdfEncoding="Identity-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[msg("共{0}页", $V{PAGE_NUMBER})]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="0" y="25" width="124" height="16" forecolor="rgba(0, 0, 0, 0.39215687)" uuid="44b2c481-dd81-49e6-9a46-6281f0072b2c"/>
+				<textFieldExpression><![CDATA[$P{printTime}]]></textFieldExpression>
+			</textField>
+			<image isUsingCache="true" onErrorType="Blank" evaluationTime="Page">
+				<reportElement x="311" y="0" width="256" height="40" uuid="2bec95ba-038c-4ee5-adb9-0e37f7f5c977"/>
+				<imageExpression><![CDATA[$P{logo}]]></imageExpression>
+			</image>
+		</band>
+	</pageFooter>
+	<summary>
+		<band height="5" splitType="Stretch"/>
+	</summary>
+</jasperReport>

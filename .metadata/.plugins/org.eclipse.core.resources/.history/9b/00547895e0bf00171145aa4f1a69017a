@@ -1,0 +1,37 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SpdSellerSendType implements ITypeEnum{
+	moveStorehouse_receiveGoods("1", "移库收货", ""),
+	moveStorehouse_returnedGoods("2", "移库退货", ""),
+	procurement_receiveGoods("3", "采购收货", ""),
+	procurement_returnedGoods("4", "采购退货", ""),
+	supply_receiveGoods("5", "供应收货", ""),
+	supply_returnedGoods("6", "供应退货", "");
+	
+	@Getter @Setter private String code ;
+	@Getter @Setter private String name ;
+	@Getter @Setter private String description;
+	
+	private SpdSellerSendType (String code,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdSellerSendType typeOf(String code){
+		for(SpdSellerSendType state : SpdSellerSendType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+
+}

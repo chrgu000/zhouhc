@@ -1,0 +1,58 @@
+package cn.ak4j.yard.spd.task.enums;
+
+import java.io.IOException;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+
+@JsonSerialize(using=SpdDispatcherSerializer.class)
+public enum SpdDispatcherType {
+	
+	on_shelf("on_shelf", "上架作业"),
+	off_shelf("off_shelf", "下架作业");
+	
+	private String code;
+	private String name;
+	
+	private SpdDispatcherType (String code,String name){
+		this.code = code;
+		this.name = name;
+	}
+	
+	public static SpdDispatcherType typeOf(String code){
+		for(SpdDispatcherType state : SpdDispatcherType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+
+	public String getCode() {
+		return code;
+	}
+
+	public String getName() {
+		return name;
+	}
+	
+	
+}
+
+class SpdDispatcherSerializer extends JsonSerializer<SpdDispatcherType> {
+	
+	@Override
+	public void serialize(SpdDispatcherType spdDispatcherType, JsonGenerator generator, SerializerProvider provider)
+			throws IOException, JsonProcessingException {
+		
+		generator.writeStartObject();
+		if(spdDispatcherType != null){
+			generator.writeStringField(spdDispatcherType.getName(), spdDispatcherType.getCode());
+		}
+		generator.writeEndObject();
+	}
+}

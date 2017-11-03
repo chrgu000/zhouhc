@@ -1,0 +1,3 @@
+flyway.user=YARD_DEV_ZYF
+flyway.password=ak123456
+flyway.url=jdbc:oracle:thin:@10.1.1.74:1523:orcl11g

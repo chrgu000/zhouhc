@@ -1,0 +1,2 @@
+update spd_biz_item set deal_qty=0;
+alter table spd_biz_item modify(deal_qty integer default 0 not null);

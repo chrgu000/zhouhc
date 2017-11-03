@@ -1,0 +1,161 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.domain.SpdGoodsItems;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class SpdBizItems extends SpdGoodsItems<SpdBizItem>{
+	
+	public SpdBizItems(List<SpdBizItem> items){
+		super(items);
+	}
+	
+	public void confirmAsPlan(){
+		this.forEach(item->item.confirmAsPlaned());
+	}
+
+	public void confirm(List<SpdGoodsQty> realQtysByStoreUnit) {
+		for(SpdBizItem bizItem : this){
+			if(bizItem.getConfirmQty() > 0){
+				//已经确认过的不再进行确认
+				continue;
+			}else{
+				bizItem.setConfirmQty(0);
+			}
+			
+			if(bizItem.getSpecialGoodsLot() == null){
+				boolean exist = false;
+				for(SpdGoodsQty goodsQty : realQtysByStoreUnit){
+					if(goodsQty.getGoods().getGoodsId().equals(bizItem.getGoodsId())){
+						bizItem.setConfirmQty(bizItem.getConfirmQty()+goodsQty.getQtyByStoreUnit());
+						exist = true;
+					}
+				}
+				if(!exist){
+					bizItem.setConfirmQty(0);
+				}
+			}else{
+				boolean exist = false;
+				for(SpdGoodsQty goodsQty : realQtysByStoreUnit){
+					if(goodsQty.getSpecialGoodsLot().getGoodsLotId().equals(bizItem.getLotId())){
+						bizItem.setConfirmQty(bizItem.getConfirmQty()+goodsQty.getQtyByStoreUnit());
+						exist = true;
+					}
+				}
+				if(!exist){
+					bizItem.setConfirmQty(0);
+				}
+			}
+		}
+	}
+
+	public boolean hasGoodsLot(YdsGoodsLotRepository glRepository) {
+		for(SpdBizItem item : this){
+			if(StringUtils.isEmpty(item.getLotId())){
+				return false;
+			}
+			if(glRepository.findAll().findById(item.getLotId()) == null){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public void fillDepotCard(String depotId, SpdDepotCards depotCards) {
+		String[] paramArr = {"depotId", "goodsId"};
+		this.forEach(item->{
+			item.setDepotCard(CollectionUtils.findWhere(paramArr, depotCards, depotId, item.getGoodsId()));
+		});
+	}
+	
+	@SuppressWarnings("unchecked")
+	public void fillGoodsLot(YdsGoodsLotRepository glRepository) {
+		YdsGoodsLots goodsLots = glRepository.findAll().findByIds(this.pluck("lotId"));
+		this.forEach(item->{
+			item.setSpecialGoodsLot(CollectionUtils.findWhere("goodsLotId", item.getLotId(), goodsLots));
+		});
+	}
+	
+	public SpdBizItems whichHasHasNotRelationLot(YdsGoodsLotRepository glRepository){
+		SpdBizItems theBizItems = new SpdBizItems();
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", this);
+		YdsGoodsLots goodsLots = glRepository.findAll().findByGoodsIds(goodsIds);
+		this.forEach(bizItem->{
+			YdsGoodsLot theGoodsLot = CollectionUtils.findWhere("goodsId", bizItem.getGoodsId(), goodsLots);
+			if(theGoodsLot == null){
+				theBizItems.add(bizItem);
+			}
+		});
+		return theBizItems;
+	}
+
+	/**
+	 * 根据产品查找是否有可关联的批次 
+	 */
+	public void checkIfAllGoodsHasLot(YdsGoodsLotRepository glRepository) {
+		SpdBizItems bizItems = whichHasHasNotRelationLot(glRepository);
+		if(CollectionUtils.isNotEmpty(bizItems)){
+			YdsGoodss goodss = new YdsGoodss();
+			bizItems.forEach(bizItem->{
+				goodss.add(bizItem.getGoods());
+			});
+			throw new OperateFailException(YardExceptionType.invalid_data_goods_without_lot, CollectionUtils.pluck("formatName", goodss));
+		}
+		
+	}
+
+	public SpdBizItem getGoodsIdAndLotId(String goodsId, String lotId) {
+		for(SpdBizItem theItem : this){
+			if(theItem.getGoodsId().equals(goodsId) && theItem.getLotId().equals(lotId)){
+				return theItem;
+			}
+		}
+		return null;
+	}
+
+	public SpdBizItems findByGoodsId(String goodsId) {
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setGoodsId(new ListParam<String>(goodsId));
+		return new SpdBizItems(find(params));
+	}
+
+	public void verifyEquipmentLotValidity() {
+		String goodsType = this.get(0).getGoods().getGoodsType();
+		if(goodsType.equals(YdsGoodsType.equipment.getCode())){
+			YdsGoodsLots expireGoodsLots = new YdsGoodsLots();
+			Date currentDate = new Date();
+			for(SpdBizItem item : this){
+				if(item.getConfirmQty() <= 0){
+					continue;
+				}
+				if(item.getGoods().getCheckValidity() && (item.getSpecialGoodsLot().getLotValidity() == null || item.getSpecialGoodsLot().getLotValidity().getTime() < currentDate.getTime())){
+					expireGoodsLots.add(item.getSpecialGoodsLot());
+				}
+			}
+			if(CollectionUtils.isNotEmpty(expireGoodsLots)){
+				throw new InvalidDataException(YardExceptionType.forbid_use_expire_goods_lot, CollectionUtils.pluck("lotNo", expireGoodsLots));
+			}
+		}
+		
+	}
+	
+}

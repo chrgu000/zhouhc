@@ -1,0 +1,34 @@
+package cn.ak4j.yard.pcs.domain;
+
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+
+public class PcsDepotAreaTest extends BaseTest{
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	
+	@Test public void testIsStocking(){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById("depot_id_001");
+		depot.fillCards(dcRepository);
+		PcsDepotArea area16 = CollectionUtils.findWhere("depotAreaId", "area_id_016", depot.getAreas());
+		assertTrue(area16.isStocking("goods_id_007"));
+		assertFalse(area16.isStocking("goods_id_001"));
+		assertFalse(area16.isStocking("goods_id_006"));
+		
+		PcsDepotArea area3 = CollectionUtils.findWhere("depotAreaId", "area_id_003", depot.getAreas());
+		assertTrue(area3.isStocking("goods_id_001"));
+		assertTrue(area3.isStocking("goods_id_006"));
+		assertFalse(area3.isStocking("goods_id_007"));
+	}
+	
+}

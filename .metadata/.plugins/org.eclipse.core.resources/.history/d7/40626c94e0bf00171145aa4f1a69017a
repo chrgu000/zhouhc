@@ -1,0 +1,86 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+
+@SuppressWarnings({"rawtypes", "serial", "unchecked"})
+public class SpdDepotTasks extends Entities<SpdDepotTask>{
+
+	public SpdDepotTasks(){}
+	
+	public SpdDepotTasks(List entities){
+		super(entities);
+	}
+
+	public void fillItems(SpdDepotTaskItems items) {
+		for(SpdDepotTask task : this){
+			SpdDepotTaskItems theItems = new SpdDepotTaskItems(CollectionUtils.find("taskId", task.getTaskId(), String.class, items));
+			task.setItems(theItems);
+		}
+	}
+
+	public SpdDepotTaskItems<SpdDepotTaskItem> getAllItems() {
+		SpdDepotTaskItems result = new SpdDepotTaskItems();
+		this.forEach((task)->result.addAll(task.getItems()));
+		return result;
+	}
+
+	public boolean isAllReviewed() {
+		for(SpdDepotTask task : this){
+			if(task.getCheckState() != CheckState.reviewed){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public void fillDepotAreas(PcsDepotRepository depotRepository) {
+		PcsDepots depots = depotRepository.findAllWithRelations().findByIds(this.pluck("taskDepotId"));
+		this.forEach(task->{
+			PcsDepot depot = depots.findById(task.getTaskDepotId());
+			PcsDepotArea depotArea = CollectionUtils.findWhere("depotAreaId", task.getTaskAreaId(), depot.getAreas());
+			task.setDepotArea(depotArea);
+		});
+	}
+
+	public SpdDepotTask findById(String taskId) {
+		return CollectionUtils.findWhere("taskId", taskId, this);
+	}
+
+	public void fillDepots(PcsDepotRepository depotRepository) {
+		PcsDepots allDepots = depotRepository.findAll();
+		this.forEach(task->{
+			task.setDepot(CollectionUtils.findWhere("depotId", task.getTaskDepotId(), allDepots));
+		});
+		
+	}
+
+	public void fillDepts(PcsDeptRepository deptRepository) {
+		PcsDepts allDepts = deptRepository.findAll();
+		this.forEach(task->{
+			task.setDept(CollectionUtils.findWhere("deptId", task.getTaskDeptId(), allDepts));
+		});
+		
+	}
+
+	public void fillTaskUser(PcsUserRepository userRepository) {
+		PcsUsers allUsers = userRepository.findAll();
+		this.forEach(task->{
+			task.setUser(CollectionUtils.findWhere("userId", task.getTaskUser(), allUsers));
+		});
+		
+	}
+
+	
+}

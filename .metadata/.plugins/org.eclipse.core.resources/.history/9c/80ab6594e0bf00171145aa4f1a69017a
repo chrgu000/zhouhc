@@ -1,0 +1,62 @@
+package cn.ak4j.yard.spd.task.factory;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+@Component
+public class SpdLogisticsTaskFactory {
+
+	@Autowired private YardCodeService codeService;
+	
+	public SpdLogisticsTask buildDeliveryTask(String bizId, PcsDepot fromDepot, PcsDepot toDepot, SpdOffShelfTaskItems allItems, PcsUser user){
+		SpdLogisticsTask task = new SpdLogisticsTask(bizId, fromDepot, toDepot); 
+		task.setTaskCode(codeService.publishCode(CodeSort.shouhuodan).getCode());
+		task.setItems(buildDeliveryTaskItems(bizId, allItems));
+		task.setMaintenanceInfo(new MaintenanceInfo(user));
+		return task;
+	}
+	
+	private SpdLogisticsTaskItems buildDeliveryTaskItems(String bizId, SpdOffShelfTaskItems allItems){
+		SpdLogisticsTaskItems deliveryTaskItems = new SpdLogisticsTaskItems();
+		SpdOffShelfTaskItems targetTaskItems = allItems.whichHasLot();
+		
+		for(SpdOffShelfTaskItem item : targetTaskItems){
+			SpdLogisticsTaskItem deliveryTaskItem = new SpdLogisticsTaskItem();
+			
+			deliveryTaskItem.setGoods(item.getSpecialGoodsLot().getGoods());
+			deliveryTaskItem.setUnitPrice(item.getSpecialGoodsLot().getGoods().getStorePrice());
+			deliveryTaskItem.setItemCode(codeService.publishCode(CodeSort.shouhuodanmingxi).getCode());
+
+			deliveryTaskItem.setGoodsId(item.getGoodsId());
+			deliveryTaskItem.setLotId(item.getLotId());
+			deliveryTaskItem.setPlanQty(item.getConfirmQty());
+			deliveryTaskItem.setConfirmQty(item.getConfirmQty());
+			
+			if(item.getConfirmQty() == 0){
+				deliveryTaskItem.setReceiveQty(item.getConfirmQty());
+			}
+			
+			deliveryTaskItem.setUnitLv(item.getUnitLv());
+			deliveryTaskItem.setCreateTime(new Date());
+			deliveryTaskItem.setLastUpdateTime(new Date());
+			deliveryTaskItem.setParentWrapperId(item.getParentWrapperId());
+			deliveryTaskItems.add(deliveryTaskItem);
+		};
+		
+		return deliveryTaskItems;
+	}
+	
+}

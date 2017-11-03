@@ -1,0 +1,176 @@
+package cn.ak4j.yard.domain;
+
+import java.io.Serializable;
+import java.util.Calendar;
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
+import javax.persistence.Transient;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.pcs.domain.PcsUser;
+
+
+@Embeddable
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class MaintenanceInfo implements Serializable{
+
+	
+	@Column(name="create_user")
+	private String createUserId;
+	
+	private Date createDate;
+	
+	@Column(name="create_org")
+	private String createOrgId;
+	
+	@Column(name="last_user")
+	private String lastUserId;
+	private Date lastDate;
+	
+	@Column(name="last_org")
+	private String lastOrgId;
+	private String describe;
+	
+	private Integer yardId;//业务场ID
+	
+	@Transient @JsonIgnore
+	private PcsUser createUser;
+	
+	@Transient @JsonIgnore
+	private PcsUser lastUser;
+	
+	public MaintenanceInfo(){}
+	
+	public MaintenanceInfo(IUser user){
+		this(user.getOrgId(), user.getUserId());
+	}
+
+	public MaintenanceInfo(String userOrgId, String userId){
+		setCreateDate(new Date());
+		setCreateOrgId(userOrgId);
+		setCreateUserId(userId);
+		setDescribe("");
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(getCreateDate());
+		cal.set(Calendar.MILLISECOND, 0);
+		setLastDate(cal.getTime());
+		setLastOrgId(getCreateOrgId());
+		setLastUserId(getCreateUserId());
+		//设置业务场
+		setYardId(Conf.getYardId());
+		//setCreateYard(Conf.getYardId());
+		//setLastYard(Conf.getYardId());
+	}
+	
+	public void updateByUser(String userOrgId, String userId){
+		Calendar cal = Calendar.getInstance();
+		cal.set(Calendar.MILLISECOND, 0);
+		setLastDate(cal.getTime());
+		setLastOrgId(userOrgId);
+		setLastUserId(userId);
+		
+		//设置修改业务场
+		//setLastYard(Conf.getYardId());
+	}
+	
+	public void updateByUser(IUser user){
+		updateByUser(user.getOrgId(), user.getUserId());
+	}
+	
+	public String getCreateUserId() {
+		return createUserId;
+	}
+	public void setCreateUserId(String createUser) {
+		this.createUserId = createUser;
+	}
+	public Date getCreateDate() {
+		return createDate;
+	}
+	public void setCreateDate(Date createDate) {
+		this.createDate = createDate;
+	}
+	public String getCreateOrgId() {
+		return createOrgId;
+	}
+	public void setCreateOrgId(String createOrg) {
+		this.createOrgId = createOrg;
+	}
+	public String getLastUserId() {
+		return lastUserId;
+	}
+	public void setLastUserId(String lastUser) {
+		this.lastUserId = lastUser;
+	}
+	public Date getLastDate() {
+		return lastDate;
+	}
+	public void setLastDate(Date lastDate) {
+		this.lastDate = lastDate;
+	}
+	public String getLastOrgId() {
+		return lastOrgId;
+	}
+	public void setLastOrgId(String lastOrg) {
+		this.lastOrgId = lastOrg;
+	}
+	
+	public String getDescribe() {
+		return describe;
+	}
+	public void setDescribe(String describe) {
+		this.describe = describe;
+	}
+
+	public Integer getYardId() {
+		return yardId;
+	}
+
+	public void setYardId(Integer yardId) {
+		this.yardId = yardId;
+	}
+	
+	//	public Integer getCreateYard() {
+//		return createYard;
+//	}
+//
+//	public void setCreateYard(Integer createYard) {
+//		this.createYard = createYard;
+//	}
+//
+//	public Integer getLastYard() {
+//		return lastYard;
+//	}
+//
+//	public void setLastYard(Integer lastYard) {
+//		this.lastYard = lastYard;
+//	}
+
+	public PcsUser getLastUser() {
+		return lastUser;
+	}
+
+	public void setLastUser(PcsUser lastUser) {
+		this.lastUser = lastUser;
+	}
+
+	public PcsUser getCreateUser() {
+		return createUser;
+	}
+
+	public void setCreateUser(PcsUser createUser) {
+		this.createUser = createUser;
+	}
+
+	public String toString() {
+		return "MaintenanceInfo [createUserId=" + createUserId
+				+ ", createDate=" + createDate + ", createOrgId=" + createOrgId
+				+ ", lastUserId=" + lastUserId + ", lastDate=" + lastDate
+				+ ", lastOrgId=" + lastOrgId + ", describe=" + describe + "]";
+	}
+	
+}

@@ -1,0 +1,197 @@
+package cn.ak4j.yard.enums;
+
+import cn.ak4j.exception.IExceptionType;
+
+/**
+* @Description: 业务场异常类型
+* @author zhengyf
+* @date 2017年1月19日 下午4:34:11
+* @version V1.0.0
+*/
+public enum YardExceptionType implements IExceptionType{
+
+	
+	invalid_data(40000,  "无效数据"),
+	invalid_password(40001, "密码无效，请重新输入"),
+	invalid_param_string(40003, "无效的参数"),
+	invalid_eds_goods_code_not_exist(40005, "企业产品编码:[%s]不存在"),
+	invalid_batch_task_exist(40006, "已经提交过相同的批量任务[id:%s]"),
+	invalid_inconsistent_timestamp(400103, "时间戳不一致[%d:%d]，操作无效"),
+	invalid_used_type_exist(40009, "使用类型[%s]已经存在"),
+	invalid_resource_exist(40010, "当前资源[%s]已存在"),
+	invalid_item_not_confirm(40011, "%s存在明细未确认"),
+	invalid_item_not_data(40014, "当前对象%s不存在明细信息"),
+	invalid_origin_code(40012,"无效的原始码"),
+	invalid_multiple_enable_card(40013, "产品[%s]包含多个启用的账页"),
+	invalid_shelf_stock_not_enough(40014, "仓库[%s]中产品批次[%s][%s]的库存不足"),
+	invalid_not_found_depot_area(40015, "仓库[%s]中没有找到产品[%s]相关的货区,:%s"),
+	invalid_client_type(40016, "无效的客户端类型"),
+	invalid_goods_shelf_stock_not_enough(40018, "产品[%s]的库存不足"),
+	invalid_exist_same_workbook(40019, "字典[类别编码:%s, 字典类别名称:%s, 字典键名:%s]已经存在！"),
+	invalid_exist_same_workbook_2(40020, "字典[类别编码:%s, 字典类别名称:%s, 字典键序:%d]已经存在！"),
+	invalid_exist_depot_name(40021, "当前仓库名称[%s]已存在"),
+	invalid_exist_dept_name(40022, "当前部门名称[%s]已存在"),
+	invalid_exist_lot_no(40023, "当前批号[%s-%s]已存在"), 
+	invalid_exist_depot_card(40024, "该产品[%s]在当前仓库[%s]已经存在帐页!"),
+	invalid_data_goods_without_lot(40025, "产品[%s]没有批次"), 
+	invalid_shelf_lock_stock(40026, "锁库存数量异常:业务[%s]中明细为[goodsId=%s,itemId=%s]的锁库存数量[%d]和明细的确认数量[%d]不一致"),
+	invalid_not_exist_depot_card(40027, "该产品[%s]在当前仓库[%s]不存在帐页!"),
+	invalid_shelf_stocks_not_enough(40028, "仓库[%s]中,%s"),
+	invalid_rule_exsit(40029, "当前规则已存在,请修改后使用"),
+	invalid_delivery_order(40030, "送货单数据无效:%s"),
+	invalid_eds_goods_unit_name_not_same(40031, "企业产品单位不一致:[%s]"),
+	invalid_eds_goods_exsit_same_goods(40032, "供应商[%s]已存在企业产品[%s]和标准产品[%s]对码！"),
+	invalid_item_not_plan(40033, "%s存在明细未计划"),
+	invalid_rule_biz_type_different(40034, "反馈规则[%s]类型[%s]与当前规则类型[%s]不相同"),
+	invalid_exist_same_property_change_rule(40035, "存在相同的物权变更规则"),
+	invalid_exist_user_name(40036, "当前用户名称[%s]已存在"),
+	invalid_biz_unit_lv(40037, "产品[%s:%s]的业务单位级别[备货:%d, 结算:%d, 存储:%d, 消耗:%d]设置无效"),
+	invalid_disabled_commiting_goods(40038, "未启用产品[%s:%s]不能提交"),
+	invalid_biz_item_without_lot_id(40039, "无效的业务明细[%s:%s],没有批次ID"),
+	invalid_task_item_without_lot_id(40040, "无效的任务明细[%s:%s],没有批次ID"),
+	invalid_receive_item_without_enough_qty_to_deal(40041, "产品[%s:%s]批次[%s:%s]没有足够的收货数量来核销:%d"),
+	invalid_goods_without_butting_code(40042, "标准产品[%s]未与企业产品对码或未提交、未启用"),
+	invalid_goods_relation_many_usable_eds_goods(40043, "标准产品[%s]关联了多个可用的企业产品！"),
+	invalid_exist_several_replenish_rule(40044, "申领规则[%s]对应的反向的申领退货规则存在多个"),
+	invalid_package_specification_incomplete(40045, "产品[%s:%s]包装单位规格不完整"),
+	invalid_useless_goods(40046, "产品[%s:%s]未启用或未提交"),
+	invalid_exist_same_depot_goods_config(40047, "仓库:[%s:%s]已存在相同的产品[%s:%s]配置"),
+	invalid_excel_file(40048, "无效的excel文件:%s"),
+	invalid_init_adjust_stock_is_increment(40049, "初始化库存调节只能是报溢类型"), 
+	invalid_init_reconciliation_exist(40050, "当前对账规则[%s,%s]已经有初始化对账[%s]"),
+	invalid_clean_days(40051, "财务对账业务[%s]的日清日期格式无效:[%s]"),
+	invalid_settlement_qty(40052, "结算数量[%d]不能大于期初+对账数量:[%d+%d]"),
+	invalid_areaType_cannot_same(40053,"[%s]规则:[%s]类型和[%s]类型不能相同"),
+	invalid_depot_goods_type_different(40054,"[%s]规则,[%s][%s]和[%s][%s]的产品类型不一致"),
+	invalid_both_can_confirm(40055, "收货方仓库确认和发货方仓库确认不能同时启用"),
+	invalid_origin_item_condition_empty(40056, "[%s]规则,设置了来源规则，但来源规则明细条件未设置"),
+	invalid_debit_org_and_credit_org_same(40057, "借入机构和贷出机构不能相同"),
+	invalid_same_day_daily_clean_exist(40058, "仓库[%s]已经有了[%s]的日清对账业务"),
+	invalid_daily_clean_target_date(40059, "无效的对账日期[%s]，只能在对账日期的第二天以后进行日清对账"), 
+	invalid_integration_supplier_qty_error(40060, "与供应商集成的产品[%s]确认数量[%d]必须为企业产品[%s]备货/送货转换比[%d]的整数倍"),
+	invalid_target_depots(40061, "财务对账的对账仓库对应的供应商部门不唯一[%s]"),
+	invalid_prepare_unit_price_not_same(40062, "送货单[%s]产品:[%s]与备货价格不一致"), 
+	prepare_qty_over_upperLimit(40063, "备货单[%s]产品[%s]的数量不得超过[%d]"), 
+	invalid_biz_item_not_found_origin_data(40064, "业务明细没有找到来源明细"), 
+	
+	unauthorized(40100, "未认证"),
+	unauthorized_invalid_access_token(40101, "无效的访问凭证"),
+	unauthorized_expired_access_token(40102, "访问凭证过期"),
+	
+	forbide_operate(40300, "禁止操作！"),
+	forbide_delete(40301, "禁止删除当前资源[%s]！"),
+	forbide_update(40302, "禁止更新当前资源[%s]！"),
+	forbide_update_check_state(40303, "当前状态为%s，禁止将其更新为%s"),
+	forbide_update_check_state_commited(40304, "当前资源禁止提交"),
+	forbide_delete_non_empty_depot_area(40305, "当前货区[%s]存在货位信息，禁止删除！"),
+	forbide_unallow_operation(40306, "当前操作未授权，url:%s，method:%s"),
+	forbide_update_stock_to_negative(40307, "禁止更新库存[%d+(%d)]为负数:仓库[%s],产品[%s],批次:[%s]"), 
+	forbide_use_turnover_box(40308, "禁止使用非空闲状态、未启用或者未提交的周转箱:[%s]"),
+	forbide_update_receive_negative(40309, "禁止更新明细[%s]收货数量为负数"), 
+	forbid_without_depot_card(40310, "仓库[%s]中产品[%s]在[%s]货区没有相关账页"),
+	forbid_big_sum_cannot_modify(40311, "产品[%s]大包装转换比不能修改，已经用于业务包装单位级别了"), 
+	forbid_can_not_apply_biz(40312, "部门[%s]的用户不能发起[%s]业务"),
+	forbid_can_not_confirm_biz(40313, "部门[%s]的用户不能确认[%s]业务"),
+	forbide_delete_role(40314, "当前权限操作正在使用,禁止删除当前资源！"),
+	forbide_use_disabled_eds_goods(40315, "禁止使用 未启用的企业产品[%s]"),
+	forbide_non_idel_turnover_box(40316, "禁止操作非空闲状态的周转箱:[%s]"),
+	forbid_inform_supplier(40317, "禁止对未审核的或者已通知的备货/备货退货通知进行同步:[%s]"),
+	forbid_edit_uneditable_workbook(40318, "禁止修改不能编辑的字典[%s]"),
+	forbid_eds_goods_exsit_eds_goods_lot(40319, "企业产品[%s]存在其他相关联的企业产品批号"),
+	forbid_review_prepare_inform(40320, "禁止审核:当前用户[%s]不是部门[%s]用户"),
+	forbid_delivery_prepare_inform(40321, "此备货[%s]已经发货,收货单号:[%s],禁止再次发货"),
+	forbid_edit_uneditable_global_info(40322, "禁止修改不能编辑的全局配置[%s]"),
+	forbid_record_recorded_receive(40323, "收货业务[%s]已入账"),
+	forbid_delete_default_user(40324, "部门默认用户[%s]禁止删除"),
+	forbid_delete_default_depot_area(40325, "默认货区[%s]禁止删除"),
+	forbid_delete_default_depot_shelf(40326, "默认货位[%s]禁止删除"),
+	forbid_update_default_depot_shelf(40327, "默认货位[%s]禁止更新"),
+	forbid_excess_delivery(40328, "送货单:[%s],产品:[%s]超额送货,超额数量:%d"),
+	forbid_modify_goods_package_specifications(40329, "禁止修改产品[%s,%s]的%s"),
+	forbid_same_goods_in_multi_shelf(40330, "禁止同一个产品[%s]放在同一货区类型的不同货位:当前货位[%s], 新货位[%s]"),
+	forbid_use_expire_goods_lot(40331,"禁止使用已过期批次:%s"),
+	forbid_only_new_created_state_can_generate_items(40332, "财务对账业务[%s]禁止在非新增状态[%s]进行生成对账明细"),
+	forbid_concurrence_generating(40333, "禁止多个线程并行对财务对账业务[%s]生成对账明细"),
+	forbid_commit_settlement_qty_unfilled(40334, "明细的结算数量未填写，禁止提交"),
+	forbid_rule_not_enabled(40335, "[%s]规则中的[id:%s]规则未启用"),
+	forbid_exist_uncomplete_biz_plan(40336, "存在未完成的[%s]业务"),
+	forbid_exist_uncomplete_task(40337, "存在未完成的作业"),
+	forbid_goods_exist_enabled_depot_card(40338, "产品[%s]在[%s]已经存在启用的账页，不能同时启用多个"),
+	forbid_add_not_new_create_state_data(40339, "禁止创建不是新增状态的资源"),
+	
+	not_found(40400, "资源未找到"),
+	not_found_user(40402, "用户[%s]未找到或已失效!"), 
+	not_found_stock(40403, "仓库[%s]中没有产品[%s]的库存记录"),
+	not_found_shelf(40404, "仓库[%s]下货区[%s]中未找到[%s]货位"),
+	not_found_area(40405, "仓库[%s]中未找到[%s]货区"),
+	not_found_depot(40406, "未找到[%s]仓库"), 
+	not_found_default_biz_rule(40407, "未找到%s业务对应的默认业务规则"), 
+	not_found_total_auto_feedback_rule(40408, "未找到申领业务规则[%s:%s]相关的全自动反馈的规则"), 
+	not_found_default_user(40409, "部门[%s:%s]未找到默认用户"),
+	not_found_apply_user(40410, "未找到申领用户[%s]"), 
+	not_found_depot_id(40411, "未找到仓库id[%s]"), 
+	not_found_eds_goods_code(40412, "未找到企业产品编码[%s]"), 
+	not_found_default_receive_rule(40413, "未找到默认的收货规则:[供应商:%s, 收货仓库id:%s]"),
+	not_found_receive_rule(40414, "未找到收货规则:[发货部门:%s, 收货仓库id:%s]"),
+	not_found_prepare_inform_rule(40415, "未找到备货通知业务规则[%s]"),
+	not_found_consume_rule(40416, "未找到消耗业务规则[id:%s]"),
+	not_found_prepare_inform(40417, "未找到备货通知业务[%s]"),
+	not_found_receive_relation_prepare_inform(40418, "收货业务[供应商id:%s, 收货仓库id:%s]未找到相关备货通知业务"),
+	not_found_replenish_origin_receive_rule(40419, "未找到来源规则为[%s]的申领规则"),
+	not_found_replenish_rule(40420, "未找到申领业务规则[id:%s]"),
+	not_found_move_area_rule(40421, "未找到库内移仓业务规则[id:%s]"),
+	not_found_adjust_stock_rule(40422, "未找到库存调节业务规则:%s"),
+	not_found_property_change_rule(40423, "未找到物权变更规则[bizRuleId:%s,triggerStepCode:%s]"),
+	not_found_general_ledger_item(40424, "未找到业务总账记录:[产品，id:%s, 编码:%s] [批次，id:%s, 编码:%s]"), 
+	not_found_dealing_receive_item(40425, "未找到可以交易的收货明细"),
+	not_found_replenish_return_rule(40426, "未找到可以使用的申领退货规则"),
+	not_found_data_type(40427, "未找到数据类型:%s"),
+	not_found_goods(40428, "未找到产品[%s]"), 
+	not_found_receive_origin_prepare_inform_rule(40429, "必须备货的收货规则未找到来源的备货规则"),
+	not_found_daily_clean_rule(40430, "未找到日清业务规则[id:%s]"),
+	not_found_property_change_record(40431, "未找到物权变更记录:[日期:%s, 部门:%s]"),
+	not_found_org(40432, "未找到机构[%s]"), 
+	not_found_goods_lot(40433, "未找到产品:[%s]批号为:[%s]的批次信息"),
+	not_found_auto_allocate_replenish_rule(40434, "当前为代收货[%s]业务，以当前收货规则[%s,%s]作为来源规则申领规则未找到"),
+	not_found_dept(40435, "未找到[%s]部门"),
+	not_found_depot_goods_config(40436, "未找到仓库[%s]中产品[%s]的配置"),
+	not_found_fin_rec_rule(40437, "未找到财务对账规则:%s"),
+	not_found_yard_global_info(40438, "未找到全局配置:[%s]"),
+	
+	
+	file_load_fail(50001, "文件加载失败:[%s]"), 
+	sync_prepare_inform_fail(50002, "同步备货通知失败:[%s:%s]"),
+	biz_forward_fail(50003, "业务事务步骤步进失败:%s=>%s"), 
+	property_change_rules_conflict(50004, "物权变更规则冲突:%s[bizRuleId=%s,triggerStepCode=%s]包含多条物权变更规则"),
+	general_ledger_not_enough(50005, "总账数量不足：[产品:%s][批号:%s]，当前库存:%d，贷出数量:%d"),
+
+	zsy_api_request_fail(50040, "中山医接口请求失败:%s"),
+	gep_api_request_fail(50041, "GEP接口请求失败:[%s]"),
+	gep_sync_update_receive_code_fail(50042, "GEP更新收货编码失败:[%s]");
+	
+	
+	private int code;
+	private String description;
+	
+	private YardExceptionType(int code, String description){
+		setCode(code);
+		setDescription(description);
+	}
+
+	public void setCode(int code) {
+		this.code = code;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	public int getCode() {
+		return code;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+	
+}

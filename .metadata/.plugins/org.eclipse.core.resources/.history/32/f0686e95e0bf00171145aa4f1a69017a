@@ -1,0 +1,83 @@
+package cn.ak4j.yard.extend.gep.domain;
+
+import javax.xml.bind.annotation.XmlAttribute;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
+
+/**
+ * 该类主要作为spd对Gep同步备货和财务对账的产品明细
+ * 1）同步备货需要inStorage字段
+ * 2）同步财务对账需要abteilung字段
+ * 除inStorage,abteilung外其他字段都需要,为null的字段在映射成xml时自动忽略
+ */
+@XmlType(propOrder = { "prod", "code", "inStorage", "abteilung", "num", "price"})
+@XmlRootElement(name="FItem")
+public class SpdGepBillItem {
+
+	private String prod;//产品名称
+	
+	private String code;//产品编码
+	
+	private String inStorage;//调入仓库
+	
+	private String abteilung;
+	
+	private int num;//数量
+	
+	private float price;//单价
+
+	public String getProd() {
+		return prod;
+	}
+
+	@XmlAttribute(name="Prod")
+	public void setProd(String prod) {
+		this.prod = prod;
+	}
+
+	public String getCode() {
+		return code;
+	}
+
+	@XmlAttribute(name="Code")
+	public void setCode(String code) {
+		this.code = code;
+	}
+
+	public String getInStorage() {
+		return inStorage;
+	}
+
+	public String getAbteilung() {
+		return abteilung;
+	}
+
+	@XmlAttribute(name="Abteilung")
+	public void setAbteilung(String abteilung) {
+		this.abteilung = abteilung;
+	}
+
+	@XmlAttribute(name="InStorage")
+	public void setInStorage(String inStorage) {
+		this.inStorage = inStorage;
+	}
+
+	public int getNum() {
+		return num;
+	}
+
+	@XmlAttribute(name="Num")
+	public void setNum(int num) {
+		this.num = num;
+	}
+
+	public float getPrice() {
+		return price;
+	}
+
+	@XmlAttribute(name="Price")
+	public void setPrice(float price) {
+		this.price = price;
+	}
+	
+}

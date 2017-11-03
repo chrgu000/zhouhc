@@ -1,0 +1,99 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Inheritance;
+import javax.persistence.InheritanceType;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings("serial")
+@Entity
+@Inheritance(strategy=InheritanceType.TABLE_PER_CLASS) 
+@JsonIgnoreProperties(ignoreUnknown=true)
+public abstract class SpdDepotTaskItem extends SpdTaskItem{
+
+	@NotNull(message="账页不能为空") @Getter @Setter
+	private String cardId;//帐页Id
+
+	@Getter @Setter
+	private String goodsFormatName;
+	
+	@Getter @Setter
+	private String packingSpec;
+	
+	@NotNull(message="单位名称不能为空") @Getter @Setter
+	private String unitName;
+	
+	@Getter @Setter
+	private String shelfId;//货位ID
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepotShelf shelf;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdShelfStock shelfStock;
+	
+	@Transient
+	public String getUnitLvName(){
+		return YdsUnitLv.unitOf(getUnitLv()).getName();
+	}
+	
+	@Transient @JsonIgnore
+	public int getConfirmQtyByBaseUnit(){
+		YdsGoods goods = getSpecialGoodsLot().getGoods();
+ 		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), YdsUnitLv.base.getLv());
+		int planQtyByMinUnit = (int)(getConfirmQty()*unitRatio);
+		return planQtyByMinUnit;
+	}
+
+	public void verifyQty() {
+		int confirmQty = getConfirmQty();
+		int planQty = getPlanQty()==null?0:getPlanQty();
+		if(confirmQty < 0 || confirmQty > planQty){
+			throw new InvalidDataException("确认数量不能大于计划数量");
+		}
+	}
+	
+	@Transient  @JsonIgnore
+	public boolean hasNotUseableLot(){
+		return getSpecialGoodsLot() == null;
+	}
+	
+	public boolean hasEffectiveParentWrapperId(){
+		return StringUtils.isNotEmpty(getParentWrapperId()) && !getParentWrapperId().equals(Constant.none);
+	}
+	
+	public boolean isBlockItem(){
+		if(getGoods() == null && getSpecialGoodsLot() == null || getPlanQtyByStoreUnit() == 0){
+			return false;
+		}
+		int ratio = getGoods()==null?getSpecialGoodsLot().getGoods().getPrepareToStoreRatio():getGoods().getPrepareToStoreRatio();
+
+		//log.debug("planQty:{}, confirmQty:{}, ratio:{}", getPlanQtyByStoreUnit(), getConfirmQtyByStoreUnit(), ratio);
+		//未确认数量下根据计划数量来计算是否为整件
+		if(getPlanQtyByStoreUnit() > 0 && getConfirmQtyByStoreUnit() < 0){
+			return getPlanQtyByStoreUnit()%ratio==0;
+		}
+		//已确认的情况下根据确认数量判断是否为整件
+		if(getConfirmQtyByStoreUnit() <= 0){
+			return false;
+		}
+		return getConfirmQtyByStoreUnit()%ratio==0;
+	}
+	
+}

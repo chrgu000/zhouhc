@@ -1,0 +1,128 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.Collections;
+import java.util.List;
+
+import org.apache.commons.collections.CollectionUtils;
+
+import cn.ak4j.entity.Entities;
+
+public class PcsMenus extends Entities<PcsMenu>{
+
+	private static final long serialVersionUID = -3048168452376744852L;
+
+	public PcsMenus toSimpleMenus(){
+		PcsMenus result = new PcsMenus();
+		for(PcsMenu menu : this){
+			result.add(menu.buildSimpleMenu());
+			result.addAll(menu.getChildren().toSimpleMenus());
+		}
+		return result;
+	}
+	
+	public PcsFunctions getAllFunctions(){
+		PcsFunctions result = new PcsFunctions();
+		for(PcsMenu menu : this){
+			if(menu.getFunctions() != null){
+				result.addAll(menu.getFunctions());	
+			}
+			result.addAll(menu.getChildren().getAllFunctions());
+		}
+		return result;
+	}
+	
+	public PcsMixedOperations getAllMixedOperations(){
+		PcsMixedOperations result = new PcsMixedOperations();
+		for(PcsMenu menu : this){
+			if(menu.getFunctions() != null){
+				for(PcsFunction function : menu.getFunctions()){
+					for(PcsOperation operation : function.getOperations()){
+						PcsMixedOperation mixedOperation = new PcsMixedOperation(operation);
+						mixedOperation.setMenuId(menu.getMenuId());
+						mixedOperation.setMenuName(menu.getName());
+						mixedOperation.setAnchor(menu.getAnchor());
+						mixedOperation.setParentMenuName(menu.getParentMenuName());
+						mixedOperation.setFunctionId(function.getFunctionId());
+						mixedOperation.setFunctionName(function.getFunctionName());
+						mixedOperation.setSystemName(menu.getSystemName());
+						result.add(mixedOperation);
+					}
+				}
+			}
+			result.addAll(menu.getChildren().getAllMixedOperations());
+		}
+		return result;
+	}
+	
+	public PcsMenus findByFunctionIds(List<String> functionIds){
+		PcsMenus result = new PcsMenus();
+		for(PcsMenu menu : this){
+			for(String functionId : functionIds){
+				if(menu.containFunction(functionId)){
+					result.add(menu.buildSimpleMenu());
+				}
+			}
+			result.addAll(menu.getChildren().findByFunctionIds(functionIds));
+		}
+		return result;
+	}
+	
+	public PcsMenu findParentMenu(PcsMenu theMenu){
+		for(PcsMenu menu : this){
+			if(theMenu.getMenuParentId().equals(menu.getMenuId())){
+				return menu;
+			}
+		}
+		return null;
+	}
+	
+	public void initParentMenu(){
+		for(PcsMenu menu : this){
+			for(PcsMenu childMenu : menu.getChildren()){
+				childMenu.setParentMenu(menu);	
+			}
+			menu.getChildren().initParentMenu();
+		}
+	}
+	
+	//这段算法需要修改，目前不支持三级菜单
+	public static PcsMenus convertToTreeStructure(PcsMenus allMenus, PcsMenus menus){
+		PcsMenus result = new PcsMenus();
+		
+		if(CollectionUtils.isEmpty(menus)){
+			return result;
+		}
+		
+		for(PcsMenu menu : menus){
+			if(!menu.isTopMenu()){
+				PcsMenu parentMenu = result.findParentMenu(menu);
+				if(parentMenu == null){
+					parentMenu = allMenus.findParentMenu(menu);
+					parentMenu = parentMenu.buildSimpleMenu();
+					result.add(parentMenu);
+				}
+				PcsMenu childMenu = menu.buildSimpleMenu();
+				childMenu.setParentMenu(parentMenu);
+				parentMenu.addChild(childMenu);
+			}else{
+				result.add(menu.buildSimpleMenu());
+			}
+		}
+		Collections.sort(result);
+		for(PcsMenu menu : result){
+			if(menu.isTopMenu()){
+				Collections.sort(menu.getChildren());
+			}
+		}
+		
+		return result;
+	}
+	
+//	private PcsMenu findById(String menuId){
+//		PcsMenuParams params = new PcsMenuParams();
+//		params.setMenuId(new ListParam<String>(menuId));
+//		PcsMenus menus = (PcsMenus)find(params);
+//		return menus.size()>0?menus.get(0):null;
+//	}
+	
+}

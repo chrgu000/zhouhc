@@ -1,0 +1,24 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class B2BSettleBillItem {
+
+	private String outSettleItemId;//结算单明细ID
+	private float outAmount;//结算金额
+	private float outUnitprice;//结算单价
+	private String outGdsExp;//有效期,格式:yyyy-MM-dd HH:mm:ss)
+	private String outGdsFormatName;//商品信息
+	private String outGdsId;//商品ID
+	private String outGdsLotNo;//商品批号
+	private String outGdsPro;//生产日期,格式:yyyy-MM-dd HH:mm:ss)
+	private int outQty;//结算数量
+	private String outTaskId;//作业单ID
+	private String outTaskItemId;//作业单明细ID
+	private String outTaskType;//作业单类型
+	
+}

@@ -1,0 +1,95 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Date;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.enums.PcsAreaType;
+
+public class SpdReceiveRuleTest {
+
+	@Test public void testEqualsRule(){
+		SpdReceiveRule rule01 = buildReceiveRule("fee_id_001");
+		SpdReceiveRule rule02 = buildReceiveRule("fee_id_001");
+		SpdReceiveRule rule03 = buildReceiveRule("fee_id_002");
+		
+		assertTrue(rule01.equalsRule(rule02));
+		assertFalse(rule01.equalsRule(rule03));
+		
+		rule02.setFeedbackRuleId("fee_id_002");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = buildReceiveRule("fee_id_001");
+		rule02.getDirectionRule().setFromDeptId("dept_id_002");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = buildReceiveRule("fee_id_001");
+		rule02.getDirectionRule().setFromOrgId("org_id_002");;
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = buildReceiveRule("fee_id_001");
+		rule02.getDirectionRule().setToDepotId("depot_id_003");;;
+		assertFalse(rule01.equalsRule(rule02));
+	}
+	
+	@Test public void testUpdate(){
+		SpdReceiveRule rule01 = buildReceiveRule("fee_id_001");
+		SpdReceiveRule rule02 = buildReceiveRule("fee_id_001");
+		SpdReceiveRule rule03 = buildReceiveRule("fee_id_001");
+		
+		rule01.setName("测试");
+		rule01.setPrior(100);
+		rule01.setEnabled(false);
+		rule01.setCanBeOriginRule(false);
+		rule01.setMustPrepare(true);
+		rule01.setFeedbackRuleId("fee_id_002");
+		rule01.getDirectionRule().setFromDeptId("dept_id_003");
+		rule01.getDirectionRule().setFromOrgId("org_id_003");
+		rule01.getDirectionRule().setToDepotId("depot_id_006");
+		rule01.getDirectionRule().setToAreaType(PcsAreaType.isolation.getCode());
+		rule01.getDirectionRule().setFinalDepotId("depot_id_003");
+		rule01.getDirectionRule().setFinalAreaType(PcsAreaType.isolation.getCode());
+		rule01.setManualApply(false);
+		
+		rule02.update(rule01);
+		
+		assertTrue(rule02.getName()!=rule03.getName());
+		assertTrue(rule02.getPrior()!=rule03.getPrior());
+		assertTrue(rule02.getEnabled()!=rule03.getEnabled());
+		assertTrue(rule02.getCanBeOriginRule()!=rule03.getCanBeOriginRule());
+		assertTrue(rule02.getMustPrepare()!=rule03.getMustPrepare());
+		assertTrue(rule02.getManualApply()!=rule03.getManualApply());
+		
+		assertTrue(rule02.getFeedbackRuleId() == rule03.getFeedbackRuleId());
+		assertTrue(rule02.getDirectionRule().getFromOrgId()==rule03.getDirectionRule().getFromOrgId());
+		assertTrue(rule02.getDirectionRule().getToDepotId()==rule03.getDirectionRule().getToDepotId());
+		assertTrue(rule02.getDirectionRule().getToAreaType()==rule03.getDirectionRule().getToAreaType());
+		assertTrue(rule02.getDirectionRule().getFinalDepotId() == rule02.getDirectionRule().getFinalDepotId());
+		assertTrue(rule02.getDirectionRule().getFinalAreaType() == rule02.getDirectionRule().getFinalAreaType());
+	}
+	
+	private SpdReceiveRule buildReceiveRule(String feedbackRuleId){
+		SpdReceiveRule rule = new SpdReceiveRule();
+		rule.setName("test_receive_001");
+		rule.setPrior(99);
+		rule.setEnabled(true);
+		rule.setCanBeOriginRule(true);
+		rule.setId("rec_id_001");
+		rule.setMustPrepare(false);
+		rule.setFeedbackRuleId(feedbackRuleId);
+		rule.setCreateTime(new Date());
+		SpdReceiveDirectionRule directionRule = new SpdReceiveDirectionRule();
+		directionRule.setFromDeptId("dept_id_001");
+		directionRule.setFromOrgId("org_id_001");
+		directionRule.setToDepotId("depot_id_001");
+		directionRule.setToAreaType(PcsAreaType.normal.getCode());
+		rule.setDirectionRule(directionRule);
+		
+		return rule;
+	}
+}

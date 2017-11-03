@@ -1,0 +1,504 @@
+package cn.ak4j.yard.sys.service;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.to.InitialStockImportTO;
+import cn.ak4j.yard.sys.to.SpdDepotCardImportTO;
+import cn.ak4j.yard.sys.to.SpdPrepareInformItemImportTO;
+import cn.ak4j.yard.sys.to.YdsEdsGoodsLotImportTO;
+import cn.ak4j.yard.sys.to.YdsGoodsLotImportTO;
+import cn.ak4j.yard.sys.to.InitialEndingImportTO;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: excel转换器类，将excel文件转换成对象集合
+* excel解析目前不接受
+* @author zhengyf
+* @date 2017年9月10日 上午10:49:42
+* @version V1.0.0
+*/
+
+@Slf4j
+@Component
+public class YardExcelTranslator {
+	
+	public List<SpdDepotCardImportTO> translateToDepotCards(byte[] data) {
+		List<SpdDepotCardImportTO> result = new ArrayList<SpdDepotCardImportTO>();
+		
+		ByteArrayInputStream in = new ByteArrayInputStream(data);
+		HSSFRow row = null;
+		try{
+			HSSFWorkbook wb = new HSSFWorkbook(in);
+			HSSFSheet sheet = wb.getSheetAt(0);
+			
+			Iterator<Row> rows = sheet.rowIterator();
+			rows.next();
+			while (rows.hasNext()) {
+				row = (HSSFRow)rows.next();
+				SpdDepotCardImportTO depotCard = buildDepotCard(row);
+				if(depotCard != null){
+					result.add(depotCard);
+				}
+			}
+		}catch(IOException e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, e.getMessage());
+		}catch(Exception e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, String.format("第[%d]行解析失败", row.getRowNum()));
+		}finally{
+			try{
+				if(in != null){
+					in.close();
+					in = null;
+				}
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
+		
+		return result;
+	}
+	
+	public List<YdsGoodsLotImportTO> translateToGoodLots(byte[] data) {
+		List<YdsGoodsLotImportTO> result = new ArrayList<YdsGoodsLotImportTO>();
+		
+		ByteArrayInputStream in = new ByteArrayInputStream(data);
+		HSSFRow row = null;
+		try{
+			HSSFWorkbook wb = new HSSFWorkbook(in);
+			HSSFSheet sheet = wb.getSheetAt(0);
+			
+			Iterator<Row> rows = sheet.iterator();
+			rows.next();
+			while(rows.hasNext()){
+				row = (HSSFRow) rows.next();
+				YdsGoodsLotImportTO goodsLot = buildGoodsLot(row);
+				
+				if(goodsLot != null){
+					result.add(goodsLot);
+				}
+			}
+		}catch(IOException e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, e.getMessage());
+		}catch(Exception e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, String.format("第[%d]行解析失败", row.getRowNum()));
+		}finally{
+			try{
+				if(in != null){
+					in.close();
+					in = null;
+				}
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
+		
+		return result;
+	}
+	
+	public List<YdsEdsGoodsLotImportTO> translateToEdsGoodsLots(byte[] data) {
+		List<YdsEdsGoodsLotImportTO> result = new ArrayList<YdsEdsGoodsLotImportTO>();
+		
+		ByteArrayInputStream in = new ByteArrayInputStream(data);
+		HSSFRow row = null;
+		try{
+			HSSFWorkbook wb = new HSSFWorkbook(in);
+			HSSFSheet sheet = wb.getSheetAt(0);
+			
+			Iterator<Row> rows = sheet.iterator();
+			rows.next();
+			while(rows.hasNext()){
+				row = (HSSFRow) rows.next();
+				YdsEdsGoodsLotImportTO edsGoodsLot = buildEdsGoodsLot(row);
+				
+				if(edsGoodsLot != null){
+					result.add(edsGoodsLot);
+				}
+			}
+		}catch(IOException e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, e.getMessage());
+		}catch(Exception e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, String.format("第[%d]行解析失败", row.getRowNum()));
+		}finally{
+			try{
+				if(in != null){
+					in.close();
+					in = null;
+				}
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
+		
+		return result;
+	}
+	
+	public List<InitialStockImportTO> translateToInitialStocks(byte[] data) {
+		List<InitialStockImportTO> result = new ArrayList<InitialStockImportTO>();
+		
+		ByteArrayInputStream in = new ByteArrayInputStream(data);
+		HSSFRow row = null;
+		try {
+			HSSFWorkbook wb = new HSSFWorkbook(in);
+			HSSFSheet sheet = wb.getSheetAt(0);
+			
+			Iterator<Row> rows = sheet.rowIterator();
+			rows.next();
+			while (rows.hasNext()){
+				row = (HSSFRow)rows.next();
+				if(row.getRowNum() >= 7){
+					InitialStockImportTO initialStock = buildInitialStock(row);
+					if(initialStock != null){
+						result.add(initialStock);
+					}
+				}
+			}
+		} catch (IOException e) {
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, e.getMessage());
+		}catch (Exception e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, String.format("第[%d]行解析失败", row.getRowNum()));
+		}finally{
+			try{
+				if(in != null){
+					in.close();
+					in = null;
+				}
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
+		log.debug("result size:{}", result.size());
+		return result;
+	}
+	
+	
+	public List<InitialEndingImportTO> translateToInitialEndings(byte[] data) {
+		List<InitialEndingImportTO> result = new ArrayList<InitialEndingImportTO>();
+		
+		ByteArrayInputStream in = new ByteArrayInputStream(data);
+		HSSFRow row = null;
+		try {
+			HSSFWorkbook wb = new HSSFWorkbook(in);
+			HSSFSheet sheet = wb.getSheetAt(0);
+			
+			Iterator<Row> rows = sheet.rowIterator();
+			rows.next();
+			while (rows.hasNext()){
+				row = (HSSFRow)rows.next();
+				if(row.getRowNum() >= 7){
+					InitialEndingImportTO initialEnding= buildInitialEnding(row);
+					if(initialEnding != null){
+						result.add(initialEnding);
+					}
+				}
+			}
+		} catch (IOException e) {
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, e.getMessage());
+		}catch (Exception e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, String.format("第[%d]行解析失败", row.getRowNum()));
+		}finally{
+			try{
+				if(in != null){
+					in.close();
+					in = null;
+				}
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
+		log.debug("result size:{}", result.size());
+		return result;
+	}
+
+	public List<SpdPrepareInformItemImportTO> translateToPrepares(byte[] data) {
+		List<SpdPrepareInformItemImportTO> result = new ArrayList<SpdPrepareInformItemImportTO>();
+		ByteArrayInputStream in = new ByteArrayInputStream(data);
+		HSSFRow row = null;
+		try {
+			HSSFWorkbook wb = new HSSFWorkbook(in);
+			HSSFSheet sheet = wb.getSheetAt(0);
+			
+			Iterator<Row> rows = sheet.rowIterator();
+			rows.next();
+			while (rows.hasNext()){
+				row = (HSSFRow)rows.next();
+				if(row.getRowNum() >= 7){
+					SpdPrepareInformItemImportTO prepareInformItem= buildPrepareInformItem(row);
+					if(prepareInformItem != null){
+						result.add(prepareInformItem);
+					}
+				}
+			}
+		} catch (IOException e) {
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, e.getMessage());
+		}catch (Exception e){
+			log.error("数据解析失败", e);
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, String.format("第[%d]行解析失败", row.getRowNum()+1));
+		}finally{
+			try{
+				if(in != null){
+					in.close();
+					in = null;
+				}
+			}catch(IOException e){
+				e.printStackTrace();
+			}
+		}
+		log.debug("result size:{}", result.size());
+		return result;
+	}
+
+	private SpdDepotCardImportTO buildDepotCard(HSSFRow row){
+		if((row.getCell(0) == null || StringUtils.isEmpty(row.getCell(0).getStringCellValue())) && 
+				(row.getCell(1) == null || StringUtils.isEmpty(row.getCell(1).getStringCellValue())) && 
+				(row.getCell(2) == null || StringUtils.isEmpty(row.getCell(2).getStringCellValue())) && 
+				(row.getCell(3) == null || StringUtils.isEmpty(row.getCell(3).getStringCellValue())) ){
+			return null;
+		}
+		SpdDepotCardImportTO depotCard = new SpdDepotCardImportTO();
+		depotCard.setGoodsCode(row.getCell(0).getStringCellValue());
+		if(row.getCell(1) != null){
+			depotCard.setGoodsName(row.getCell(1).getStringCellValue());
+		}
+		
+		String depotCode = row.getCell(2).getStringCellValue();
+		if(depotCode.indexOf(CodeSort.cangku.getCode()) != 0){
+			depotCard.setDepotCode(CodeSort.cangku.getCode()+depotCode);
+		}
+		
+		String shelfCode = row.getCell(3).getStringCellValue();
+		if(shelfCode.indexOf(CodeSort.huowei.getCode()) != 0){
+			depotCard.setNormalAreaShelfCode(CodeSort.huowei.getCode()+shelfCode);
+		}
+		return depotCard;
+	}
+	
+	private YdsGoodsLotImportTO buildGoodsLot(HSSFRow row){
+		if((row.getCell(0) == null || StringUtils.isEmpty(row.getCell(0).getStringCellValue())) && 
+				(row.getCell(1) == null || StringUtils.isEmpty(row.getCell(1).getStringCellValue())) && 
+				(row.getCell(2) == null || StringUtils.isEmpty(row.getCell(2).getStringCellValue())) && 
+				(row.getCell(3) == null || StringUtils.isEmpty(row.getCell(3).getStringCellValue())) &&
+				(row.getCell(4) == null || StringUtils.isEmpty(row.getCell(4).getStringCellValue()))){
+			return null;
+		}
+		if(row.getCell(0) != null){
+			row.getCell(0).setCellType(Cell.CELL_TYPE_STRING);
+		}
+		if(row.getCell(1) != null){
+			row.getCell(1).setCellType(Cell.CELL_TYPE_STRING);
+		}
+		if(row.getCell(2) != null){
+			row.getCell(2).setCellType(Cell.CELL_TYPE_STRING);
+		}
+		
+		YdsGoodsLotImportTO goodsLot = new YdsGoodsLotImportTO();
+		
+		goodsLot.setGoodsCode(row.getCell(0).getStringCellValue());
+		goodsLot.setGoodsName(row.getCell(1) != null?row.getCell(1).getStringCellValue():"");
+		goodsLot.setLotNo(row.getCell(2).getStringCellValue());
+		goodsLot.setSterilizeLotNo(row.getCell(5) != null?row.getCell(5).getStringCellValue():"");
+		try{
+			goodsLot.setProduceDate(row.getCell(3).getDateCellValue() != null?row.getCell(3).getDateCellValue():null);
+			goodsLot.setLotValidity(row.getCell(4).getDateCellValue() != null?row.getCell(4).getDateCellValue():null);
+			goodsLot.setSterilizeTime(row.getCell(6) != null?row.getCell(6).getDateCellValue():null);
+		}catch(IllegalStateException e){
+			throw new InvalidDataException(String.format("[%s:%s}日期格式不正确", goodsLot.getGoodsCode(), goodsLot.getGoodsName()));
+		}
+		
+		return goodsLot;
+	}
+
+	private YdsEdsGoodsLotImportTO buildEdsGoodsLot(HSSFRow row) {
+		if((row.getCell(0) == null || StringUtils.isEmpty(row.getCell(0).getStringCellValue())) && 
+				(row.getCell(1) == null || StringUtils.isEmpty(row.getCell(1).getStringCellValue())) && 
+				(row.getCell(2) == null || StringUtils.isEmpty(row.getCell(2).getStringCellValue())) && 
+				(row.getCell(3) == null || StringUtils.isEmpty(row.getCell(3).getStringCellValue())) &&
+				(row.getCell(4) == null || StringUtils.isEmpty(row.getCell(4).getStringCellValue())) &&
+				(row.getCell(7) == null || StringUtils.isEmpty(row.getCell(7).getStringCellValue()))){
+			return null;
+		}
+		if(row.getCell(0) != null){
+			row.getCell(0).setCellType(Cell.CELL_TYPE_STRING);
+		}
+		if(row.getCell(1) != null){
+			row.getCell(1).setCellType(Cell.CELL_TYPE_STRING);
+		}
+		if(row.getCell(2) != null){
+			row.getCell(2).setCellType(Cell.CELL_TYPE_STRING);
+		}
+		if(row.getCell(5) != null){
+			row.getCell(5).setCellType(Cell.CELL_TYPE_STRING);
+		}
+		if(row.getCell(7) != null){
+			row.getCell(7).setCellType(Cell.CELL_TYPE_STRING);
+		}
+		
+		YdsEdsGoodsLotImportTO edsGoodsLot = new YdsEdsGoodsLotImportTO();
+		edsGoodsLot.setEdsGoodsCode(row.getCell(0).getStringCellValue());
+		edsGoodsLot.setEdsGoodsName(row.getCell(1) != null?row.getCell(1).getStringCellValue():"");
+		edsGoodsLot.setEdsLotNo(row.getCell(2).getStringCellValue());
+		edsGoodsLot.setSterilizeLotNo(row.getCell(5) != null?row.getCell(5).getStringCellValue():"");
+		edsGoodsLot.setOwnerOrgCode(row.getCell(7).getStringCellValue());
+		
+		try{
+			edsGoodsLot.setProduceDate(row.getCell(3).getDateCellValue() != null?row.getCell(3).getDateCellValue():null);
+			edsGoodsLot.setEdsLotValidity(row.getCell(4).getDateCellValue()!= null?row.getCell(4).getDateCellValue():null);
+			edsGoodsLot.setSterilizeTime(row.getCell(6) != null?row.getCell(6).getDateCellValue():null);
+		}catch(IllegalStateException e){
+			throw new InvalidDataException(String.format("[%s:%s}日期格式不正确", edsGoodsLot.getEdsGoodsCode(), edsGoodsLot.getEdsGoodsName()));
+		}
+		
+		
+		return edsGoodsLot;
+	}
+	
+	
+	private InitialStockImportTO buildInitialStock(HSSFRow row) {
+		if((row.getCell(0) == null || StringUtils.isEmpty(row.getCell(0).getStringCellValue())) && 
+				(row.getCell(3) == null || StringUtils.isEmpty(row.getCell(3).getStringCellValue())) && 
+				(row.getCell(4) == null || StringUtils.isEmpty(row.getCell(4).getStringCellValue())) && 
+				(row.getCell(6) == null || StringUtils.isEmpty(row.getCell(5).getStringCellValue())) &&
+				(row.getCell(7) == null || StringUtils.isEmpty(row.getCell(7).getStringCellValue())) &&
+				(row.getCell(8) == null || StringUtils.isEmpty(row.getCell(8).getStringCellValue()))){
+			return null;
+		}
+		
+		InitialStockImportTO initialStock = new InitialStockImportTO();
+		initialStock.setGoodsCode(row.getCell(0).getStringCellValue());
+		if(row.getCell(2) != null){
+			initialStock.setStoreUnitName(row.getCell(2).getStringCellValue());	
+		}
+		initialStock.setLotNo(row.getCell(3).getStringCellValue());
+		
+		
+		String depotCode = row.getCell(4).getStringCellValue();
+		if(depotCode.indexOf(CodeSort.cangku.getCode()) != 0){
+			initialStock.setDepotCode(CodeSort.cangku.getCode()+depotCode);	
+		}
+		
+		String areaCode = row.getCell(6).getStringCellValue();
+		if(areaCode.indexOf(CodeSort.huoqu.getCode()) != 0){
+			initialStock.setAreaCode(CodeSort.huoqu.getCode()+areaCode);	
+		}
+		
+		String shelfCode = row.getCell(7).getStringCellValue();
+		if(shelfCode.indexOf(CodeSort.huowei.getCode()) != 0){
+			initialStock.setShelfCode(CodeSort.huowei.getCode()+shelfCode);
+		}
+		
+		row.getCell(8).setCellType(Cell.CELL_TYPE_STRING);
+		int stockQty = Integer.parseInt(row.getCell(8).getStringCellValue());
+		initialStock.setStockQty(stockQty);
+		
+		return initialStock;
+	}
+
+	private InitialEndingImportTO buildInitialEnding(HSSFRow row) {
+		
+		if((row.getCell(0) == null || StringUtils.isEmpty(row.getCell(0).getStringCellValue())) &&
+				(row.getCell(1) == null || StringUtils.isEmpty(row.getCell(1).getStringCellValue())) &&
+				(row.getCell(3) == null || StringUtils.isEmpty(row.getCell(3).getStringCellValue())) && 
+				(row.getCell(5) == null || StringUtils.isEmpty(row.getCell(5).getStringCellValue())) && 
+				(row.getCell(7) == null || StringUtils.isEmpty(row.getCell(7).getStringCellValue())) &&
+				(row.getCell(8) == null || StringUtils.isEmpty(row.getCell(8).getStringCellValue()))){
+			return null;
+		}
+		
+		if((row.getCell(0) == null || StringUtils.isEmpty(row.getCell(0).getStringCellValue())) || 
+				(row.getCell(1) == null || StringUtils.isEmpty(row.getCell(1).getStringCellValue())) ||
+				(row.getCell(3) == null || StringUtils.isEmpty(row.getCell(3).getStringCellValue())) || 
+				(row.getCell(5) == null || StringUtils.isEmpty(row.getCell(5).getStringCellValue())) || 
+				(row.getCell(7) == null) || (row.getCell(8) == null)){
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, "必填字段为空");
+		}
+		
+		InitialEndingImportTO initialEnding = new InitialEndingImportTO();
+		initialEnding.setRuleCode(row.getCell(0).getStringCellValue());
+		initialEnding.setDeptCode(row.getCell(1).getStringCellValue());
+		initialEnding.setGoodsCode(row.getCell(3).getStringCellValue());
+		if(row.getCell(6) != null){
+			initialEnding.setStoreUnitName(row.getCell(6).getStringCellValue());	
+		}
+		initialEnding.setLotNo(row.getCell(5).getStringCellValue());
+		
+		row.getCell(7).setCellType(Cell.CELL_TYPE_STRING);
+		row.getCell(8).setCellType(Cell.CELL_TYPE_STRING);
+		float storePrice = Float.parseFloat(row.getCell(7).getStringCellValue());
+		int endingQty = Integer.parseInt(row.getCell(8).getStringCellValue());
+		initialEnding.setStorePrice(storePrice);
+		initialEnding.setEndingQty(endingQty);
+		
+		return initialEnding;
+	}
+
+	private SpdPrepareInformItemImportTO buildPrepareInformItem(HSSFRow row) {
+		row.getCell(0).setCellType(Cell.CELL_TYPE_STRING);
+		row.getCell(3).setCellType(Cell.CELL_TYPE_STRING);
+		row.getCell(4).setCellType(Cell.CELL_TYPE_STRING);
+		row.getCell(5).setCellType(Cell.CELL_TYPE_STRING);
+		row.getCell(6).setCellType(Cell.CELL_TYPE_STRING);
+		
+		if((row.getCell(0) == null || StringUtils.isEmpty(row.getCell(0).getStringCellValue())) &&
+				(row.getCell(3) == null || StringUtils.isEmpty(row.getCell(3).getStringCellValue())) && 
+				(row.getCell(4) == null || StringUtils.isEmpty(row.getCell(4).getStringCellValue())) && 
+				(row.getCell(5) == null || StringUtils.isEmpty(row.getCell(5).getStringCellValue())) &&
+				(row.getCell(6) == null || StringUtils.isEmpty(row.getCell(6).getStringCellValue()))){
+			return null;
+		}
+		
+		if((row.getCell(0) == null || StringUtils.isEmpty(row.getCell(0).getStringCellValue())) || 
+				(row.getCell(3) == null || StringUtils.isEmpty(row.getCell(3).getStringCellValue())) ||
+				(row.getCell(4) == null || StringUtils.isEmpty(row.getCell(4).getStringCellValue())) || 
+				(row.getCell(5) == null || StringUtils.isEmpty(row.getCell(5).getStringCellValue())) || 
+				(row.getCell(6) == null) || StringUtils.isEmpty(row.getCell(6).getStringCellValue())){
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, "必填字段为空");
+		}
+		
+		SpdPrepareInformItemImportTO prepareInformItem = new SpdPrepareInformItemImportTO();
+		prepareInformItem.setGoodsCode(row.getCell(0).getStringCellValue());
+		
+		String depotCode = row.getCell(3).getStringCellValue();
+		if(depotCode.indexOf(CodeSort.cangku.getCode()) != 0){
+			prepareInformItem.setDepotCode(CodeSort.cangku.getCode()+depotCode);	
+		}
+		
+		prepareInformItem.setUnitName(row.getCell(4).getStringCellValue());
+		
+		String prepareQty = row.getCell(5).getStringCellValue();
+		if(StringUtils.isNumeric(prepareQty)){
+			prepareInformItem.setPrepareQty(Integer.parseInt(prepareQty));
+		}else{
+			throw new OperateFailException(YardExceptionType.invalid_excel_file, String.format("输入的数量:[%s]是非法数字", prepareQty));
+		}
+		
+		prepareInformItem.setSupplierCode(row.getCell(6).getStringCellValue());
+	
+		return prepareInformItem;
+	}
+}

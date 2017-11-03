@@ -1,0 +1,1 @@
+org.springframework.boot.SpringApplicationRunListener=cn.ak4j.yard.configuration.CommonResourceConfiguration

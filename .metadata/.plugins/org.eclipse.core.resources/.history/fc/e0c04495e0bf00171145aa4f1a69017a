@@ -1,0 +1,39 @@
+package cn.ak4j.yard.pcs.domain;
+
+import cn.ak4j.entity.IEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+public class PcsOperation implements IEntity{
+	
+	private static final long serialVersionUID = 4488903973420848560L;
+
+	@Getter @Setter
+	private String opId;
+	
+	@Getter @Setter
+	private String opName;
+	
+	@Getter @Setter
+	private String opSort;
+	
+	@Getter @Setter
+	private String elementClass;
+	
+	@Getter @Setter
+	private PcsWebApis webApis = new PcsWebApis();
+	
+	public PcsOperation() {}
+	
+	public PcsOperation(String opId, String opName, String opSort, String elementClass) {
+		this.opId = opId;
+		this.opName = opName;
+		this.opSort = opSort;
+		this.elementClass = elementClass;
+	}
+
+	public void addWebApi(PcsWebApi webApi){
+		webApis.add(webApi);
+	}
+	
+}

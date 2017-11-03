@@ -1,0 +1,198 @@
+package cn.ak4j.yard.spd.stock.repository;
+
+import java.util.Arrays;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.params.PcsDepotAreaParams;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDepotShelfParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotAreaRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStock;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStocks;
+import cn.ak4j.yard.spd.stock.params.SpdDepotStockParams;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+
+@Repository
+@SuppressWarnings({"unchecked"})
+public class SpdDepotStockRepository extends BaseRepository<SpdDepotStock, SpdDepotStocks, SpdDepotStockParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	@Autowired private PcsDepotAreaRepository daRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+
+	public SpdDepotStocks find(SpdDepotStockParams params,OrderParam order,int pageNo,int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			return new SpdDepotStocks(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdDepotStocks();
+	}
+
+	public int count(SpdDepotStockParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	} 
+
+	public long findDepotCount(SpdDepotStockParams params, String depotId) {
+		params.setDepotId(new ListParam<String>(depotId));
+		return count(params);
+	}
+
+	public List<SpdDepotStock> findDepotStock(SpdDepotStockParams params, OrderParam order, int pageNo, int pageSize,
+			String depotId) {
+		params.setDepotId(new ListParam<String>(depotId));
+		SpdDepotStocks list = find(params, order, pageNo, pageSize);
+		return list;
+	}
+
+	public SpdDepotStocks findMyDepotStock(SpdDepotStockParams params, OrderParam order, int currentPage, int pageSize,String deptId) {
+		if(params == null){
+			params = new SpdDepotStockParams();
+		}
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setManageDeptId(new ListParam<String>(deptId));
+		PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+		List<String> depotIds = depots.pluck("depotId");
+		SpdDepotStocks spdDepotStocks = new SpdDepotStocks();
+		if(depotIds.size()>0){
+			params.setDepotId(new ListParam<String>(depotIds));
+			spdDepotStocks = find(params, order, currentPage, pageSize);
+		}
+
+		return spdDepotStocks;
+	}
+
+	public long findMyDepotStockCount(SpdDepotStockParams params, String deptId) {
+		if(params == null){
+			params = new SpdDepotStockParams();
+		}
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setManageDeptId(new ListParam<String>(deptId));
+		PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+		List<String> depotIds = depots.pluck("depotId");
+		long count = 0;
+		if(depotIds.size()>0){
+			params.setDepotId(new ListParam<String>(depotIds));
+			count = count(params);
+		}
+		return count;
+	}
+
+	public SpdDepotStocks getSpdDepotStocks(String ids) {
+		String[] idArray = ids.split(",");
+		List<String> idList = Arrays.asList(idArray);
+		SpdDepotStockParams params = new SpdDepotStockParams();
+		params.setStockId(new ListParam<String>(idList));
+		return find(params);
+	}
+
+	public boolean setRelationParams(SpdDepotStockParams params){
+		if(params != null){
+			YdsGoodsParams goodsParams = new YdsGoodsParams();
+			goodsParams.setFormatName(params.getFormatName());
+			if(!goodsParams.isEmpty()){
+				YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams, depotRepository, dcRepository));
+				if(goodss.size()==0){
+					return false;
+				}
+				params.setGoodsId(new ListParam<String>(goodss.getIds()));
+			}
+
+			PcsDepotAreaParams areParams = new PcsDepotAreaParams();
+			areParams.setAreaName(params.getAreaName());
+			if(!areParams.isEmpty()){
+				Entities<PcsDepotArea> ares = daRepository.findAllWithRelation().find(areParams);
+				if(ares.size()==0){
+					return false;
+				}
+				PcsDepotShelfParams shelfParams = new PcsDepotShelfParams();
+				shelfParams.setAreaId(new ListParam<String>(ares.getIds()));
+				if(!shelfParams.isEmpty()){
+					PcsDepotShelfs shelfs = new PcsDepotShelfs(dsRepository.findAll().find(shelfParams));
+					if(CollectionUtils.isEmpty(shelfs)){
+						return false;
+					}
+					params.setShelfId(new ListParam<String>(shelfs.getIds()));
+				}
+			}
+
+			YdsGoodsLotParams lotParams = new YdsGoodsLotParams();
+			lotParams.setLotNo(params.getLotNo());
+			lotParams.setLotValidity(params.getLotValidity());
+			if(!lotParams.isEmpty()){
+				YdsGoodsLots lots = new YdsGoodsLots(glRepository.findAll().find(lotParams));
+				if(lots.size()==0){
+					return false;
+				}	
+				params.setGoodsLotId(new ListParam<String>(lots.getIds()));
+			}
+
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			depotParams.setDepotId(params.getDepotId());
+			if(!depotParams.isEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);	
+				if(CollectionUtils.isEmpty(depots)){
+					return false;
+				}
+				params.setDepotId(new ListParam<String>(depots.getIds()));
+			}
+
+			PcsDepotShelfParams shelfParams = new PcsDepotShelfParams();
+			shelfParams.setShelfName(params.getShelfName());
+			if(!shelfParams.isEmpty()){
+				PcsDepotShelfs shelfs = new PcsDepotShelfs(dsRepository.findAll().find(shelfParams));
+				if(CollectionUtils.isEmpty(shelfs)){
+					return false;
+				}	
+				params.setShelfId(new ListParam<String>(shelfs.getIds()));
+			}
+		}
+
+		return true;	
+	}
+
+	public SpdDepotStocks findByDepotAndGoodsLots(String depotId, List<String> goodsLotIds) {
+		SpdDepotStockParams params = new SpdDepotStockParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		params.setGoodsLotId(new ListParam<String>(goodsLotIds));
+		SpdDepotStocks depotStocks = find(params, new OrderParam(), -1, -1);
+		return depotStocks;
+	}
+
+}

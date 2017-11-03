@@ -1,0 +1,162 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdAdjustStockType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAdjustStockRule;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdAdjustStockRuleResourceTest extends BaseTest{
+	
+	@Autowired private YardCodeService codeService;
+
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdAdjustStockRules?accessToken={accessToken}";
+		List<SpdAdjustStockRule> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdAdjustStockRule>>(){}, url, accessToken);
+		assertEquals(11, rules.size());
+	}
+	
+	@Test public void count() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdAdjustStockRules/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(11, count);
+	}
+	
+	
+	@Test public void testGet() throws Exception{
+		String id = "as_rule_id_01";
+		SpdAdjustStockRule rule = mockMvcHelper.findOne(SpdAdjustStockRule.class, testUserCode, id);
+		assertEquals(id, rule.getId());
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdAdjustStockRules/ids,{ids}?accessToken={accessToken}";
+		String id01 = "as_rule_id_01";
+		String id02 = "as_rule_id_02";
+		String ids = String.format("%s,%s", id01, id02);
+		List<String> listIds = new ArrayList<String>();
+		listIds.add(id01);
+		listIds.add(id02);
+		List<SpdAdjustStockRule> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdAdjustStockRule>>() {}, url, ids, accessToken);
+		listIds.forEach(id->{
+			assertNotNull(CollectionUtils.findWhere("id", id, rules));
+		});
+	}
+	
+	
+	@Test public void testWhichICanApply() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdAdjustStockRules/whichICanApply?accessToken={accessToken}";
+		PcsUser user =  mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		List<SpdAdjustStockRule> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdAdjustStockRule>>() {}, url, accessToken);
+		assertEquals(10, rules.size());
+		rules.forEach(rule->{
+			assertEquals(user.getDeptId(), rule.getDepot().getManageDeptId());
+		});
+	}
+
+	@Test public void testAdd() throws Exception{
+		SpdAdjustStockRule rule = createAdjustStockRule();
+		
+		SpdAdjustStockRule newRule = mockMvcHelper.add(SpdAdjustStockRule.class, testUserCode, rule);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.tiaojieguize);
+		assertEquals(CodeSort.tiaojieguize.getCode()+getCurrentDateCode()+sequenceCode, newRule.getRuleCode());
+		
+		assertEquals(rule.getName(), newRule.getName());
+		assertEquals(rule.getCustomName(), newRule.getCustomName());
+		assertEquals(rule.getPrior(), newRule.getPrior());
+		assertEquals(rule.getFeedbackRuleId(), newRule.getFeedbackRuleId());
+		assertEquals(rule.getDepotId(), newRule.getDepotId());
+		assertEquals(rule.getAreaType(), newRule.getAreaType());
+		assertEquals(rule.getTypeCode(), newRule.getTypeCode());
+		assertEquals(rule.getEnabled(), newRule.getEnabled());
+		assertEquals(rule.getCanBeOriginRule(), newRule.getCanBeOriginRule());
+		assertNotNull(newRule.getCreateTime());
+		assertNotNull(newRule.getLastUpdateTime());
+		
+		rule.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.add(SpdAdjustStockRule.class, testUserCode, rule, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		rule.setFeedbackRuleId("rec_fb_id_09");
+		mockMvcHelper.add(SpdAdjustStockRule.class, testUserCode, rule, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+		//库存初始化
+		SpdAdjustStockRule initAdjustStockRule = createInitAdjustStockRule();
+		mockMvcHelper.add(SpdAdjustStockRule.class, testUserCode, initAdjustStockRule, status().is4xxClientError(), YardExceptionType.invalid_init_adjust_stock_is_increment);
+	}
+	
+	@Test public void testModify() throws Exception{
+		String id = "as_rule_id_01";
+		SpdAdjustStockRule rule = mockMvcHelper.findOne(SpdAdjustStockRule.class, testUserCode, id);
+		assertEquals(true, rule.getEnabled());
+		
+		rule.setEnabled(false);
+		rule.setCustomName("自定义名称");
+		SpdAdjustStockRule newRule = mockMvcHelper.modify(SpdAdjustStockRule.class, testUserCode, id, rule);
+		assertEquals(false, newRule.getEnabled());
+		assertEquals("自定义名称", newRule.getCustomName());
+		
+		rule.setFeedbackRuleId("as_fb_id_04");
+		mockMvcHelper.modify(SpdAdjustStockRule.class, testUserCode, id, rule, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		rule.setFeedbackRuleId("rec_fb_id_09");
+		mockMvcHelper.modify(SpdAdjustStockRule.class, testUserCode, id, rule, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+		
+		//初始化库存调节
+		SpdAdjustStockRule initAdjustStockRule = createInitAdjustStockRule();
+		initAdjustStockRule.setTypeCode(SpdAdjustStockType.increment.getCode());
+		newRule = mockMvcHelper.add(SpdAdjustStockRule.class, testUserCode, initAdjustStockRule);
+		assertEquals(SpdAdjustStockType.increment.getCode(), newRule.getTypeCode());
+		assertEquals(initAdjustStockRule.getInitAdjust(), newRule.getInitAdjust());
+		newRule.setTypeCode(SpdAdjustStockType.decrement.getCode());
+		mockMvcHelper.modify(SpdAdjustStockRule.class, testUserCode, newRule.getId(), newRule, status().is4xxClientError(), YardExceptionType.invalid_init_adjust_stock_is_increment);
+	}
+	
+	private SpdAdjustStockRule createAdjustStockRule(){
+		SpdAdjustStockRule rule = new SpdAdjustStockRule();
+		rule.setName("半自动库存报溢");
+		rule.setCustomName("自定义名称");
+		rule.setPrior(99);
+		rule.setFeedbackRuleId("as_fb_id_03");
+		rule.setDepotId("depot_id_005");
+		rule.setAreaType(PcsAreaType.normal.getCode());
+		rule.setTypeCode(SpdAdjustStockType.increment.getCode());
+		rule.setEnabled(true);
+		rule.setCanBeOriginRule(false);
+		rule.setInitAdjust(false);
+		return rule;
+	}
+	
+	private SpdAdjustStockRule createInitAdjustStockRule(){
+		SpdAdjustStockRule rule = new SpdAdjustStockRule();
+		rule.setName("库存初始化");
+		rule.setCustomName("西药库库存初始化");
+		rule.setPrior(99);
+		rule.setFeedbackRuleId("as_fb_id_03");
+		rule.setDepotId("depot_id_004");
+		rule.setAreaType(PcsAreaType.normal.getCode());
+		rule.setTypeCode(SpdAdjustStockType.decrement.getCode());
+		rule.setEnabled(true);
+		rule.setCanBeOriginRule(false);
+		rule.setInitAdjust(true);
+		return rule;
+	}
+}

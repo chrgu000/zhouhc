@@ -1,0 +1,35 @@
+package cn.ak4j.yard.pcs.domain;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+
+public class PcsOrgsTest extends BaseTest{
+
+	@Autowired private PcsOrgRepository orgRepository;
+	
+	@Test public void testFind(){
+		String orgName = "中山医医药有限公司";
+		PcsOrgs orgs = orgRepository.findAll();
+		PcsOrgParams params = new PcsOrgParams();
+		params.setOrgName(new ListParam<String>(orgName));
+		params.setSaler(new ListParam<Boolean>(true));
+		params.setBuyer(new ListParam<Boolean>(false));
+		params.setStorage(new ListParam<Boolean>(false));
+		params.setTrans(new ListParam<Boolean>(true));
+		params.setAgent(new ListParam<Boolean>(false));
+		params.setGov(new ListParam<Boolean>(false));
+		params.setBank(new ListParam<Boolean>(false));
+		
+		PcsOrgs resultOrgs = new PcsOrgs(orgs.find(params));
+		assertEquals(1, resultOrgs.size());
+		assertEquals(orgName, resultOrgs.get(0).getOrgName());
+	}
+	
+}

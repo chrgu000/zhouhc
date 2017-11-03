@@ -1,0 +1,32 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.Collections;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+
+/**
+* @Description: 消耗业务步骤
+* @author zhengyf
+* @date 2017年7月25日 下午7:19:41
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+public class SpdConsumeBizSteps extends SpdBizSteps{
+	public static SpdBizStep create_consume = new SpdBizStep(1, AmqpMsgType.CREATE_CONSUME_BIZ.getCode(), "作业步骤模板", "consume_created", "消耗已创建");
+	public static SpdBizStep review_consume = new SpdBizStep(2, AmqpMsgType.REVIEW_CONSUME_BIZ.getCode(), "作业步骤模板", "consume_confirmed", "已确认消耗");
+	public static SpdBizStep create_dispatcher = new SpdBizStep(3, "创建调度作业", "作业步骤模板", "dispatcher_created", "调度待审核");
+	public static SpdBizStep create_off_shelf_task = new SpdBizStep(4, AmqpMsgType.CREATE_OFF_SHELF_TASK.getCode(), "作业步骤模板", "on_shelf_task_created", "下架待审核");
+	public static SpdBizStep complete_off_shelf_task = new SpdBizStep(5, AmqpMsgType.CONFIRM_OFF_SHELF_TASK.getCode(), "作业步骤模板", "on_shelf_task_completed", "下架完成");
+	public static SpdBizStep complete_consume = new SpdBizStep(6, AmqpMsgType.COMPLETE_CONSUME_BIZ.getCode(), "作业步骤模板", "consume_completed", "消耗完成");
+	
+	public SpdConsumeBizSteps(){
+		this.add(create_consume);
+		this.add(review_consume);
+		this.add(create_dispatcher);
+		this.add(create_off_shelf_task);
+		this.add(complete_off_shelf_task);
+		this.add(complete_consume);
+		
+		Collections.sort(this, comparator);
+	}
+}

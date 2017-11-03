@@ -1,0 +1,19 @@
+package cn.ak4j.yard.sys.datacheck.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItem;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItems;
+import cn.ak4j.yard.sys.datacheck.params.SysDataCheckTaskItemParams;
+import lombok.Getter;
+
+@Repository
+public class SysDataCheckTaskItemRepository extends BaseRepository<SysDataCheckTaskItem, SysDataCheckTaskItems, SysDataCheckTaskItemParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+}

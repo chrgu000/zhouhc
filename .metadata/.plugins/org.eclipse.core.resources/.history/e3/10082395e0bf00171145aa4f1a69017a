@@ -1,0 +1,63 @@
+package cn.ak4j.yard.repository;
+
+import java.util.Date;
+
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.domain.Conf;
+import lombok.Getter;
+
+@Repository
+public class CommonRepository {
+	
+	@Autowired @Getter private EntityManager entityManager;
+	
+
+	/**
+	 * 获取编码
+	 * @param fieldNm 类.属性名
+	 * @param prefix 前缀
+	 * @param suffixLength 后缀长度
+	 * @return
+	 */
+	public String getCode(String fieldNm,String prefix,int suffixLength){
+		String date = Global.sdfYMDNotLine.format(new Date());
+		StringBuilder code = new StringBuilder();
+		StringBuilder hql = new StringBuilder();
+		String conditionValue = prefix+Conf.getYardId().toString()+date;
+		String[] strArray = fieldNm.split("\\.");
+		String classname = strArray[0];
+		String fieldName = strArray[1];
+		hql.append(String.format("select max(e.%s) from %s e where e.%s like '%s'", fieldName,classname,fieldName,conditionValue+"%"));
+		//logger.debug("HQL:{}",hql.toString());
+		Query query = entityManager.createQuery(hql.toString());
+		Object o = query.getSingleResult();
+		String codeStr = "";
+		Long codeLong = 1l;
+		if (o != null) {
+			codeStr = (String) o;
+			codeStr = codeStr.substring(codeStr.length() - suffixLength);
+			codeLong = Long.valueOf(codeStr) + 1;
+		}
+		code.append(conditionValue);
+		code.append(String.format("%0" + suffixLength + "d", codeLong));
+		return code.toString().replaceAll("-", "");
+	}
+	
+	/**
+	 * 获取编码
+	 * @param fieldNm 类.属性名
+	 * @param prefix 前缀
+	 * @return
+	 */
+	public String getCode(String fieldNm,String prefix){
+		return getCode(fieldNm,prefix,4);
+	}
+	
+	
+}

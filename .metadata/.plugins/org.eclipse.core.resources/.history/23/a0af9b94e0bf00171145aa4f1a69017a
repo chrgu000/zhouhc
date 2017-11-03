@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.reconciliation.report.rep_detail;
+
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportItems;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+
+
+@SuppressWarnings("serial")
+public class Items extends SpdReconciliationReportItems<Item>{
+
+	public void fillEdsGoodsFormatName(YdsEdsGoodss edsGoodss) {
+		this.forEach(item->{
+			YdsEdsGoods edsGoods = edsGoodss.findUseableByGoodsId(item.getGoodsId());
+			if(edsGoods != null){
+				item.setEdsGoodsFormatName(edsGoods.getEdsGoodsFormatName());
+			}
+		});
+	}
+
+}

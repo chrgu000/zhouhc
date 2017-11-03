@@ -1,0 +1,204 @@
+package cn.ak4j.yard.sys.service.taskprocessor;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.service.SpdPrepareInformBizService;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfig;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.params.SpdDepotGoodsConfigParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotGoodsConfigRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.sys.to.SpdPrepareInformItemImportTO;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class ImportPrepareInformItemTaskProcessor implements IBatchTaskProcessor{
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdDepotGoodsConfigRepository dgcRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdPrepareInformBizService pibService;
+	@Autowired private YardGlobalInfoRepository giRepository;
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public void process(YardBatchTask batchTask, PcsUser user, MailMsg hisMail, MailMsg supplyMail) throws Exception {
+		
+		String json = batchTask.getJson();
+		YardBatchTaskTO<List<SpdPrepareInformItemImportTO>> importPrepareInformItemTO = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTaskTO<List<SpdPrepareInformItemImportTO>>>(){});
+		batchTask.setData(importPrepareInformItemTO.getData());
+		
+		List<SpdPrepareInformItemImportTO> prepareInformItemTOs = (List<SpdPrepareInformItemImportTO>)batchTask.getData();
+		List<SpdPrepareInformItemImportTO> withoutPrepareInformItemTOs = new ArrayList<SpdPrepareInformItemImportTO>();
+		
+		PcsDepot depot = depotRepository.findAllWithRelations().findByDepotCode(prepareInformItemTOs.get(0).getDepotCode());
+		if(depot == null){
+			NotFoundException ex = new NotFoundException(YardExceptionType.not_found_depot, String.format("编码为:%s", prepareInformItemTOs.get(0).getDepotCode()));
+			log.error("导入失败", ex);
+			throw ex;
+		}
+		depot.fillCards(dcRepository);
+		
+		//获取当前备货仓库的仓库产品配置
+		//TODO 仓库产品配置缓存之后，调整该代码
+		SpdDepotGoodsConfigParams configParams = new SpdDepotGoodsConfigParams();
+		configParams.setDepotId(new ListParam<String>(depot.getDepotId()));
+		SpdDepotGoodsConfigs goodsConfigs = dgcRepository.find(configParams);
+		
+		PcsOrg org = orgRepository.findAll().findByOrgCode(prepareInformItemTOs.get(0).getSupplierCode());
+		if(org == null){
+			NotFoundException ex = new NotFoundException(YardExceptionType.not_found_org, String.format("编码为:%s", prepareInformItemTOs.get(0).getSupplierCode()));
+			log.error("导入失败", ex);
+			throw ex;
+		}
+		
+		SpdPrepareInformRule rule = brRepository.findAllWithRelations().getAllPrepareInformRules().findByFromOrgIdAndToDepotId(org.getOrgId(), depot.getDepotId());
+		
+		if(rule == null){
+			NotFoundException ex = new NotFoundException(YardExceptionType.not_found_prepare_inform_rule, String.format("供应商编码:[%s],收货仓库编码:[%s]", prepareInformItemTOs.get(0).getSupplierCode(), prepareInformItemTOs.get(0).getDepotCode()));
+			log.error("导入失败", ex);
+			throw ex;
+		}
+		
+		//获取产品信息
+		List<String> goodsCodes = CollectionUtils.pluck("goodsCode", prepareInformItemTOs);
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsCode(new ListParam<String>(goodsCodes));
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(params));
+		
+		//获取货位库存
+//		SpdShelfStocks stocks = ssRepository.findByShelfType(depot.getDepotId(), PcsAreaType.normal.getCode());
+//		stocks.fillGoodsLots(glRepository);
+//		SpdShelfStocks goodsShelfStocks = stocks.mergeByGoods();
+		
+		for(SpdPrepareInformItemImportTO prepareInformItem : prepareInformItemTOs){
+			YdsGoods goods = goodss.findByGoodsCode(prepareInformItem.getGoodsCode());
+			if(goods == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_goods, String.format("产品编码:%s", prepareInformItem.getGoodsCode()));
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			String prepareUnitName = SpdUnitUtils.computeGoodsUnitName(goods, goods.getPrepareUnitLv());
+			if(!prepareInformItem.getUnitName().equals(prepareUnitName)){
+				InvalidDataException ex = new InvalidDataException(String.format("产品[编码:%s,单位:%s]在系统中的备货单位是:[%s],单位信息不一致，请检查", prepareInformItem.getGoodsCode(), prepareInformItem.getUnitName(), prepareUnitName));
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			SpdDepotGoodsConfig config = goodsConfigs.findByGoodsId(goods.getGoodsId());
+			if(config == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_depot_goods_config, String.format("编码:%s", prepareInformItem.getDepotCode()), String.format("编码:%s", prepareInformItem.getGoodsCode()));
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			
+			
+			SpdDepotCard card = CollectionUtils.findWhere("goodsId", goods.getGoodsId(), depot.getCards().getUsableCards());
+			if(card == null){
+				InvalidDataException ex = new InvalidDataException(YardExceptionType.invalid_not_exist_depot_card, prepareInformItem.getGoodsCode(), prepareInformItem.getDepotCode());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			//TODO 验证采购的数量和备货上下限和库存数量之间的验证逻辑
+//			SpdShelfStock stock = CollectionUtils.findWhere("goodsId", goods.getGoodsId(), goodsShelfStocks);
+//			float prepareAndStoreRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), goods.getPrepareUnitLv());
+//			float storeUnitPrepareQty = prepareInformItem.getPrepareQty()/prepareAndStoreRatio;
+//			boolean invalidQty = false;
+//			int storeUnitStockQty = 0;
+//			if(stock == null){
+//				if(storeUnitPrepareQty > config.getUpperLimit()){
+//					invalidQty = true;
+//				}
+//			}else{
+//				storeUnitStockQty = stock.getUseableQtyByStoreUnit();
+//				int canPrepareQty = config.getUpperLimit() - storeUnitStockQty;
+//				if(storeUnitPrepareQty > canPrepareQty){
+//					invalidQty = true;
+//				}
+//			}
+//			
+//			if(invalidQty){
+//				InvalidDataException ex = new InvalidDataException(String.format("产品:[%s]的采购数量是非法的。采购数量是:[备货单位数量:%s],备货上限是:[存储单位数量:%s]，现有库存数量:[存储单位数量:%s],存储单位转备货单位的转换比是:[%s]",
+//																					prepareInformItem.getGoodsCode(),
+//																					prepareInformItem.getPrepareQty(),
+//																					config.getUpperLimit(),
+//																					storeUnitStockQty,
+//																					prepareAndStoreRatio));
+//				log.error("导入失败", ex);
+//				throw ex;
+//			}
+			
+			withoutPrepareInformItemTOs.add(prepareInformItem);
+		}
+		
+		log.info("处理导入备货明细，共{}个", withoutPrepareInformItemTOs.size());
+		
+		SpdPrepareInformBiz prepareInform = new SpdPrepareInformBiz();
+		prepareInform.setBizRuleId(rule.getId());
+		prepareInform.setMaintenanceInfo(new MaintenanceInfo(depot.getManageDept().getDefaultUser()));
+		
+		//创建备货明细
+		SpdBizItems items = new SpdBizItems();
+		int i = 0;
+		for(SpdPrepareInformItemImportTO prepareInformItem : withoutPrepareInformItemTOs){
+			SpdBizItem item = new SpdBizItem();
+			YdsGoods goods = goodss.findByGoodsCode(prepareInformItem.getGoodsCode());
+			
+			item.setGoodsId(goods.getGoodsId());
+			item.setUnitLv(goods.getPrepareUnitLv());
+			item.setUnitPrice(goods.getPreparePrice());
+			item.setPlanQty(prepareInformItem.getPrepareQty());
+			items.add(item);
+			
+			log.info("{}]导入备货明细:产品编码:{}, 数量:{}", i, prepareInformItem.getGoodsCode(), prepareInformItem.getPrepareQty());
+			i++;
+		}
+		prepareInform.setItems(items);
+		prepareInform = pibService.add(prepareInform, user);
+		
+		//拆分备货通知单
+		int batchGoodsSize = giRepository.findAll().findByKey(YardGlobalInfo.prepareInform_batch_goods_size).getIntValue();
+		pibService.splitPrepareInform(prepareInform.getBizId(), batchGoodsSize, depot.getManageDept().getDefaultUser());
+	}
+	
+}

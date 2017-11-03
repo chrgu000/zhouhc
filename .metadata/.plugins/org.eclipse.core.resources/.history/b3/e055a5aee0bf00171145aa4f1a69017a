@@ -1,0 +1,29 @@
+package cn.ak4j.yard.pcs.domain;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.Arrays;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+
+public class PcsDepotTest extends BaseTest{
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	
+	@Test public void testFindByGoodsIds(){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById("depot_id_001");
+		depot.fillCards(dcRepository);
+		List<String> goodsIds = Arrays.asList("goods_id_001", "goods_id_007", "goods_id_006");
+		PcsDepotAreas areas = depot.findAreasByGoodsIds(goodsIds, PcsAreaType.normal);
+		assertEquals(2, areas.size());
+	}
+	
+}

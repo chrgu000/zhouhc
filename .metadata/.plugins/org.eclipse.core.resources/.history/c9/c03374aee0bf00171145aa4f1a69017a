@@ -1,0 +1,136 @@
+package cn.ak4j.yard.sys.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.sys.domain.AbstractYardCode;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.domain.YardTimeSequenceCode;
+
+public class YardCodeServiceTest extends BaseTest{
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Autowired private YardCodeService ycService;
+	
+	@Test
+	public void testPublishCode(){
+		Integer sequenceCode = 1;
+		YardTimeSequenceCode yardCode = ycService.publishCode(CodeSort.xiajiadan);
+		assertEquals(CodeSort.xiajiadan.getCode(), yardCode.getSortCode());
+		assertEquals(getCurrentDateCode(), yardCode.getDateCode());
+		assertEquals(sequenceCode, yardCode.getSequenceCode());
+		assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+sequenceCode, yardCode.getCode());
+		
+		//验证连续发布多个编码
+		int publishTimes = 5;
+		for(int i = 1; i <= publishTimes; i++){
+			yardCode = ycService.publishCode(CodeSort.xiajiadan);
+			assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+(sequenceCode+i), yardCode.getCode());
+		}
+		
+		//验证日期变更后步进码重置
+		Global.defaultCalendar.add(Calendar.DAY_OF_YEAR, 1);
+		yardCode = ycService.publishCode(CodeSort.xiajiadan);
+		assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+(sequenceCode+0), yardCode.getCode());
+		yardCode = ycService.publishCode(CodeSort.xiajiadan);
+		assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+(sequenceCode+1), yardCode.getCode());
+		
+		//验证跨年后步进码重置
+		Global.defaultCalendar.add(Calendar.YEAR, 1);
+		yardCode = ycService.publishCode(CodeSort.xiajiadan);
+		assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+(sequenceCode+0), yardCode.getCode());
+		yardCode = ycService.publishCode(CodeSort.xiajiadan);
+		assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+(sequenceCode+1), yardCode.getCode());
+		
+		Global.defaultCalendar.set(Calendar.YEAR, Calendar.getInstance().get(Calendar.YEAR));
+		Global.defaultCalendar.set(Calendar.DAY_OF_YEAR, Calendar.getInstance().get(Calendar.DAY_OF_YEAR));
+	}
+	
+
+	@Test
+	public void testPublishCodeWithNotExistSortCode(){
+		thrown.expect(NotFoundException.class);
+		ycService.publishCode(CodeSort.zhouzhuanxiang);
+	}
+	
+	@Test
+	public void testPublishMultiCode(){
+		Integer sequenceCode = 1;
+		YardTimeSequenceCode yardCode = ycService.publishCode(CodeSort.xiajiadan);
+		assertEquals(CodeSort.xiajiadan.getCode(), yardCode.getSortCode());
+		assertEquals(getCurrentDateCode(), yardCode.getDateCode());
+		assertEquals(sequenceCode, yardCode.getSequenceCode());
+		assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+sequenceCode, yardCode.getCode());
+		
+		sequenceCode = 2;
+		yardCode = ycService.publishCode(CodeSort.xiajiadan);
+		assertEquals(sequenceCode, yardCode.getSequenceCode());
+		assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+sequenceCode, yardCode.getCode());
+		
+		sequenceCode = 3;
+		yardCode = ycService.publishCode(CodeSort.xiajiadan);
+		assertEquals(sequenceCode, yardCode.getSequenceCode());
+		assertEquals(CodeSort.xiajiadan.getCode()+getCurrentDateCode()+sequenceCode, yardCode.getCode());
+	}
+	
+	@Test
+	public void testMultiThreadPublishCode() throws InterruptedException, ExecutionException{
+		ExecutorService threadPool = Executors.newCachedThreadPool();
+		
+		int threadCount = 20;
+		List<PublishCodeThread> tasks = new ArrayList<PublishCodeThread>();
+		for(int i = 0; i < threadCount; i++){
+			tasks.add(new PublishCodeThread(ycService, CodeSort.xiajiadan));
+		}
+		
+		List<Future<YardTimeSequenceCode>> results = threadPool.invokeAll(tasks);
+		List<YardTimeSequenceCode> yardCodes = new ArrayList<YardTimeSequenceCode>();
+		for(Future<YardTimeSequenceCode> future : results){
+			YardTimeSequenceCode code = (YardTimeSequenceCode)future.get();
+			assertTrue(!yardCodes.contains(code));
+			yardCodes.add(code);
+		}
+		
+	}
+	
+	public void testPublishArbitraryCode(){
+		String meteriaCode = "123";
+		AbstractYardCode sysCode = ycService.publishCode(CodeSort.cangku, meteriaCode);
+		assertEquals(CodeSort.cangku.getCode()+meteriaCode, sysCode.getCode());
+	}
+	
+}
+
+class PublishCodeThread implements Callable<YardTimeSequenceCode>{
+	
+	private YardCodeService ycService;
+	private CodeSort codeSort;
+	
+	public PublishCodeThread(YardCodeService ycService, CodeSort codeSort) {
+		this.ycService = ycService;
+		this.codeSort = codeSort;
+	}
+	
+	@Override
+	public YardTimeSequenceCode call() {
+		return ycService.publishCode(codeSort);
+	}
+}

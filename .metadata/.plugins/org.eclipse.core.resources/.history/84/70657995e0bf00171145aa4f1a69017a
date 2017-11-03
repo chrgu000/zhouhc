@@ -1,0 +1,39 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum PcsDeptType implements ITypeEnum{
+
+	depot_management("depot_management","仓储管理部门",""),
+	purchase_management("purchase_management","采购管理部门",""),
+	sale_management("sale_management","销售管理部门",""),
+//	finance_management("finance_management","财务管理部门"),
+	operate_management("operate_management","运营管理部门",""),
+	technology_management("technology_management","技术管理部门","");
+//	operate("operate","运营部门");//唯一运营部门
+	
+	@Getter @Setter	private String code;
+	@Getter @Setter	private String name;
+	@Getter @Setter	private String description;
+	
+	private PcsDeptType(String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static PcsDeptType stateOf(String typeCode){
+		for(PcsDeptType type : PcsDeptType.values()){
+			if(type.getCode() == typeCode){
+				return type;
+			}
+		}
+		return null;
+	}
+}
+

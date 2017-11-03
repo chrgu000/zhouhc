@@ -1,0 +1,176 @@
+package cn.ak4j.yard.yds.service;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Service
+public class YdsEdsGoodsLotService extends IYardService<YdsEdsGoodsLot>{
+
+	@Autowired private YdsEdsGoodsLotRepository eglRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allEdsGoodsLots\""),
+				@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\""),
+				@CacheEvict(value="longTimeCache", key="\"allLots\"")})
+	public YdsEdsGoodsLot add(@Valid YdsEdsGoodsLot ydsEdsGoodsLot, IUser user){
+		ydsEdsGoodsLot.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		YdsEdsGoodsLotParams ydsEdsGoodsLotParams = new YdsEdsGoodsLotParams();
+		ydsEdsGoodsLotParams.setEdsGoodsId(new ListParam<String>(ydsEdsGoodsLot.getEdsGoodsId()));
+		ydsEdsGoodsLotParams.setEdsLotNo(new ListParam<String>(ydsEdsGoodsLot.getEdsLotNo()));
+		ydsEdsGoodsLotParams.setOwnerOrgId(new ListParam<String>(user.getOrgId()));
+		YdsEdsGoodsLots edsGoodsLots = new YdsEdsGoodsLots(eglRepository.findAll().find(ydsEdsGoodsLotParams));
+		if(edsGoodsLots.size()>0){
+			throw new InvalidDataException("产品的批次号已经存在");
+		}
+		
+		boolean hasDateInfo =  ydsEdsGoodsLot.getEdsLotValidity() != null && ydsEdsGoodsLot.getProduceDate() != null;
+		if(hasDateInfo && !(ydsEdsGoodsLot.getEdsLotValidity().getTime() > ydsEdsGoodsLot.getProduceDate().getTime())){
+			throw new InvalidDataException("生产日期要小于批号日期!");
+		}
+		
+		//添加企业产品批次时，关联标准产品批次时，发现没有的给标准产品添加一个和企业产品一样的批次
+		YdsEdsGoods ydsEdsGoods = egRepository.findAll().findById(ydsEdsGoodsLot.getEdsGoodsId());
+		String goodsId = ydsEdsGoods.getYardGoodsId();
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setGoodsId(new ListParam<String>(goodsId));
+		params.setLotNo(new ListParam<String>(ydsEdsGoodsLot.getEdsLotNo()));
+		YdsGoodsLots ydsGoodsLots = new YdsGoodsLots(glRepository.findAll().find(params));
+		YdsGoodsLot ydsGoodsLot;
+		if(ydsGoodsLots.size()>0){
+			ydsGoodsLot = ydsGoodsLots.get(0);
+		}else{
+			ydsGoodsLot = new YdsGoodsLot();
+			ydsGoodsLot.setGoodsId(goodsId);
+			ydsGoodsLot.setLotNo(ydsEdsGoodsLot.getEdsLotNo());
+			ydsGoodsLot.setLotValidity(ydsEdsGoodsLot.getEdsLotValidity());
+			ydsGoodsLot.setEnabled(ydsEdsGoodsLot.isEnabled());
+			ydsGoodsLot.setProduceDate(ydsEdsGoodsLot.getProduceDate());
+			ydsGoodsLot.setSterilizeLotNo(ydsEdsGoodsLot.getSterilizeLotNo());
+			ydsGoodsLot.setSterilizeTime(ydsEdsGoodsLot.getSterilizeTime());
+			ydsGoodsLot.setMaintenanceInfo(ydsEdsGoodsLot.getMaintenanceInfo());
+			ydsGoodsLot = glRepository.save(ydsGoodsLot);
+		}
+		ydsEdsGoodsLot.setYardGoodsLotId(ydsGoodsLot.getGoodsLotId());
+		ydsEdsGoodsLot = eglRepository.save(ydsEdsGoodsLot);
+		
+		return ydsEdsGoodsLot;
+	}
+	
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allEdsGoodsLots\""),
+				@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\""),
+				@CacheEvict(value="longTimeCache", key="\"allLots\"")})
+	public void delete(String edsGoodsLotId,IUser user){
+		YdsEdsGoodsLot ydsEdsGoodsLot =eglRepository.findAll().findById(edsGoodsLotId);
+		if(!ydsEdsGoodsLot.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, "lotNo:" + ydsEdsGoodsLot.getEdsLotNo());
+		}
+		eglRepository.delete(ydsEdsGoodsLot);
+	}
+	
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allEdsGoodsLots\""),
+				@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\""),
+				@CacheEvict(value="longTimeCache", key="\"allLots\"")})
+	public YdsEdsGoodsLot modify(@Valid YdsEdsGoodsLot ydsEdsGoodsLot,IUser user){
+		//修改企业产品批次时，判断当前产品的当前批次是否已经存在
+		YdsEdsGoodsLotParams ydsEdsGoodsLotParams = new YdsEdsGoodsLotParams();
+		ydsEdsGoodsLotParams.setEdsGoodsLotId(new ListParam<String>(ydsEdsGoodsLot.getEdsGoodsLotId(),QueryParam.operation_not_in));
+		ydsEdsGoodsLotParams.setEdsGoodsId(new ListParam<String>(ydsEdsGoodsLot.getEdsGoodsId()));
+		ydsEdsGoodsLotParams.setEdsLotNo(new ListParam<String>(ydsEdsGoodsLot.getEdsLotNo()));
+		ydsEdsGoodsLotParams.setOwnerOrgId(new ListParam<String>(user.getOrgId()));
+		List<YdsEdsGoodsLot> edsGoodsLots = eglRepository.findAll().find(ydsEdsGoodsLotParams);
+		if(edsGoodsLots.size()>0){
+			throw new InvalidDataException("产品的批次号已经存在");
+		}
+		if(!(ydsEdsGoodsLot.getEdsLotValidity().getTime() > ydsEdsGoodsLot.getProduceDate().getTime())){
+			throw new InvalidDataException("生产日期要小于批号日期!");
+		}
+		
+		//修改企业产品批次时，关联标准产品批次时，发现没有的给标准产品添加一个和企业一样的批次(暂时不实现该功能，)
+		YdsEdsGoodsLot ydsEdsGoodsLotPO = eglRepository.findAll().findById(ydsEdsGoodsLot.getEdsGoodsLotId());
+		ydsEdsGoodsLotPO.update(ydsEdsGoodsLot, user.getOrgId(), user.getUserId());
+		eglRepository.save(ydsEdsGoodsLotPO);
+		
+		return ydsEdsGoodsLotPO;
+	}
+
+	public YdsEdsGoodsLot updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException("企业产品批次不支持该行为");
+	}
+
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allEdsGoodsLots\""),
+				@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\""),
+				@CacheEvict(value="longTimeCache", key="\"allLots\"")})
+	public YdsEdsGoodsLots checkAndCreateNotExistEdsGoodsLots(YdsEdsGoodsLots edsGoodsLots, PcsUser user) {
+		YdsEdsGoodsLots newEdsGoodsLots = new YdsEdsGoodsLots();
+		YdsEdsGoodsLots allEdsGoodsLots = eglRepository.findAll();
+		
+		edsGoodsLots.forEach(edsGoodsLot->{
+			YdsEdsGoodsLots existYdsEdsGoodsLots = allEdsGoodsLots.findByLotNoAndOrgIdAndEdsGoodsId(edsGoodsLot.getEdsLotNo(), edsGoodsLot.getOwnerOrgId(), edsGoodsLot.getEdsGoodsId());
+			if(CollectionUtils.isEmpty(existYdsEdsGoodsLots)){
+				YdsEdsGoodsLot newEdsGoodsLot = add(edsGoodsLot, user);
+				newEdsGoodsLots.add(newEdsGoodsLot);
+			}
+		});
+		
+		eglRepository.saveAll(newEdsGoodsLots);
+		return newEdsGoodsLots;
+	}
+
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allEdsGoodsLots\""),
+				@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\""),
+				@CacheEvict(value="longTimeCache", key="\"allLots\"")})
+	public void updateGoodsLotRelation(YdsEdsGoodsLots edsGoodsLots, String goodsId) {
+		YdsGoodsLots goodsLots = glRepository.findAll().findByGoodsId(goodsId);
+		for(YdsEdsGoodsLot edsGoodsLot : edsGoodsLots){
+			YdsGoodsLot goodsLot = CollectionUtils.findWhere("lotNo", edsGoodsLot.getEdsLotNo(), goodsLots);
+			if(goodsLot == null){
+				YdsGoods goods = goodsRepository.findAll().findById(goodsId);
+				throw new InvalidDataException(YardExceptionType.not_found_goods_lot, goods.getGoodsCode(), edsGoodsLot.getEdsLotNo());
+			}
+			edsGoodsLot.setYardGoodsLotId(goodsLot.getGoodsLotId());
+			eglRepository.save(edsGoodsLot);
+		}
+		
+	}
+
+
+}

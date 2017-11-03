@@ -1,0 +1,45 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.PcsAreaType;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdGoodsStocks extends Entities<SpdGoodsStock>{
+
+	public SpdGoodsStocks(List<SpdGoodsStock> entities){
+		super(entities);
+	}
+	
+	public SpdGoodsStocks (SpdShelfStocks shelfStocks){
+		List<String> depotIds = CollectionUtils.pluck("depotId", shelfStocks);
+		
+		depotIds.forEach(depotId->{
+			SpdShelfStocks theShelfStocks = new SpdShelfStocks(CollectionUtils.find("depotId", depotId, shelfStocks));
+			List<String> goodsIds = CollectionUtils.pluck("goodsId", theShelfStocks);
+			goodsIds.forEach(goodsId->{
+				SpdShelfStocks sameGoodsStocks = new SpdShelfStocks(CollectionUtils.find("goodsId", goodsId, theShelfStocks));
+				
+				SpdShelfStocks normalAreaTypeStocks = new SpdShelfStocks(CollectionUtils.find("shelfType", PcsAreaType.normal.getCode(), sameGoodsStocks));
+				SpdShelfStocks isolationAreaTypeStocks = new SpdShelfStocks(CollectionUtils.find("shelfType", PcsAreaType.isolation.getCode(), sameGoodsStocks));
+				SpdShelfStocks unqualifiedAreaTypeStocks = new SpdShelfStocks(CollectionUtils.find("shelfType", PcsAreaType.unqualified.getCode(), sameGoodsStocks));
+				
+				SpdGoodsLotStock goodsStock = new SpdGoodsLotStock();
+				goodsStock.setGoods(sameGoodsStocks.get(0).getGoods());
+				goodsStock.setDepot(sameGoodsStocks.get(0).getDepot());
+				goodsStock.setDepotId(depotId);
+				goodsStock.setGoodsId(goodsId);
+				goodsStock.setNormalQtyByStoreUnit(normalAreaTypeStocks.getTotalQtyByStoreUnit());
+				goodsStock.setIsolationQtyByStoreUnit(isolationAreaTypeStocks.getTotalQtyByStoreUnit());
+				goodsStock.setUnqualifiedQtyByStoreUnit(unqualifiedAreaTypeStocks.getTotalQtyByStoreUnit());
+				this.add(goodsStock);
+			});
+		});
+	}
+}

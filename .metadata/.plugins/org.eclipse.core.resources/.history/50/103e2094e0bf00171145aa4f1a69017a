@@ -1,0 +1,113 @@
+package cn.ak4j.yard.sys.service.taskprocessor;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.service.SpdDepotCardService;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.to.SpdDepotCardImportTO;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Component
+@Slf4j
+public class ImportDepotCardsTaskProcessor implements IBatchTaskProcessor{
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdDepotCardService depotCardService;
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public void process(YardBatchTask batchTask, PcsUser user, MailMsg hisMail, MailMsg supplyMail) throws Exception{
+		String json = batchTask.getJson();
+		YardBatchTaskTO<List<SpdDepotCardImportTO>> importDepotCardsTaskTO = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTaskTO<List<SpdDepotCardImportTO>>>(){});
+		batchTask.setData(importDepotCardsTaskTO.getData());
+		
+		List<SpdDepotCardImportTO> depotCardTOs = (List<SpdDepotCardImportTO>)batchTask.getData();
+		List<SpdDepotCardImportTO> withoutDepotCardTOS = new ArrayList<SpdDepotCardImportTO>();
+		
+		PcsDepot depot = depotRepository.findAllWithRelations().findByDepotCode(depotCardTOs.get(0).getDepotCode());
+		if(depot == null){
+			NotFoundException ex = new NotFoundException(YardExceptionType.not_found_depot, String.format("编码为:%s", depotCardTOs.get(0).getDepotCode()));
+			log.error("导入失败", ex);
+			throw ex;
+		}
+		
+		depot.fillCards(dcRepository);
+		PcsDepotShelfs shelfs = depot.getAreas().findByAreaType(PcsAreaType.normal).getAllShelfs();
+		
+		List<String> goodsCodes = CollectionUtils.pluck("goodsCode", depotCardTOs);
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsCode(new ListParam<String>(goodsCodes));
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(params));
+		
+		for(SpdDepotCardImportTO depotCardTO : depotCardTOs){
+			YdsGoods goods = goodss.findByGoodsCode(depotCardTO.getGoodsCode());
+			if(goods == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_goods, "产品编码:"+depotCardTO.getGoodsCode());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			SpdDepotCard card = depot.getCards().findEnableCardByGoodsId(goods.getGoodsId());
+			if (card == null){
+				withoutDepotCardTOS.add(depotCardTO);
+			}else{
+				log.info(String.format("仓库[%s:%s],产品[%s:%s]的帐页已存在", depot.getDepotCode(), depot.getDepotName(), depotCardTO.getGoodsCode(), depotCardTO.getGoodsName()));
+			}
+			
+			PcsDepotShelf depotShelf = shelfs.findByShelfCode(depotCardTO.getNormalAreaShelfCode());
+			if(depotShelf == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_shelf, depotCardTO.getDepotCode(), "", "合格货位编码:"+depotCardTO.getNormalAreaShelfCode());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+		}
+		
+		log.info("处理导入帐页, 共{}个", withoutDepotCardTOS.size());
+		int i = 0;
+		for(SpdDepotCardImportTO depotCardTO : withoutDepotCardTOS){
+			YdsGoods goods = goodss.findByGoodsCode(depotCardTO.getGoodsCode());
+			SpdDepotCard depotCard = new SpdDepotCard();
+			depotCard.setDepotId(depot.getDepotId());
+			PcsDepotShelf depotShelf = shelfs.findByShelfCode(depotCardTO.getNormalAreaShelfCode());
+			depotCard.setShelfId(depotShelf.getDepotShelfId());
+
+			log.info("{}] 导入帐页 shelfCode: {}, goodsCode: {}", i, depotCardTO.getNormalAreaShelfCode(), depotCardTO.getGoodsCode());
+			depotCard.setGoodsId(goods.getGoodsId());
+			depotCard.setStoreUnitLv(goods.getStoreUnitLv().toString());
+			depotCard.setStoreUnitName(goods.getStorePackageUnitLvName());
+			depotCard.setEnabled(true);
+			depotCard.setCheckStateCode(CheckState.commited.getCode());
+			depotCard.setMaintenanceInfo(new MaintenanceInfo(user));
+			depotCardService.add(depotCard, user);
+			i++;
+		}
+	}
+	
+}

@@ -1,0 +1,35 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SpdDepotTaskType implements ITypeEnum{
+
+	on_shelf_task("on_shelf_task", "散件上架", ""),
+	off_shelf_task("off_shelf_task", "散件下架", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SpdDepotTaskType (String code,String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdDepotTaskType typeOf(String code){
+		for(SpdDepotTaskType state : SpdDepotTaskType.values()){
+			if(state.getCode().equals(code)){
+				return state;
+			}
+		}
+		return null;
+	}
+	
+}
+

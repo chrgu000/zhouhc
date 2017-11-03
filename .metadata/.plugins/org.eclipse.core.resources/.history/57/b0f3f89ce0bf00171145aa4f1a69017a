@@ -1,0 +1,1 @@
+alter table spd_biz_item rename column deal_qty to deal_qty_by_base_unit;

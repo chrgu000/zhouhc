@@ -1,0 +1,1 @@
+alter table spd_receive_biz add (sale_completed char(1) default '0' not null);

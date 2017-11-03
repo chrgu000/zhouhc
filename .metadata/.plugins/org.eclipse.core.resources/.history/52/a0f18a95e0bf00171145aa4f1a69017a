@@ -1,0 +1,88 @@
+package cn.ak4j.yard.domain;
+
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.sys.domain.YardGlobalInfos;
+import lombok.Setter;
+
+@Component
+public class Conf {
+
+	@Setter private static String workSpace;
+	
+	@Setter private static Integer yardId;
+	
+	@Setter private static String weixinUrl;
+	
+	@Setter private static boolean autoUpdateDBSchema;
+	
+	@Setter private static String env;
+	
+	@Setter private static String envCode;
+	
+	@Setter private static boolean sendExceptionMail;
+	
+	@Setter private static int amqpMsgDelay;
+	
+	@Setter private static int depotCardQueryThreadPoolSize;
+	
+	@Setter private static String depotNotifyEmails;
+	
+	
+	/**
+	 * 是否为初始化阶段，在初始化阶段不会处理产品新增和更新的事件
+	 */
+	@Setter private static boolean initPhase;
+	
+	@Setter private static YardGlobalInfos allGlobalInfos;
+	
+	public static String getWorkSpace() {
+		return workSpace;
+	}
+
+	public static String getEnv() {
+		return env;
+	}
+
+	public static Integer getYardId() {
+		return yardId;
+	}
+
+	public static String getWeixinUrl() {
+		return weixinUrl;
+	}
+
+	public static int getDepotCardQueryThreadPoolSize() {
+		return depotCardQueryThreadPoolSize;
+	}
+	
+	public static boolean isInitPhase() {
+		return initPhase;
+	}
+
+
+	public static boolean isAutoUpdateDBSchema() {
+		return autoUpdateDBSchema;
+	}
+	
+	public static boolean isSendExceptionMail() {
+		return sendExceptionMail;
+	}
+
+	public static String getDepotNotifyEmails() {
+		return depotNotifyEmails;
+	}
+
+	public static int getAmqpMsgDelay() {
+		return amqpMsgDelay;
+	}
+
+	public static String getEnvCode() {
+		return envCode;
+	}
+
+	public static YardGlobalInfos getAllGlobalInfos() {
+		return allGlobalInfos;
+	}
+	
+}

@@ -1,0 +1,178 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.commons.lang.SerializationUtils;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.domain.SpdGoodsQtys;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedger;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedgerItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedgerItems;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class SpdGeneralLedgerServiceTest extends BaseTest{
+
+	@Autowired private SpdGeneralLedgerService glService;
+	@Autowired private SpdReceiveBizService rbService;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testDebit(){
+		String receiveId = "rece_biz_id_013";
+		SpdReceiveBiz receive = rbService.getFullReceive(receiveId);
+		receive.setRecorded(false);
+		rbRepository.save(receive);
+		
+		//借入前的总账
+		SpdGeneralLedger originGeneralLedger = (SpdGeneralLedger)SerializationUtils.clone(glService.getGeneralLedger(receive.getFromDeptId()));
+		
+		//总账借入
+		glService.debit(receiveId);
+		
+		//借入后的总账
+		SpdGeneralLedger newGeneralLedger = glService.getGeneralLedger(receive.getFromDeptId());
+		
+		receive.getItems().forEach(receiveItem->{
+			SpdGeneralLedgerItem newGeneralLedgerItem = newGeneralLedger.getItems().findByGoodIdAndLotId(receiveItem.getGoodsId(), receiveItem.getLotId());
+			SpdGeneralLedgerItem originGeneralLedgerItem = originGeneralLedger.getItems().findByGoodIdAndLotId(receiveItem.getGoodsId(), receiveItem.getLotId());
+			Integer qtyByBaseUnit = receiveItem.getConfirmQty(YdsUnitLv.base.getLv()) + (originGeneralLedgerItem==null?0:originGeneralLedgerItem.getCurrentStorageQty());
+			Float amount = receiveItem.getConfirmAmount() + (originGeneralLedgerItem==null?0:originGeneralLedgerItem.getTotalAmount());
+
+			//log.debug("origin: {}, new: {}", originGeneralLedgerItem==null?0:originGeneralLedgerItem.getTotalAmount(), newGeneralLedgerItem.getTotalAmount());
+			assertEquals(amount, newGeneralLedgerItem.getTotalAmount(), 0.0001);
+			assertEquals(qtyByBaseUnit, newGeneralLedgerItem.getCurrentStorageQty());
+		});
+		
+		SpdGeneralLedgerItems ledgerItems = glService.debit(receiveId);
+		assertNull(ledgerItems);
+	}
+	
+	@Test public void testCreditWithError(){
+		String deptId = "dept_id_005";
+		String goodsId001 = "goods_id_001";
+		String goodsId002 = "goods_id_002";
+		String goodsId003 = "goods_id_003";
+		String goodsId010 = "goods_id_010";
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put(goodsId001, 500);
+		map.put(goodsId002, 400);
+		map.put(goodsId003, 60);
+		map.put(goodsId010, 2300);
+		
+		String[] goodsIdArr = new String[]{goodsId001, goodsId002, goodsId003, goodsId010};
+		String[] lotIdArr = new String[]{"goods_lot_id_019", "goods_lot_id_024", "goods_lot_id_018", "goods_lot_id_002"};
+		
+		Entities<YdsGoods> goodss = goodsRepository.findAll().findByIds(Arrays.asList(goodsIdArr));
+		YdsGoodsLots lots = glRepository.findAll().findByIds(Arrays.asList(lotIdArr));
+		
+		SpdGoodsQtys goodsQtys = new SpdGoodsQtys();
+		for(YdsGoods goods : goodss){
+			YdsGoodsLot lot = lots.findByGoodsId(goods.getGoodsId()).get(0);
+			SpdGoodsQty goodsQty = new SpdGoodsQty(goods, lot, 4);
+			goodsQty.setQty(map.get(goods.getGoodsId()));
+			goodsQtys.add(goodsQty);
+		}
+		thrown.expect(OperateFailException.class);
+		
+		glService.credit(deptId, goodsQtys);
+	}
+	
+	@Test public void testCredit(){
+		String deptId = "dept_id_005";
+		String goodsId001 = "goods_id_001";
+		String goodsId002 = "goods_id_002";
+		String goodsId003 = "goods_id_003";
+		String goodsId010 = "goods_id_010";
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put(goodsId001, 200);
+		map.put(goodsId002, 100);
+		map.put(goodsId003, 5);
+		map.put(goodsId010, 200);
+		
+		String[] goodsIdArr = new String[]{goodsId001, goodsId002, goodsId003, goodsId010};
+		String[] lotIdArr = new String[]{"goods_lot_id_019", "goods_lot_id_024", "goods_lot_id_018", "goods_lot_id_002"};
+		
+		Entities<YdsGoods> goodss = goodsRepository.findAll().findByIds(Arrays.asList(goodsIdArr));
+		YdsGoodsLots lots = glRepository.findAll().findByIds(Arrays.asList(lotIdArr));
+		
+		SpdGoodsQtys goodsQtys = new SpdGoodsQtys();
+		for(YdsGoods goods : goodss){
+			YdsGoodsLot lot = lots.findByGoodsId(goods.getGoodsId()).get(0);
+			SpdGoodsQty goodsQty = new SpdGoodsQty(goods, lot, 4);
+			goodsQty.setQty(map.get(goods.getGoodsId()));
+			goodsQtys.add(goodsQty);
+		}
+		
+		SpdGeneralLedger originLedger = glService.getGeneralLedger(deptId);
+		Map<String, Integer> originLedgerStorage = getLedgerStorage(originLedger);
+		
+		glService.credit(deptId, goodsQtys);
+		
+		SpdGeneralLedger newLedger = glService.getGeneralLedger(deptId);
+		Map<String, Integer> newLedgerStorage = getLedgerStorage(newLedger);
+
+		goodsQtys.forEach(goodsQty->{
+			String lotId = goodsQty.getSpecialGoodsLot().getGoodsLotId();
+			log.debug("goodsQty:{}, originLedgerItemStorage:{}, newLedgerItemStorage:{}", 
+					goodsQty.getQty(YdsUnitLv.base.getLv()), originLedgerStorage.get(lotId), newLedgerStorage.get(lotId));
+			assertEquals(goodsQty.getQty(YdsUnitLv.base.getLv()), originLedgerStorage.get(lotId) - newLedgerStorage.get(lotId));
+		});
+	}
+	
+	private Map<String, Integer> getLedgerStorage(SpdGeneralLedger ledger){
+		Map<String, Integer> result = new HashMap<String, Integer>();
+		ledger.getItems().forEach(item->{
+			result.put(item.getLotId(), item.getCurrentStorageQty());
+		});
+		return result;
+	}
+	
+	public void generateGeneralLedgerData(){
+		SpdReceiveBizParams params = new SpdReceiveBizParams();
+		params.setRecorded(new ListParam<Boolean>(false));
+		params.setCheckStateCode(new ListParam<Integer>()
+								.addValue(CheckState.completed.getCode()));
+		
+		SpdReceiveBizs receives = rbRepository.find(params);
+		log.debug("receive size: {}", receives.size());
+		receives.forEach(receive->{
+			log.debug("debit biz:{}", receive.getBizCode());
+			//if(!receive.getBizId().equals("rece_biz_id_013")){
+				glService.debit(receive.getBizId());
+			//}
+		});
+	}
+	
+	
+	
+}

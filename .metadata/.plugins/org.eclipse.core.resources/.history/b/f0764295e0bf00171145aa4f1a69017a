@@ -1,0 +1,30 @@
+package cn.ak4j.yard.pcs.domain;
+
+import org.springframework.web.util.UriTemplate;
+
+import cn.ak4j.entity.IEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings({"serial"})
+public class PcsWebApi implements IEntity{
+
+	@Getter @Setter
+	private String serviceUrl;
+	
+	@Getter @Setter
+	private String serviceMethod;
+	
+	public PcsWebApi(){}
+	
+	public PcsWebApi(String serviceUrl, String serviceMethod){
+		setServiceUrl(serviceUrl);
+		setServiceMethod(serviceMethod);
+	}
+	
+	public boolean match(String url, String method){
+		UriTemplate uriTemplate = new UriTemplate(serviceUrl);
+		return uriTemplate.matches(url) && method.equalsIgnoreCase(serviceMethod);
+	}
+	
+}

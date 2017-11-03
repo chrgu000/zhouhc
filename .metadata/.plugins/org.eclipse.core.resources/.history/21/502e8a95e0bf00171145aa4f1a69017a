@@ -1,0 +1,9 @@
+package cn.ak4j.yard.domain;
+
+
+public interface IUser {
+
+	public String getUserId();
+	public String getOrgId();
+	
+}

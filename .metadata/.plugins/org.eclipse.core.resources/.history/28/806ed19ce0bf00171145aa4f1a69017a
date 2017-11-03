@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.3.1.final using JasperReports Library version 6.3.1  -->
+<!-- 2017-06-09T14:37:48 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="allSingleGoodsDepotShelfs" pageWidth="255" pageHeight="112" orientation="Landscape" columnWidth="251" leftMargin="2" rightMargin="2" topMargin="2" bottomMargin="2" uuid="9672829c-8906-4c77-a0d5-1672f17af3f3">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<property name="com.jaspersoft.studio.unit." value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.pageHeight" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.pageWidth" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.topMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.bottomMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.leftMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.rightMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.columnWidth" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.columnSpacing" value="pixel"/>
+	<field name="shelfCode" class="java.lang.String"/>
+	<field name="shelfName" class="java.lang.String"/>
+	<field name="depotCard.goods.wareName" class="java.lang.String"/>
+	<field name="depotCard.goods.goodsName" class="java.lang.String"/>
+	<field name="depotCard.goods.packingSpec" class="java.lang.String"/>
+	<field name="depotCard.goods.factName" class="java.lang.String"/>
+	<field name="depotCard.goods.blockQtyInStoreLvUnitName" class="java.lang.String"/>
+	<detail>
+		<band height="108">
+			<textField isStretchWithOverflow="true" pattern="" isBlankWhenNull="false">
+				<reportElement key="" positionType="Float" mode="Opaque" x="7" y="1" width="114" height="14" uuid="4cfac5cc-ed13-4024-9278-2e9bdc70fa8e"/>
+				<box topPadding="0">
+					<pen lineWidth="0.0"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Left" verticalAlignment="Top" rotation="None" markup="none">
+					<font fontName="微软雅黑" size="10" isBold="false" isStrikeThrough="false"/>
+					<paragraph lineSpacing="AtLeast"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{shelfName}.length()>10?$F{shelfName}.substring(0, 10):$F{shelfName}]]></textFieldExpression>
+			</textField>
+			<componentElement>
+				<reportElement positionType="Float" stretchType="RelativeToBandHeight" x="0" y="15" width="123" height="45" uuid="378fe839-e737-45d8-a14d-c6ac3a7bd612">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.barHeight" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.barWidth" value="pixel"/>
+				</reportElement>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="Code128B" drawText="false" checksumRequired="false" barWidth="10" barHeight="500" rotation="None">
+					<jr:codeExpression><![CDATA[$F{shelfCode}]]></jr:codeExpression>
+				</jr:barbecue>
+			</componentElement>
+			<textField pattern="">
+				<reportElement x="7" y="58" width="114" height="16" uuid="347c381b-06be-49fe-bbed-470d5c4e07b4">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Top">
+					<font fontName="微软雅黑" size="12" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{depotCard.goods.wareName}==null?"无产品":$F{depotCard.goods.wareName}.length()>10?$F{depotCard.goods.wareName}.substring(0, 10):$F{depotCard.goods.wareName}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="7" y="74" width="20" height="11" uuid="dc70810a-1b2c-4474-a65e-9e082d178152">
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8"/>
+				</textElement>
+				<text><![CDATA[整件:]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="27" y="74" width="82" height="11" uuid="ed4a5b17-6bf9-46d0-8202-4dc81087ca5a">
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{depotCard.goods.blockQtyInStoreLvUnitName}==null?"无产品":$F{depotCard.goods.blockQtyInStoreLvUnitName}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="7" y="85" width="34" height="11" uuid="85109897-4e58-4b5a-98f6-06076dcfd28b">
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8"/>
+				</textElement>
+				<text><![CDATA[包装规格:]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="41" y="85" width="80" height="11" uuid="6d34e0bc-a566-480d-8a1f-fc3e65fb4af2">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{depotCard.goods.packingSpec}==null?"无产品":$F{depotCard.goods.packingSpec}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="7" y="96" width="34" height="11" uuid="4ff17954-ea15-4645-a8ab-da80b664994b">
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8"/>
+				</textElement>
+				<text><![CDATA[生产厂家:]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="41" y="96" width="80" height="11" uuid="de768581-42da-457a-aa9b-2cde5dd11add">
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{depotCard.goods.factName}==null?"无产品":$F{depotCard.goods.factName}]]></textFieldExpression>
+			</textField>
+			<line>
+				<reportElement x="124" y="0" width="1" height="108" uuid="25da50c0-682b-4b12-8e5d-68e070663dbe">
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+			</line>
+			<textField isStretchWithOverflow="true" pattern="" isBlankWhenNull="false">
+				<reportElement key="" positionType="Float" mode="Opaque" x="135" y="1" width="114" height="14" uuid="0540f95d-c116-4700-b905-aa6ae1b475a8">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<box topPadding="0">
+					<pen lineWidth="0.0"/>
+					<topPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<leftPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<bottomPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+					<rightPen lineWidth="0.0" lineStyle="Solid" lineColor="#000000"/>
+				</box>
+				<textElement textAlignment="Left" verticalAlignment="Top" rotation="None" markup="none">
+					<font fontName="微软雅黑" size="10" isBold="false" isStrikeThrough="false"/>
+					<paragraph lineSpacing="AtLeast"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{shelfName}.length()>10?$F{shelfName}.substring(0, 10):$F{shelfName}]]></textFieldExpression>
+			</textField>
+			<componentElement>
+				<reportElement positionType="Float" stretchType="RelativeToBandHeight" x="127" y="16" width="123" height="45" uuid="598ef9dc-1ed3-4c33-95fb-31f8595c0ebb">
+					<property name="com.jaspersoft.studio.unit.barWidth" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.barHeight" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<jr:barbecue xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" type="Code128B" drawText="false" checksumRequired="false" barWidth="10" barHeight="500" rotation="None">
+					<jr:codeExpression><![CDATA[$F{shelfCode}]]></jr:codeExpression>
+				</jr:barbecue>
+			</componentElement>
+			<textField pattern="">
+				<reportElement x="135" y="58" width="114" height="16" uuid="a778a3f4-21f6-407c-80c8-8b2284924de9">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Top">
+					<font fontName="微软雅黑" size="12" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{depotCard.goods.wareName}==null?"无产品":$F{depotCard.goods.wareName}.length()>10?$F{depotCard.goods.wareName}.substring(0, 10):$F{depotCard.goods.wareName}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="135" y="74" width="20" height="11" uuid="e483c96d-2583-4060-bddd-d6dc6732deee">
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+				<textElement>
+					<font fontName="微软雅黑" size="8"/>
+				</textElement>
+				<text><![CDATA[整件:]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="156" y="74" width="75" height="11" uuid="f8101473-1972-4d51-867a-b93e0969db89">
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{depotCard.goods.blockQtyInStoreLvUnitName}==null?"无产品":$F{depotCard.goods.blockQtyInStoreLvUnitName}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="135" y="86" width="34" height="11" uuid="3c6f7e54-ba8d-4875-8c1e-f2e57c29c510">
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8"/>
+				</textElement>
+				<text><![CDATA[包装规格:]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="169" y="85" width="80" height="11" uuid="51e157a2-b78f-4c90-a413-bca69cfc8d5e">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{depotCard.goods.packingSpec}==null?"无产品":$F{depotCard.goods.packingSpec}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="169" y="95" width="80" height="11" uuid="8ee22141-2125-44be-b666-36711e22b679">
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Bottom">
+					<font fontName="微软雅黑" size="8" isBold="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{depotCard.goods.factName}==null?"无产品":$F{depotCard.goods.factName}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="135" y="95" width="34" height="11" uuid="f6350ee0-7c17-46e3-a011-69af842b95a7">
+					<property name="com.jaspersoft.studio.unit.height" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.y" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.x" value="pixel"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="微软雅黑" size="8"/>
+				</textElement>
+				<text><![CDATA[生产厂家:]]></text>
+			</staticText>
+		</band>
+	</detail>
+</jasperReport>

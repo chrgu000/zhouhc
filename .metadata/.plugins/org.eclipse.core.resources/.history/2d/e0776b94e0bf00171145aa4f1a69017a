@@ -1,0 +1,72 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRefRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+
+@SuppressWarnings({"rawtypes", "serial", "unchecked"})
+public class SpdDispatchers extends Entities<SpdDispatcher> {
+
+	public SpdDispatchers(){}
+	
+	public SpdDispatchers(List entities){
+		super(entities);
+	}
+	
+	public boolean isAllReviewed() {
+		for(SpdDispatcher dispatcher : this){
+			if(dispatcher.getCheckState() != CheckState.reviewed){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public void fillDepot(PcsDepotRepository depotRepository) {
+		PcsDepots depots = depotRepository.findAllWithRelations();
+		for(SpdDispatcher dispathcer : this){
+			PcsDepot depot = CollectionUtils.findWhere("depotId", dispathcer.getDispatcherDepotId(), depots);
+			dispathcer.setDepot(depot);
+		}
+	}
+
+	public void fillRefsWithGoodsItems(SpdDispatcherRefRepository drRepository, SpdBizItemRepository biRepository, SpdLogisticsTaskItemRepository ltiRepository) {
+		SpdDispatcherRefs refs = drRepository.findByDispatcherIds(getIds());
+		for(SpdDispatcher dispatcher : this){
+			SpdDispatcherRefs theRefs = new SpdDispatcherRefs(CollectionUtils.find("dispatcherId", dispatcher.getDispatcherId(), String.class, refs));
+			dispatcher.setRefs(theRefs);
+			if(theRefs.get(0).getRefObjectType().equals(SpdDispatcherRef.ref_object_type_biz)){
+				SpdBizItems bizItems = biRepository.findWithGoodsByBizIds(theRefs.pluck("refObjectId"));
+				theRefs.forEach(theRef->{
+					theRef.setGoodsItems(bizItems);
+				});
+			}else if(theRefs.get(0).getRefObjectType().equals(SpdDispatcherRef.ref_object_type_logistics_task)){
+//				SpdLogisticsTaskItems taskItems = ltiRepository.findByTaskIds(theRefs.pluck("refObjectId"));
+				SpdLogisticsTaskItems taskItems = ltiRepository.findWithGoodsByTaskIds(theRefs.pluck("refObjectId"));
+				theRefs.forEach(theRef->{
+					SpdLogisticsTaskItems theTaskItems = new SpdLogisticsTaskItems(CollectionUtils.find("taskId", theRef.getRefObjectId(), String.class, taskItems));
+					theRef.setGoodsItems(theTaskItems);
+				});
+			}
+		}
+	}
+
+	public void fillTasks(SpdDepotTaskRepository taskRepository) {
+		SpdDepotTasks tasks = taskRepository.findWithItemsByDispatcherIds(getIds());
+		
+		for(SpdDispatcher dispatcher : this){
+			SpdDepotTasks theTasks = new SpdDepotTasks(CollectionUtils.find("dispatcherId", dispatcher.getDispatcherId(), String.class, tasks));
+		    dispatcher.setTasks(theTasks);
+		}
+	}
+}

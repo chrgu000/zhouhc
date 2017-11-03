@@ -1,0 +1,47 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdReturnGoodsRules extends SpdBizRules<SpdReturnGoodsRule>{
+
+	public SpdReturnGoodsRules(List<SpdReturnGoodsRule> rules){
+		super(rules);
+	}
+
+	public void fillAllRelations(PcsDepots allDepots, PcsDepts allSupplierDepts, SpdAbstractBizRules rules) {
+		for(SpdReturnGoodsRule rule : this){
+			PcsDept toDept = allSupplierDepts.findById(rule.getDirectionRule().getToDeptId());
+			PcsDepot fromDepot = allDepots.findById(rule.getDirectionRule().getFromDepotId());
+
+			rule.getDirectionRule().setFromDepot(fromDepot);
+			rule.getDirectionRule().setToDept(toDept);
+			
+			if(StringUtils.isNotEmpty(rule.getOriginRuleId())){
+				@SuppressWarnings("rawtypes")
+				SpdAbstractBizRule originRule = rules.findById(rule.getId());
+				rule.setOriginRule(originRule);
+			}
+		}
+	}
+
+	public PcsDepots getAllDepots() {
+		PcsDepots allToDepots = new PcsDepots();
+		this.forEach(rule->{
+			if(!allToDepots.contains(rule.getDirectionRule().getFromDepot())){
+				allToDepots.add(rule.getDirectionRule().getFromDepot());
+			}
+		});
+		return allToDepots;
+	}
+	
+}

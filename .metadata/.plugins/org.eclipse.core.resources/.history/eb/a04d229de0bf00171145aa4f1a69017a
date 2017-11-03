@@ -1,0 +1,1 @@
+update spd_shelf_stock ss set(shelf_id)=(select dc.shelf_id from spd_depot_card dc where ss.goods_id=dc.goods_id and ss.depot_id=dc.depot_id);

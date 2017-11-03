@@ -1,0 +1,150 @@
+package cn.ak4j.yard.spd.supply.domain;
+
+import java.util.Date;
+import java.util.UUID;
+
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Past;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.AbstractEntity;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@NoArgsConstructor
+public class SpdDeliveryOrderItem extends AbstractEntity{
+
+	@Getter @Setter
+	private String orderId;//送货单ID
+	
+	@Getter @Setter
+	private String itemId; //明细ID
+	
+	@Getter @Setter
+	private String itemCode; //明细编码，可对应于箱码
+	
+	@NotEmpty(message="企业编码不能为空") @Getter @Setter
+	private String edsGoodsCode; //企业产品编码
+	
+	@Getter @Setter
+	private String edsLotNo; //企业产品批号
+	
+	@JsonFormat(pattern = "yyyy-MM-dd") @Getter @Setter
+	private Date edsLotValidity; //批次有效期
+	
+	@JsonFormat(pattern = "yyyy-MM-dd")
+	@Past(message="生产日期必须是一个过去的时间")
+	@Getter @Setter
+	private Date edsProduceDate; //批次生产日期
+	
+	@Min(value=0)
+	@NotNull(message="送货数量不能为空") @Getter @Setter
+	private Integer qty; //送货数量
+	
+	@NotEmpty(message="产品单位不能为空") @Getter @Setter
+	private String unitName; //单位名称
+	
+	@Min(value=0, message="产品价格必须大于0")
+	@NotNull(message="产品价格不能为空") @Getter @Setter
+	private Float unitPrice; // 单位价格
+	
+	@Getter @Setter
+	private String invoiceNo; //发票号
+	
+	@Getter @Setter
+	private Float amount; //发票金额
+	
+	@NotEmpty(message="产品类型不能为空") @Getter @Setter
+	private String goodsType;//产品类型
+	
+	@Getter @Setter
+	private String sn;
+	
+	@Getter @Setter
+	private String sterilizeLotNo;//灭菌批次
+	
+	@JsonFormat(pattern = "yyyy-MM-dd")
+	@Getter @Setter
+	private Date sterilizeTime;//灭菌日期
+	
+	@JsonIgnore @Getter @Setter
+	private YdsGoods goods;
+	
+	@JsonIgnore @Getter @Setter
+	private YdsEdsGoods edsGoods;
+	
+	@JsonIgnore @Getter @Setter
+	private YdsEdsGoodsLot edsGoodsLot;
+
+	public SpdDeliveryOrderItem(String itemCode,
+			String edsGoodsCode, String edsLotNo, Date edsLotValidity, Date edsProduceDate, Integer qty,
+			String unitName, Float unitPrice, String invoiceNo, Float amount, String goodsType) {
+		this.itemCode = itemCode;
+		this.edsGoodsCode = edsGoodsCode;
+		this.edsLotNo = edsLotNo;
+		this.edsLotValidity = edsLotValidity;
+		this.edsProduceDate = edsProduceDate;
+		this.qty = qty;
+		this.unitName = unitName;
+		this.unitPrice = unitPrice;
+		this.invoiceNo = invoiceNo;
+		this.amount = amount;
+		this.goodsType = goodsType;
+	}
+
+	public YdsEdsGoodsLot buildEdsGoodsLot(YdsEdsGoodss edsGoodss, PcsUser user){
+		YdsEdsGoodsLot edsGoodsLot = new YdsEdsGoodsLot();
+		
+		String lotNo = "";
+		String theEdsLotNo = StringUtils.isNotEmpty(this.edsLotNo) ? this.edsLotNo : Constant.lot_no_empty;
+		if(StringUtils.isNotEmpty(this.getSn())){
+			lotNo = edsGoodsLot.attachSN(theEdsLotNo, this.getSn());
+		}else{
+			lotNo = theEdsLotNo;
+		}
+		
+		YdsEdsGoods edsGoods = CollectionUtils.findWhere("edsGoodsCode", this.edsGoodsCode, edsGoodss);
+		edsGoodsLot.setEdsGoodsId(edsGoods.getEdsGoodsId());
+		edsGoodsLot.setEdsLotNo(lotNo);
+		edsGoodsLot.setProduceDate(this.edsProduceDate);
+		edsGoodsLot.setEdsLotValidity(this.edsLotValidity);
+		edsGoodsLot.setCreateTime(new Date());
+		edsGoodsLot.setEnabled(true);
+		edsGoodsLot.setCheckStateCode(CheckState.commited.getCode());
+		edsGoodsLot.setOwnerOrgId(user.getOrgId());
+		edsGoodsLot.setSterilizeLotNo(this.getSterilizeLotNo());
+		edsGoodsLot.setSterilizeTime(this.getSterilizeTime());
+		edsGoodsLot.setMaintenanceInfo(new MaintenanceInfo(user));
+		return edsGoodsLot;
+	}
+
+	public SpdDeliveryOrderItem(SpdBizItem bizItem, YdsEdsGoods edsGoods) {
+		this.itemId = UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
+		this.edsGoodsCode = edsGoods.getEdsGoodsCode();
+		this.goodsType = YdsGoodsType.equipment.getCode();
+		int qty = (int)(bizItem.getConfirmQty()/edsGoods.getEdsYdsUnitRatio());
+		float price = bizItem.getUnitPrice() * edsGoods.getEdsYdsUnitRatio();
+		this.qty = qty;
+		this.unitName = edsGoods.getDeliveryUnitName();
+		this.unitPrice = price;
+	}
+	
+}

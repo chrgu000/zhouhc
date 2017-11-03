@@ -1,0 +1,53 @@
+package cn.ak4j.yard.sys.service;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+
+@Service
+public class YardGlobalInfoService extends IYardService<YardGlobalInfo>{
+	
+	@Autowired private YardGlobalInfoRepository giRepository;
+
+	@Override
+	public YardGlobalInfo add(YardGlobalInfo t, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+	@Override
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+	@Transactional
+	@CacheEvict(value="longTimeCache", key="\"allGlobalInfos\"")
+	public YardGlobalInfo modify(YardGlobalInfo globalInfo, IUser user) {
+		YardGlobalInfo globalInfoPO = giRepository.findAll().findByKey(globalInfo.getKey());
+		if(!globalInfoPO.getEditable()){
+			throw new InvalidDataException(YardExceptionType.forbid_edit_uneditable_global_info, globalInfoPO.getName());
+		}
+		globalInfoPO.updateValue(globalInfo.getValue(), globalInfo.getDescription());
+		giRepository.save(globalInfoPO);
+		
+		Conf.setAllGlobalInfos(giRepository.findAll());
+		return globalInfoPO;
+	}
+
+	@Override
+	public YardGlobalInfo updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+}

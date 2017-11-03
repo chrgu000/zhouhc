@@ -1,0 +1,58 @@
+package cn.ak4j.yard.spd.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.Test;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.task.domain.SpdDispatchers;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.params.SpdDispatcherParams;
+
+public class SpdDispatcherResourceTest extends BaseTest {
+	
+	@Test public void testFindAll() throws Exception{
+		SpdDispatchers dispatchers = mockMvcHelper.findList(SpdDispatchers.class, testUserCode, null);
+		assertEquals(21,dispatchers.size());
+	}
+	
+	@Test public void testFindAllCount() throws Exception{
+		int count = mockMvcHelper.count(SpdDispatchers.class, testUserCode, null);
+		assertEquals(21,count);
+	}
+	
+	@Test public void testFindByOffShelf() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		SpdDispatcherParams params = new SpdDispatcherParams();
+		params.setDispatcherDeptId(new ListParam<String>(user.getDeptId()));
+		params.setDispatcherType(new ListParam<String>(SpdDispatcherType.off_shelf.getCode()));
+		
+		SpdDispatchers dispatchers = mockMvcHelper.findList(SpdDispatchers.class, xykUserCode, params);
+		assertEquals(7,dispatchers.size());
+	}
+	
+	@Test public void testFindByOnShelf() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		SpdDispatcherParams params = new SpdDispatcherParams();
+		params.setDispatcherDeptId(new ListParam<String>(user.getDeptId()));
+		params.setDispatcherType(new ListParam<String>(SpdDispatcherType.on_shelf.getCode()));
+		
+		SpdDispatchers dispatchers = mockMvcHelper.findList(SpdDispatchers.class, xykUserCode, params);
+		assertEquals(10,dispatchers.size());
+	}
+	
+	@Test public void testModifyByEnabledExistIncompleteDepotTask() throws Exception{
+		String cardId022 = "depot_card_id_022";
+		SpdDepotCard depotCard = mockMvcHelper.findOne(SpdDepotCard.class, testUserCode, cardId022);
+		depotCard.setEnabled(false);
+		mockMvcHelper.modify(SpdDepotCard.class, xykUserCode, cardId022, depotCard, status().is4xxClientError(), YardExceptionType.forbid_exist_uncomplete_task);
+		
+	}
+}

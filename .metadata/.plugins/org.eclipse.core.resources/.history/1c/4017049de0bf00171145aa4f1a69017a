@@ -1,0 +1,1 @@
+alter table spd_depot_goods_config add(uncompleted_prepare_qty number(10,0) default 0);

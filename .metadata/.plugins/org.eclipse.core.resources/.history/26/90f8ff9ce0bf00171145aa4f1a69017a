@@ -1,0 +1,11 @@
+alter table spd_replenish_rule add (rule_code varchar2(50));
+alter table spd_consume_rule add (rule_code varchar2(50));
+alter table spd_prepare_inform_rule add (rule_code varchar2(50));
+alter table spd_receive_rule add (rule_code varchar2(50));
+alter table spd_return_goods_rule add (rule_code varchar2(50));
+alter table spd_adjust_stock_rule add (rule_code varchar2(50));
+alter table spd_move_area_rule add (rule_code varchar2(50));
+alter table spd_property_change_rule add (rule_code varchar2(50));
+alter table spd_daily_clean_rule add (rule_code varchar2(50));
+alter table spd_fin_rec_rule add (rule_code varchar2(50));
+

@@ -1,0 +1,19 @@
+package cn.ak4j.yard.sys.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.sys.domain.YardCodeSequence;
+import cn.ak4j.yard.sys.domain.YardCodeSequences;
+import cn.ak4j.yard.sys.domain.params.YardCodeSequenceParams;
+import lombok.Getter;
+
+@Repository
+public class YardCodeSequenceRepository extends BaseRepository<YardCodeSequence, YardCodeSequences, YardCodeSequenceParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+}

@@ -1,0 +1,8 @@
+package cn.ak4j.yard.spd.supply.domain;
+
+import lombok.Data;
+
+@Data
+public class SpdSupplyInvoice {
+	
+}

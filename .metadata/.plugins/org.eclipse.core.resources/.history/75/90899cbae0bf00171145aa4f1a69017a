@@ -1,0 +1,23 @@
+delete from SPD_DISPATCHER_REF;
+
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_021','disp_id_021','adju_biz_id_003','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_014','disp_id_015','move_biz_id_001','isolation','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_015','disp_id_016','logi_task_id_005','normal','logistics_task');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_016','disp_id_014','move_biz_id_001','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_017','disp_id_017','logi_task_id_004','isolation','logistics_task');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_018','disp_id_018','rep_biz_id_009','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_012','disp_id_012','rece_biz_id_013','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_id_item_010','disp_id_010','rep_biz_id_006','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_009','disp_id_009','rep_biz_id_005','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_008','disp_id_008','rep_biz_id_004','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_003','disp_id_001','rece_biz_id_003','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_001','disp_id_002','rece_biz_id_005','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_002','disp_id_003','rece_biz_id_006','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_004','disp_id_004','rece_biz_id_010','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_006','disp_id_006','rece_biz_id_011','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_007','disp_id_007','rep_biz_id_003','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_011','disp_id_011','rece_biz_id_012','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_013','disp_id_013','rep_biz_id_007','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_019','disp_id_019','rep_biz_id_010','isolation','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_020','disp_id_020','rep_biz_id_011','normal','biz');
+Insert into SPD_DISPATCHER_REF (DISPATCHER_REF_ID,DISPATCHER_ID,REF_SHEET_ID,AREA_TYPE,REF_OBJECT_TYPE) values ('disp_item_id_022','disp_id_022','rece_biz_id_019','normal','biz');

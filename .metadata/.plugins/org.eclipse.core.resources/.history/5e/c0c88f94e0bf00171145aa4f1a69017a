@@ -1,0 +1,142 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import java.util.Arrays;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAllBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.SpdGoodsBizPlan;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizPlanRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRecordParams;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRuleParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRecordRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.service.SpdPropertyChangeService;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+
+@RestController
+public class SpdPropertyChangeRecordResource {
+
+	@Autowired private SpdPropertyChangeRecordRepository pcRecordRepository;
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private SpdPropertyChangeService pcService;
+	@Autowired private SpdBizPlanRepository bpRepository;
+	@Autowired private SpdAllBizSteps allBizSteps;
+	
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdReplenishBizService rbService;
+	
+	@Transactional
+	@RequestMapping(value="/yard/spd/recreateAllChangeTasks", method=RequestMethod.POST)
+	public String recreateAllChanges(){
+		SpdPropertyChangeRules rules = pcrRepository.findAllWithRelations();
+		
+		SpdReplenishBizs replenishs =  rbRepository.getAll();
+		replenishs.forEach(replenish->{
+			System.out.print(replenish.getBizCode()+",");
+		});
+		System.out.println("");
+		for(SpdReplenishBiz replenish : replenishs){
+			//System.out.println("process replenish: "+ replenish.getBizCode());
+			String bizRuleId = replenish.getBizRuleId();
+			SpdPropertyChangeRule rule = CollectionUtils.findWhere("bizRuleId", bizRuleId, rules);
+			if(rule == null){
+				continue;
+			}
+			replenish = rbService.getFullReplenish(replenish.getBizId());
+			if(replenish.getCheckState() != CheckState.completed){
+				continue;
+			}
+			for(SpdLogisticsTask task : replenish.getDeliveryTasks()){
+				if(task.getCheckState() != CheckState.reviewed){
+					continue;
+				}
+				pcService.change(rule, replenish, task.getTaskId());
+			}
+		}
+		
+		return "ok";
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRecords", method=RequestMethod.POST)
+	public SpdPropertyChangeRecord generateByBizAndTask(@RequestParam("bizId")String bizId, 
+														@RequestParam(name="taskId", required=false)String taskId, 
+														@RequestParam("bizStepStatusCode")String bizStepStatusCode){
+		SpdGoodsBizPlan<?> biz = bpRepository.findOne(bizId);
+		SpdBizStep bizStep = allBizSteps.findByBizStepStatusCode(bizStepStatusCode);
+		
+		//根据业务的业务规则id以及当前的业务步骤查询是否有对应的物权变更规则
+		SpdPropertyChangeRuleParams params = new SpdPropertyChangeRuleParams();
+		params.setBizRuleId(new ListParam<String>(biz.getBizRuleId()));
+		params.setTriggerStepCode(new ListParam<String>(bizStep.getStatusCode()));
+		Entities<SpdPropertyChangeRule> rules = pcrRepository.findAllWithRelations().find(params);
+		if(rules.size() == 0){
+			return null;
+		}
+		if(rules.size() > 1){
+			throw new OperateFailException(YardExceptionType.property_change_rules_conflict, biz.getBizType().getCode(), biz.getBizRuleId(), biz.getBizStatusCode());
+		}
+
+		SpdPropertyChangeRule propertyChangeRule = rules.get(0);
+		SpdPropertyChangeRecord propertyChangeRecord = pcService.change(propertyChangeRule, biz, taskId);
+		return propertyChangeRecord;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRecords/ids,{ids}", method=RequestMethod.GET)
+	public SpdPropertyChangeRecords findByIds(@PathVariable(value = "ids", required = false) String ids){
+		return pcRecordRepository.findByIds(Arrays.asList(ids.split(",")));
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRecords/myRelated", method=RequestMethod.GET)
+	public SpdPropertyChangeRecords findMyRelated(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdPropertyChangeRecordParams params = SpdPropertyChangeRecordParams.buildParamsFromJson(paramsStr, SpdPropertyChangeRecordParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = new OrderParam();
+		}
+		
+		SpdPropertyChangeRecords records = pcService.findMyRelatedRecords(user, params, order, currentPage-1, pageSize);
+		return records;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdPropertyChangeRecords/myRelated/count", method=RequestMethod.GET)
+	public int findMyRelated(@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute(Constant.user_attr_name);
+		SpdPropertyChangeRecordParams params = SpdPropertyChangeRecordParams.buildParamsFromJson(paramsStr, SpdPropertyChangeRecordParams.class);
+		int count = pcService.countMyRelatedRecords(user, params);
+		return count;
+	}
+}

@@ -1,0 +1,210 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdPrepareInformFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 备货规则
+* @author zhengyf
+* @date 2017年7月21日 上午8:19:45
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_prepare_inform_rule")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdPrepareInformRule extends SpdAbstractBizRule<SpdPrepareInformFeedbackRule>{
+
+	@Getter @Setter
+	private String originRuleId;
+	
+	@Getter @Setter @NotNull(message="确认部门不能为空")
+	private String confirmDeptId;
+	
+	/**
+	 * 是否允许超额送货
+	 */
+	@Getter @Setter
+	private Boolean excessDelivery;
+	
+	/**
+	 * 是否允许多次送货
+	 */
+	@Getter @Setter
+	private Boolean multiDelivery;
+	
+	/**
+	 * 是否手动通知供应商
+	 */
+	@Getter @Setter
+	private Boolean manualInformSupplier;
+	
+	/**
+	 * 通知组件，仅在非手动通知的情况下有效
+	 */
+	@Getter @Setter
+	private String informComponent;
+	
+	@Getter @Setter @NotNull(message="供应商业务名称不能为空")
+	private String supplierBizName;
+	
+	@Getter @Setter @Embedded @NotNull(message="directionRule不能为空") @Valid
+	private SpdPrepareInformDirectionRule directionRule;
+	
+	@Transient private String displayName;
+	
+	@SuppressWarnings("rawtypes") @Getter @Setter
+	@Transient private SpdAbstractBizRule originRule;
+	
+	@Transient @Getter @Setter
+	private PcsDept confirmDept;
+	
+	public boolean hasInformComponent(){
+		return StringUtils.isNotEmpty(getInformComponent());
+	}
+	
+	@SuppressWarnings("rawtypes") @Override
+	public void update(SpdAbstractBizRule theRule) {
+		SpdPrepareInformRule rule = (SpdPrepareInformRule)theRule;
+		setName(rule.getName());
+		setCustomName(rule.getCustomName());
+		setPrior(rule.getPrior());
+		setEnabled(rule.getEnabled());
+		setCanBeOriginRule(rule.getCanBeOriginRule());
+		setConfirmDeptId(rule.getConfirmDeptId());
+		setManualInformSupplier(rule.getManualInformSupplier());
+		setInformComponent(rule.getInformComponent());
+		setSupplierBizName(rule.getSupplierBizName());
+		setExcessDelivery(rule.getExcessDelivery());
+		setMultiDelivery(rule.getMultiDelivery());
+		setManualApply(rule.getManualApply());
+	}
+	
+	@Override
+	public String getDescription() {
+		StringBuffer buf = new StringBuffer();
+		buf.append(manualInformSupplier?"手动":"调用"+informComponent+"组件")
+			.append(String.format("通知到供应商的%s:{}", supplierBizName))
+			.append(",流向规则:"+directionRule.getDescription());
+		return buf.toString();
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.prepare_inform_biz;
+	}
+
+	@Transient @JsonIgnore
+	public PcsDepot getReceiveDepot(){
+		return getDirectionRule().getCollectDepot() == null?getDirectionRule().getToDepot():getDirectionRule().getCollectDepot();
+	}
+	
+	@Transient
+	public String getDisplayName(){
+		String fromDeptName = directionRule.getFromDept().getDeptName();
+		String toDepotName = directionRule.getToDepot().getDepotName();
+		return String.format("%s [%s>%s]", getName(), fromDeptName, toDepotName);
+	}
+	
+	@Override
+	public void checkRule(SpdBizRules<?> allRules, SpdPropertyChangeRules allPropertyChangeRules) {
+		if(StringUtils.isNotEmpty(getDirectionRule().getCollectDepotId())){
+			boolean sameGoodsType = getDirectionRule().getToDepot().getGoodsType().equals(getDirectionRule().getCollectDepot().getGoodsType());
+			if(!sameGoodsType){
+				throw new InvalidDataException(YardExceptionType.invalid_depot_goods_type_different,
+						SpdBizType.prepare_inform_biz.getName(),
+						getDirectionRule().getToDepot().getDepotName(),
+						getDirectionRule().getToDepot().getGoodsType(),
+						getDirectionRule().getCollectDepot().getDepotName(),
+						getDirectionRule().getCollectDepot().getGoodsType());
+			}
+		}
+	}
+
+	@SuppressWarnings("rawtypes")
+	public boolean equalsRule(SpdAbstractBizRule theRule) {
+		if(theRule.getBizType() != getBizType()){
+			return false;
+		}
+		SpdPrepareInformRule prepareInformRule = (SpdPrepareInformRule)theRule;
+		
+		boolean sameManualInformSupplier = getManualInformSupplier().equals(prepareInformRule.getManualInformSupplier());
+		
+		boolean sameExcessDelivery = getExcessDelivery().equals(prepareInformRule.getExcessDelivery());
+		
+		boolean sameMultiDelivery = getMultiDelivery().equals(prepareInformRule.getMultiDelivery());
+		
+		boolean sameInformComponent = (StringUtils.isEmpty(getInformComponent()) 
+											&& StringUtils.isEmpty(prepareInformRule.getInformComponent()))
+									 || (StringUtils.isNotEmpty(getInformComponent()) 
+											 && getInformComponent().equals(prepareInformRule.getInformComponent()));
+		
+		boolean sameDirectionRule = getDirectionRule().equals(prepareInformRule.getDirectionRule());
+		
+		boolean sameFeedback = getFeedbackRuleId().equals(prepareInformRule.getFeedbackRuleId());
+		
+		boolean sameOriginRuleId = (StringUtils.isEmpty(getOriginRuleId()) 
+												&& StringUtils.isEmpty(prepareInformRule.getOriginRuleId()))
+										 || (StringUtils.isNotEmpty(getOriginRuleId()) 
+												 && getOriginRuleId().equals(prepareInformRule.getOriginRuleId()));
+		
+		boolean sameConfirmDept = getConfirmDeptId().equals(prepareInformRule.getConfirmDeptId());
+		//log.debug("{}, {}, {}, {}, {}", sameManualInformSupplier, sameInformComponent, sameDirectionRule, sameFeedback, sameOriginRuleId);
+		if(sameConfirmDept
+			&& sameManualInformSupplier
+			&& sameExcessDelivery
+			&& sameMultiDelivery
+			&& sameInformComponent	
+			&& sameDirectionRule
+			&& sameFeedback
+			&& sameOriginRuleId){
+			return true;
+		}
+		return false;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		SpdPrepareInformRule theRule =  (SpdPrepareInformRule)obj;
+		return equalsRule(theRule) 
+				&& getEnabled().equals(theRule.getEnabled()) 
+				&& getName().equals(theRule.getName())
+				&& getPrior().equals(theRule.getPrior())
+				&& getManualInformSupplier().equals(theRule.getManualInformSupplier())
+				&& getSupplierBizName().equals(theRule.getSupplierBizName())
+				&& getCanBeOriginRule().equals(theRule.getCanBeOriginRule()
+				&& getManualApply().equals(theRule.getManualApply()));
+	}
+
+	public boolean canApplyByUser(PcsUser user) {
+		boolean isToDepotUser = getDirectionRule().getToDepot().getManageDeptId().equals(user.getDeptId());
+		return isToDepotUser;
+	}
+
+	public boolean canConfirmByUser(PcsUser user) {
+		boolean isConfirmDeptUser = getConfirmDeptId().equals(user.getDeptId());
+		return isConfirmDeptUser;
+	}
+
+}

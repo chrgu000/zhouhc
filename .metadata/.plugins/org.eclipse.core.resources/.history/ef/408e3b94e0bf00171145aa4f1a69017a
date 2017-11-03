@@ -1,0 +1,18 @@
+package cn.ak4j.yard.sys.datacheck.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckType;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTypes;
+import cn.ak4j.yard.sys.datacheck.params.SysDataCheckTypeParams;
+import lombok.Getter;
+
+@Repository
+public class SysDataCheckTypeRepository extends BaseRepository<SysDataCheckType, SysDataCheckTypes, SysDataCheckTypeParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+}

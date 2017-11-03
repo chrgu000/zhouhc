@@ -1,0 +1,47 @@
+package cn.ak4j.yard.domain;
+
+import java.util.Calendar;
+import java.util.Date;
+
+import cn.ak4j.entity.IEntity;
+
+@SuppressWarnings({"serial"})
+public abstract class YardEntity extends AbstractEntity implements IEntity{
+
+	public abstract Date getCreateTime();
+	
+	public abstract Date getLastUpdateTime();
+	
+	public abstract void setLastUpdateTime(Date date);
+	
+	public abstract void setCreateTime(Date date);
+	
+	public YardEntity(){
+		updateLastUpdateTime();
+	}
+	
+	public void initDateInfo(){
+		Calendar cal = Calendar.getInstance();
+		cal.set(Calendar.MILLISECOND, 0);
+		setLastUpdateTime(cal.getTime());
+		setCreateTime(cal.getTime());
+	}
+	
+	public void updateLastUpdateTime(){
+		Calendar cal = Calendar.getInstance();
+		cal.set(Calendar.MILLISECOND, 0);
+		setLastUpdateTime(cal.getTime());
+	}
+	
+	protected int checkTimeStamp(Date targetDate){
+		if(getLastUpdateTime() == null){
+			return 0;
+		}
+		if(targetDate == null){
+			return 1;
+		}
+		return (int)(targetDate.getTime() - getLastUpdateTime().getTime());
+	}
+	
+	
+}

@@ -1,0 +1,2 @@
+alter table spd_depot_stock drop column stock_qty;
+alter table spd_shelf_stock drop column store_unit_qty;

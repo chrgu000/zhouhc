@@ -1,0 +1,48 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+
+/**
+* @Description: 仓库库存变更
+* @author zhengyf
+* @date 2017年3月31日 上午10:32:47
+* @version V1.0.0
+*/
+
+@SuppressWarnings({"serial"})
+public class SpdDepotStockChanges extends SpdStockChanges<SpdDepotStockChange>{
+	
+	public SpdDepotStockChanges setToNegativeQty(){
+		this.forEach(change->change.setQtyByStoreUnit(0-change.getQtyByStoreUnit()));
+		return this;
+	}
+	
+	public boolean isSameDepot() {
+		if(CollectionUtils.isEmpty(this)){
+			return true;
+		}
+		PcsDepot depot = get(0).getDepot();
+		for(SpdDepotStockChange change : this){
+			if(!change.getDepot().getDepotId().equals(depot.getDepotId())){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	/**
+	 * 在添加时，如果如果库存中有同产品批次的数量进行增加，没有时新增一条记录
+	 */
+	public boolean add(SpdDepotStockChange stockChange){
+		SpdDepotStockChange sameLotStockChange = findByGoodsLot(stockChange.getGoodsLot());
+		if(sameLotStockChange == null){
+			super.add(stockChange);
+		}else{
+			sameLotStockChange.incrementQtyByStoreUnit(stockChange);
+		}
+		
+		return true;
+	}
+	
+}

@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.bizplan.vo;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+public class SpdReturnGoodsQty {
+
+	private String receiveItemId;
+	private int qty;
+	private int unitLv;
+	
+	public SpdReturnGoodsQty(String receiveItemId, int qty, int unitLv){
+		this.receiveItemId = receiveItemId;
+		this.qty = qty;
+		this.unitLv = unitLv;
+	}
+	
+}

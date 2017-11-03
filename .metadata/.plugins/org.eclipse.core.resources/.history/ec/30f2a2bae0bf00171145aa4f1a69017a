@@ -1,0 +1,143 @@
+spring:
+  jpa.properties.javax.persistence.validation.mode: none
+  datasource.yard:
+    url: jdbc:oracle:thin:@120.77.2.93:1521:orcl11g
+    username: yard_dev
+    password: ak123456
+    driver-class-name: oracle.jdbc.driver.OracleDriver
+    max-active: 10
+    max-idle: 5
+    min-idle: 5
+    initial-size: 5 
+    test-while-idle: true
+    test-on-borrow: true
+    validation-query: 'SELECT 1 from dual'
+    validation-interval: 3000
+  
+server:
+  port: 9000  
+  
+ak:
+  weixinUrl: http://10.1.2.3:8080/manage/messages
+  yardCenter:
+    yardId: 626
+  autoUpdateDBSchema: false
+  spdRabbitMQAddress: 120.77.2.93
+  spdRabbitMQUserName: rabbitmq_admin
+  spdRabbitMQPassword: aoKA20!^
+  spdRabbitMQVirtualHost: dev
+  env: dev
+  envCode: dev
+  sendExceptionMail: false
+  test.waitTimeRatio: 1.0
+  amqpMsgDelay: 0
+  depotCardQueryThreadPoolSize: 4
+  ydsGoodsUnitLv: 4 
+  initPhase: false
+  depotNotifyEmails: zhengyf@1ycloud.net,wuyw@1ycloud.net,zhengmf@1ycloud.net,liangyk@1ycloud.net
+  addNewGoodsNotifyEmail: zhengyf@1ycloud.net,wuyw@1ycloud.net,zhengmf@1ycloud.net,liangyk@1ycloud.net
+  scheduleConfFile:
+
+ 
+eis:
+  eisRabbitMQAddress: 120.77.2.93
+  eisRabbitMQUserName: rabbitmq_admin
+  eisRabbitMQPassword: aoKA20!^
+  eisRabbitMQVirtualHost: dev 
+
+  
+mg:
+  rabbitMQAddress: none
+  rabbitMQUserName: none
+  rabbitMQPassword: none
+  rabbitMQVirtualHost: none  
+
+---
+spring:
+  profiles: bradyin
+ak:  
+  spdRabbitMQVirtualHost: dev
+  
+---
+spring:
+  profiles: daxiang
+  datasource.yard:
+#    url: jdbc:oracle:thin:@14.23.113.5:1523:orcl11g
+    url: jdbc:oracle:thin:@192.168.3.102:1523:orcl11g
+    username: YARD_DEV_ZYF
+#    username: YARD_DEV
+
+ak:
+  spdRabbitMQVirtualHost: daxiang
+  autoUpdateDBSchema: true
+
+---
+spring:
+  profiles: windy
+  autoUpdateDBSchema: false
+  datasource.yard:
+    url: jdbc:oracle:thin:@14.23.113.5:1523:orcl11g
+    username: YARD_DEV_ZMF
+    password: ak123456
+ak:  
+  spdRabbitMQVirtualHost: windy
+  autoUpdateDBSchema: true
+  
+eis:
+  eisRabbitMQVirtualHost: windy
+
+---
+spring:
+  profiles: liangyk
+  datasource.yard:
+     url: jdbc:oracle:thin:@14.23.113.5:1523:orcl11g
+     username: YARD_DEV_LYK
+     password: ak123456
+ak:  
+  spdRabbitMQVirtualHost: liangyk
+  autoUpdateDBSchema: true
+#  scheduleConfFile: schedule.json
+#  components:
+#    supplierProxy: 
+#      zsy: cn.ak4j.yard.extend.zsy.SpdZsyProxy  
+eis:
+  eisRabbitMQVirtualHost: liangyk
+    
+---
+spring:
+  profiles: wyw
+  datasource.yard:
+    url: jdbc:oracle:thin:@14.23.113.5:1523:orcl11g
+    username: YARD_DEV_WYW
+ak:  
+  spdRabbitMQVirtualHost: wyw
+  autoUpdateDBSchema: true
+
+eis:
+  eisRabbitMQVirtualHost: wyw
+
+---
+spring:
+  profiles: zhc
+  datasource.yard:
+    url: jdbc:oracle:thin:@14.23.113.2:1523:orcl11g
+    username: YARD_DEV_ZHC
+    password: ak123456
+    
+ak:  
+  autoUpdateDBSchema: true
+
+eis:
+  eisRabbitMQVirtualHost: zhouhc
+  
+---
+spring:
+  profiles: tank
+  datasource.yard:
+    url: jdbc:oracle:thin:@192.168.3.102:1523:orcl11g
+    username: YARD_DEV_TK
+
+ak:
+  spdRabbitMQVirtualHost: tank
+  autoUpdateDBSchema: true
+  

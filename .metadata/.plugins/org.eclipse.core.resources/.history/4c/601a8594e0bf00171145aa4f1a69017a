@@ -1,0 +1,300 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class SpdShelfStocks extends Entities<SpdShelfStock>{
+
+	public SpdShelfStocks(List<SpdShelfStock> stocks){
+		super(stocks);
+	}
+	
+	public void update(SpdShelfStockChanges stockChanges) {
+		SpdShelfStocks newStocks = new SpdShelfStocks();
+		
+		stockChanges.forEach(change->{
+			if(!change.isInvalid()){
+				SpdShelfStock stock = findByDepotAndGoodsLot(change.getDepot().getDepotId(), change.getShelfType(), change.getGoodsLot().getGoodsLotId());
+				if(stock == null){
+					SpdShelfStock newStock = new SpdShelfStock(change);
+					newStocks.add(newStock);
+				}else{
+					if(!stock.getShelfId().equals(change.getShelfId())){
+						if(stock.getQtyByMinUnit() > 0){
+							throw new OperateFailException(YardExceptionType.forbid_same_goods_in_multi_shelf, change.getGoodsLot().getGoods().getGoodsCode(), stock.getShelfId(), change.getShelfId());
+						}else{
+							log.info("产品[{}]更新货位:{}->{}", change.getGoodsLot().getGoods().getGoodsCode(), stock.getShelfId(), change.getShelfId());
+							stock.setShelfId(change.getShelfId());
+						}
+					}
+					stock.updateQty(change.getQtyByBaseUnit());
+				}
+			}
+		});
+		this.addAll(newStocks);
+	}
+
+	public SpdShelfStock findByDepotAndGoodsLot(String depotId, String shelfType, String lotId){
+		for(SpdShelfStock stock : this){
+			if(stock.getDepotId().equals(depotId) 
+				&& stock.getShelfType().equals(shelfType)	
+				&& stock.getLotId().equals(lotId)){
+				return stock;
+			}
+		}
+		return null;
+	}
+	
+//	public SpdShelfStock findByShelfAndGoodsLot(String shelfId, String lotId){
+//		for(SpdShelfStock stock : this){
+//			if(stock.getShelfId().equals(shelfId) && stock.getGoodsLotId().equals(lotId)){
+//				return stock;
+//			}
+//		}
+//		return null;
+//	}
+	
+//	public SpdShelfStocks sumByGoods(){
+//		SpdShelfStocks newStocks = new SpdShelfStocks();
+//		List<String> goodsIds = CollectionUtils.pluck("goodsId", this);
+//		goodsIds.forEach(goodsId->{
+//			SpdShelfStocks goodsLotshelfStocks = new SpdShelfStocks(CollectionUtils.find("goodsId", goodsId, this));
+//			newStocks.add(buildGoodsShelfStock(goodsLotshelfStocks));
+//		});
+//		return newStocks;
+//	}
+	
+	public SpdShelfStocks mergeByGoods(){
+		SpdShelfStocks newStocks = new SpdShelfStocks();
+		List<String> depotIds = CollectionUtils.pluck("depotId", this);
+		depotIds.forEach(depotId->{
+			SpdShelfStocks stocks = new SpdShelfStocks(CollectionUtils.find("depotId", depotId, this));
+			newStocks.addAll(buildGoodsShelfStocks(stocks));
+		});
+		
+		return newStocks;
+	}
+	
+	private SpdShelfStocks buildGoodsShelfStocks(SpdShelfStocks stocks){
+		SpdShelfStocks newStocks = new SpdShelfStocks();
+		List<String> shelfTypes = CollectionUtils.pluck("shelfType", stocks);
+		shelfTypes.forEach(shelfType->{
+			SpdShelfStocks goodsLotshelfStocks = new SpdShelfStocks(CollectionUtils.find("shelfType", shelfType, stocks));
+			List<String> goodsIds = CollectionUtils.pluck("goodsId", goodsLotshelfStocks);
+			goodsIds.forEach(goodsId->{
+				SpdShelfStocks theStocks = new SpdShelfStocks(CollectionUtils.find("goodsId", goodsId, goodsLotshelfStocks));
+				newStocks.add(buildGoodsShelfStock(theStocks));
+			});
+		});
+		return newStocks;
+	}
+	
+	private SpdShelfStock buildGoodsShelfStock(SpdShelfStocks goodsLotshelfStocks){
+		SpdShelfStock goodsShelfStock = new SpdShelfStock(goodsLotshelfStocks.get(0).getGoodsId(), 
+				                                          goodsLotshelfStocks.get(0).getDepotId(), 
+				                                          goodsLotshelfStocks.get(0).getShelfType(), 
+				                                          0, 0);
+
+		int qtyByMinUnitTotal = 0;
+		int lockQtyByMinUnitTotal = 0;
+		int lockQtyByStoreUnitTotal = 0;
+		for(SpdShelfStock stock : goodsLotshelfStocks){
+			qtyByMinUnitTotal += stock.getQtyByMinUnit();
+			lockQtyByMinUnitTotal += stock.getLockQtyByMinUnit();
+			lockQtyByStoreUnitTotal += stock.getLockQtyByStoreUnit();
+		}
+		goodsShelfStock.setQtyByMinUnit(qtyByMinUnitTotal);
+		goodsShelfStock.setLockQtyByMinUnit(lockQtyByMinUnitTotal);
+		goodsShelfStock.setLockQtyByStoreUnit(lockQtyByStoreUnitTotal);
+		goodsShelfStock.setGoodsLot(goodsLotshelfStocks.get(0).getGoodsLot());
+		goodsShelfStock.setShelfId(goodsLotshelfStocks.get(0).getShelfId());
+		return goodsShelfStock;
+	}
+	
+	
+	public SpdShelfStocks getUseableShelfStock(){
+		SpdShelfStocks goodsLotShelfStocks = new SpdShelfStocks();
+		this.forEach(stock->{
+			if(stock.getQtyByMinUnit()>stock.getLockQtyByMinUnit()){
+				goodsLotShelfStocks.add(stock);
+			}
+		});
+		return goodsLotShelfStocks;
+	}
+
+	/**
+	 * 增加锁库存
+	 * @return 返回锁库存记录
+	 */
+	public SpdShelfLockStocks incrementLockQty(String bizId, SpdShelfStockChanges stockChanges) {
+		SpdShelfLockStocks lockStocks = new SpdShelfLockStocks();
+		stockChanges.forEach(change->{
+			if(change.getGoodsLot() != null){
+				SpdShelfStock stock = findByDepotAndGoodsLot(change.getDepot().getDepotId(), change.getShelfType(), change.getGoodsLot().getGoodsLotId());
+				if(stock != null){
+					int newMinUnitLockQty = stock.getLockQtyByMinUnit()+change.getQtyByBaseUnit();
+					//校验实际货位库存是否足够
+					if((stock.getQtyByMinUnit() - stock.getLockQtyByMinUnit()) < change.getQtyByBaseUnit()){
+						//定义库存不足的，不能执行添加库存锁的异常类型
+						log.error("库存数量[{}] - 锁库存数量[{}] < 库存变更数量[{}]", stock.getQtyByMinUnit(), stock.getLockQtyByMinUnit(), change.getQtyByBaseUnit());
+						throw new OperateFailException(YardExceptionType.invalid_shelf_stock_not_enough, change.getDepot().getDepotName(), change.getGoodsLot().getGoods().getFactName(), change.getGoodsLot().getLotNo());
+					}
+					stock.setLockQtyByMinUnit(newMinUnitLockQty);
+					lockStocks.add(new SpdShelfLockStock(stock.getShelfStockId(), bizId, change.getQtyByBaseUnit()));
+				}else{
+					log.warn("产品[{},{}]的批次[{}]在仓库[{}]中无货位库存，可能原因是相关业务从外部系统同步过来，而库存数据又不完整。", 
+							change.getGoodsLot().getGoods().getGoodsName(), 
+							change.getGoodsLot().getGoods().getGoodsCode(), 
+							change.getGoodsLot().getLotNo(),
+							change.getDepot().getDepotName());
+				}
+			}
+		});
+		return lockStocks;
+	}
+
+	/**
+	 * 扣减库存，扣减库存的同时"释放"锁库存
+	 */
+	public void decrementStockQty(SpdShelfStockChanges stockChanges) {
+		stockChanges.forEach(change->{
+			if(change.getQtyByStoreUnit() > 0){
+				SpdShelfStock stock = findByDepotAndGoodsLot(change.getDepot().getDepotId(), change.getShelfType(), change.getGoodsLot().getGoodsLotId());
+				//扣减库存
+				int newStockQtyByMinUnit = stock.getQtyByMinUnit() - change.getQtyByBaseUnit();
+				//log.debug("stockQtyByStoreUnit: {}, changeQtyByStoreUnit:{}", stock.getQtyByStoreUnit(), change.getQtyByStoreUnit());
+				//log.debug("stockQtyByMinUnit:{}, changeQtyByMinUnit:{}, goodsLotId:{}", stock.getQtyByMinUnit(), change.getQtyByMinUnit(), stock.getGoodsLotId());
+				if(newStockQtyByMinUnit < 0){
+					throw new OperateFailException(YardExceptionType.forbide_update_stock_to_negative, stock.getQtyByMinUnit(), 0-change.getQtyByBaseUnit());
+				}
+				stock.setQtyByMinUnit(newStockQtyByMinUnit);
+				
+				//释放锁库存
+				int newLockQtyByMinUnit = stock.getLockQtyByMinUnit() - change.getPlanQtyByMinUnit();
+				if(newLockQtyByMinUnit < 0){
+					throw new OperateFailException(YardExceptionType.forbide_update_stock_to_negative, stock.getLockQtyByMinUnit(), 0-change.getPlanQtyByMinUnit());
+				}
+				stock.setLockQtyByMinUnit(newLockQtyByMinUnit);
+				stock.updateLastUpdateTime();
+			}
+		});
+	}
+
+	/**
+	 * TODO 该方法语义性极为不好，它隐藏了批次关联了产品，并且产品又关联了可用批次的逻辑，产品是否需要关联可用批次的逻辑
+	 * 存在冗余的可能性，后期将其剥离到应用场景中，由应用场景决定是否要关联可用批次
+	 */
+	public void fillGoodsLotsAndGoodsWithUseableLots(YdsGoodsLotRepository glRepository, SpdShelfStockRepository ssRepository) {
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setGoodsId(new ListParam<String>(this.pluck("goodsId")));
+		params.setEnabled(new ListParam<Boolean>(true));
+		//YdsGoodsLots lots = glRepository.findWithGoods(params);
+		YdsGoodsLots lots = new YdsGoodsLots(glRepository.findAllWithGoods().find(params));
+		lots.getAllGoodss().fillUsableLots(glRepository, ssRepository);
+		if(CollectionUtils.isEmpty(lots)){
+			return ;
+		}
+		fillGoodsLots(lots);
+	}
+	
+	public void fillGoodsLots(YdsGoodsLotRepository glRepository) {
+		YdsGoodsLotParams params = new YdsGoodsLotParams();
+		params.setGoodsId(new ListParam<String>(this.pluck("goodsId")));
+		params.setEnabled(new ListParam<Boolean>(true));
+		//YdsGoodsLots lots = glRepository.findWithGoods(params);
+		YdsGoodsLots lots = new YdsGoodsLots(glRepository.findAllWithGoods().find(params));
+		if(CollectionUtils.isEmpty(lots)){
+			return ;
+		}
+		fillGoodsLots(lots);
+	}
+	
+	public void fillGoodsLots(YdsGoodsLots lots){
+		this.forEach(stock->{
+			stock.setGoodsLot(CollectionUtils.findWhere("goodsLotId", stock.getLotId(), lots));	
+		});
+	}
+
+	public int getTotalLockQtyByStoreUnit() {
+		int totalLockQty = 0;
+		for(SpdShelfStock stock : this){
+			totalLockQty += stock.getLockQtyByStoreUnit();
+		}
+		return totalLockQty;
+	}
+	
+	public int getTotalQtyByStoreUnit(){
+		int totalQtyByStoreUnit = 0;
+		for(SpdShelfStock stock : this){
+			totalQtyByStoreUnit += stock.getQtyByStoreUnit();
+		}
+		return totalQtyByStoreUnit;
+	}
+
+	public void fillDepot(PcsDepotRepository depotRepository) {
+		PcsDepots allDepots = depotRepository.findAll();
+		this.forEach(stock->{
+			stock.setDepot(CollectionUtils.findWhere("depotId", stock.getDepotId(), allDepots));
+		});
+	}
+
+	public void fillGoods(YdsGoodsRepository goodsRepository) {
+		YdsGoodss goodss = goodsRepository.findAll();
+		this.forEach(stock->{
+			stock.setGoods(CollectionUtils.findWhere("goodsId", stock.getGoodsId(), goodss));
+		});
+	}
+
+	public void fillDepotShelf(SpdDepotCards depotCards, PcsDepotShelfs depotShelfs) {
+		SpdDepotCardParams cardParams = new SpdDepotCardParams();
+		cardParams.setGoodsId(new ListParam<String>(this.pluck("goodsId")));
+		depotCards = new SpdDepotCards(depotCards.find(cardParams));
+		
+		for(SpdShelfStock stock : this){
+			SpdDepotCard depotCard = depotCards.findByDepotAndGoodsId(stock.getDepotId(), stock.getGoodsId());
+			if(stock.getShelfType().equals(PcsAreaType.normal.getCode())){
+				stock.setDepotShelf(depotShelfs.findById(depotCard.getShelfId()));
+			}else if(stock.getShelfType().equals(PcsAreaType.isolation.getCode())){
+				stock.setDepotShelf(depotShelfs.findById(depotCard.getIsolationShelfId()));
+			}else if(stock.getShelfStockId().equals(PcsAreaType.unqualified.getCode())){
+				stock.setDepotShelf(depotShelfs.findById(depotCard.getUnqualifiedShelfId()));
+			}
+		}
+	}
+
+	
+	public SpdShelfStocks findByGoodsIds(List<String> goodsIds) {
+		SpdShelfStocks shelfStocks = new SpdShelfStocks();
+		goodsIds.forEach(goodsId->{
+			SpdShelfStock shelfStock = CollectionUtils.findWhere("goodsId", goodsId, this);
+			if(shelfStock != null){
+				shelfStocks.add(shelfStock);
+			}
+		});
+		return shelfStocks;
+	}
+	
+}

@@ -1,0 +1,169 @@
+package cn.ak4j.yard.yds.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsLotParams;
+
+public class YdsEdsGoodsLotResourceTest extends BaseTest{
+	
+	@Test public void testFindOne() throws Exception{
+		String edsGoodsLotId = "eds_lot_id_001";
+		YdsEdsGoodsLot edsGoodsLot = mockMvcHelper.findOne(YdsEdsGoodsLot.class, zsyUserCode, edsGoodsLotId);
+		assertEquals(edsGoodsLotId, edsGoodsLot.getEdsGoodsLotId());
+	}
+	
+	@Test public void testFindAll() throws Exception{
+		YdsEdsGoodsLots edsGoodsLots = mockMvcHelper.findList(YdsEdsGoodsLots.class, testUserCode, null);
+		assertEquals(110, edsGoodsLots.size());
+	}
+	
+	@Test public void testGetMine() throws Exception{
+		String accessToken = getAccessToken(zsyUserCode);
+		String urlTemplate = "/yds/ydsEdsGoodsLots/mine?params={params}&accessToken={accessToken}&pageSize=-1";
+		YdsEdsGoodsLotParams params = new YdsEdsGoodsLotParams();
+		params.setEdsGoodsType(new ListParam<String>(YdsGoodsType.drug.getCode()));
+		
+		YdsEdsGoodsLots edsGoodsLots = mockMvcHelper.mockGet(YdsEdsGoodsLots.class, urlTemplate, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(32, edsGoodsLots.size());
+		
+		testFindByEdsGoodsFormatName();
+	}
+	
+	@Test public void testGetMineCount() throws Exception{
+		String accessToken = getAccessToken(zsyUserCode);
+		String urlTemplate = "/yds/ydsEdsGoodsLots/mine/count?accessToken={accessToken}&pageSize=-1";
+		
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, accessToken);
+		assertEquals(32, count);
+	}
+	
+	private void testFindByEdsGoodsFormatName() throws Exception{
+		String edsGoodsFormatName = "[zsy_1701001] 复方嗜酸乳杆菌片 0.5g*24 通化金马药业集团股份有限公司";
+		YdsEdsGoodsLotParams params = new YdsEdsGoodsLotParams();
+		params.setEdsGoodsFormatName(new ListParam<String>(edsGoodsFormatName));
+		params.setEdsGoodsType(new ListParam<String>(YdsGoodsType.drug.getCode()));
+		
+		YdsEdsGoodsLots edsGoodsLots = mockMvcHelper.findList(YdsEdsGoodsLots.class, testUserCode, params);
+		assertEquals(2, edsGoodsLots.size());
+		
+		YdsEdsGoodss edsGoodss = mockMvcHelper.findList(YdsEdsGoodss.class, testUserCode, null);
+		YdsEdsGoods edsGoods = CollectionUtils.findWhere("edsGoodsFormatName", edsGoodsFormatName, edsGoodss);
+		assertEquals(edsGoods.getEdsGoodsId(), edsGoodsLots.get(0).getEdsGoodsId());
+	}
+	
+	@Test public void testCount() throws Exception{
+		int count = mockMvcHelper.count(YdsEdsGoodsLots.class, zsyUserCode, null);
+		assertEquals(110, count);
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		String edsGoodsLotId001 = "eds_lot_id_001";
+		String edsGoodsLotId002 = "eds_lot_id_002";
+		String edsGoodsLotId003 = "eds_lot_id_003";
+		String edsGoodsLotId004 = "eds_lot_id_004";
+		List<String> ids = new ArrayList<String>();
+		ids.add(edsGoodsLotId001);
+		ids.add(edsGoodsLotId002);
+		ids.add(edsGoodsLotId003);
+		ids.add(edsGoodsLotId004);
+		
+		YdsEdsGoodsLots edsGoodsLots = mockMvcHelper.getByIds(YdsEdsGoodsLots.class, zsyUserCode, ids);
+		
+		ids.forEach(id->{
+			YdsEdsGoodsLot edsGoodsLot = CollectionUtils.findWhere("edsGoodsLotId", id, edsGoodsLots);
+			assertNotNull(edsGoodsLot);
+		});
+	}
+	
+	@Test public void testAdd() throws Exception{
+		String edsGoodsId = "eds_goods_id_001";
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, zsyUserId);
+		YdsEdsGoodsLot newEdsGoodsLot = createEdsGoodsLot(user, edsGoodsId);
+		
+		YdsEdsGoodsLot edsGoodsLot = mockMvcHelper.add(YdsEdsGoodsLot.class, zsyUserCode, newEdsGoodsLot);
+		assertEquals("test_lot_001", edsGoodsLot.getEdsLotNo());
+		assertEquals(edsGoodsId, edsGoodsLot.getEdsGoodsId());
+	}
+	
+	@Test public void testModify() throws Exception{
+		String edsGoodsLotId001 = "eds_lot_id_001";
+		YdsEdsGoodsLot originEdsGoodsLot = mockMvcHelper.findOne(YdsEdsGoodsLot.class, zsyUserCode, edsGoodsLotId001);
+		originEdsGoodsLot.setEnabled(false);
+		
+		YdsEdsGoodsLot newEdsGoodsLot = mockMvcHelper.modify(YdsEdsGoodsLot.class, zsyUserCode, edsGoodsLotId001, originEdsGoodsLot);
+		assertEquals(false, newEdsGoodsLot.isEnabled());
+	}
+	
+	@Ignore
+	@Test public void testDeleted() throws Exception{
+		String edsGoodsLotId001 = "eds_lot_id_001";
+		String accessToken = getAccessToken(zsyUserCode);
+		String urlTemplate = "/yds/ydsEdsGoodsLots/{edsGoodsLotId}?accessToken={accessToken}";
+		
+		mockMvcHelper.mockDelete(urlTemplate, edsGoodsLotId001, accessToken);
+		
+		YdsEdsGoodsLot originEdsGoodsLot = mockMvcHelper.findOne(YdsEdsGoodsLot.class, zsyUserCode, edsGoodsLotId001);
+		assertNull(originEdsGoodsLot);
+		
+	}
+	
+	@Test public void testUpdateCheckState() throws Exception{
+		String edsGoodsLotId001 = "eds_lot_id_001";
+		YdsEdsGoodsLot originEdsGoodsLot = mockMvcHelper.findOne(YdsEdsGoodsLot.class, zsyUserCode, edsGoodsLotId001);
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.commited.getCode(), originEdsGoodsLot.getMaintenanceInfo().getLastDate());
+		
+		//throw unsupportedOPerationException
+		String urlTemplate = getUrlTemplate("/yds/ydsEdsGoodsLots/{edsGoodsLotId}/checkState/commited?accessToken={accessToken}");
+		String accessToken = getAccessToken(zsyUserCode);
+		mockMvc.perform(put(urlTemplate, edsGoodsLotId001, accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(checkStateTO)))
+		        .andExpect(status().is5xxServerError());
+		
+	}
+	
+	public YdsEdsGoodsLot createEdsGoodsLot(PcsUser user, String edsGoodsId) throws ParseException{
+		YdsEdsGoodsLot edsGoodsLot = new YdsEdsGoodsLot();
+		SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+		Date beginDate = new Date();
+		Calendar cl  = Calendar.getInstance();
+		cl.setTime(beginDate);
+		cl.set(Calendar.DATE, cl.get(Calendar.DATE)+1);
+		Date endDate = df.parse(df.format(cl.getTime()));
+		edsGoodsLot.setEdsGoodsId(edsGoodsId);
+		edsGoodsLot.setEdsLotNo("test_lot_001");
+		edsGoodsLot.setProduceDate(beginDate);
+		edsGoodsLot.setEdsLotValidity(endDate);
+		edsGoodsLot.setEnabled(true);
+		edsGoodsLot.setMaintenanceInfo(new MaintenanceInfo(user));
+		return edsGoodsLot;
+	}
+}

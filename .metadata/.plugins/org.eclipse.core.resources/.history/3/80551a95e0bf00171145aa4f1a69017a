@@ -1,0 +1,55 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.HashMap;
+import java.util.Iterator;
+
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdAdjustStockBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdConsumeBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdDailyCleanBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdFinancialReconciliationBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdMoveAreaBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdPrepareInformBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReturnGoodsBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+
+@SuppressWarnings("serial")
+@Component
+public class SpdAllBizSteps extends HashMap<SpdBizType, SpdBizSteps>{
+	
+	public SpdAllBizSteps(){
+		put(SpdBizType.receive_biz, new SpdReceiveBizSteps());
+		put(SpdBizType.adjust_stock_biz, new SpdAdjustStockBizSteps());
+		put(SpdBizType.move_area_biz, new SpdMoveAreaBizSteps());
+		put(SpdBizType.replenish_biz, new SpdReplenishBizSteps());
+		put(SpdBizType.prepare_inform_biz, new SpdPrepareInformBizSteps());
+		put(SpdBizType.consume_biz, new SpdConsumeBizSteps());
+		put(SpdBizType.return_goods_biz, new SpdReturnGoodsBizSteps());
+		
+		put(SpdBizType.daily_clean_biz, new SpdDailyCleanBizSteps());
+		put(SpdBizType.finacial_reconciliation_biz, new SpdFinancialReconciliationBizSteps());
+		
+		Constant.all_biz_steps = this;
+	}
+	
+	public SpdBizStep findByBizStepStatusCode(String bizStepStatusCode){
+		Iterator<SpdBizSteps> it = this.values().iterator();
+		SpdBizStep result = null;
+		while(it.hasNext()){
+			SpdBizSteps bizSteps = it.next();
+			for(SpdBizStep bizStep : bizSteps){
+				if(bizStep.getStatusCode().equals(bizStepStatusCode)){
+					result = bizStep;
+				}
+			}
+		}
+		return result;
+	}
+
+}

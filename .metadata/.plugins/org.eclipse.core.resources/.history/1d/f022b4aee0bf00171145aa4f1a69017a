@@ -1,0 +1,18 @@
+package cn.ak4j.yard;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+public class AMQPMsg{
+	
+	private String msgType;
+	private String msgBody;
+	
+	public AMQPMsg(String msgType, String msgBody){
+		this.msgType = msgType;
+		this.msgBody = msgBody;
+	}
+	
+}

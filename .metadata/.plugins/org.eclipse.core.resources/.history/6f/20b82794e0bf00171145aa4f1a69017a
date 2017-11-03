@@ -1,0 +1,17 @@
+package cn.ak4j.yard.sys.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class YardBatchTaskParams extends QueryParams{
+	private ListParam<String> checksum;
+	private ListParam<String> taskStatus;
+	private ListParam<String> taskType;
+	private DateRangeParam createTime;
+}

@@ -1,0 +1,9 @@
+delete from spd_biz_log where biz_id ='ff8080815e7ad9a8015e7daca65e024e';
+delete from spd_return_goods_biz where biz_id ='ff8080815e7ad9a8015e7daca65e024e';
+
+
+update spd_return_goods_biz set auto_assign_receive='0';
+update spd_biz_item set origin_id='ff8080815f48cd3f015f516cd0d10260', origin_item_id='ff8080815f48cd3f015f516cd0d10264' where biz_item_id='ff8080815f48cd3f015f57d9e65003d0';
+update spd_biz_item set return_qty=72 where biz_item_id='ff8080815f48cd3f015f516cd0d10264';
+update spd_receive_biz set sale_completed=1  where biz_id='ff8080815f48cd3f015f516cd0d10260';
+update spd_general_ledger set current_storage_qty=0 where lot_id='ff8080815f48cd3f015f516cd038025c';

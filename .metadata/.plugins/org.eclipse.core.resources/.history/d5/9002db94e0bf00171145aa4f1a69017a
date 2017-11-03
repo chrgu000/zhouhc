@@ -1,0 +1,64 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.Column;
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity  
+@DiscriminatorValue("return_goods") 
+public class SpdReturnGoodsFeedbackRule extends SpdAbstractFeedbackRule{
+
+	private Boolean autoReviewReturnGoods;
+	private Boolean autoCreateDispatcher;
+	private Boolean autoReviewDispatcher;
+	private Boolean autoReviewDepotTask;
+	private Boolean autoCompleteReturnGoods;
+	
+	@Column(name="auto_sync_to_supplier")
+	private Boolean autoSyncToSupplier;
+	
+	@Transient private String description;
+	
+	@Override @Transient
+	public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			buf.append(autoReviewReturnGoods?auto_word:manual_word)
+			.append("审核退货业务").append(Global.generalSeparator)
+			.append(autoCreateDispatcher?auto_word:manual_word)
+			.append("创建下架调度").append(Global.generalSeparator)
+			.append(autoReviewDispatcher?auto_word:manual_word)
+			.append("审核下架调度").append(Global.generalSeparator)
+			.append(autoReviewDepotTask?auto_word:manual_word)
+			.append("审核下架作业").append(Global.generalSeparator)
+			.append(autoCompleteReturnGoods?auto_word:manual_word)
+			.append("同步供应商").append(Global.generalSeparator)
+			.append(autoSyncToSupplier?auto_word:manual_word)
+			.append("完成退货");
+			
+			return this.description = buf.toString();
+		}
+		return description;
+	}
+
+	@Override @JsonIgnore
+	public SpdBizType getBizType() {
+		return SpdBizType.return_goods_biz;
+	}
+
+	
+	
+}

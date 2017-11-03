@@ -1,0 +1,9 @@
+alter table spd_consume_rule add(manual_apply char(1) default 1);
+alter table spd_daily_clean_rule add(manual_apply char(1) default 1);
+alter table spd_fin_rec_rule add(manual_apply char(1) default 1);
+alter table spd_move_area_rule add(manual_apply char(1) default 1);
+alter table spd_prepare_inform_rule add(manual_apply char(1) default 1);
+alter table spd_receive_rule add(manual_apply char(1) default 1);
+alter table spd_replenish_rule add(manual_apply char(1) default 1);
+alter table spd_return_goods_rule add(manual_apply char(1) default 1);
+alter table spd_adjust_stock_rule add(manual_apply char(1) default 1);

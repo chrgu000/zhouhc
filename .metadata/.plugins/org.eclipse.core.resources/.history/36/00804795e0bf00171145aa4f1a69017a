@@ -1,0 +1,102 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.List;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.domain.YardCodeParser;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name="pcs_depot_area")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class PcsDepotArea extends YardMaintenceEntity {
+
+	@Id
+	@GeneratedValue(strategy=GenerationType.AUTO,generator="uuidGenerator")
+	@GenericGenerator(name="uuidGenerator",strategy="uuid")
+	@Column(name="area_id")
+	@Getter @Setter
+	private String depotAreaId;//货区Id
+	
+	@Getter @Setter
+	private String depotId;//仓库Id
+	
+	@NotEmpty(message="货区编码不能为空") @Getter @Setter
+	private String areaCode;//货区编码
+	
+	@NotEmpty(message="货区名称不能为空") @Getter @Setter
+	private String areaName;//货区名称
+	
+	@Getter @Setter
+	private String areaType;// 区域类型
+	
+	@NotEmpty(message="联系人不能为空") @Getter @Setter
+	private String linkMan;//联系人
+	
+	@NotEmpty(message="联系电话不能为空") @Getter @Setter
+	private String linkTel;//联系电话
+	
+	@Getter @Setter
+	private boolean primary;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();//审核状态
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo ;
+	
+//	@Transient @Setter
+//	private YardArbitraryCode sysCode;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepotShelfs shelfs;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot depot; 
+
+	@Transient public String getAreaTypeName(){
+		return PcsAreaType.typeOf(getAreaType()).getName();
+	}
+	
+	@Transient public YardArbitraryCode getSysCode(){
+		return YardCodeParser.parseArbitraryCode(getAreaCode());
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Transient public boolean isStocking(String goodsId){
+		List<String> shelfIds = shelfs.getIds();
+		SpdDepotCard card = depot.getCards().findEnableCardByShelfIds(shelfIds, getAreaType()).findEnableCardByGoodsId(goodsId);
+		return card != null && card.isEnabled() && card.getCheckState() == CheckState.commited;
+	}
+	
+	public String toString(){
+		return String.format("货区[编码:%s, 名称:%s]", getAreaCode(), getAreaName());
+	}
+	
+}

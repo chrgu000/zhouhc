@@ -1,0 +1,24 @@
+update spd_on_shelf_task_item set lot_id='ff8080815f676a4f015f6bbd3bc90568'  
+	where lot_id='ff8080815f33e225015f391510ac0b8b' and task_id='ff8080815f676a4f015f6b3b3bae0533';
+	
+update spd_on_shelf_task_item set lot_id='ff8080815f18b63d015f1a4535602295' 
+	where lot_id='ff8080815f33e225015f38a73ebb08f8' and task_id='ff8080815f676a4f015f6b3b3bae0533';
+	
+update spd_depot_stock set goods_lot_id='ff8080815f18b63d015f1a4535602295' where 
+	goods_lot_id='ff8080815f33e225015f38a73ebb08f8' 
+	and depot_id='ff8080815e371d0c015e3762abe80e06';
+	
+update spd_depot_stock set goods_lot_id='ff8080815f676a4f015f6bbd3bc90568' where goods_lot_id='ff8080815f33e225015f391510ac0b8b' 
+	and depot_id='ff8080815e371d0c015e3762abe80e06';
+	
+update spd_depot_stock set goods_id='ff8080815f48ac3c015f4c1cd51301a8' where goods_lot_id='ff8080815f676a4f015f6bbd3bc90568' and depot_id='ff8080815e371d0c015e3762abe80e06';
+update spd_depot_stock set goods_id='ff8080815f053850015f053ad671001e' where goods_lot_id='ff8080815f18b63d015f1a4535602295' and depot_id='ff8080815e371d0c015e3762abe80e06';
+
+update spd_shelf_stock set goods_lot_id='ff8080815f18b63d015f1a4535602295' where goods_lot_id='ff8080815f33e225015f38a73ebb08f8' and depot_id='ff8080815e371d0c015e3762abe80e06';
+update spd_shelf_stock set goods_lot_id='ff8080815f676a4f015f6bbd3bc90568',min_unit_qty=4000 where goods_lot_id='ff8080815f33e225015f391510ac0b8b' and depot_id='ff8080815e371d0c015e3762abe80e06';
+	
+update spd_shelf_stock set goods_id='ff8080815f48ac3c015f4c1cd51301a8' where goods_lot_id='ff8080815f676a4f015f6bbd3bc90568' and depot_id='ff8080815e371d0c015e3762abe80e06';
+update spd_shelf_stock set goods_id='ff8080815f053850015f053ad671001e' where goods_lot_id='ff8080815f18b63d015f1a4535602295' and depot_id='ff8080815e371d0c015e3762abe80e06';
+
+update spd_general_ledger set lot_id='ff8080815f18b63d015f1a4535602295',goods_id='ff8080815f053850015f053ad671001e' where lot_id='ff8080815f33e225015f38a73ebb08f8';
+update spd_general_ledger set lot_id='ff8080815f676a4f015f6bbd3bc90568',goods_id='ff8080815f48ac3c015f4c1cd51301a8',storage_qty=4000,total_amount=11145.2 where lot_id='ff8080815f33e225015f391510ac0b8b';

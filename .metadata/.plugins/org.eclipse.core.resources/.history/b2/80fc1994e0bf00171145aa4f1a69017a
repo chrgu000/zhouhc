@@ -1,0 +1,75 @@
+package cn.ak4j.yard.sys.web;
+
+import java.util.Arrays;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+import cn.ak4j.yard.sys.domain.YardGlobalInfos;
+import cn.ak4j.yard.sys.domain.params.YardGlobalInfoParams;
+import cn.ak4j.yard.sys.repository.YardGlobalInfoRepository;
+import cn.ak4j.yard.sys.service.YardGlobalInfoService;
+
+@RestController
+public class YardGlobalInfoResource {
+	
+	@Autowired private YardGlobalInfoRepository giRepository;
+	@Autowired private YardGlobalInfoService giService;
+
+	@RequestMapping(value = "/yard/sys/yardGlobalInfos", method = RequestMethod.GET)
+	public YardGlobalInfos list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		YardGlobalInfoParams params = YardGlobalInfoParams.buildParamsFromJson(paramsStr, YardGlobalInfoParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new YardGlobalInfoParams();
+		}
+		if(orders == null){
+			order = new OrderParam("lastUpdateTime", "desc");
+		}
+		YardGlobalInfos globalInfos = new YardGlobalInfos(giRepository.findAll().findByPage(params, order, currentPage-1, pageSize));
+		
+		return globalInfos;
+	}
+	
+	@RequestMapping(value = "/yard/sys/yardGlobalInfos/count", method = RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		YardGlobalInfoParams params = YardGlobalInfoParams.buildParamsFromJson(paramsStr, YardGlobalInfoParams.class);
+		if(params == null){
+			params = new YardGlobalInfoParams();
+		}
+		
+		return giRepository.findAll().find(params).size();
+	}
+	
+	@RequestMapping(value = "/yard/sys/yardGlobalInfos/{key}", method = RequestMethod.GET)
+	public YardGlobalInfo get(@PathVariable(value = "key", required = true) String key){
+		YardGlobalInfo globalInfo = giRepository.findAll().findByKey(key);
+		return globalInfo;
+	}
+	
+	@RequestMapping(value = "/yard/sys/yardGlobalInfos/keys,{keys}", method = RequestMethod.GET)
+	public YardGlobalInfos getByKeys(@PathVariable(value = "keys", required = true) String keys){
+		YardGlobalInfos globalInfos = giRepository.findAll().findByKeys(Arrays.asList(keys.split(",")));
+		return globalInfos;
+	}
+	
+	@RequestMapping(value="/yard/sys/yardGlobalInfos/{key}", method = RequestMethod.PUT)
+	public YardGlobalInfo update(@RequestBody YardGlobalInfo globalInfo, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		return giService.modify(globalInfo, user);
+	}
+	
+}

@@ -1,0 +1,15 @@
+<#if goods??>
+<h4>产品:${"[${goods.formatName}]"}</h4>
+</br>
+<h4>系统自动为${"[${count}]"}个仓库创建帐页</h4>
+<#list depots as depot>
+<#list depotCards as depotCard>
+<#if depot.depotId == depotCard.depotId && depotCard.goodsId == goods.goodsId>
+<li>
+<h4>仓库:${"[${depot.depotName}]"},[帐页编码:${depotCard.cardCode},启用:${depotCard.enabled?string('true','false')}]</h4>
+</br>
+</li>
+</#if>
+</#list>
+</#list>
+</#if>

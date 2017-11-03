@@ -1,0 +1,39 @@
+package cn.ak4j.yard.spd.task.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.IntegerParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@EqualsAndHashCode(callSuper=false)
+@Data
+public class SpdDepotTaskItemParams extends QueryParams{
+	
+	private ListParam<String> taskItemId; 
+	private ListParam<String> itemCode; 
+	private ListParam<String> taskId;//作业主单的Id
+	private ListParam<String> cardId;//帐页Id
+	private ListParam<String> goodsFormatName;
+	private ListParam<String> packingSpec;
+	private ListParam<String> unitName;
+	private IntegerParam unitLv;
+	private ListParam<String> lotId;
+	private IntegerRangeParam planQty;
+	private IntegerRangeParam confirmQty;
+	private ListParam<String> shelfId;//货位ID
+	private ListParam<String> taskUser;//作业人
+	private DateRangeParam taskTime;//作业时间
+	private ListParam<String> lotNo; //关联产品批次批号
+	private DateRangeParam lotValidity; //关联产品批次有效期
+	private DateRangeParam produceDate;
+	private ListParam<String> sterilizeLotNo;
+	private DateRangeParam sterilizeTime;
+	private ListParam<String> shelfName;//关联货位名
+	
+	private ListParam<String> shelfCode;
+	
+}

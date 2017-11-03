@@ -1,0 +1,14 @@
+package cn.ak4j.yard.sys.domain;
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class ReconciliationReportDisplayConfig{
+	
+	private String reportTypeCode;
+	private String reportName;
+	private boolean supportHisVersion = false;
+}

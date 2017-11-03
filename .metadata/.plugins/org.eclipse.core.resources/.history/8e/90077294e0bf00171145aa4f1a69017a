@@ -1,0 +1,211 @@
+package cn.ak4j.yard.spd.supply.service;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.gep.domain.SpdGepPrepareInformBizTO;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.service.PcsUserService;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrder;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItem;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItems;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.spd.supply.factory.SpdDeliveryOrderFactory;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.factory.YardBatchTaskFactory;
+import cn.ak4j.yard.sys.service.YardBatchTaskService;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Slf4j
+public class SpdDeliveryOrderService {
+
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private PcsUserService userService;
+	@Autowired private YardBatchTaskService btService;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	@Autowired private SpdDeliveryOrderFactory doFactory;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private YardBatchTaskFactory batchTaskFactory;
+
+	/**
+	 * 校验外部系统的收货单是否有效
+	 * 1）检查仓库编码
+	 * 2）检查企业产品是否存在并启用
+	 * 3）检查是否有对应的收货规则
+	 * 4）检查备货业务规则判断是否可以送货
+	 */
+	public void checkExteralSystemDeliveryOrders(SpdDeliveryOrders orders, PcsUser user){
+		//基本数据校验
+		StringBuffer buf = new StringBuffer();
+		orders.forEach(order->{
+			String validateMsg = order.isValid()?"":String.format("[%s]:%s;", order.getOrderNo(), order.getValidateMsg());
+			buf.append(validateMsg);
+		});
+		String validateMsg = buf.toString();
+		if(StringUtils.isNotEmpty(validateMsg)){
+			log.warn("送货单构造失败:{}", validateMsg);
+			throw new InvalidDataException(YardExceptionType.invalid_delivery_order, validateMsg);
+		}
+		
+		//获取所有的仓库编码并确认存在相应编码的仓库
+		PcsDepot toDepot = orders.get(0).getReceiveDepot(depotRepository);
+		
+		//获取所有的企业产品并确认存在相应编码的企业产品,企业产品已启用
+		List<String> edsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", orders.getAllItems());
+		List<String> notExistEdsGoodsCodes =  egRepository.findAll().findByOrgId(user.getOrgId()).findNotExistEdsGoodsCodes(edsGoodsCodes);
+		if(CollectionUtils.isNotEmpty(notExistEdsGoodsCodes)){
+			throw new InvalidDataException(YardExceptionType.not_found_eds_goods_code, StringUtils.join(notExistEdsGoodsCodes, Global.generalSeparator));
+		}
+		
+		//确认送货单明细产品单位与相应的企业产品单位一致
+		YdsEdsGoodss edsGoodss = egRepository.findAll().findByOrgId(user.getOrgId()).findByEdsGoodsCodes(edsGoodsCodes);
+		
+		YdsEdsGoodss disabledEdsGoodss = edsGoodss.getDisabledEdsGoods();
+		List<String> disabledEdsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", disabledEdsGoodss);
+		if(CollectionUtils.isNotEmpty(disabledEdsGoodsCodes)){
+			throw new InvalidDataException(YardExceptionType.forbide_use_disabled_eds_goods, disabledEdsGoodsCodes);
+		}
+		
+		List<SpdDeliveryOrderItem> notSameUnitNameItems = orders.whichItemNotSameUnitName(edsGoodss);
+		if(CollectionUtils.isNotEmpty(notSameUnitNameItems)){
+			List<String> notSameUnitNameEdsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", notSameUnitNameItems);
+			throw new InvalidDataException(YardExceptionType.invalid_eds_goods_unit_name_not_same, notSameUnitNameEdsGoodsCodes);
+		}
+		
+		
+		SpdDeliveryOrderItems items = orders.getAllItems();
+		items.fillGoods(goodsRepository, egRepository);
+		
+//		orders.forEach(order->{
+//			SpdPrepareInformBiz prepareInform = pibRepository.findByBizCode(order.getPrepareInformBizCode());
+//			SpdBizItems prepareItems = biRepository.findByBizId(prepareInform.getBizId());
+//			
+//			List<SpdDeliveryOrderItem> notSameUnitPriceItems = order.whichItemNotSameUnitPrice(prepareItems);
+//			if(CollectionUtils.isNotEmpty(notSameUnitPriceItems)){
+//				List<String> notSameUnitPirceEdsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", notSameUnitPriceItems);
+//				StringBuffer orderSign = new StringBuffer();
+//				if(StringUtils.isNotEmpty(order.getOrderId())){
+//					orderSign.append(order.getOrderId());
+//					orderSign.append(",");
+//				}
+//				if(StringUtils.isNotEmpty(order.getOrderNo())){
+//					orderSign.append(order.getOrderNo());
+//				}
+//				throw new InvalidDataException(YardExceptionType.invalid_prepare_unit_price_not_same, orderSign.toString(), notSameUnitPirceEdsGoodsCodes);
+//			}
+//		});
+		
+		SpdReceiveRules receiveRules = new SpdReceiveRules(brRepository.findAllWithRelations().getAllReceiveRules().getEnabledRules());
+		SpdReceiveRule matchRule = receiveRules.find(user.getDeptId(), toDepot.getDepotId());
+		if(matchRule == null){
+			throw new InvalidDataException(YardExceptionType.not_found_receive_rule, user.getDeptId(), toDepot.getDepotId());
+		}
+		
+		orders.forEach(order->{
+			verifyCanDelivery(order);
+		});
+		
+	}
+	
+	public void verifyCanDelivery(SpdDeliveryOrder order) {
+		SpdPrepareInformBiz prepareInform = pibRepository.findByBizCode(order.getPrepareInformBizCode());
+		if(prepareInform == null){
+			throw new InvalidDataException(YardExceptionType.not_found_prepare_inform, order.getPrepareInformBizCode());
+		}
+		SpdPrepareInformRule prepareInformRule = brRepository.findAllWithRelations().getAllPrepareInformRules().findById(prepareInform.getBizRuleId());
+
+		SpdReceiveBizs receives = rbRepository.findByPrepareInformBizId(prepareInform.getBizId());
+		//不允许多次收货
+		if(!prepareInformRule.getMultiDelivery() && CollectionUtils.isNotEmpty(receives)){
+			throw new InvalidDataException(YardExceptionType.forbid_delivery_prepare_inform, prepareInform.getBizCode(), receives.get(0).getBizCode());
+		}
+		//不允许超额收货
+		if(!prepareInformRule.getExcessDelivery()){
+			SpdBizItems prepareInfromItems = biRepository.findByBizId(prepareInform.getBizId());
+			SpdDeliveryOrderItems orderItems = order.getItems();
+			
+			//收货为空(第一次送货)
+			boolean firstDelivery = CollectionUtils.isEmpty(receives);
+			if(firstDelivery){
+				prepareInfromItems.forEach(item->{
+					int orderItemQty = orderItems.getGoodsQtyByPrepareUnit(item.getGoodsId());
+					if(orderItemQty > item.getConfirmQty()){
+						throw new InvalidDataException(YardExceptionType.forbid_excess_delivery, order.getOrderNo(), item.getGoodsId(), orderItemQty - item.getConfirmQty());
+					}
+				});
+			}
+			//收货不为空(不是第一次送货)
+			else{
+				List<String> receiveBizIds = CollectionUtils.pluck("bizId", receives);
+				SpdReceiveItems receiveItems = new SpdReceiveItems(biRepository.findByBizIds(receiveBizIds));
+				prepareInfromItems.forEach(item->{
+					int orderItemQty = orderItems.getGoodsQtyByPrepareUnit(item.getGoodsId());
+					int receivedItemQty = receiveItems.getQtyByGoodsId(receives, item.getGoodsId());
+					if(orderItemQty + receivedItemQty > item.getConfirmQty()){
+						throw new InvalidDataException(YardExceptionType.forbid_excess_delivery, order.getOrderNo(), item.getGoodsId(), (orderItemQty + receivedItemQty) - item.getConfirmQty());
+					}
+				});
+			}
+		}
+	}
+
+	public void fillAllRelation(SpdDeliveryOrders orders){
+		orders.fillDepots(depotRepository);
+		SpdDeliveryOrderItems items = orders.getAllItems();
+		items.fillGoods(goodsRepository, egRepository);
+	}
+	
+	@Transactional @SuppressWarnings("unchecked")
+	public SpdDeliveryOrders deliveryAsPlan(SpdGepPrepareInformBizTO prepareInformBizTO) throws Exception{
+		//检查是否有备货通知
+		SpdPrepareInformBiz prepareInform = pibRepository.getWithItems(prepareInformBizTO.getBizId());
+		if(prepareInform == null){
+			throw new InvalidDataException(YardExceptionType.not_found_prepare_inform, prepareInformBizTO.getBizId());
+		}
+		
+		//查找供应商部门的默认用户
+		PcsUser user = userService.getDeptDefaultUser(prepareInform.getFromDeptId());
+		
+		SpdDeliveryOrders deliveryOrders = new SpdDeliveryOrders();
+		SpdDeliveryOrder deliveryOrder = doFactory.buildDeliveryOrder(prepareInform);
+		//检查是否可以发货
+		deliveryOrder.getItems().fillGoods(goodsRepository, egRepository);
+		verifyCanDelivery(deliveryOrder);
+		deliveryOrders.add(deliveryOrder);
+		
+		YardBatchTask<SpdDeliveryOrders> batchTask = batchTaskFactory.createDeliveryBatchTask(deliveryOrders);
+		batchTask = btService.createBatchTask(user, batchTask);
+		return batchTask.getData();
+	}
+
+}

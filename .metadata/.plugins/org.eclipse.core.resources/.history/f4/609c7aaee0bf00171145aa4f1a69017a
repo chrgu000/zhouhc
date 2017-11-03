@@ -1,0 +1,47 @@
+package cn.ak4j.yard.spd.task.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+
+import org.junit.Test;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskItemParams;
+
+public class SpdTaskItemResourceTest extends BaseTest{
+
+	@Test public void testGetTaskPdf() throws Exception{
+		String accessToken = getAccessToken("xyf");
+		String urlTemplate = getUrlTemplate("/spd/spdTaskItems/taskId,{taskId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, "task_id_001", accessToken))
+//				.andDo(print())
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("拣配作业单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+		
+	}
+	
+	@Test public void testGetTaskItemByItemCode() throws Exception{
+		String taskItemCode = "1031704011";
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdTaskItems?accessToken={accessToken}&params={params}";
+		SpdDepotTaskItemParams params = new SpdDepotTaskItemParams();
+		params.setItemCode(new ListParam<String>(taskItemCode));
+		String paramsJson = Global.defaultObjectMapper.writeValueAsString(params);
+//
+		SpdDepotTaskItems<SpdOffShelfTaskItem> items = mockMvcHelper.mockGet(SpdOffShelfTaskItems.class, urlTemplate, accessToken, paramsJson);
+		assertEquals(1, items.size());
+	}
+	
+}

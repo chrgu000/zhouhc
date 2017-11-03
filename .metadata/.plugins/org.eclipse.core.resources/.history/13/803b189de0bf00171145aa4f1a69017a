@@ -1,0 +1,1 @@
+update yds_goods set settle_unit_lv ='2';

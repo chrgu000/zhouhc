@@ -1,0 +1,20 @@
+package cn.ak4j.yard.sys.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class ReportConfig {
+
+	private String pdfFileName;
+	private String jasperFilePath;
+	
+	public ReportConfig(String pdfFileName, String jasperFilePath){
+		this.pdfFileName = pdfFileName;
+		this.jasperFilePath = jasperFilePath;
+	}
+}

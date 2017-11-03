@@ -1,0 +1,45 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+
+@Ignore
+public class SpdPropertyChangeServiceTest extends BaseTest{
+
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private SpdPropertyChangeService pcService;
+	@Autowired private SpdReplenishBizService rbService;
+	
+	@Test public void createTestData(){
+		/**
+		 * 目前只有rep_rule_id_08，rep_rule_id_09，rep_rule_id_25三个申领业务规则涉及到物权变更规则，
+		 * 分别对应的物权变更规则是：prp_change_rule_06，prp_change_rule_01，prp_change_rule_08
+		 */
+		
+		//prp_change_rule_06对应的业务规则rep_rule_id_08只有id为rep_biz_id_009的申领业务有涉及到物权变更
+		doChange("prp_change_rule_06", "rep_biz_id_009");
+		
+		//prp_change_rule_01对应的业务规则rep_rule_id_09只有id为rep_biz_id_006的申领业务有涉及到物权变更
+		doChange("prp_change_rule_01", "rep_biz_id_006");
+
+		//prp_change_rule_08对应的业务规则rep_rule_id_25只有id为rep_biz_id_010的退货申领业务
+		doChange("prp_change_rule_08", "rep_biz_id_010");
+	}
+	
+	private void doChange(String propertyChangeRuleId, String bizId){
+		SpdPropertyChangeRule rule = pcrRepository.findAllWithRelations().findById(propertyChangeRuleId);
+		SpdReplenishBiz replenish = rbService.getFullReplenish(bizId);
+		for(SpdLogisticsTask task : replenish.getDeliveryTasks()){
+			pcService.change(rule, replenish, task.getTaskId());
+		}
+	}
+	
+}

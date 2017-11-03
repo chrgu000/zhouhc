@@ -1,0 +1,54 @@
+package cn.ak4j.yard.spd.task.factory;
+
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.utils.EntityUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.domain.IStockChangeable;
+import cn.ak4j.yard.spd.domain.SpdGoodsItems;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRef;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+
+@Component
+@SuppressWarnings({"rawtypes"})
+public class SpdDispatcherFactory {
+	
+	public SpdDispatcher buildDispatcherFromBiz(IStockChangeable dispatcherRef, SpdDispatcherType dispatcherType, PcsUser user){
+		return buildDispatcher(dispatcherRef, SpdDispatcherRef.ref_object_type_biz, dispatcherType, user);
+	}
+	
+	public SpdDispatcher buildDispatcherFromLogisticsTask(IStockChangeable dispatcherRef, SpdDispatcherType dispatcherType, PcsUser user){
+		return buildDispatcher(dispatcherRef, SpdDispatcherRef.ref_object_type_logistics_task, dispatcherType, user);
+	}
+	
+	private SpdDispatcher buildDispatcher(IStockChangeable dispatcherRef, String refObjectType, SpdDispatcherType dispatcherType, PcsUser user){
+		PcsDepot depot = dispatcherRef.getStockChangeDepot();
+		SpdDispatcher dispatcher = new SpdDispatcher();
+		
+		dispatcher.setDispatcherDepotId(depot.getDepotId());
+		dispatcher.setDispatcherOrgId(depot.getManageOrgId());
+		dispatcher.setDispatcherDeptId(depot.getManageDeptId());
+		dispatcher.setDispatcherType(dispatcherType.getCode());
+		dispatcher.setDepot(depot);
+		dispatcher.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		String refObjectId = (String)EntityUtils.getId(dispatcherRef);
+		dispatcher.addRef(buildDispatcherRef(refObjectId, refObjectType, dispatcherRef.getItems(), dispatcherType, dispatcherRef.getTargetAreaType()));
+		
+		return dispatcher;
+	}
+
+	private SpdDispatcherRef buildDispatcherRef(String refObjectId, String refObjectType, SpdGoodsItems goodsItems, SpdDispatcherType dispatcherType, String areaType){
+		SpdDispatcherRef dispatcherRef = new SpdDispatcherRef();
+	    dispatcherRef.setRefObjectId(refObjectId);
+	    dispatcherRef.setAreaType(areaType);
+	    dispatcherRef.setRefObjectType(refObjectType);
+	    dispatcherRef.setGoodsItems(goodsItems);
+	    
+	    return dispatcherRef;
+	}
+	
+}

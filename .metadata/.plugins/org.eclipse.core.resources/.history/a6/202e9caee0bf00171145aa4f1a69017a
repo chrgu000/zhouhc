@@ -1,0 +1,132 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdMoveAreaBiz;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdMoveAreaBizRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+@SuppressWarnings({"unchecked"})
+public class SpdMoveAreaBizServiceTest extends BaseTest{
+
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdMoveAreaBizService mabService;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdMoveAreaBizRepository mabRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+
+	String depotId = "depot_id_001";
+	
+	@Test public void testAdd(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		SpdMoveAreaBiz moveArea = new SpdMoveAreaBiz(depotId, PcsAreaType.normal.getCode(), PcsAreaType.isolation.getCode());
+		moveArea.setBizRuleId("ma_rule_id_02");
+		moveArea.setMaintenanceInfo(new MaintenanceInfo(user));
+		PcsDepot depot = CollectionUtils.findWhere("manageDeptId", user.getDeptId(), depotRepository.findAllWithRelations());
+		moveArea.setCreatorDepotId(depot.getDepotId());
+		
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item1 = new SpdBizItem("goods_id_001", "goods_lot_id_019", 2, 10, null, 20.5f);
+		items.add(item1);
+		
+		SpdBizItem item2 = new SpdBizItem("goods_id_002", "goods_lot_id_024", 2, 12, null, 123.2f);
+		items.add(item2);
+		moveArea.setItems(items);
+		
+		SpdShelfStocks originShelfStocksInFromArea = ssRepository.findByShelfTypeAndGoodsLots(depotId, PcsAreaType.normal.getCode(), items.pluck("lotId"));
+		originShelfStocksInFromArea.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		SpdShelfStocks originShelfStocksInToArea = ssRepository.findByShelfTypeAndGoodsLots(depotId, PcsAreaType.isolation.getCode(), items.pluck("lotId"));
+		originShelfStocksInToArea.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		
+		moveArea = mabService.add(moveArea, user);
+		wait(3);
+		moveArea = mabRepository.findOne(moveArea.getBizId());
+		assertEquals(depotId, moveArea.getDepotId());
+		assertEquals(CheckState.new_created, moveArea.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.yicangdan);
+		assertEquals(CodeSort.yicangdan.getCode()+getCurrentDateCode()+sequenceCode, moveArea.getBizCode());
+		
+		SpdBizItems bizItems = biRepository.findWithGoodsByBizId(moveArea.getBizId());
+		assertEquals(items.size(), bizItems.size());
+		for(SpdBizItem bizItem : bizItems){
+			SpdBizItem theItem = CollectionUtils.findWhere("lotId", bizItem.getLotId(), items);
+			assertEquals(theItem.getGoodsId(), bizItem.getGoodsId());
+			assertEquals(theItem.getPlanQty(), bizItem.getPlanQty());
+		}
+		
+		//提交移仓
+		moveArea = mabService.updateCheckState(moveArea.getBizId(), CheckState.commited.getCode(), moveArea.getMaintenanceInfo().getLastDate(), user);
+		wait(2);
+		moveArea = mabRepository.findOne(moveArea.getBizId());
+		assertEquals(CheckState.commited, moveArea.getCheckState());
+		mabService.fillAllRelations(moveArea);
+
+		//确认数量
+		moveArea.getItems().confirmAsPlan();
+		biRepository.saveAll(moveArea.getItems());
+		moveArea = mabService.updateCheckState(moveArea.getBizId(), CheckState.reviewed.getCode(), moveArea.getMaintenanceInfo().getLastDate(), user);
+		wait(5);
+		
+		moveArea = mabRepository.findOne(moveArea.getBizId());
+		assertTrue(moveArea.isCompleted());
+		
+		items = biRepository.findByBizId(moveArea.getBizId());
+		for(SpdBizItem item : items){	
+			if(item.getPlanQty() > item.getConfirmQty()){
+				assertFalse(item.getAsPlanned());
+			}else{
+				assertTrue(item.getAsPlanned());
+			}
+		}
+		
+		SpdShelfStocks newShelfStocksInFromArea = ssRepository.findByShelfTypeAndGoodsLots(depotId, PcsAreaType.normal.getCode(), items.pluck("lotId"));
+		newShelfStocksInFromArea.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		SpdShelfStocks newShelfStocksInToArea = ssRepository.findByShelfTypeAndGoodsLots(depotId, PcsAreaType.isolation.getCode(), items.pluck("lotId"));
+		newShelfStocksInToArea.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		
+		newShelfStocksInFromArea.forEach(newShelfStockInFromArea->{
+			String lotId = newShelfStockInFromArea.getLotId();
+			SpdShelfStock originShelfStockInFromArea = CollectionUtils.findWhere("lotId", lotId, originShelfStocksInFromArea);
+			SpdBizItem bizItem = CollectionUtils.findWhere("lotId", lotId, bizItems);
+			int expectedNewShelfStockQty = originShelfStockInFromArea.getQtyByMinUnit()-bizItem.getPlanQtyByBaseUnit();
+			int expectedNewShelfLockStockQty = originShelfStockInFromArea.getLockQtyByMinUnit();
+			assertEquals(expectedNewShelfStockQty, newShelfStockInFromArea.getQtyByMinUnit().intValue());
+			assertEquals(expectedNewShelfLockStockQty, newShelfStockInFromArea.getLockQtyByMinUnit().intValue());
+		});
+		
+		newShelfStocksInToArea.forEach(newShelfStockInToArea->{
+			String lotId = newShelfStockInToArea.getLotId();
+			SpdShelfStock originShelfStockInToArea = CollectionUtils.findWhere("lotId", lotId, originShelfStocksInToArea);
+			SpdBizItem bizItem = CollectionUtils.findWhere("lotId", lotId, bizItems);
+			int expectedNewShelfStockQty = (originShelfStockInToArea==null?0:originShelfStockInToArea.getQtyByMinUnit())+bizItem.getPlanQtyByBaseUnit();
+			assertEquals(expectedNewShelfStockQty, newShelfStockInToArea.getQtyByMinUnit().intValue());
+		});
+	}
+	
+}

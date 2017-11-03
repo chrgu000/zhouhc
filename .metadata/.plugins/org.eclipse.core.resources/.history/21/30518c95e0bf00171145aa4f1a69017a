@@ -1,0 +1,12 @@
+package cn.ak4j.yard.domain;
+
+import lombok.Data;
+
+@Data
+public class ScheduleTaskDefine {
+
+	private String taskName;
+	private String className;
+	private String schedule;
+	
+}

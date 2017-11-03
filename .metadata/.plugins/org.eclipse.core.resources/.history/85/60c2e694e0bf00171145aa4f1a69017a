@@ -1,0 +1,74 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.spd.bizrule.params.SpdPrepareInformRuleParams;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdPrepareInformRules extends SpdBizRules<SpdPrepareInformRule>{
+	
+	public SpdPrepareInformRules(List<SpdPrepareInformRule> rules){
+		super(rules);
+	}
+	
+	public void fillAllRelations(PcsDepts allDepts, PcsDepots allDepots, SpdAbstractBizRules rules) {
+		for(SpdPrepareInformRule rule : this){
+			PcsDept fromDept = allDepts.findById(rule.getDirectionRule().getFromDeptId());
+			PcsDepot toDepot = allDepots.findById(rule.getDirectionRule().getToDepotId());
+			PcsDepot collectDeopt = allDepots.findById(rule.getDirectionRule().getCollectDepotId());
+			PcsDept confirmDept = allDepts.findById(rule.getConfirmDeptId());
+			
+			rule.getDirectionRule().setFromDept(fromDept);
+			rule.setConfirmDept(confirmDept);
+			rule.getDirectionRule().setToDepot(toDepot);
+			rule.getDirectionRule().setCollectDepot(collectDeopt);
+			
+			if(StringUtils.isNotEmpty(rule.getOriginRuleId())){
+				@SuppressWarnings("rawtypes")
+				SpdAbstractBizRule originRule = rules.findById(rule.getId());
+				rule.setOriginRule(originRule);
+			}
+		}
+	}
+
+	public PcsDepots getAllDepots() {
+		PcsDepots depots = new PcsDepots();
+		this.forEach(rule->{
+			if(!depots.contains(rule.getDirectionRule().getToDepot())){
+				depots.add(rule.getDirectionRule().getToDepot());
+			}
+
+			if(!depots.contains(rule.getDirectionRule().getToDepot())){
+				depots.add(rule.getDirectionRule().getCollectDepot());
+			}
+		});
+		return depots;
+	}
+	
+	public SpdPrepareInformRule findByFromOrgIdAndToDepotId(String fromOrgId, String toDepotId){
+		SpdPrepareInformRuleParams params = new SpdPrepareInformRuleParams();
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setDirectionRule_fromOrgId(new ListParam<String>(fromOrgId));
+		params.setDirectionRule_toDepotId(new ListParam<String>(toDepotId));
+		OrderParam order = new OrderParam("prior", "desc");
+		SpdPrepareInformRules prepareInformRules = new SpdPrepareInformRules(findByPage(params, order, -1, -1));
+		
+		if(CollectionUtils.isNotEmpty(prepareInformRules)){
+			return prepareInformRules.get(0);
+		}
+		
+		return null;
+	}
+	
+}

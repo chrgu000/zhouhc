@@ -1,0 +1,43 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRecordItemParams;
+
+public class SpdPropertyChangeRecordItemResourceTest extends BaseTest{
+
+	
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRecordItems?accessToken={accessToken}&pageSize=-1";
+		SpdPropertyChangeRecordItems items = mockMvcHelper.mockGet(SpdPropertyChangeRecordItems.class, url, accessToken);
+		assertEquals(22, items.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRecordItems/count?accessToken={accessToken}&pageSize=-1";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(22, count);
+	}
+	
+	@Test public void testListWithParams() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRecordItems?params={params}&accessToken={accessToken}&pageSize=-1";
+		
+		String id = "prp_change_id_001";
+		
+		SpdPropertyChangeRecordItemParams params = new SpdPropertyChangeRecordItemParams();
+		params.setRecordId(new ListParam<String>(id));
+		SpdPropertyChangeRecordItems items = mockMvcHelper.mockGet(SpdPropertyChangeRecordItems.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(16, items.size());
+	}
+}

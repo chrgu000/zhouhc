@@ -1,0 +1,147 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdReceiveFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 收货业务规则
+* @author zhengyf
+* @date 2017年6月20日 下午5:48:04
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_receive_rule")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdReceiveRule extends SpdAbstractBizRule<SpdReceiveFeedbackRule>{
+
+	@Getter @Setter
+	private String originRuleId;
+	
+	@Getter @Setter @NotNull(message="是否必须备货不能为空")
+	private Boolean mustPrepare;
+	
+	@Embedded @NotNull(message="directionRule不能为空") @Valid
+	@Getter @Setter private SpdReceiveDirectionRule directionRule;
+	
+	@Transient private String displayName;
+	
+	@SuppressWarnings("rawtypes") @Transient @Getter @Setter
+	private SpdAbstractBizRule originRule;
+
+	@Override public String getDescription() {
+		return String.format("[%s];[%s]", getFeedbackRule().getDescription(), getDirectionRule().getDescription());
+	}
+	
+	@SuppressWarnings("rawtypes") @Override
+	public void update(SpdAbstractBizRule theRule) {
+		SpdReceiveRule rule = (SpdReceiveRule)theRule;
+		setName(rule.getName());
+		setCustomName(rule.getCustomName());
+		setPrior(rule.getPrior());
+		setEnabled(rule.getEnabled());
+		setCanBeOriginRule(rule.getCanBeOriginRule());
+		setMustPrepare(rule.getMustPrepare());
+		setManualApply(rule.getManualApply());
+	}
+	
+	@Override public SpdBizType getBizType() {
+		return SpdBizType.receive_biz;
+	}
+	
+	@Transient public String getDisplayName(){
+		if(directionRule.getFromDept()!=null && directionRule.getToDepot() !=null){
+			String fromDeptName = directionRule.getFromDept().getDeptName();
+			String toDepotName = directionRule.getToDepot().getDepotName();
+			return String.format("%s [%s>%s]", getName(), fromDeptName, toDepotName);
+		}
+		return "";
+	}
+	
+	@Override 
+	public void checkRule(SpdBizRules<?> allRules, SpdPropertyChangeRules allPropertyChangeRules) {
+		if(StringUtils.isNotEmpty(getDirectionRule().getFinalDepotId())){
+			boolean sameGoodsType = getDirectionRule().getToDepot().getGoodsType().equals(getDirectionRule().getFinalDepot().getGoodsType());
+			if(!sameGoodsType){
+				throw new InvalidDataException(YardExceptionType.invalid_depot_goods_type_different,
+						SpdBizType.receive_biz.getName(),
+						getDirectionRule().getFinalDepot().getDepotName(),
+						getDirectionRule().getFinalDepot().getGoodsType(),
+						getDirectionRule().getToDepot().getDepotName(),
+						getDirectionRule().getToDepot().getGoodsType());
+			}
+		}
+		
+		if(mustPrepare && StringUtils.isEmpty(originRuleId)){
+			throw new InvalidDataException(YardExceptionType.not_found_receive_origin_prepare_inform_rule);
+		}
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public boolean equalsRule(SpdAbstractBizRule theRule){
+		if(theRule.getBizType() != getBizType()){
+			return false;
+		}
+		SpdReceiveRule receiveRule = (SpdReceiveRule)theRule;
+		
+		boolean sameOriginRuleId = (StringUtils.isEmpty(getOriginRuleId()) 
+											&& StringUtils.isEmpty(receiveRule.getOriginRuleId()))
+									 || (StringUtils.isNotEmpty(getOriginRuleId()) 
+											 && getOriginRuleId().equals(receiveRule.getOriginRuleId()));
+		
+		if(getDirectionRule().equals(receiveRule.getDirectionRule())
+				&& getFeedbackRuleId().equals(receiveRule.getFeedbackRuleId())
+				&& sameOriginRuleId
+				&& mustPrepare.equals(receiveRule.getMustPrepare())){
+			return true;
+		}
+		return false;
+	}
+	
+	@Override public boolean equals(Object obj) {
+		SpdReceiveRule theRule =  (SpdReceiveRule)obj;
+		return equalsRule(theRule) 
+				&& getEnabled().equals(theRule.getEnabled()) 
+				&& getName().equals(theRule.getName())
+				&& getPrior().equals(theRule.getPrior())
+				&& getCanBeOriginRule().equals(theRule.getCanBeOriginRule()
+				&& getManualApply().equals(theRule.getManualApply()));
+	}
+	
+	@Override public int hashCode() {
+		return super.hashCode();
+	}
+
+
+	public boolean canApplyByUser(PcsUser user) {
+		if(!getEnabled()){
+			return false;
+		}
+		
+		boolean isToDepotUser = getDirectionRule().getToDepot().getManageDeptId().equals(user.getDeptId());
+		
+		if(isToDepotUser){
+			return true;
+		}
+		
+		return false;
+	}
+
+}

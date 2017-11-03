@@ -1,0 +1,47 @@
+package cn.ak4j.yard.spd.supply.web;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.Map;
+
+import org.junit.Test;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.extend.gep.domain.SpdGepPrepareInformBizTO;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+
+public class SpdSupplyResourceTest extends BaseTest{
+
+	@Test public void testGetCodeType() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/supplyCodeType?code={code}&accessToken={accessToken}";
+		
+		String sendCode = "1131707041";
+		Map<String, String> result = mockMvcHelper.mockGet(new TypeReference<Map<String, String>>() {}, urlTemplate, sendCode, accessToken);
+		assertEquals("sendCode", result.get(sendCode));
+		
+		String boxNo = "NO1";
+		result = mockMvcHelper.mockGet(new TypeReference<Map<String, String>>() {}, urlTemplate, boxNo, accessToken);
+		assertEquals("boxNo", result.get(boxNo));
+		
+		String otherCode = "CODE_020";
+		result = mockMvcHelper.mockGet(new TypeReference<Map<String, String>>() {}, urlTemplate, otherCode, accessToken);
+		assertEquals("unknown", result.get(otherCode));
+	}
+	
+	@Test public void testDeliveryAsPlan() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/spdDeliveryOrders/prepareDeliveryOrders?accessToken={accessToken}";
+		String prepareInformBizId = "prp_inf_biz_id_005";
+		SpdGepPrepareInformBizTO prepareInformBizTO = new SpdGepPrepareInformBizTO();
+		prepareInformBizTO.setBizId(prepareInformBizId);
+		
+		SpdDeliveryOrders deliveryOrders = mockMvcHelper.mockPost(SpdDeliveryOrders.class, prepareInformBizTO, urlTemplate, accessToken);
+		wait(10);
+		assertEquals(1, deliveryOrders.size());
+	}
+	
+	
+}

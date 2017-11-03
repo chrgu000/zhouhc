@@ -1,0 +1,3 @@
+update spd_feedback_rule set auto_sync_to_supplier='1' where id='ret_fb_id_15';
+update spd_feedback_rule set auto_sync_to_supplier='0' where id='ret_fb_id_17';
+update spd_feedback_rule set auto_sync_to_supplier='1' where id='ret_fb_id_16';

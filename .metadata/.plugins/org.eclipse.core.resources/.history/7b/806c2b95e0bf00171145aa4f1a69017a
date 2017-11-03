@@ -1,0 +1,20 @@
+package cn.ak4j.yard.pcs.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewPcsDepotShelfTO {
+	private String areaId;//货区ID
+	private String shelfCode;//货位编码
+	private String shelfName;//货位名称
+	private String storeType;//存储类型
+	private boolean mixedGoods;//混品种
+	private boolean mixedBatch;//混批次数量
+	private String depotId;//仓库ID
+	private boolean enabled;
+	private boolean primary;
+	private Integer inx;//排序编号
+}

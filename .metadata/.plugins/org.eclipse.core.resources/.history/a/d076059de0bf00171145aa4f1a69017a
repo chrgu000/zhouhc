@@ -1,0 +1,2 @@
+alter table SPD_BIZ_ITEM modify UNIT_PRICE number(20,8);
+alter table SPD_PRP_CHG_ITEM_RELATION modify UNIT_PRICE number(20,8);

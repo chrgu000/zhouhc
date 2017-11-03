@@ -1,0 +1,207 @@
+package cn.ak4j.yard.spd.reconciliation.factory;
+
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.SpdDealPriceStratage;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizPlan;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReturnGoodsBizSteps;
+import cn.ak4j.yard.spd.domain.SpdGoodsItem;
+import cn.ak4j.yard.spd.domain.SpdGoodsItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdTaskItem;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class SpdPropertyChangeRecordFactory {
+
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	
+	@SuppressWarnings("rawtypes")
+	public SpdPropertyChangeRecord buildRecord(SpdPropertyChangeRule rule, SpdBizPlan biz, String taskId){
+		SpdPropertyChangeRecord record = new SpdPropertyChangeRecord();
+		record.setBizId(biz.getBizId());
+		record.setBizCode(biz.getBizCode());
+		record.setBizTypeCode(biz.getBizType().getCode());
+		record.setTaskId(taskId);
+		
+		if(rule.getTriggerStepCode().equals(SpdReceiveBizSteps.complete_on_shelf_task.getStatusCode())
+			|| rule.getTriggerStepCode().equals(SpdReturnGoodsBizSteps.complete_off_shelf_task.getStatusCode()) 
+			|| rule.getTriggerStepCode().equals(SpdReturnGoodsBizSteps.complete_return_goods.getStatusCode()) 
+			|| rule.getTriggerStepCode().equals(SpdReplenishBizSteps.complete_on_shelf_task.getStatusCode())){
+			SpdDepotTask depotTask = dtRepository.findOne(taskId);
+			record.setTaskCode(depotTask.getTaskCode());
+			record.setTargetDate(depotTask.getLastUpdateTime());
+			record.setCreateTime(new Date());
+			record.setLastUpdateTime(depotTask.getLastUpdateTime());
+		}else if(rule.getTriggerStepCode().equals(SpdReplenishBizSteps.review_delivery_task.getStatusCode())){
+			SpdLogisticsTask logisticsTask = ltRepository.findOne(taskId);
+			record.setTaskCode(logisticsTask.getTaskCode());
+			record.setTargetDate(logisticsTask.getLastUpdateTime());
+			record.setCreateTime(new Date());
+			record.setLastUpdateTime(logisticsTask.getLastUpdateTime());
+		}else{
+			record.setTargetDate(biz.getLastUpdateTime());
+			record.setCreateTime(new Date());
+			record.setLastUpdateTime(biz.getLastUpdateTime());
+		}
+		
+		record.setPropertyChangeRuleId(rule.getId());
+		record.setTriggerBizStepCode(rule.getTriggerStepCode());
+		BeanUtils.copyProperties(rule, record, "id", "createTime", "lastUpdateTime");
+		return record;
+	}
+	
+	private SpdPropertyChangeRecordItem buildRecordItem(SpdPropertyChangeRecord record, SpdGoodsItem goodsItem, boolean isSupplierCredit){
+		SpdPropertyChangeRecordItem recordItem = new SpdPropertyChangeRecordItem();
+		recordItem.setRecordId(record.getId());
+		recordItem.setGoodsId(goodsItem.getGoodsId());
+		recordItem.setLotId(goodsItem.getLotId());
+		if(goodsItem instanceof SpdTaskItem){
+			recordItem.setOriginItemId(((SpdTaskItem)goodsItem).getTaskItemId());
+		}else{
+			recordItem.setOriginItemId(((SpdBizItem)goodsItem).getBizItemId());
+		}
+		recordItem.setQty(isSupplierCredit?goodsItem.getConfirmQty():(0-goodsItem.getConfirmQty()));
+		recordItem.setUnitLv(goodsItem.getUnitLv());
+		recordItem.setUnitName(SpdUnitUtils.computeGoodsUnitName(goodsItem.getGoods(), goodsItem.getUnitLv()));
+		
+		return recordItem;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public SpdPropertyChangeRecordItems createPropertyChangeItems(SpdPropertyChangeRecord record, SpdGoodsItems items, boolean isSupplierCredit){
+		SpdPropertyChangeRecordItems recordItems = new SpdPropertyChangeRecordItems();
+		
+		for(Object item : items){
+			checkItemWithSpecialLot(item); //校验明细是特定批次的
+			
+			SpdGoodsItem goodsItem = (SpdGoodsItem)item;
+			
+			//构造并保存物权变更明细
+			SpdPropertyChangeRecordItem recordItem = buildRecordItem(record, goodsItem, isSupplierCredit);
+			recordItem.setOriginItem(goodsItem);
+			recordItems.add(recordItem);
+		}
+		record.setItems(recordItems);
+		return recordItems;
+	}
+	
+	/**
+	 * 根据价格策略、物权变更明细、收货交易明细创建交易明细的收货关联明细
+	 */
+	public SpdPropertyChangeRelationItems createAndSaveReceiveRelationItems(SpdDealPriceStratage dealPriceStratage, SpdPropertyChangeRecordItems recordItems, SpdReceiveBizs dealReceives){
+		SpdPropertyChangeRelationItems result = new SpdPropertyChangeRelationItems();
+		SpdReceiveItems dealReceiveItems = new SpdReceiveItems(dealReceives.getAllItems()).getDealingItems();
+		if(CollectionUtils.isEmpty(dealReceiveItems)){
+			throw new InvalidDataException(YardExceptionType.not_found_dealing_receive_item);
+			//return result;
+		}
+		
+		//是否是供应商贷出
+		boolean supplierCredit = dealReceiveItems.get(0).getDealingQtyByBaseUnit()>0;
+		for(SpdPropertyChangeRecordItem recordItem : recordItems){
+			//查询正在交易数量不为0的交易收货明细
+			List<SpdReceiveItem> theDealItems = CollectionUtils.find("lotId", recordItem.getLotId(), dealReceiveItems);
+			
+			//根据有交易的收货明细产生物权变更明细关联
+			if(CollectionUtils.isEmpty(theDealItems)){
+				log.error("产品[{}]批次[{}]没有对应的交易明细", recordItem.getGoodsId(), recordItem.getLotId());
+				throw new InvalidDataException(YardExceptionType.not_found_dealing_receive_item);
+			}
+			
+			//从收货明细的正在交易数量中扣减
+			int changeQty = recordItem.getOriginItem().getConfirmQty(YdsUnitLv.base.getLv());
+			for(SpdReceiveItem dealItem : theDealItems){
+				SpdReceiveBiz receive = dealReceives.findById(dealItem.getBizId());
+
+				int relationItemQty = changeQty;
+				int itemDealingQty = dealItem.getDealingQtyByBaseUnit();
+				
+				//当前收货明细的正在交易数量是否不足够
+				boolean dealingQtyEnough = supplierCredit?(itemDealingQty >= changeQty):(itemDealingQty+changeQty>0);
+				if(!dealingQtyEnough){
+					changeQty = changeQty - dealItem.getDealingQtyByBaseUnit();
+					dealItem.setDealingQtyByBaseUnit(0);
+					relationItemQty = itemDealingQty;
+				}else{
+					dealItem.setDealingQtyByBaseUnit(supplierCredit?(itemDealingQty-changeQty):(itemDealingQty+changeQty));
+				}
+
+				SpdPropertyChangeRelationItem relationItem = new SpdPropertyChangeRelationItem(relationItemQty,
+																								recordItem.getId(), 
+																								dealItem.getBizId(), 
+																								dealItem.getBizItemId(), 
+																								receive.getSendId(), 
+																								receive.getSendCode(), 
+																								dealItem.getSendItemCode());
+
+				float unitPrice = getDealPrice(recordItem.getOriginItem(), dealItem, dealPriceStratage);
+				relationItem.setUnitPrice(unitPrice);
+				recordItem.addItem(relationItem);
+				result.add(relationItem);
+				
+				if(dealingQtyEnough){
+					break;
+				}
+			}
+		}
+		
+		return result;
+	}
+	
+	private float getDealPrice(SpdGoodsItem goodsItem, SpdReceiveItem receiveItem, SpdDealPriceStratage dealPriceStratage){
+		if(dealPriceStratage == SpdDealPriceStratage.basic_price){
+			return goodsItem.getGoods().getPrice(YdsUnitLv.base.getLv());
+		}else if(dealPriceStratage == SpdDealPriceStratage.receive_price){
+			return receiveItem.getPrice(YdsUnitLv.base.getLv());
+		}else if(dealPriceStratage == SpdDealPriceStratage.contract_price){
+			
+		}
+		
+		return 0;
+	}
+
+	private void checkItemWithSpecialLot(Object item){
+		if(item instanceof SpdBizItem){
+			SpdBizItem bizItem = (SpdBizItem)item;
+			if(StringUtils.isEmpty(bizItem.getLotId())){
+				throw new InvalidDataException(YardExceptionType.invalid_biz_item_without_lot_id, bizItem.getBizId(), bizItem.getBizItemId());
+			}
+		}else{
+			SpdTaskItem taskItem = (SpdTaskItem)item;
+			if(StringUtils.isEmpty(taskItem.getLotId())){
+				throw new InvalidDataException(YardExceptionType.invalid_task_item_without_lot_id, taskItem.getTaskId(), taskItem.getTaskItemId());
+			}
+		}
+	}
+	
+}

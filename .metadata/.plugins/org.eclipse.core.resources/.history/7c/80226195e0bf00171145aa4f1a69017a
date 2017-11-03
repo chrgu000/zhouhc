@@ -1,0 +1,32 @@
+package cn.ak4j.yard.extend.web;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.yard.extend.CustomComponentDoc;
+import cn.ak4j.yard.extend.ICustomComponent;
+
+@RestController
+public class CustomLogicResource {
+
+	@Autowired private ICustomComponent[] customComponents;
+	
+	@RequestMapping(value = "/yard/sys/customLogics/doc", method = RequestMethod.GET)
+	public List<CustomComponentDoc> getCustomLogicsDoc(){
+		List<CustomComponentDoc> result = new ArrayList<CustomComponentDoc>();
+		
+		for(ICustomComponent customComponent : customComponents){
+			CustomComponentDoc doc = customComponent.getDoc();
+			if(doc != null){
+				result.add(doc);
+			}
+		}
+		
+		return result;
+	}
+}

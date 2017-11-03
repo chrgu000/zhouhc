@@ -1,0 +1,5 @@
+[{
+	"taskName"    :  "定时生成日清对账",
+	"className"   :  "cn.ak4j.yard.extend.zhjw.ZhjwAutoCreateDailyCleanBizTask",
+	"schedule"    :  "0 * * * * *"
+}]

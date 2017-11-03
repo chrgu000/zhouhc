@@ -1,0 +1,3 @@
+ALTER TABLE yds_eds_goods RENAME COLUMN eds_unit_name TO delivery_unit_name;
+
+ALTER TABLE yds_eds_goods ADD(delivery_unit_lv NUMBER(10, 0));

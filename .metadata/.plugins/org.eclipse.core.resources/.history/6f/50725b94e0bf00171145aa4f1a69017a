@@ -1,0 +1,261 @@
+package cn.ak4j.yard.spd.task.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTask;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTasks;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.spd.task.factory.SpdLogisticsTaskFactory;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdWrappers;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import cn.ak4j.yard.spd.wrapper.service.SpdWrapperService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Service
+@SuppressWarnings({"unchecked"})
+public class SpdLogisticsTaskService  extends IYardService<SpdLogisticsTask>{
+
+	@Autowired private SpdLogisticsTaskFactory logisticsTaskFactory;
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private SpdLogisticsTaskItemRepository liRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	@Autowired private SpdTurnoverBoxRepository tbRepository;
+	@Autowired private SpdWrapperService wrapperService;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	
+	@Transactional public SpdLogisticsTask createDeliveryTask(String bizId, PcsDepot fromDepot, PcsDepot toDepot, SpdOffShelfTaskItems offShelfTaskItems, PcsUser user) {
+		SpdLogisticsTask task = logisticsTaskFactory.buildDeliveryTask(bizId, fromDepot, toDepot, offShelfTaskItems, user);
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(bizId, task.getTaskId(), user.getUserId(), AmqpMsgType.CREATE_DELIVERY_TASK);
+            }
+		});
+		
+		ltRepository.saveWithItems(task);
+		wrapperService.addLogisticTaskWraper(task.getTaskId(), task.getItems().getAllParentWrapperIds());
+		return task;
+	}
+	
+	@Transactional
+	public void batchCommit(SpdLogisticsTasks deliveryTasks, PcsUser user){
+		for(SpdLogisticsTask deliveryTask : deliveryTasks){
+			if(deliveryTask.getCheckState() != CheckState.commited){
+				commit(deliveryTask, user);
+			}
+		}
+	}
+	
+	@Transactional
+	public void batchReview(SpdLogisticsTasks deliveryTasks, PcsUser user){
+		for(SpdLogisticsTask deliveryTask : deliveryTasks){
+			if(deliveryTask.getCheckState() != CheckState.reviewed){
+				review(deliveryTask, user);
+			}
+		}
+	}
+
+	@Transactional public SpdLogisticsTask commit(SpdLogisticsTask deliveryTask, PcsUser user) {
+		//发送业务消息
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(deliveryTask.getBizId(), deliveryTask.getTaskId(), user.getUserId(), AmqpMsgType.COMMIT_DELIVERY_TASK);
+            }
+		});
+		
+		//扣减送货方仓库库存
+		SpdDepotStockChanges stockChanges = deliveryTask.getStockChanges().setToNegativeQty();
+		stockChanges.forEach(change->change.setDepot(deliveryTask.getFromDepot()));
+		dsService.updateDepotStocks(stockChanges);
+		
+		//更新送货作业
+		deliveryTask.commit(deliveryTask.getMaintenanceInfo().getLastDate(), user);//更新送货作业状态
+		ltRepository.save(deliveryTask);
+		
+		return deliveryTask;
+	}
+
+	@Transactional public SpdLogisticsTask review(SpdLogisticsTask deliveryTask, PcsUser user) {
+		if(!deliveryTask.getItems().isAllReceived()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("送货作业[%s]", deliveryTask.getTaskCode()));
+		}
+		
+		//当申领类型是请领时，如果未全部收货，则需要找到当前申领的申领规则对应的唯一一条申领退货规则，否则抛出异常
+		SpdReplenishBiz replenish = rbRepository.findByIdWithRule(deliveryTask.getBizId());
+		if(replenish.getBizRule().isApply()){
+			SpdLogisticsTaskItems taskItems = deliveryTask.getItems().getAllNotEntireReceiveItems();
+			if(CollectionUtils.isNotEmpty(taskItems)){
+				SpdReplenishRules theRules = brRepository.findAllWithRelations().getAllEnabledReplenishRules().findRelateReturnRule(replenish.getBizRule());
+				
+				if(CollectionUtils.isEmpty(theRules)){
+					throw new InvalidDataException(YardExceptionType.not_found_replenish_return_rule);
+				}
+				
+				if(theRules.size()>1){
+					throw new InvalidDataException(YardExceptionType.invalid_exist_several_replenish_rule, replenish.getBizRuleId());
+				}
+			}
+		}
+		
+		//发送业务消息
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(deliveryTask.getBizId(), deliveryTask.getTaskId(), user.getUserId(), AmqpMsgType.CONFIRM_DELIVERY_TASK);
+            }
+		});
+		
+		//增加收货方仓库库存
+		SpdDepotStockChanges stockChanges = deliveryTask.getStockChanges();
+		stockChanges.forEach(change->change.setDepot(deliveryTask.getToDepot()));
+		dsService.updateDepotStocks(stockChanges);
+		
+		//更新送货作业状态
+		deliveryTask.review(deliveryTask.getMaintenanceInfo().getLastDate(), user);
+		
+		//保存送货作业
+		SpdLogisticsTask deliveryTaskPO = ltRepository.save(deliveryTask);
+		
+		//回收周转箱
+		wrapperService.releaseWrapper(deliveryTask.getWrappers());
+		
+		return deliveryTaskPO;
+	}
+	
+	public SpdLogisticsTaskItem modifyItem(@Valid SpdLogisticsTaskItem taskItem){
+		SpdLogisticsTaskItem taskItemPO = liRepository.findOne(taskItem.getTaskItemId());
+		if(!(taskItem.getConfirmQty().equals(taskItem.getPlanQty()))){
+			throw new InvalidDataException(YardExceptionType.forbide_update, taskItem.getItemCode());
+		}
+		if(taskItem.getReceiveQty().intValue() < 0){
+			throw new InvalidDataException(YardExceptionType.forbide_update_receive_negative, taskItem.getItemCode());
+		}
+		taskItemPO.update(taskItem);
+		taskItemPO = liRepository.save(taskItemPO);
+		return taskItemPO;
+	}
+	
+	public void fillAllRelations(SpdLogisticsTask task){
+		SpdLogisticsTaskItems items = liRepository.findByTaskId(task.getTaskId());
+		items.fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		items.fillUnuseableGoodsLot(glRepository);
+		items.fillParentWrapper(tbRepository);
+		task.setItems(items);
+
+		SpdWrappers wrappers = tbRepository.findAll().findByOwnerId(task.getTaskId());
+		wrappers.fillItems(items);
+		task.setWrappers(wrappers);
+		
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		PcsDepot fromDepot = allDepots.findById(task.getFromDepotId());
+		PcsDepot toDepot = allDepots.findById(task.getToDepotId());
+		PcsUser createUser = userRepository.findAll().findById(task.getMaintenanceInfo().getCreateUserId());
+		task.setFromDepot(fromDepot);
+		task.setToDepot(toDepot);
+		task.setCreateUser(createUser);
+	}
+
+	@Override
+	public SpdLogisticsTask add(SpdLogisticsTask t, IUser user) {
+		throw new UnsupportedOperationException("不支持新增物流作业");
+	}
+
+	@Override
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException("不支持删除物流作业");
+		
+	}
+
+	@Override
+	public SpdLogisticsTask modify(SpdLogisticsTask t, IUser user) {
+		throw new UnsupportedOperationException("不支持更改物流作业");
+	}
+
+	@Override @Transactional
+	public SpdLogisticsTask updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		SpdLogisticsTask task = ltRepository.findOne(id);
+		fillAllRelations(task);
+		//task.getItems().removeTurnoverBox();
+		if(CheckState.commited.getCode() == checkStateCode){
+			return commit(task, (PcsUser)user);
+		}else if(CheckState.reviewed.getCode() == checkStateCode){
+			return review(task, (PcsUser)user);
+		}
+		return task;
+	}
+
+	
+	/**
+	 * 查询可被特定的调度任务进行调度的物流作业，包含两类：
+	 * 1）当前调度任务所关联的物流作业
+	 * 2）不被任何调度任务所关联的物流作业:也即申领已审核但还没有下架调度的物流作业
+	 */
+	public SpdLogisticsTasks findDispatcherableLogisticsTasks(String dispatcherId){
+		SpdDispatcher dispatcher = dispatcherRepository.findOne(dispatcherId);
+		//查询已审核申领的物流作业
+		SpdLogisticsTasks reviewdLogisticsTasks = ltRepository.findByCommitedAndToDepotId(dispatcher.getDispatcherDepotId());
+		
+		//查询当前调度任务所关联的物流作业
+		SpdLogisticsTasks dispatcherRelationLogisticsTasks = findDispatcherRelationLogisticsTasks(dispatcherId);
+		
+		SpdLogisticsTasks result = new SpdLogisticsTasks();
+		result.addAll(reviewdLogisticsTasks);
+		result.addAll(dispatcherRelationLogisticsTasks);
+		
+		return result;
+	}
+	
+	/**
+	 * 根据当前的调度的信息获取关联的物流作业
+	 */
+	public SpdLogisticsTasks findDispatcherRelationLogisticsTasks(String dispatcherId){
+		//查询当前调度明细关联的物流作业
+		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+		
+		SpdLogisticsTasks logisticsTasks = ltRepository.findByIds(dispatcher.getRefs().pluck("refObjectId"));
+		
+		return logisticsTasks;
+	}
+}

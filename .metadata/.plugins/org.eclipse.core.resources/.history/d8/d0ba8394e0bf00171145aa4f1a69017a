@@ -1,0 +1,54 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+
+@SuppressWarnings("serial")
+public class SpdShelfLockStocks extends Entities<SpdShelfLockStock>{
+
+	public void releaseLock() {
+		this.forEach(lockStock->{
+			lockStock.releaseLock();
+		});
+	}
+
+	public void fillShelfStocks(SpdShelfStocks shelfStocks) {
+		this.forEach(lockStock->{
+			SpdShelfStock shelfStock = CollectionUtils.findWhere("shelfStockId", lockStock.getShelfStockId(), shelfStocks);
+			lockStock.setShelfStock(shelfStock);
+		});
+	}
+
+	public SpdShelfLockStocks findByGoodsId(String goodsId) {
+		SpdShelfLockStocks result = new SpdShelfLockStocks();
+		this.forEach(lockStock->{
+			if(lockStock.getShelfStock().getGoodsId().equals(goodsId)){
+				result.add(lockStock);
+			}
+		});
+		return result;
+	}
+	
+	public SpdShelfLockStocks findByLotId(String lotId){
+		SpdShelfLockStocks result = new SpdShelfLockStocks();
+		this.forEach(lockStock->{
+			if(lockStock.getShelfStock().getLotId().equals(lotId)){
+				result.add(lockStock);
+			}
+		});
+		return result;
+	}
+
+	public int getTotalQtyByMinUnit() {
+		int result = 0;
+		for(SpdShelfLockStock lockStock : this){
+			result += lockStock.getQtyByMinUnit();
+		}
+		return result;
+	}
+
+	public SpdShelfLockStock findByShelfStockId(String shelfStockId) {
+		return CollectionUtils.findWhere("shelfStockId", shelfStockId, this);
+	}
+	
+}

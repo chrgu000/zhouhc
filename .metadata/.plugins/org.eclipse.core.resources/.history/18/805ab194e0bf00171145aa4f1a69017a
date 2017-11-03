@@ -1,0 +1,40 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.spd.reconciliation.params.SpdGeneralLedgerItemParams;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdGeneralLedgerItems extends Entities<SpdGeneralLedgerItem>{
+	
+	public SpdGeneralLedgerItems(List<SpdGeneralLedgerItem> items){
+		super(items);
+	}
+
+	public SpdGeneralLedgerItems findByLotIds(List<String> lotIds) {
+		SpdGeneralLedgerItemParams params = new SpdGeneralLedgerItemParams();
+		params.setLotId(new ListParam<String>(lotIds));
+		
+		return new SpdGeneralLedgerItems(find(params));
+	}
+
+	public SpdGeneralLedgerItems findByDeptId(String deptId) {
+		SpdGeneralLedgerItemParams params = new SpdGeneralLedgerItemParams();
+		params.setOwnerDeptId(new ListParam<String>(deptId));
+		return new SpdGeneralLedgerItems(find(params));
+	}
+
+	public SpdGeneralLedgerItem findByGoodIdAndLotId(String goodsId, String lotId) {
+		SpdGeneralLedgerItemParams params = new SpdGeneralLedgerItemParams();
+		params.setGoodsId(new ListParam<String>(goodsId));
+		params.setLotId(new ListParam<String>(lotId));
+		
+		Entities<SpdGeneralLedgerItem> items = find(params);
+		return items.size()>0?items.get(0):null;
+	}
+	
+}

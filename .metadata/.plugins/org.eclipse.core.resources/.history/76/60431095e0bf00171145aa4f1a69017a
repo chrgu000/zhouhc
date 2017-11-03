@@ -1,0 +1,28 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.Collections;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+
+@SuppressWarnings({"serial"})
+public class SpdAdjustStockBizSteps extends SpdBizSteps{
+
+	public static SpdBizStep create_adjust_stock = new SpdBizStep(1, AmqpMsgType.CREATE_ADJUST_STOCK_BIZ.getCode(), "作业步骤模板", "adjust_stock_created", "库存调节已创建");
+	public static SpdBizStep commit_adjust_stock = new SpdBizStep(2, AmqpMsgType.COMMIT_ADJUST_STOCK_BIZ.getCode(), "作业步骤模板", "adjust_stock_commited", "库存调节已提交");
+	public static SpdBizStep confirm_adjust_stock = new SpdBizStep(3, AmqpMsgType.REVIEW_ADJUST_STOCK_BIZ.getCode(), "作业步骤模板", "adjust_stock_confirmed", "库存调节已确认");
+	public static SpdBizStep create_dispatcher = new SpdBizStep(4, "创建调度", "作业步骤模板", "dispatcher_created", "调度已创建");
+	public static SpdBizStep create_depot_task = new SpdBizStep(5, "创建仓库作业", "作业步骤模板", "task_created", "仓库作业已创建");
+	public static SpdBizStep complete_depot_task = new SpdBizStep(6, "完成仓库作业", "作业步骤模板", "task_completed", "仓库作业已完成");
+	
+	
+	public SpdAdjustStockBizSteps() {
+		this.add(create_adjust_stock);
+		this.add(commit_adjust_stock);
+		this.add(confirm_adjust_stock);
+		this.add(create_dispatcher);
+		this.add(create_depot_task);
+		this.add(complete_depot_task);
+		
+		Collections.sort(this, comparator);
+	}
+}

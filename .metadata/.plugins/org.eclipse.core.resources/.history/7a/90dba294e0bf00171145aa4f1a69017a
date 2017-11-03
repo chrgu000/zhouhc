@@ -1,0 +1,9 @@
+package cn.ak4j.yard.spd.reconciliation.report.hspt_credit_rep_detail;
+
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportItems;
+
+
+@SuppressWarnings("serial")
+public class Items extends SpdReconciliationReportItems<Item>{
+
+}

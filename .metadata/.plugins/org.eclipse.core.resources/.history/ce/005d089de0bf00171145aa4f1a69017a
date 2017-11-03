@@ -1,0 +1,4 @@
+ALTER TABLE spd_adjust_stock_rule rename column "PRIOR" to "RULE_PRIOR";
+ALTER TABLE spd_move_area_rule rename column "PRIOR" to "RULE_PRIOR";
+ALTER TABLE spd_receive_rule rename column "PRIOR" to "RULE_PRIOR";
+ALTER TABLE spd_replenish_rule rename column "PRIOR" to "RULE_PRIOR";

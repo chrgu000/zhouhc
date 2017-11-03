@@ -1,0 +1,169 @@
+package cn.ak4j.yard.sys.service.taskprocessor;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.service.SpdAdjustStockBizService;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAdjustStockRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.to.InitialStockImportTO;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class ImportInitialStockTaskProcessor implements IBatchTaskProcessor{
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdAdjustStockBizService asbService;
+	@Autowired private PcsUserRepository userRepository;
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public void process(YardBatchTask batchTask, PcsUser user, MailMsg hisMail, MailMsg supplyMail) throws Exception {
+		String json = batchTask.getJson();
+		YardBatchTaskTO<List<InitialStockImportTO>> importInitialStockTO = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTaskTO<List<InitialStockImportTO>>>(){});
+		batchTask.setData(importInitialStockTO.getData());
+		
+		List<InitialStockImportTO> initialStockTOs = (List<InitialStockImportTO>)batchTask.getData();
+		List<InitialStockImportTO> withoutInitialStockTOs = new ArrayList<InitialStockImportTO>();
+		
+		//获取仓库及关联信息,货区信息，货位信息
+		PcsDepot depot = depotRepository.findAllWithRelations().findByDepotCode(initialStockTOs.get(0).getDepotCode());
+		if(depot == null){
+			NotFoundException ex = new NotFoundException(YardExceptionType.not_found_depot, String.format("编码为:%s", initialStockTOs.get(0).getDepotCode()));
+			log.error("导入失败", ex);
+			throw ex;
+		}
+		depot.fillCards(dcRepository);
+		PcsDepotAreas areas = depot.getAreas().findByAreaType(PcsAreaType.normal);
+		
+		//验证是否存在初始化库存调节规则
+		SpdAdjustStockRule rule = brRepository.findAllWithRelations().getAllAdjustStockRules().getInitAdjustRule(depot.getDepotId() ,PcsAreaType.normal.getCode());
+		if(rule == null){
+			NotFoundException ex = new NotFoundException(YardExceptionType.not_found_adjust_stock_rule, String.format("条件为：仓库编码[%s]，货区类型[%s]，初始化库存调节为[%s]，非手动发起并且是全自动反馈", depot.getDepotCode(), PcsAreaType.normal.getName(), true));
+			log.error("导入失败", ex);
+			throw ex;
+		}
+		
+		//获取产品信息
+		List<String> goodsCodes = CollectionUtils.pluck("goodsCode", initialStockTOs);
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsCode(new ListParam<String>(goodsCodes));
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(params));
+		//获取批次信息
+		YdsGoodsLots goodsLots = glRepository.findAll();
+		
+		//验证excel是否有效
+		for(InitialStockImportTO initialStock : initialStockTOs){
+			YdsGoods goods = goodss.findByGoodsCode(initialStock.getGoodsCode());
+			if(goods == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_goods, String.format("产品编码:%s", initialStock.getGoodsCode()));
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			String storeUnitName = SpdUnitUtils.computeGoodsUnitName(goods, goods.getStoreUnitLv());
+			boolean isEmptyStoreUnitName = initialStock.getStoreUnitName() ==null || initialStock.getStoreUnitName().isEmpty();
+			if(!isEmptyStoreUnitName && !(initialStock.getStoreUnitName().equals(storeUnitName))){
+				InvalidDataException ex = new InvalidDataException(String.format("产品[编码:%s,单位:%s]在系统中的存储单位是:[%s],单位信息不一致，请检查", initialStock.getGoodsCode(), initialStock.getStoreUnitName(), storeUnitName));
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			YdsGoodsLot goodsLot = goodsLots.getByGoodsLotNoAndGoodsId(initialStock.getLotNo(), goods.getGoodsId());
+			if(goodsLot == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_goods_lot, initialStock.getGoodsCode(), initialStock.getLotNo());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			PcsDepotArea area = areas.findByAreaCode(initialStock.getAreaCode());
+			if(area == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_area, initialStock.getDepotCode(), initialStock.getAreaCode());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			PcsDepotShelf shelf = area.getShelfs().findByShelfCode(initialStock.getShelfCode());
+			if(shelf == null){
+				NotFoundException ex = new NotFoundException(YardExceptionType.not_found_shelf, initialStock.getDepotCode(), initialStock.getAreaCode(), initialStock.getShelfCode());
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			SpdDepotCard card = depot.getCards().getUsableCardsByShelfIdAndGoodsId(shelf.getDepotShelfId(), goods.getGoodsId());
+			if(card == null){
+				InvalidDataException ex = new InvalidDataException(YardExceptionType.invalid_not_exist_depot_card, initialStock.getGoodsCode(), String.format("%s,货位:%s", initialStock.getDepotCode(), initialStock.getShelfCode()));
+				log.error("导入失败", ex);
+				throw ex;
+			}
+			
+			withoutInitialStockTOs.add(initialStock);
+		}
+		
+		log.info("处理导入初始库存，共{}个", withoutInitialStockTOs.size());
+		
+		//构建初始化库存调节单
+		SpdAdjustStockBiz adjustStock = new SpdAdjustStockBiz();
+		PcsUser executeUser = userRepository.findAll().findById(depot.getManageDept().getDefaultUserId());
+		adjustStock.applyRule(rule, executeUser);
+		adjustStock.setMaintenanceInfo(new MaintenanceInfo(executeUser));
+		
+		//构建初始化库存调节单明细
+		SpdBizItems items = new SpdBizItems();
+		int i = 0;
+		for(InitialStockImportTO initialStock : withoutInitialStockTOs){
+			log.info("{}]导入初始库存，产品编码:{}，批号:{}，货位编码:{}，数量:{}", i, initialStock.getGoodsCode(), initialStock.getLotNo(), initialStock.getShelfCode(), initialStock.getStockQty());
+			SpdBizItem item = new SpdBizItem();
+			YdsGoods goods = goodss.findByGoodsCode(initialStock.getGoodsCode());
+			item.setGoodsId(goods.getGoodsId());
+			item.setUnitLv(goods.getStoreUnitLv());
+			YdsGoodsLot goodsLot = goodsLots.findByGoodsLotNoAndGoodsId(initialStock.getLotNo(), goods.getGoodsId());
+			item.setLotId(goodsLot.getGoodsLotId());
+			item.setPlanQty(initialStock.getStockQty());
+			items.add(item);
+			i++;
+		}
+		adjustStock.setItems(items);
+		
+		asbService.add(adjustStock, executeUser);
+	}
+	
+}

@@ -1,0 +1,57 @@
+package cn.ak4j.yard.datahelper;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.service.SpdAdjustStockBizService;
+
+@Ignore
+public class AdjustStockBizHelper extends BaseTest{
+	
+	@Autowired private SpdAdjustStockBizService asbService;
+	@Autowired private PcsUserRepository userRepository;
+
+	@Test public void createCommitAdjustStock() throws Exception{
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		String depotId = "depot_id_001";
+		SpdAdjustStockBiz adjustStock = new SpdAdjustStockBiz();
+		adjustStock.setMaintenanceInfo(new MaintenanceInfo(user));
+		adjustStock.setCreatorDepotId(depotId);
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item1 = new SpdBizItem();
+		item1.setPlanQty(300);
+		item1.setGoodsId("goods_id_005");
+		item1.setLotId("goods_lot_id_021");
+		item1.setUnitPrice(20.5f);
+		item1.setUnitLv(2);
+		items.add(item1);
+		
+		SpdBizItem item2 = new SpdBizItem();
+		item2.setPlanQty(400);
+		item2.setGoodsId("goods_id_006");
+		item2.setLotId("goods_lot_id_017");
+		item2.setUnitPrice(123.2f);
+		item2.setUnitLv(2);
+		items.add(item2);
+		
+		adjustStock.setItems(items);
+		
+		adjustStock = asbService.add(adjustStock, user);
+		wait(2);
+		
+		//提交库存调节
+		adjustStock = asbService.updateCheckState(adjustStock.getBizId(), CheckState.commited.getCode(), adjustStock.getMaintenanceInfo().getLastDate(), user);
+		
+	}
+	
+}

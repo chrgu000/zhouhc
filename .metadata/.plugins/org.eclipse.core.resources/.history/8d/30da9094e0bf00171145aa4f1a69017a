@@ -1,0 +1,38 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedgerItem;
+import cn.ak4j.yard.spd.reconciliation.params.SpdGeneralLedgerItemParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdGeneralLedgerItemRepository;
+
+@RestController
+public class SpdGeneralLedgerItemResource {
+
+	@Autowired private SpdGeneralLedgerItemRepository gliRepository;
+	
+	@RequestMapping(value="/yard/spd/SpdGeneralLedgerItems", method = RequestMethod.GET)
+	public Entities<SpdGeneralLedgerItem> findAll(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdGeneralLedgerItemParams params = SpdGeneralLedgerItemParams.buildParamsFromJson(paramsStr, SpdGeneralLedgerItemParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+	
+		return gliRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/spd/SpdGeneralLedgerItems/count", method = RequestMethod.GET)
+	public int getCount(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdGeneralLedgerItemParams params = SpdGeneralLedgerItemParams.buildParamsFromJson(paramsStr, SpdGeneralLedgerItemParams.class);
+		return gliRepository.count(params);
+	}
+}

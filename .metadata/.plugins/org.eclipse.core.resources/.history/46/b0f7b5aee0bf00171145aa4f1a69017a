@@ -1,0 +1,12 @@
+package cn.ak4j.yard;
+
+import java.util.ArrayList;
+
+import org.springframework.stereotype.Component;
+
+@SuppressWarnings("serial")
+@Component
+public class AMQPMsgs extends ArrayList<AMQPMsg>{
+
+}
+

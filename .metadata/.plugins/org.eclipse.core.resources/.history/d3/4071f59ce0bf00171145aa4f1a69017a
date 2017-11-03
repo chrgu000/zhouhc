@@ -1,0 +1,1 @@
+alter table pcs_user drop column is_main_flag;

@@ -1,0 +1,41 @@
+package cn.ak4j.yard.spd.to;
+
+import java.util.Date;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import lombok.Data;
+
+@Data
+public class SpdDepotCardExcelTO {
+
+	private String depotCardId;
+	private String cardCode;
+	private String depotId;
+	private String shelfId;
+	
+	private String unqualifiedShelfId;
+	
+	private String isolationShelfId;
+	private String goodsId;
+	private Integer lowerLimit;
+	private Integer upperLimit;
+	private String receiveCycle;
+	private Integer receiveMultiple;
+	private Date receiveLastDate;
+	private Date receiveNextDate;
+	private String storeUnitLv;
+	private String storeUnitName;
+	private boolean enabled;
+	
+	private YdsGoods goods;
+	private PcsDepot depot;
+	
+	public String getEnabledText(){
+		if(isEnabled()){
+			return "是";
+		}
+		return "否";
+	}
+	
+}

@@ -1,0 +1,1 @@
+alter table spd_property_change_item add(record_id varchar2(32 byte));

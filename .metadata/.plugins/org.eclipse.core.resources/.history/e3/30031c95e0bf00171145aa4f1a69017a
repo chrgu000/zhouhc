@@ -1,0 +1,109 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.List;
+
+import javax.persistence.Entity;
+import javax.persistence.Inheritance;
+import javax.persistence.InheritanceType;
+import javax.persistence.Transient;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRule;
+import cn.ak4j.yard.spd.domain.IStockChangeable;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChange;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 业务计划，业务计划代表着业务系统对外提供的核心业务
+* @author zhengyf
+* @date 2017年3月29日 下午1:37:02
+* @version V1.0.0
+*/
+
+@Entity
+@Inheritance(strategy=InheritanceType.TABLE_PER_CLASS) 
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial", "rawtypes"})
+public abstract class SpdGoodsBizPlan<R extends SpdAbstractBizRule> extends SpdBizPlan<R> implements IStockChangeable<SpdDepotStockChanges>  {
+	
+	@Transient @Valid @Getter @Setter
+	private SpdBizItems items = new SpdBizItems();
+	
+	@NotNull(message="创建仓库不能为空") @Getter @Setter
+	private String creatorDepotId;
+	
+	public void updateItemsBizIdAndTime(){
+		if(CollectionUtils.isNotEmpty(getItems())){
+			getItems().forEach(item->{
+					item.setBizId(getBizId());
+					item.initDateInfo();
+				});
+		}
+	}
+
+	@JsonIgnore @Transient
+	public SpdDepotStockChanges getStockChanges() {
+		SpdDepotStockChanges result = new SpdDepotStockChanges();
+		for(SpdBizItem item : getItems()){
+			YdsGoodsLot lot = item.getSpecialGoodsLot();
+			SpdDepotStockChange stockChange = new SpdDepotStockChange(lot, getStockChangeDepot());
+			stockChange.setQtyByStoreUnit(item.getConfirmQtyByStoreUnit());
+			result.add(stockChange);
+		}
+		return result;
+	}
+	
+	/**
+	 * 校验仓库是否有账页，如果没有账页则发送缺乏账页的消息并抛出异常
+	 * @param rabbitProxy
+	 * @param depot
+	 * @param user
+	 */
+	@SuppressWarnings("unchecked")
+	public void verifyDepotCard(RabbitProxy rabbitProxy, PcsDepot depot, PcsUser user){
+		YdsGoodss goodssWithoutCard = depot.whichHasNotCards(getItems().getAllGoods(), getTargetAreaType());
+		List<String> lackCardGoodsIds = goodssWithoutCard.pluck("goodsId");
+
+		//缺乏账页事件
+		if(CollectionUtils.isNotEmpty(goodssWithoutCard)){
+			rabbitProxy.sendDepotCardMsg(depot.getDepotId(), lackCardGoodsIds, user.getUserId());
+			throw new OperateFailException("缺乏账页", YardExceptionType.forbid_without_depot_card, depot.getDepotName(), goodssWithoutCard.pluck("goodsCode"), PcsAreaType.typeOf(getTargetAreaType()).getName());
+		}
+	}
+
+	public void verifyGoodsLot(YdsGoodsLotRepository glRepository) {
+		boolean itemsHasGoodsLot = getItems().hasGoodsLot(glRepository);
+		if(!itemsHasGoodsLot){
+			throw new OperateFailException("收货明细没有相关批次");
+		}
+	}
+	
+	public boolean hasItems(){
+		return CollectionUtils.isNotEmpty(getItems());
+	}
+	
+	public boolean verifyOperationPermission(PcsUserRepository userRepository, PcsDepotRepository depotRepository, String userId){
+		PcsUser user = CollectionUtils.findWhere("userId", userId, userRepository.getAll());
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		return CollectionUtils.isNotEmpty(CollectionUtils.find("depotId", getCreatorDepotId(), depots));
+	}
+}

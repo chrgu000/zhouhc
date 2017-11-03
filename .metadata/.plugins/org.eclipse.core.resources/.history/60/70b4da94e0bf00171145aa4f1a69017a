@@ -1,0 +1,58 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 消耗反馈
+* @author zhengyf
+* @date 2017年7月27日 上午10:21:56
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity  
+@DiscriminatorValue("consume")
+public class SpdConsumeFeedbackRule extends SpdAbstractFeedbackRule{
+
+	private Boolean autoReviewConsume;
+	private Boolean autoCreateDispatcher;
+	private Boolean autoReviewDispatcher;
+	private Boolean autoReviewDepotTask;
+	private Boolean autoCompleteConsume;
+	
+	@Transient private String description;
+	
+	@Override public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			buf.append(autoReviewConsume?auto_word:manual_word)
+				.append("审核消耗").append(Global.generalSeparator)
+				.append(autoCreateDispatcher?auto_word:manual_word)
+				.append("创建调度").append(Global.generalSeparator)
+				.append(autoReviewDispatcher?auto_word:manual_word)
+				.append("审核调度").append(Global.generalSeparator)
+				.append(autoReviewDepotTask?auto_word:manual_word)
+				.append("审核仓库作业").append(Global.generalSeparator)
+				.append(autoCompleteConsume?auto_word:manual_word)
+				.append("完成消耗");
+			this.description = buf.toString();
+		}
+		return description;
+	}
+
+	@Override public SpdBizType getBizType() {
+		return SpdBizType.consume_biz;
+	}
+	
+}

@@ -1,0 +1,191 @@
+package cn.ak4j.yard.spd.domain;
+
+import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@MappedSuperclass
+@NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public abstract class SpdGoodsItem extends YardEntity{
+
+	@Getter @Setter
+	private String goodsId;
+	
+	@Getter @Setter
+	private String lotId;
+	
+	@NotNull(message="单位级别不能为空") @Getter @Setter
+	private Integer unitLv;
+	
+	@Getter @Setter
+	private Integer planQty;
+	
+	@Setter
+	private Integer confirmQty = -1;
+	
+	@Setter
+	private Float unitPrice;
+	
+	@Transient @JsonIgnore @Getter
+	private YdsGoods goods;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private YdsGoodsLot specialGoodsLot;
+	
+	public SpdGoodsItem(String goodsId, String lotId, Integer unitLv, Integer planQty, Integer confirmQty, Float unitPrice){
+		this.goodsId = goodsId;
+		this.lotId = lotId;
+		this.unitLv = unitLv;
+		this.planQty = planQty;
+		this.confirmQty = confirmQty;
+		this.unitPrice = unitPrice;
+	}
+	
+	@Transient
+	public String getUnitName(){
+		if(this.getGoods() != null){
+			YdsUnitLv unitLv = YdsUnitLv.unitOf(getUnitLv());
+			switch (unitLv) {
+			case big:
+				return goods.getBigName();
+			case mid:
+				return goods.getMidName();
+			case min:
+				return goods.getMinName();
+			case base:
+				return goods.getBaseName();
+			default:
+				break;
+			}
+		}
+		return "";
+	}
+	
+	@Transient @JsonIgnore
+	public int getPlanQtyByStoreUnit() {
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), goods.getStoreUnitLv());
+		return (int)(getPlanQty()*unitRatio);
+	}
+	
+	@Transient @JsonIgnore
+	public int getPlanQtyByBaseUnit() {
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), YdsUnitLv.base.getLv());
+		return (int)(getPlanQty()*unitRatio);
+	}
+
+	@Transient @JsonIgnore
+	public int getConfirmQtyByBaseUnit(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), YdsUnitLv.base.getLv());
+		return (int)(getConfirmQty()*unitRatio);
+	}
+	
+	@Transient @JsonIgnore
+	public int getConfirmQtyByConsumeUnit(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), goods.getConsumeUnitLv());
+		return (int)(getConfirmQty()*unitRatio);
+	}
+	
+	@Transient @JsonIgnore
+	public int getConfirmQtyByStoreUnit(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), goods.getStoreUnitLv());
+		return (int)(getConfirmQty()*unitRatio);
+	}
+	
+	public int getConfirmQty(int unitLv){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), unitLv);
+		return (int)(getConfirmQty()*unitRatio);
+	}
+	
+	public Integer getConfirmQty(){
+		return this.confirmQty == null?-1:this.confirmQty;
+	}
+	
+	@Transient public float getPlanAmount(){
+		return getPlanQty()*getUnitPrice();
+	}
+	
+	@Transient public float getConfirmAmount(){
+		return getConfirmQty()*getUnitPrice();
+	}
+	
+	public Float getUnitPrice(){
+		return unitPrice == null?0:unitPrice;
+	}
+	
+	@Transient @JsonIgnore
+	public float getPriceBySaleUnit(){
+		int qtyBySaleUnit = getConfirmQtyByConsumeUnit();
+		float priceBySaleUnit = getConfirmAmount()/qtyBySaleUnit;
+		return priceBySaleUnit;
+	}
+	
+	public float getPrice(Integer unitLv){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), unitLv);
+		int qty = (int)(getConfirmQty()*unitRatio);
+		return getConfirmAmount()/qty;
+	}
+	
+	@Transient @JsonIgnore
+	public String getPreparePackageUnitName(){
+		return SpdUnitUtils.computeGoodsUnitName(getGoods(), getGoods().getPrepareUnitLv());
+	}
+	
+	@Transient
+	public String getStorePackageUnitLvName(){
+		YdsGoods goods = getGoods();
+		if(goods == null && getSpecialGoodsLot() != null && getSpecialGoodsLot().getGoods() != null){
+			goods = getSpecialGoodsLot().getGoods();
+		}
+		if(goods != null){
+			return SpdUnitUtils.computeGoodsUnitName(goods, goods.getStoreUnitLv());
+		}
+		return "";
+	}
+	
+	@Transient @JsonIgnore
+	public String getBlockQtyInStoreLvUnitName(){
+		float bigStoreRatio = SpdUnitUtils.computeUnitExchangeRatio(specialGoodsLot.getGoods(), YdsUnitLv.big.getLv(), specialGoodsLot.getGoods().getStoreUnitLv());
+		
+		return (int)(1*bigStoreRatio)+""+SpdUnitUtils.computeGoodsUnitName(specialGoodsLot.getGoods(), specialGoodsLot.getGoods().getStoreUnitLv())+"/"+SpdUnitUtils.computeGoodsUnitName(specialGoodsLot.getGoods(), YdsUnitLv.big.getLv());
+	}
+	
+	@Transient @JsonIgnore
+	public boolean isSpecialGoodsLotUseable(){
+		if(goods == null){
+			return false;
+		}
+		return CollectionUtils.findWhere("goodsLotId", lotId, goods.getUseableGoodsLots()) != null;
+	}
+	
+	public void setGoods(YdsGoods goods){
+		if(goods == null){
+			return ;
+		}
+		this.goods = goods;
+		if(StringUtils.isNotEmpty(lotId) && this.specialGoodsLot == null){
+			this.specialGoodsLot = CollectionUtils.findWhere("goodsLotId", lotId, goods.getUseableGoodsLots());
+		}
+	}
+	
+	public void confirmAsPlaned() {
+		setConfirmQty(planQty);
+	}
+	
+}

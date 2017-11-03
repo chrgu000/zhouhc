@@ -1,0 +1,13 @@
+package cn.ak4j.yard.domain;
+
+/**
+* @Description: 定义一个对象是可描述的
+* @author zhengyf
+* @date 2017年6月20日 下午3:24:13
+* @version V1.0.0
+*/
+public interface IDescribable {
+
+	public String getDescription();
+	
+}

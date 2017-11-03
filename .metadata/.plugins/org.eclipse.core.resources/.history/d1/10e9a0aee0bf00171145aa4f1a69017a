@@ -1,0 +1,109 @@
+package cn.ak4j.yard.pcs.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.Date;
+
+import org.junit.Test;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsRoleApi;
+import cn.ak4j.yard.pcs.domain.PcsRoleApis;
+import cn.ak4j.yard.pcs.params.PcsRoleApiParams;
+
+public class PcsRoleApiResourceTest extends BaseTest{
+	
+	@Test public void testGetList() throws Exception{
+		PcsRoleApis roleApis = mockMvcHelper.findList(PcsRoleApis.class, testUserCode, null);
+		assertEquals(7, roleApis.size());
+	}
+	
+	@Test public void testCountList() throws Exception{
+		int count = mockMvcHelper.count(PcsRoleApis.class, testUserCode, null);
+		assertEquals(7, count);
+	}
+	
+	@Test public void testFindOne() throws Exception{
+		String id = "role_api_id_001";
+		
+		PcsRoleApi roleApi = mockMvcHelper.findOne(PcsRoleApi.class, testUserCode, id);
+		assertEquals(id, roleApi.getId());
+	}
+	
+	@Test public void testAdd() throws Exception{
+		String uri = "/yard/yds/ydsEdsGoodss";
+		String roleId = "FB1EE871955A4A00A00E88C9E0A6C1F1";//全权限
+		String requestMethod = "GET";
+		PcsRoleApi roleApi = getPcsRoleApi(uri, requestMethod, roleId);
+	
+		PcsRoleApi newRoleApi = mockMvcHelper.add(PcsRoleApi.class, xykUserCode, roleApi);
+		assertNotNull(newRoleApi.getId());
+		assertEquals(uri, newRoleApi.getUri());
+		assertEquals(roleId, newRoleApi.getRoleId());
+		assertEquals(requestMethod, newRoleApi.getRequestMethod());
+		
+		PcsRoleApiParams params = new PcsRoleApiParams();
+		params.setRoleId(new ListParam<String>(roleId));
+		params.setUri(new ListParam<String>(uri));
+		params.setRequestMethod(new ListParam<String>(requestMethod));
+		
+		PcsRoleApis roleApiPOs = mockMvcHelper.findList(PcsRoleApis.class, xykUserCode, params);
+		assertEquals(1, roleApiPOs.size());
+		PcsRoleApi roleApiPO = roleApiPOs.get(0);
+		assertEquals(uri, roleApiPO.getUri());
+		assertEquals(roleId, roleApiPO.getRoleId());
+		assertEquals(requestMethod, roleApiPO.getRequestMethod());
+
+	}
+	
+	@Test public void testAddWithError() throws Exception{
+		String apiId = "role_api_id_001";
+		
+		PcsRoleApi roleApi = mockMvcHelper.findOne(PcsRoleApi.class, xykUserCode, apiId);
+		mockMvcHelper.add(PcsRoleApi.class, xykUserCode, roleApi, status().is4xxClientError(), YardExceptionType.invalid_data);
+
+	}
+	
+	@Test public void testUpdate() throws Exception{
+		String apiId = "role_api_id_001";
+		String uri = "/yard/yds/ydsEdsGoodss";
+		
+		PcsRoleApi roleApi = mockMvcHelper.findOne(PcsRoleApi.class, xykUserCode, apiId);
+		roleApi.setUri(uri);
+		PcsRoleApi newRoleApi = mockMvcHelper.modify(PcsRoleApi.class, xykUserCode, apiId, roleApi);
+		
+		assertEquals(apiId, newRoleApi.getId());
+		assertEquals(uri, newRoleApi.getUri());
+		
+		PcsRoleApi roleApiPO = mockMvcHelper.findOne(PcsRoleApi.class, xykUserCode, apiId);
+		assertEquals(uri, roleApiPO.getUri());
+	}
+	
+	@Test public void deleteTest() throws Exception{
+		String urlTemplate = "/pcs/pcsRoleApis/{id}?accessToken={accessToken}";
+		String accessToken = getAccessToken(xykUserCode);
+
+		String apiId = "role_api_id_001";
+		
+		mockMvcHelper.mockDelete(urlTemplate, apiId, accessToken);
+		
+		PcsRoleApi roleApiPO = mockMvcHelper.findOne(PcsRoleApi.class, testUserCode, apiId);
+		assertNull(roleApiPO);
+	}
+	
+	private PcsRoleApi getPcsRoleApi(String uri,String requestMethod, String roleId){
+		PcsRoleApi roleApi = new PcsRoleApi();
+		roleApi.setUri(uri);
+		roleApi.setRoleId(roleId);
+		roleApi.setRequestMethod(requestMethod);
+		roleApi.setCreateTime(new Date());
+		roleApi.setLastUpdateTime(new Date());
+		return roleApi;
+	}
+
+}

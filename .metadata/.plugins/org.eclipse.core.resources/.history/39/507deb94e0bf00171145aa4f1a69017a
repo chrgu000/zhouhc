@@ -1,0 +1,34 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.List;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdMoveAreaRules extends SpdBizRules<SpdMoveAreaRule>{
+
+	public SpdMoveAreaRules(List<SpdMoveAreaRule> rules){
+		super(rules);
+	}
+
+	public void fillAllRelations(PcsDepots allDepots) {
+		for(SpdMoveAreaRule rule : this){
+			PcsDepot fromDepot = allDepots.findById(rule.getDirectionRule().getDepotId());
+			rule.getDirectionRule().setDepot(fromDepot);
+		}
+	}
+
+	public PcsDepots getAllDepots() {
+		PcsDepots allToDepots = new PcsDepots();
+		this.forEach(rule->{
+			if(!allToDepots.contains(rule.getDirectionRule().getDepot())){
+				allToDepots.add(rule.getDirectionRule().getDepot());
+			}
+		});
+		return allToDepots;
+	}
+	
+}

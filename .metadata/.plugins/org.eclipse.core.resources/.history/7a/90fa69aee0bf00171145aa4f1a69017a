@@ -1,0 +1,449 @@
+package cn.ak4j.yard.yds.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.spd.stock.params.SpdShelfStockParams;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsIndexName;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.to.YdsPrepareGoodsTO;
+
+public class YdsGoodsResourceTest extends BaseTest{
+	
+	@Test public void testGetAllIndexNames() throws UnsupportedEncodingException, Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/yds/ydsGoodss/indexNames?accessToken={accessToken}";
+		
+		List<YdsGoodsIndexName> stocks = mockMvcHelper.mockGet(new TypeReference<List<YdsGoodsIndexName>>() {}, urlTemplate, accessToken);
+		assertEquals(48, stocks.size());
+	}
+
+	@Test 
+	public void testGetDepotGoods() throws Exception{
+		String accessToken = getAccessToken(xyfUserCode);
+		String urlTemplate = "/spd/depots/{depotId}/goodss?params={params}&pageSize=-1&accessToken={accessToken}";
+		
+		String depotId = "depot_id_002";
+		String goodsId = "goods_id_003";
+		SpdShelfStockParams params = new SpdShelfStockParams();
+		params.setGoodsId(new ListParam<String>(goodsId));
+		
+		YdsGoodss goodss = mockMvcHelper.mockGet(YdsGoodss.class, urlTemplate, depotId, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(1, goodss.size());
+		assertEquals(goodsId, goodss.get(0).getGoodsId());
+	}
+	
+	@Test public void testDownloadExcelFile() throws Exception{
+		String accessToken = getAccessToken(xyfUserCode);
+		String urlTemplate = getUrlTemplate("/yds/ydsGoodss/excel?accessToken={accessToken}");
+		
+		mockMvc.perform(get(urlTemplate,accessToken))
+//		.andDo(print())
+		.andExpect(status().isOk())
+		.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", URLEncoder.encode("标准产品", Global.defaultCharset.name()))))
+		.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"));
+	}
+	
+	@Test public void testGetGoodsListByGoodsCode() throws Exception{
+		String goodsCode = "1704";
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsCode(new ListParam<String>(goodsCode, QueryParam.operation_like_in));
+		
+		YdsGoodss goodss = mockMvcHelper.findList(YdsGoodss.class, xykUserCode, params);
+		assertEquals(16, goodss.size());
+		goodss.forEach(goods->{
+			assertTrue(goods.getGoodsCode().contains(goodsCode));
+		});
+	}
+	
+	@Test public void testList() throws Exception{
+		YdsGoodss goodss = mockMvcHelper.findList(YdsGoodss.class, xykUserCode, null);
+		assertEquals(48, goodss.size());
+		
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		params.setEnabled(new ListParam<Boolean>(true));
+		
+		goodss = mockMvcHelper.findList(YdsGoodss.class, xykUserCode, params);
+		assertEquals(47, goodss.size());
+		
+		String wareName = "强力枇杷露";
+		params.setWareName(new ListParam<String>(wareName));
+		goodss = mockMvcHelper.findList(YdsGoodss.class, xykUserCode, params);
+		assertEquals(1, goodss.size());
+		goodss.forEach(goods->{
+			assertEquals(wareName, goods.getWareName());
+		});
+		
+		YdsGoodsParams equipmentGoodsParams = new YdsGoodsParams();
+		equipmentGoodsParams.setGoodsType(new ListParam<String>(YdsGoodsType.equipment.getCode()));
+		goodss = mockMvcHelper.findList(YdsGoodss.class, xykUserCode, equipmentGoodsParams);
+		assertEquals(10, goodss.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String wareName = "强力枇杷露";
+		
+		int count = mockMvcHelper.count(YdsGoodss.class, xykUserCode, null);
+		assertEquals(48, count);
+		
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		params.setEnabled(new ListParam<Boolean>(true));
+
+		count = mockMvcHelper.count(YdsGoodss.class, xykUserCode, params);
+		assertEquals(47, count);
+		
+		params.setWareName(new ListParam<String>(wareName));
+		count = mockMvcHelper.count(YdsGoodss.class, xykUserCode, params);
+		assertEquals(1, count);
+		
+		YdsGoodsParams equipmentGoodsParams = new YdsGoodsParams();
+		equipmentGoodsParams.setGoodsType(new ListParam<String>(YdsGoodsType.equipment.getCode()));
+		count = mockMvcHelper.count(YdsGoodss.class, xykUserCode, equipmentGoodsParams);
+		assertEquals(10, count);
+	}
+	
+	@Test public void testListPrepareGoods() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/yds/ydsPrepareGoods(orgId,{orgId})?pageSize=-1&accessToken={accessToken}";
+		
+		String[] goodsIds = new String[]{"goods_id_022","goods_id_023","goods_id_024","goods_id_025","goods_id_026","goods_id_027","goods_id_020","goods_id_009","goods_id_008","goods_id_028"};
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsId(new ListParam<String>(goodsIds));
+		String orgId = "org_id_001";
+		
+		List<YdsPrepareGoodsTO> prepareGoodss = mockMvcHelper.mockGet(new TypeReference<List<YdsPrepareGoodsTO>>() {}, urlTemplate, orgId, accessToken);
+		assertEquals(48, prepareGoodss.size());
+		prepareGoodss.forEach(prepareGoods->{
+			assertNotNull(prepareGoods.getFormatName());
+			assertNotNull(prepareGoods.getOrgId());
+			assertNotNull(prepareGoods.getGoodsId());
+			assertNotNull(prepareGoods.getGoodsCode());
+			assertTrue(prepareGoods.getPreparePrice() > 0);
+			if(prepareGoods.getGoodsId().equals("goods_id_048")){
+				assertNull(prepareGoods.getEdsGoodsId());
+			}else{
+				assertNotNull(prepareGoods.getEdsGoodsId());
+			}
+		});
+	}
+	
+	@Test public void testCountPrepareGoods() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/yds/ydsPrepareGoods(orgId,{orgId})/count?accessToken={accessToken}";
+		String orgId = "org_id_001";
+		Integer count = mockMvcHelper.mockGet(Integer.class, urlTemplate, orgId, accessToken);
+		assertEquals(48, count.intValue());
+	}
+	
+	@Test public void testFindWithoutCardGoodss() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/yds/ydsGoodss/withoutCardGoodss(depotId,{depotId})?pageSize=-1&accessToken={accessToken}";
+		
+		String depotId = "depot_id_007";
+		YdsGoodss goodss = mockMvcHelper.mockGet(YdsGoodss.class, urlTemplate, depotId, accessToken);
+		assertEquals(1, goodss.size());
+		
+		urlTemplate = "/yds/ydsGoodss/withoutCardGoodss(depotId,{depotId})?pageSize={pageSize}&currentPage={pageNo}&accessToken={accessToken}";
+		depotId = "depot_id_005";
+		goodss = mockMvcHelper.mockGet(YdsGoodss.class, urlTemplate, depotId, 20, 2, accessToken);
+		assertEquals(17, goodss.size());
+	}
+	
+	@Test public void testCountWithoutCardGoodss() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/yds/ydsGoodss/withoutCardGoodss(depotId,{depotId})/count?accessToken={accessToken}";
+		
+		String depotId = "depot_id_007";
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, depotId, accessToken);
+		assertEquals(1, count);
+		
+		depotId = "depot_id_005";
+		count = mockMvcHelper.mockGet(Integer.class, urlTemplate, depotId, accessToken);
+		assertEquals(37, count);
+	}
+	
+	@Test public void testGet() throws Exception{
+		String goodsId = "goods_id_045";
+		YdsGoods goods = mockMvcHelper.findOne(YdsGoods.class, xykUserCode, goodsId);
+		assertEquals(goodsId, goods.getGoodsId());
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		List<String> ids = new ArrayList<String>();
+		ids.add("goods_id_045");
+		ids.add("goods_id_041");
+		ids.add("goods_id_042");
+		ids.add("goods_id_040");
+		ids.add("goods_id_032");
+		
+		YdsGoodss goodss = mockMvcHelper.getByIds(YdsGoodss.class, xykUserCode, ids);
+		assertEquals(ids.size(), goodss.size());
+		goodss.forEach(goods->{
+			ids.contains(goods.getGoodsId());
+		});
+	}
+	
+	@Test public void testAdd() throws Exception{
+		YdsGoods goods = createGoods();
+		
+		//正常数据
+		goods = mockMvcHelper.add(YdsGoods.class, xykUserCode, goods);
+		assertNotNull(goods.getGoodsId());
+
+		wait(2);
+		
+		goods = mockMvcHelper.findOne(YdsGoods.class, testUserCode, goods.getGoodsId());
+		assertEquals(CheckState.new_created.getCode(), goods.getCheckState().getCode());
+		
+		//重复数据
+		goods = createGoods();
+		mockMvcHelper.add(YdsGoods.class, xykUserCode, goods, status().is4xxClientError(), YardExceptionType.invalid_resource_exist);
+
+		wait(2);
+		
+		//数据不全产品不启用
+		goods = createNotAllGoods();
+		YdsGoods newGoods = mockMvcHelper.add(YdsGoods.class, xykUserCode, goods);
+
+		wait(2);
+		assertNotNull(newGoods.getGoodsId());
+		assertFalse(newGoods.getEnabled());
+		
+		assertEquals(goods.getWareName(), newGoods.getWareName());
+		assertEquals(goods.getGoodsName(), newGoods.getGoodsName());
+		assertEquals(goods.getGoodsCode(), newGoods.getGoodsCode());
+		assertEquals(goods.getGoodsType(), newGoods.getGoodsType());
+		assertEquals(goods.getGoodsModel(), newGoods.getGoodsModel());
+		assertEquals(goods.getFactName(), newGoods.getFactName());
+		assertEquals(goods.getGoodsSpec(), newGoods.getGoodsSpec());
+		assertEquals((int)goods.getUnitPrice(), (int)newGoods.getUnitPrice());
+		assertEquals(goods.getPackingSpec(), newGoods.getPackingSpec());
+		assertEquals(goods.getAthDoc(), newGoods.getAthDoc());
+		
+		goods = createNotAllGoods();
+		goods.setGoodsCode("3202394333");
+		goods.setGoodsName("testGoodsName");
+		goods.setWareName("testWareName");
+		goods.setEquipmentLevel("");
+		goods.setEquipmentSortName("");
+		
+		wait(2);
+		newGoods = mockMvcHelper.add(YdsGoods.class, xykUserCode, goods);
+		assertNotNull(newGoods.getGoodsId());
+		assertFalse(newGoods.getEnabled());
+		
+	}
+	
+	@Test public void testCommit() throws Exception{
+		String updatePackageUrl = "/yds/ydsGoodss/{id}/packageSpecifications?accessToken={accessToken}";
+
+		YdsGoods goods = createGoods();
+		goods.setBigName(null);
+		
+		//正常数据
+		goods = mockMvcHelper.add(YdsGoods.class, xykUserCode, goods);
+		assertNotNull(goods.getGoodsId());
+		
+		goods = mockMvcHelper.findOne(YdsGoods.class, testUserCode, goods.getGoodsId());
+		
+		CheckStateTO checkState = new CheckStateTO(CheckState.commited.getCode(), goods.getMaintenanceInfo().getLastDate());
+		mockMvcHelper.updateCheckState(YdsGoods.class, xykUserCode, checkState, goods.getGoodsId(), status().is4xxClientError(), YardExceptionType.invalid_package_specification_incomplete);
+		
+		wait(2);
+		
+		//修改包装后提交
+		goods.setBigName("盒");
+		String accessToken = getAccessToken(xykUserCode);
+		goods = mockMvcHelper.mockPut(YdsGoods.class, goods, updatePackageUrl, goods.getGoodsId(), accessToken);
+		checkState.setLastDate(goods.getLastUpdateTime());
+		
+		mockMvcHelper.updateCheckState(YdsGoods.class, xykUserCode, checkState, goods.getGoodsId());
+		
+		testNotAllDataCommit(xykUserCode);
+	}
+	
+	@Test public void testUpdatePackageSpec() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String updatePackageSpecUrlTemplate = "/yds/ydsGoodss/{id}/packageSpecifications?accessToken={accessToken}";
+		
+		YdsGoods goods = createPackageSpecGoods();
+		YdsGoods newGoods = mockMvcHelper.add(YdsGoods.class, testUserCode, goods);
+		
+		newGoods.setPrepareUnitLv(3);
+		newGoods.setSettleUnitLv(3);
+		newGoods.setMinName("盒");
+		newGoods.setMidName("盒");
+		newGoods.setBigName("盒");
+		
+		newGoods = mockMvcHelper.mockPut(YdsGoods.class, newGoods, updatePackageSpecUrlTemplate, newGoods.getGoodsId(), accessToken);
+		assertEquals(3, newGoods.getPrepareUnitLv().intValue());
+		assertEquals(3, newGoods.getSettleUnitLv().intValue());
+		assertEquals("盒", newGoods.getMinName());
+		assertEquals("盒", newGoods.getMidName());
+		assertEquals("盒", newGoods.getBigName());
+	}
+	
+	@Test public void testModify() throws Exception{
+		String goodsId = "goods_id_001";
+		YdsGoods goods = mockMvcHelper.findOne(YdsGoods.class, testUserCode, goodsId);
+		
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.new_created.getCode(), goods.getLastUpdateTime());
+
+		checkStateTO = mockMvcHelper.updateCheckState(YdsGoods.class, xykUserCode, checkStateTO, false, goodsId);
+		assertEquals(CheckState.new_created.getCode(), checkStateTO.getCheckStateCode().intValue());
+		
+		goods = mockMvcHelper.findOne(YdsGoods.class, testUserCode, goodsId);
+		goods = mockMvcHelper.modify(YdsGoods.class, xykUserCode, goodsId, goods);
+		
+		goods.setWareName("test");
+		goods.setGoodsName("test");
+		goods.setGoodsCode("test001");
+		goods = mockMvcHelper.modify(YdsGoods.class, xykUserCode, goodsId, goods);
+		
+		assertEquals("test", goods.getWareName());
+		assertEquals("test", goods.getGoodsName());
+		assertEquals("test001", goods.getGoodsCode());
+		
+		//数据不规范
+		goods.setFactName("");
+		mockMvcHelper.modify(YdsGoods.class, xykUserCode, goodsId, goods, status().is4xxClientError(), YardExceptionType.invalid_data);
+		
+		//存在相同编码
+		goods.setFactName("生产企业");
+		goods.setGoodsCode("gc_170320059");
+		mockMvcHelper.modify(YdsGoods.class, xykUserCode, goodsId, goods, status().is4xxClientError(), YardExceptionType.invalid_resource_exist);
+		
+		//器械产品数据不规范
+		String equipmentGoodsId = "goods_id_038";
+		YdsGoods equipmentGoods = mockMvcHelper.findOne(YdsGoods.class, testUserCode, equipmentGoodsId);
+		equipmentGoods.setEquipmentLevel("");
+		equipmentGoods.setEquipmentSortName("");
+		mockMvcHelper.modify(YdsGoods.class, xykUserCode, equipmentGoodsId, equipmentGoods, status().is4xxClientError(), YardExceptionType.invalid_data);
+	}
+	
+	private void testNotAllDataCommit(String xykUserCode) throws UnsupportedEncodingException, JsonProcessingException, Exception {
+		YdsGoods goods = createNotAllGoods();
+		
+		goods = mockMvcHelper.add(YdsGoods.class, xykUserCode, goods);
+		assertNotNull(goods.getGoodsId());
+		
+		goods = mockMvcHelper.findOne(YdsGoods.class, testUserCode, goods.getGoodsId());
+		
+		CheckStateTO checkState = new CheckStateTO(CheckState.commited.getCode(), goods.getMaintenanceInfo().getLastDate());
+		mockMvcHelper.updateCheckState(YdsGoods.class, xykUserCode, checkState, goods.getGoodsId(), status().is4xxClientError(), YardExceptionType.invalid_data);
+	}
+	
+	private YdsGoods createPackageSpecGoods() {
+		YdsGoods goods = new YdsGoods();
+		goods.setGoodsType(YdsGoodsType.drug.getCode());
+		goods.setGoodsCode("gc_170802030");
+		goods.setWareName("test");
+		goods.setGoodsName("test");
+		goods.setGoodsSpec("0.5g*24");
+		goods.setGoodsModel("片剂");
+		goods.setPackingSpec("0.5g*24");
+		goods.setAthDoc("国药准字H109401132");
+		goods.setFactName("test药业集团股份有限公司");
+		goods.setUnitPrice(32.f);
+		goods.setBigName("");
+		goods.setBigSum(1);
+		goods.setMidName("");
+		goods.setMidSum(1);
+		goods.setMinName("");
+		goods.setMinSum(1);
+		goods.setBaseName("");
+		goods.setPrepareUnitLv(4);
+		goods.setStoreUnitLv(3);
+		goods.setConsumeUnitLv(2);
+		goods.setSettleUnitLv(4);
+		goods.setEnabled(false);
+		
+		return goods;
+	}
+	
+	private YdsGoods createGoods() {
+		YdsGoods goods = new YdsGoods();
+		goods.setGoodsType(YdsGoodsType.drug.getCode());
+		goods.setGoodsCode("gc_170702030");
+		goods.setWareName("test");
+		goods.setGoodsName("test");
+		goods.setGoodsSpec("0.5g*24");
+		goods.setGoodsModel("片剂");
+		goods.setPackingSpec("0.5g*24");
+		goods.setAthDoc("国药准字H109401132");
+		goods.setFactName("test药业集团股份有限公司");
+		goods.setUnitPrice(32.f);
+		goods.setBigName("盒");
+		goods.setBigSum(32);
+		goods.setMidName("片");
+		goods.setMidSum(1);
+		goods.setMinName("片");
+		goods.setMinSum(1);
+		goods.setBaseName("片");
+		goods.setPrepareUnitLv(4);
+		goods.setStoreUnitLv(3);
+		goods.setConsumeUnitLv(2);
+		goods.setSettleUnitLv(4);
+		goods.setEnabled(true);
+		
+		return goods;
+	}
+	
+	private YdsGoods createNotAllGoods() {
+		YdsGoods goods = new YdsGoods();
+		goods.setGoodsType(YdsGoodsType.equipment.getCode());
+		goods.setGoodsCode("gc_170902030");
+		goods.setWareName("testNotAll");
+		goods.setGoodsName("testNotAll");
+		goods.setGoodsSpec("0.5g*24");
+		goods.setGoodsModel("其他");
+		goods.setPackingSpec("0.5g*24");
+		goods.setAthDoc("国药准字H109401132");
+		goods.setFactName("test药业集团股份有限公司");
+		goods.setUnitPrice(32.f);
+		goods.setBigName("盒");
+		goods.setBigSum(32);
+		goods.setMidName("片");
+		goods.setMidSum(1);
+		goods.setMinName("片");
+		goods.setMinSum(1);
+		goods.setBaseName("片");
+		goods.setPrepareUnitLv(4);
+		goods.setStoreUnitLv(3);
+		goods.setConsumeUnitLv(2);
+		goods.setSettleUnitLv(4);
+		goods.setEnabled(true);
+		
+		return goods;
+	}
+	
+}

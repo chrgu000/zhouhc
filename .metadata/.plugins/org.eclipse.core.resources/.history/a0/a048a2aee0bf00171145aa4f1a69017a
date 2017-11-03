@@ -1,0 +1,112 @@
+package cn.ak4j.yard.pcs.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.PcsDeptType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+
+public class PcsDeptRespurceTest extends BaseTest{
+
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testAdd() throws Exception{
+		//检验添加部门时默认创建默认用户，并检验默认用户不能删除
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, testUserId);
+		
+		PcsDept dept = createDept(user);
+		PcsDept newDept = mockMvcHelper.add(PcsDept.class, testUserCode, dept);
+		newDept = mockMvcHelper.findOne(PcsDept.class, testUserCode, newDept.getDeptId());
+		
+		assertEquals(dept.getParentId(), newDept.getParentId());
+		assertEquals(dept.getOrgId(), newDept.getOrgId());
+		assertEquals(dept.getDeptName(), newDept.getDeptName());
+		assertEquals(dept.getDeptCode(), newDept.getDeptCode());
+		assertEquals(dept.getDeptType(), newDept.getDeptType());
+		assertEquals(dept.isMainFlag(), newDept.isMainFlag());
+		assertEquals(dept.isEnabled(), newDept.isEnabled());
+		
+		PcsUserParams userParams = new PcsUserParams();
+		userParams.setUserCode(new ListParam<String>(dept.getDeptCode()));
+		userParams.setDeptId(new ListParam<String>(newDept.getDeptId()));
+		
+		PcsUser defaultUser = mockMvcHelper.findList(PcsUsers.class, testUserCode, userParams).get(0);
+		assertEquals(defaultUser.getDeptId(), newDept.getDeptId());
+		assertEquals(defaultUser.getOrgId(), newDept.getOrgId());
+		assertEquals(defaultUser.getUserName(), newDept.getDeptName());
+		assertEquals(defaultUser.getUserCode(), newDept.getDeptCode());
+		assertEquals(defaultUser.getGender(), "m");
+		assertEquals(defaultUser.getLinkTel(), Conf.getAllGlobalInfos().findByKey(YardGlobalInfo.default_user_link_tel).getValue());
+		assertEquals(defaultUser.getEmail(), Conf.getAllGlobalInfos().findByKey(YardGlobalInfo.default_user_email).getValue());
+		assertEquals(defaultUser.isEnabled(), true);
+		assertEquals(defaultUser.isPrimary(), true);
+		assertEquals(defaultUser.getUserId(), newDept.getDefaultUserId());
+		
+		String accessToken = getAccessToken(testUserCode);
+		String deleteUserUrlTemplate = "/pcs/pcsUsers/{id}?accessToken={accessToken}";
+		mockMvcHelper.mockDelete(deleteUserUrlTemplate, defaultUser.getUserId(), accessToken, status().is4xxClientError(), YardExceptionType.forbid_delete_default_user);
+	}
+	
+	@Test public void testModifyByClientError() throws Exception{
+		String deptId = "dept_id_001";
+		PcsDept dept = mockMvcHelper.findOne(PcsDept.class, testUserCode, deptId);
+		dept.setDefaultUserId(xyfUserId);
+		
+		mockMvcHelper.modify(PcsDept.class, testUserCode, deptId, dept, status().is4xxClientError(), YardExceptionType.invalid_data);
+	}
+	
+	@Test public void testModify() throws Exception{
+		String deptId = "dept_id_001";
+		PcsDept dept = mockMvcHelper.findOne(PcsDept.class, testUserCode, deptId);
+		dept.setDefaultUserId(xykUserId);
+		
+		mockMvcHelper.modify(PcsDept.class, testUserCode, deptId, dept);
+		PcsDept theDept = mockMvcHelper.findOne(PcsDept.class, testUserCode, deptId);
+		assertEquals(deptId, theDept.getDeptId());
+		assertEquals(xykUserId, dept.getDefaultUserId());
+	}
+	
+	@Test public void testDownloadExcelFile() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = getUrlTemplate("/pcs/pcsDepts/excel?accessToken={accessToken}");
+		
+		mockMvc.perform(get(urlTemplate,accessToken))
+//		.andDo(print())
+		.andExpect(status().isOk())
+		.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", URLEncoder.encode("部门信息", Global.defaultCharset.name()))))
+		.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"));
+	}
+	
+	private PcsDept createDept(PcsUser user) {
+		PcsDept dept = new PcsDept();
+		dept.setParentId("-1");
+		dept.setOrgId("626");
+		dept.setDeptName("测试部门");
+		dept.setDeptCode("test_code_001");
+		dept.setDeptType(PcsDeptType.depot_management.getCode());
+		dept.setMainFlag(false);
+		dept.setEnabled(true);
+		
+		return dept;
+	}
+
+	
+}

@@ -1,0 +1,459 @@
+package cn.ak4j.yard;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.exception.ErrorInfo;
+import cn.ak4j.utils.AKStringUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+
+public class MockMvcHelper {
+
+	private MockMvc mockMvc;
+	
+	protected String orgId = "626";
+	protected String xykUserCode = "xyk";
+	protected String xyfUserCode = "xyf";
+	protected String eisUserCode = "eis";
+	protected String nxykUserCode = "nxyk";
+	protected String eisPassword = "eis_ak1234";
+	protected String testUserCode = "test";
+	protected String mzmanagerUserCode = "mzmanager";
+	protected String yhmanagerUserCode = "yhmanager";
+	protected String zsyUserCode = "zsy";
+	protected String gyUserCode = "gy001";
+	protected String yjUserCode = "yj001";
+
+	protected String eisUserId = "user_id_001";
+	protected String xykUserId = "user_id_002";
+	protected String xyfUserId = "user_id_003";
+	protected String nxykUserId = "user_id_011";
+	protected String testUserId = "626";
+	protected String mzmanagerUserId = "user_id_005";
+	protected String yhmanagerUserId = "user_id_006";
+	protected String zsyUserId = "user_id_007";
+	protected String gyUserId = "user_id_009";
+	protected String yjUserId = "user_id_008";
+	
+	public MockMvcHelper(MockMvc mockMvc){
+		this.mockMvc = mockMvc;
+	}
+	
+	public <T> T findOne(Class<T> clazz, String userCode, String resourceId)throws Exception{
+		return findOne(clazz, userCode, resourceId, status().isOk(), null);
+	}
+	
+	public <T> T findOne(Class<T> clazz, String userCode, String resourceId, ResultMatcher resultMatcher, YardExceptionType exceptionType)throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName()) + "s";
+		String moduleName = resourceName.substring(0, 3);
+		return findOne(clazz, userCode, moduleName, resourceName, resourceId, resultMatcher, exceptionType);
+	}
+	
+	public <T> T findOne(Class<T> clazz, String userCode, String moduleName, String resourceName, String resourceId) throws Exception{
+		return findOne(clazz, userCode, moduleName, resourceName, resourceId, status().isOk(), null);
+	}
+	
+	public <T> T findOne(Class<T> clazz, String userCode, String moduleName, String resourceName, String resourceId, ResultMatcher resultMatcher, YardExceptionType exceptionType)throws Exception{
+		String accessToken = getAccessToken(userCode);
+		String urlTemplate = getUrlTemplate("/{moduleName}/{resourceName}/{resourceId}?accessToken={accessToken}");
+		
+		String json = mockMvc.perform(get(urlTemplate, moduleName, resourceName, resourceId, accessToken))
+								.andExpect(resultMatcher)
+								.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			if(StringUtils.isEmpty(json)){
+				return null;
+			}
+			T resource = Global.defaultObjectMapper.readValue(json, clazz);
+			return resource;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> T findList(Class<T> clazz, String userCode, QueryParams params, int pageSize) throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName());
+		String moduleName = resourceName.substring(0, 3);
+		return findList(clazz, userCode, moduleName, resourceName, params, pageSize, status().isOk(), null);
+	}
+	
+	public <T> T findList(Class<T> clazz, String userCode, QueryParams params) throws Exception{
+		return findList(clazz, userCode, params, status().isOk(), null);
+	}
+	
+	public <T> T findList(Class<T> clazz, String userCode, QueryParams params, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName());
+		String moduleName = resourceName.substring(0, 3);
+		return findList(clazz, userCode, moduleName, resourceName, params, -1, resultMatcher, exceptionType);
+	}
+	
+	public <T> T findList(Class<T> clazz, String userCode, String moduleName, String resourceName, QueryParams params, ResultMatcher resultMatcher, YardExceptionType exceptionType)throws Exception{
+		return findList(clazz, userCode, moduleName, resourceName, params, -1, resultMatcher, exceptionType);
+	}
+	
+	private <T> T findList(Class<T> clazz, String userCode, String moduleName, String resourceName, QueryParams params, int pageSize, ResultMatcher resultMatcher, YardExceptionType exceptionType)throws Exception{
+		String accessToken = getAccessToken(userCode);
+		String urlTemplate = getUrlTemplate("/{moduleName}/{resourceName}?params={params}&pageSize={pageSize}&accessToken={accessToken}");
+		String paramsStr = params ==null ? "" : Global.defaultObjectMapper.writeValueAsString(params);
+		
+		String json = mockMvc.perform(get(urlTemplate, moduleName, resourceName, paramsStr, pageSize, accessToken))
+								.andExpect(resultMatcher)
+								.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T resource = Global.defaultObjectMapper.readValue(json, clazz);
+			return resource;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> int count(Class<T> clazz, String userCode, QueryParams params) throws Exception{
+		return count(clazz, userCode, params, status().isOk(), null);
+	}
+	
+	public <T> int count(Class<T> clazz, String userCode, QueryParams params, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName());
+		String moduleName = resourceName.substring(0, 3);
+		return count(clazz, userCode, moduleName, resourceName, params, resultMatcher, exceptionType);
+	}
+	
+	public <T> int count(Class<T> clazz, String userCode, String moduleName, String resourceName, QueryParams params, ResultMatcher resultMatcher, YardExceptionType exceptionType)throws Exception{
+		String accessToken = getAccessToken(userCode);
+		String urlTemplate = getUrlTemplate("/{moduleName}/{resourceName}/count?params={params}&accessToken={accessToken}");
+		String paramsStr = params ==null ? "" : Global.defaultObjectMapper.writeValueAsString(params);
+		
+		String json = mockMvc.perform(get(urlTemplate, moduleName, resourceName, paramsStr, accessToken))
+								.andExpect(resultMatcher)
+								.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			int resource = Global.defaultObjectMapper.readValue(json, Integer.class);
+			return resource;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return -1;
+		}
+	}
+	
+	public <T> T getByIds(Class<T> clazz, String userCode, List<String> ids) throws Exception{
+		return getByIds(clazz, userCode, ids, status().isOk(), null);
+	}
+	
+	public <T> T getByIds(Class<T> clazz, String userCode, List<String> ids, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName());
+		String moduleName = resourceName.substring(0, 3);
+		return getByIds(clazz, userCode, moduleName, resourceName, ids, resultMatcher, exceptionType);
+	}
+	
+	public <T> T getByIds(Class<T> clazz, String userCode, String moduleName, String resourceName, List<String> ids, ResultMatcher resultMatcher, YardExceptionType exceptionType)throws Exception{
+		String accessToken = getAccessToken(userCode);
+		String urlTemplate = getUrlTemplate("/{moduleName}/{resourceName}/ids,{ids}?&accessToken={accessToken}");
+		String idsStr = StringUtils.join(ids, ",");
+		
+		String json = mockMvc.perform(get(urlTemplate, moduleName, resourceName, idsStr, accessToken))
+								.andExpect(resultMatcher)
+								.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T resource = Global.defaultObjectMapper.readValue(json, clazz);
+			return resource;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> T add(Class<T> clazz, String userCode, Object resource) throws Exception{
+		return add(clazz, userCode, resource, status().isOk(), null);
+	}
+	
+	public <T> T add(Class<T> clazz, String userCode, Object resource, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName()) +"s";
+		String moduleName = resourceName.substring(0, 3);
+		return add(clazz, userCode, moduleName, resourceName, resource, resultMatcher, exceptionType);
+	}
+	
+	public <T> T add(Class<T> clazz, String userCode, String moduleName, String resourceName, Object resource) throws Exception{
+		return add(clazz, userCode, moduleName, resourceName, resource, status().isOk(), null);
+	}
+	
+	public <T> T add(Class<T> clazz, String userCode, String moduleName, String resourceName, Object resource, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String accessToken = getAccessToken(userCode);
+		String urlTemplate = getUrlTemplate("/{moduleName}/{resourceName}?&accessToken={accessToken}");
+		
+		String json = mockMvc.perform(post(urlTemplate, moduleName, resourceName, accessToken)
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(Global.defaultObjectMapper.writeValueAsString(resource)))
+								.andExpect(resultMatcher)
+								.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T entity = Global.defaultObjectMapper.readValue(json, clazz);
+			return entity;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> CheckStateTO updateCheckState(Class<T> clazz, String userCode, CheckStateTO checkState, String resourceId) throws Exception{
+		return updateCheckState(clazz, userCode, checkState, true, resourceId);
+	}
+	
+	public <T> CheckStateTO updateCheckState(Class<T> clazz, String userCode, CheckStateTO checkState, boolean stepForward, String resourceId) throws Exception{
+		return updateCheckState(clazz, userCode, checkState, stepForward, resourceId, status().isOk(), null);
+	}
+	
+	public <T> CheckStateTO updateCheckState(Class<T> clazz, String userCode, CheckStateTO checkState, String resourceId, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		return updateCheckState(clazz, userCode, checkState, true, resourceId, resultMatcher, exceptionType);
+	}
+	
+	public <T> CheckStateTO updateCheckState(Class<T> clazz, String userCode, CheckStateTO checkState, boolean stepForward, String resourceId, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName()) +"s";
+		String moduleName = resourceName.substring(0, 3);
+		return updateCheckState(clazz, userCode, moduleName, resourceName, checkState, stepForward, resourceId, resultMatcher, exceptionType);
+	}
+	
+	public <T> CheckStateTO updateCheckState(Class<T> clazz, String userCode, String moduleName, String resourceName, CheckStateTO checkState, boolean stepForward, String resourceId, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String accessToken = getAccessToken(userCode);
+		String urlTemplate = getUrlTemplate("/{moduleName}/{resourceName}/{id}/checkState/{checkStateCode}?&accessToken={accessToken}");
+		String checkStateCode = stepForward ? CheckState.stateOf(checkState.getCheckStateCode()).name() : CheckState.stateOf(checkState.getCheckStateCode()+1).name();
+		
+		String json = mockMvc.perform(put(urlTemplate, moduleName, resourceName, resourceId, checkStateCode, accessToken)
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(Global.defaultObjectMapper.writeValueAsString(checkState)))
+								.andExpect(resultMatcher)
+								.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			checkState = Global.defaultObjectMapper.readValue(json, CheckStateTO.class);
+			return checkState;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> T modify(Class<T> clazz, String userCode, String resourceId, Object resource) throws Exception{
+		return modify(clazz, userCode, resourceId, resource, status().isOk(), null);
+	}
+	
+	public <T> T modify(Class<T> clazz, String userCode, String resourceId, String objJson) throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName()) +"s";
+		String moduleName = resourceName.substring(0, 3);
+		return modify(clazz, userCode, moduleName, resourceName, resourceId, objJson, status().isOk(), null);
+	}
+	
+	public <T> T modify(Class<T> clazz, String userCode, String resourceId, Object resource, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String resourceName = AKStringUtils.lowerCaseFirstChar(clazz.getSimpleName()) +"s";
+		String moduleName = resourceName.substring(0, 3);
+		return modify(clazz, userCode, moduleName, resourceName, resourceId, resource, resultMatcher, exceptionType);
+	}
+	
+	public <T> T modify(Class<T> clazz, String userCode, String moduleName, String resourceName, String resourceId, String objJson, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String accessToken = getAccessToken(userCode);
+		String urlTemplate = getUrlTemplate("/{moduleName}/{resourceName}/{id}?&accessToken={accessToken}");
+		
+		String json = mockMvc.perform(put(urlTemplate, moduleName, resourceName, resourceId, accessToken)
+									.contentType(MediaType.APPLICATION_JSON)
+									.content(objJson))
+									.andExpect(resultMatcher)
+									.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T resource = Global.defaultObjectMapper.readValue(json, clazz);
+			return resource;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> T modify(Class<T> clazz, String userCode, String moduleName, String resourceName, String resourceId, Object resource, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String accessToken = getAccessToken(userCode);
+		String urlTemplate = getUrlTemplate("/{moduleName}/{resourceName}/{id}?&accessToken={accessToken}");
+		
+		String json = mockMvc.perform(put(urlTemplate, moduleName, resourceName, resourceId, accessToken)
+									.contentType(MediaType.APPLICATION_JSON)
+									.content(Global.defaultObjectMapper.writeValueAsString(resource)))
+									.andExpect(resultMatcher)
+									.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T result = Global.defaultObjectMapper.readValue(json, clazz);
+			return result;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> T mockGet(Class<T> clazz, String url, Object... urlParams) throws Exception{
+		return mockGet(clazz, url, status().isOk(), null, urlParams);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public <T> T mockGet(TypeReference reference, String url, Object... urlParams) throws Exception{
+		return mockGet(reference, url, status().isOk(), null, urlParams);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public <T> T mockGet(TypeReference reference, String url, ResultMatcher resultMatcher, YardExceptionType exceptionType, Object... urlParams) throws Exception{
+		String urlTemplate = getUrlTemplate(url);
+		String json = mockMvc.perform(get(urlTemplate, urlParams))
+				.andExpect(resultMatcher)
+				.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T resource = Global.defaultObjectMapper.readValue(json, reference);
+			return resource;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> T mockGet(Class<T> clazz, String url, ResultMatcher resultMatcher, YardExceptionType exceptionType, Object... urlParams) throws Exception{
+		String urlTemplate = getUrlTemplate(url);
+		String json = mockMvc.perform(get(urlTemplate, urlParams))
+				.andExpect(resultMatcher)
+				.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T resource = Global.defaultObjectMapper.readValue(json, clazz);
+			return resource;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> T mockPost(Class<T> clazz, Object resource, String url, Object... urlParams) throws Exception{
+		return mockPost(clazz, resource, url, status().isOk(), null, urlParams);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T> T mockPost(Class<T> clazz, Object resource, String url, ResultMatcher resultMatcher, YardExceptionType exceptionType, Object... urlParams) throws Exception{
+		String urlTemplate = getUrlTemplate(url);
+		String json = mockMvc.perform(post(urlTemplate, urlParams)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(resource)))
+				.andExpect(resultMatcher)
+				.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			if(clazz.equals(String.class)){
+				return (T) json;
+			}
+			T result = Global.defaultObjectMapper.readValue(json, clazz);
+			return result;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public <T> T mockPut(TypeReference reference, Object resource, String url, Object... urlParams) throws Exception{
+		return mockPut(reference, resource, url, status().isOk(), null, urlParams);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public <T> T mockPut(TypeReference reference, Object resource, String url, ResultMatcher resultMatcher, YardExceptionType exceptionType, Object... urlParams) throws Exception{
+		String urlTemplate = getUrlTemplate(url);
+		String json = mockMvc.perform(put(urlTemplate, urlParams)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(resource)))
+				.andExpect(resultMatcher)
+				.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T t = Global.defaultObjectMapper.readValue(json, reference);
+			return t;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public <T> T mockPut(Class<T> clazz, Object resource, String url, Object... urlParams) throws Exception{
+		return mockPut(clazz, resource, url, status().isOk(), null, urlParams);
+	}
+	
+	public <T> T mockPut(Class<T> clazz, Object resource, String url, ResultMatcher resultMatcher, YardExceptionType exceptionType, Object... urlParams) throws Exception{
+		String urlTemplate = getUrlTemplate(url);
+		String json = mockMvc.perform(put(urlTemplate, urlParams)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(Global.defaultObjectMapper.writeValueAsString(resource)))
+				.andExpect(resultMatcher)
+				.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			T t = Global.defaultObjectMapper.readValue(json, clazz);
+			return t;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(json, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	public String mockDelete(String url, String resourceId, String accessToken) throws Exception{
+		return mockDelete(url, resourceId, accessToken, status().isOk(), null);
+	}
+	
+	public String mockDelete(String url, String resourceId, String accessToken, ResultMatcher resultMatcher, YardExceptionType exceptionType) throws Exception{
+		String urlTemplate = getUrlTemplate(url);
+		String result = mockMvc.perform(MockMvcRequestBuilders.delete(urlTemplate, resourceId, accessToken))
+				.andExpect(resultMatcher)
+				.andReturn().getResponse().getContentAsString();
+		if(exceptionType == null){
+			return result;
+		}else{
+			ErrorInfo error = Global.defaultObjectMapper.readValue(result, ErrorInfo.class);
+			assertEquals(exceptionType.getCode(), error.getCode());
+			return null;
+		}
+	}
+	
+	protected String getAccessToken(String userCode) throws Exception{
+		return getAccessToken(userCode, "ak1234");
+	}
+	
+	@SuppressWarnings("rawtypes")
+	protected String getAccessToken(String userCode, String password) throws Exception{
+		String urlTemplate = getUrlTemplate("/pcs/accessTokens?userCode={userCode}&password={password}&clientType={clientType}");
+		String clientType = userCode.equals(eisUserCode)?YardChannelType.eis.getCode():YardChannelType.spd_web.getCode();
+		MvcResult result = mockMvc.perform(post(urlTemplate, userCode, userCode.equals(eisUserCode)?eisPassword:password, clientType)).andReturn();
+		Map map = Global.defaultObjectMapper.readValue(result.getResponse().getContentAsString(), Map.class);
+		String accessToken = (String)map.get("accessToken");
+		return accessToken;
+	}
+	protected String getUrlTemplate(String uri){
+		return "http://localhost:9000/yard"+uri;
+	}
+	
+}

@@ -1,0 +1,33 @@
+package cn.ak4j.yard.pcs.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.domain.PcsRole;
+import cn.ak4j.yard.pcs.domain.PcsRoles;
+import cn.ak4j.yard.pcs.params.PcsRoleParams;
+import lombok.Getter;
+
+@Repository
+public class PcsRoleRepository extends BaseRepository<PcsRole, PcsRoles, PcsRoleParams, String>{
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Cacheable(value="longTimeCache", key="\"allPcsRoles\"")
+	public PcsRoles findAll(){
+		return getAll();
+	}
+	
+	public PcsRoles findByIds(List<String> ids){
+		PcsRoleParams params = new PcsRoleParams();
+		params.setRoleId(new ListParam<String>(ids));
+		return (PcsRoles)findAll().find(params);
+	}
+	
+}

@@ -1,0 +1,2 @@
+update SYS_GLOBAL_INFO set value = 'example@spd.com' where key = 'default_user_email';
+update SYS_GLOBAL_INFO set value = '13800800800' where key = 'default_user_link_tel';

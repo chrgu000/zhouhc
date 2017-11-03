@@ -1,0 +1,57 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import static org.junit.Assert.*;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChange;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+public class SpdDepotTaskTest extends BaseTest{
+
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	@Test public void testGetStockChanges(){
+		String receiveId = "rece_biz_id_003";
+		String areaId1 = "area_id_003";
+		String areaId2 = "area_id_016";
+		
+		String lotId1 = "goods_lot_id_021";
+		String lotId2 = "goods_lot_id_017";
+		String lotId3 = "goods_lot_id_014";
+		String lotId4 = "goods_lot_id_023";
+		
+		//获取上架作业
+		SpdDepotTasks tasks = dtRepository.findWithItemsByBizId(receiveId);
+		tasks.getAllItems().fillGoodsLots(glRepository);
+		tasks.fillDepotAreas(depotRepository);
+		
+		SpdDepotTask task1 = CollectionUtils.findWhere("taskAreaId", areaId1, tasks);
+		testDepotStockChange(lotId1, task1);
+		testDepotStockChange(lotId2, task1);
+		
+		SpdDepotTask task2 = CollectionUtils.findWhere("taskAreaId", areaId2, tasks);
+		testDepotStockChange(lotId3, task2);
+		testDepotStockChange(lotId4, task2);
+	}
+	
+	private void testDepotStockChange(String lotId, SpdDepotTask task){
+		//获取上架作业的库存变更集
+		SpdDepotTaskItem task1Item = CollectionUtils.findWhere("lotId", lotId, task.getItems());
+		SpdShelfStockChanges changes = task.getStockChanges();
+		SpdShelfStockChange change = changes.findByDepotAndGoodsLot(task.getTaskDepotId(), lotId);
+		
+		//检查上架作业库存变更集
+		assertNotNull(change);
+		assertEquals(task1Item.getConfirmQty().intValue(), change.getQtyByStoreUnit());
+	}
+	
+}

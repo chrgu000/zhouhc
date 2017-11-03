@@ -1,0 +1,23 @@
+<h3>本次送货共有${deliveryOrders?size}个送货单</h3>
+	<ul>
+	<#list deliveryOrders as deliveryOrder>
+		<li>
+			<h4>入库仓库:${deliveryOrder.depot.depotName}</h4>
+			<h4>送货单号:${deliveryOrder.orderNo}</h4>
+			<h4>送货时间:${deliveryOrder.deliveryDate?string("yyyy-MM-dd")}</h4>
+				<ul>
+				<#list deliveryOrder.items as item>
+					<li>
+						<h4>产品:[${item.edsGoodsCode}]${item.edsGoods.edsGoodsName} ${item.edsGoods.edsGoodsSpec}</h4>
+						<h4>批号:${item.edsLotNo}</h4>
+						<h4>生产日期:${item.edsProduceDate?string("yyyy-MM-dd")}</h4>
+						<h4>有效期:${item.edsLotValidity?string("yyyy-MM-dd")}</h4>
+						<h4>单价:${item.unitPrice}</h4>
+						<h4>数量:${item.qty}</h4>
+						<h4>发票号:${item.invoiceNo}</h4>
+					</li>
+				</#list>
+				</ul>
+		</li>
+	</#list>
+	</ul>

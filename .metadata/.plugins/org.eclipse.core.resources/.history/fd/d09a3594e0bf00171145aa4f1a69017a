@@ -1,0 +1,45 @@
+package cn.ak4j.yard.sys.domain;
+
+import java.io.Serializable;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: SPD编码
+* @author zhengyf
+* @date 2017年3月17日 上午10:45:07
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Data
+@NoArgsConstructor
+public abstract class AbstractYardCode implements Serializable{
+
+	/**
+	 * 分类码
+	 */
+	private String sortCode;
+	
+	/**
+	 * 分类码名称
+	 */
+	private String sortCodeName;
+
+	public AbstractYardCode(CodeSort codeSort){
+		this.sortCode = codeSort.getCode();
+		this.sortCodeName = codeSort.getName();
+	}
+	
+	public abstract String getCode();
+	
+	/**
+	 * 获取资料码
+	 */
+	public abstract String getMeterialCode();
+	
+	public CodeSort getCodeSort(){
+		return CodeSort.sortOf(sortCode);
+	}
+	
+}

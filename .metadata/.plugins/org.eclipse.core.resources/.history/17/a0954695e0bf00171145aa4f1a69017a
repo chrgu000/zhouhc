@@ -1,0 +1,133 @@
+package cn.ak4j.yard.pcs.domain;
+
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.IEntity;
+import cn.ak4j.exception.common.UnAuthorizatedException;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Entity
+@Table(name="pcs_user_token")
+@SuppressWarnings({"serial"})
+public class PcsUserToken implements IEntity{
+	
+	private static final long expired_time = 1000*60*60;
+	private static final long refresh_interval_time = 1000*5;
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String id;
+	
+	@Getter @Setter
+	private String userId;
+	
+	@Getter @Setter
+	private String randomCode;
+	
+	@Column(name="refresh_lasttime")
+	@Getter @Setter
+	private Date refreshLastTime;
+	
+	@Getter @Setter
+	private Integer yardId;
+	
+	@Getter @Setter
+	private String clientType = YardChannelType.spd_web.getCode();
+	
+	public void refresh(){
+		setRandomCode(RandomStringUtils.random(6, true, true));
+		setRefreshLastTime(new Date());
+	}
+	
+	public static PcsUserToken newInstance(String userId, Integer yardId, String clientType){
+		PcsUserToken pcsUserToken = new PcsUserToken();
+		pcsUserToken.setUserId(userId);
+		pcsUserToken.setRandomCode(RandomStringUtils.random(6, true, true));
+		pcsUserToken.setClientType(clientType);
+		pcsUserToken.setRefreshLastTime(new Date());
+		pcsUserToken.setYardId(yardId);
+		return pcsUserToken;
+	}
+	
+//	public static void main(String[] args){
+//		System.out.println(getUserIdFromAccessToken("NDYxQzc5REFBRkI5RjdCMENCQzMxMkRCMEQ2QjBERTgsemhqd191c2VyX2lkXzAwMSxzcGRfd2ViLEdMamZvSQ=="));
+//	}
+	
+	public static String getUserIdFromAccessToken(String accessToken){
+		try{
+			accessToken = new String(Base64.decodeBase64(accessToken.getBytes()), Global.defaultCharset.name());
+		}catch(Exception e){
+			log.warn(e.getMessage());
+		}
+		String userId = accessToken.split(",")[1];
+		return userId;
+	}
+	
+	public static String getClientTypeFromAccessToken(String accessToken){
+		try{
+			accessToken = new String(Base64.decodeBase64(accessToken.getBytes()), Global.defaultCharset.name());
+		}catch(Exception e){
+			log.warn(e.getMessage());
+		}
+		String[] segments = accessToken.split(",");
+		if(segments.length != 4){
+			throw new UnAuthorizatedException(YardExceptionType.unauthorized_invalid_access_token);
+		}
+		String clientType = segments[2];
+		return clientType;
+	}
+	
+	@Transient
+	public boolean isExpired(){
+		if(getClientType().equals(YardChannelType.eis.getCode()) 
+				|| getClientType().equals(YardChannelType.spd_pda.getCode()) 
+				|| getClientType().equals(YardChannelType.poppy.getCode())){
+			return false;
+		}
+		Date now = new Date();
+		return now.getTime() > (getRefreshLastTime().getTime()+expired_time);
+	}
+	
+	@Transient @JsonIgnore
+	public boolean isNeedUpdateRefreshTime(){
+		if(getClientType().equals(YardChannelType.eis.getCode()) || getClientType().equals(YardChannelType.spd_pda.getCode()) || getClientType().equals(YardChannelType.poppy.getCode())){
+			return false;
+		}
+		Date now = new Date();
+		return now.getTime() > (getRefreshLastTime().getTime()+refresh_interval_time);
+	}
+
+	public static boolean isValidClientType(String clientType) {
+		return clientType.equals(YardChannelType.eis.getCode()) || clientType.equals(YardChannelType.spd_pda.getCode()) || clientType.equals(YardChannelType.spd_web.getCode()) || clientType.equals(YardChannelType.poppy.getCode());
+	}
+	
+	public String toString() {
+		return "PCSUserToken [userId=" + userId + ", randomCode=" + randomCode + ", refreshLastTime=" + refreshLastTime
+				+ ", yardId=" + yardId + "]";
+	}
+
+	
+}

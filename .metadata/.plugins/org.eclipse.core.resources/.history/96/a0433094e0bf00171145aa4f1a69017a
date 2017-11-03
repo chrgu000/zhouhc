@@ -1,0 +1,32 @@
+package cn.ak4j.yard.sys.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 任意资料码
+* @author zhengyf
+* @date 2017年3月17日 上午10:52:17
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+@NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class YardArbitraryCode extends AbstractYardCode{
+
+	private String meterialCode;
+	
+	public YardArbitraryCode(CodeSort codeSort, String meterialCode){
+		super(codeSort);
+		this.meterialCode = meterialCode;
+	}
+	
+	public String getCode(){
+		return getSortCode()+meterialCode;
+	}
+}

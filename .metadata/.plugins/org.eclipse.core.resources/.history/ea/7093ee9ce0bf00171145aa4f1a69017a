@@ -1,0 +1,16 @@
+create table spd_property_change_rule(
+	id varchar2(32 byte),
+	name varchar2(100 byte),
+	debit_org_id varchar2(32 byte),
+	debit_dept_id varchar2(32 byte),
+	credit_org_id varchar2(32 byte),
+	credit_dept_id varchar2(32 byte),
+	biz_rule_id varchar2(32 byte),
+	biz_type_code varchar2(50 byte),
+	trigger_step_code varchar2(60 byte),
+	enabled char(1 byte),
+	create_time date,
+	last_update_time date,
+	primary key (id)
+);
+comment on table spd_property_change_rule is '物权变更规则表';

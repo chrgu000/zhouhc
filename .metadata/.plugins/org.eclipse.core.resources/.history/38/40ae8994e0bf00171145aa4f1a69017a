@@ -1,0 +1,165 @@
+package cn.ak4j.yard.spd.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventoryItem;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.repository.SpdInventoryItemRepository;
+import cn.ak4j.yard.spd.repository.SpdInventoryRepository;
+
+@Service
+public class SpdInventoryItemService extends IYardService<SpdInventoryItem>{
+
+	
+//	@Autowired private PcsDeptRepository deptRepository;
+//	@Autowired private PcsDepotRepository depotRepository;
+//	@Autowired private PcsOrgRepository orgRepository;
+//	@Autowired private PcsDepotAreaRepository daRepository;
+//	@Autowired private YdsGoodsRepository goodsRepository;
+//	@Autowired private YdsGoodsLotRepository goodsLotRepository;
+//	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdInventoryRepository inventoryRepository;
+	@Autowired private SpdInventoryItemRepository iiRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+
+
+//	public byte[] checkPdf(String inventoryId)throws Exception{
+//		Map<String,Object> parameters = new HashMap<String,Object>();
+//		SpdInventory spdDepotInventory = spdDepotInventoryRepository.findOne(inventoryId);
+//
+//		List<SpdDepotInventoryItemRep> spdDepotInventoryItemReps = spdDepotInventoryItemRepository.findByInventoryId(inventoryId);
+//		//查找机构
+//		PcsOrgParams orgParams = new PcsOrgParams();
+//		orgParams.setOrgId(new ListParam<String>(spdDepotInventory.getOrgId()));
+//		PcsOrg pcsOrg = pcsOrgRepository.find(orgParams).get(0);
+//
+//		//查找部门
+//		PcsDepts allDepts = pcsDeptRepository.findAllWithRelations();
+//		PcsDeptParams deptParam = new PcsDeptParams();
+//		deptParam.setDeptId(new ListParam<String>(spdDepotInventory.getDeptId()));
+//		List<PcsDept> deptList = allDepts.find(deptParam);
+//		PcsDept pcsDept = null;
+//		if (deptList.size()>0){
+//			pcsDept = deptList.get(0);
+//		}
+//
+//		//查找仓库
+//		PcsDepots allDepots = pcsDepotRepository.findAllWithRelations();
+//		PcsDepotParams depotParam = new PcsDepotParams();
+//		depotParam.setDepotId(new ListParam<String>(spdDepotInventory.getDepotId()));
+//		List<PcsDepot> depotList = allDepots.find(depotParam);
+//		PcsDepot pcsDepot = null;
+//		if (depotList.size()>0){
+//			pcsDepot = depotList.get(0);
+//		}
+//		//查找货区
+//		PcsDepotAreas allPcsDepotAreas = pcsDepotAreaRepository.findAllWithRelation();
+//		PcsDepotAreaParams depotAreaParam = new PcsDepotAreaParams();
+//		depotAreaParam.setDepotAreaId(new ListParam<String>(spdDepotInventory.getAreaId()));
+//		List<PcsDepotArea> depotAreaList = allPcsDepotAreas.find(depotAreaParam);
+//		PcsDepotArea pcsDepotArea = null;
+//		if(depotAreaList.size()>0){
+//			pcsDepotArea = depotAreaList.get(0);
+//		}
+//
+//		PcsUser pcsUser = pcsUserRepository.findOne(spdDepotInventory.getInventoryUser());
+//
+//		StringBuffer orgNm= new StringBuffer();//机构
+//		StringBuffer deptNm = new StringBuffer();//部门
+//		StringBuffer depotNm=new StringBuffer();//仓库
+//		StringBuffer areaNm=new StringBuffer();//货区
+//		StringBuffer code = new StringBuffer();//盘点单编码
+//		StringBuffer way = new StringBuffer();//盘点方式
+//		StringBuffer user= new StringBuffer();//盘点人
+//		StringBuffer date = new StringBuffer();//盘点时间
+//
+//		if(spdDepotInventory !=null){
+//			code.append(spdDepotInventory.getInventoryCode());
+//			way.append(SpdInventoryWay.typeOf(spdDepotInventory.getInventoryType()).getName());
+//			if(spdDepotInventory.getInventoryDate()!=null){
+//				date.append(spdDepotInventory.getInventoryDate());
+//			}else{
+//				date.append(" ");
+//			}
+//		}
+//		if(pcsOrg !=null){
+//			orgNm.append(pcsOrg.getOrgName());
+//
+//		}
+//		if(pcsUser !=null){
+//			user.append(pcsUser.getUserName());
+//		}
+//		if(pcsDept !=null){
+//			deptNm.append(pcsDept.getDeptName());
+//		}
+//		if (pcsDepot != null){
+//			depotNm.append(pcsDepot.getDepotName());
+//			depotNm.append("(");
+//			depotNm.append(pcsDepot.getDepotAddress());
+//			depotNm.append(")");
+//		}
+//		if(pcsDepotArea !=null){
+//			areaNm.append(pcsDepotArea.getAreaName());
+//		}
+//		parameters.put("orgNm",orgNm.toString() );
+//		parameters.put("deptNm",deptNm.toString());
+//		parameters.put("depotNm",depotNm.toString());
+//		parameters.put("areaNm", areaNm.toString());
+//		parameters.put("user", user.toString());
+//
+//		parameters.put("code", code.toString());
+//		parameters.put("way", way.toString());
+//		parameters.put("date", date.toString());
+//
+//		HttpHeaders headers = new HttpHeaders();
+//		headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+//		headers.setContentDispositionFormData("attchment",URLEncoder.encode("物资盘点单.pdf", Global.defaultCharset.name()));
+//		return PdfPrintor.printPdfFile(parameters, "/reports/spd/spdDepotInventory.jasper",  spdDepotInventoryItemReps);
+//	}
+
+	public SpdInventoryItem add(SpdInventoryItem inventoryItem, IUser user) {
+		
+		SpdInventory inventoryPO = inventoryRepository.findByIdWithRelations(inventoryItem.getInventoryId());
+		
+		if(CollectionUtils.isNotEmpty(inventoryPO.getItems())){
+			SpdInventoryItem item = inventoryPO.getItems().getGoodsIdAndLotId(inventoryItem.getGoodsId(), inventoryItem.getStockGoodsLotId());
+			if(item != null){
+				throw new InvalidDataException("当前产品和当前批次的明细已存在，不能重复添加，请检查！");
+			}
+		}
+		
+		//关联货位
+		SpdDepotCards depotCards = dcRepository.findAll().getUsableCards();
+		inventoryItem.fillShelf(depotCards);
+		
+		return iiRepository.save(inventoryItem);
+	}
+	
+	public SpdInventoryItem modify(@Valid SpdInventoryItem inventoryItem, IUser user) {
+		SpdInventoryItem inventoryItemPO = iiRepository.findOne(inventoryItem.getInventoryItemId());
+		inventoryItemPO.update(inventoryItem, user.getOrgId(), user.getUserId());
+		iiRepository.save(inventoryItemPO);
+		return inventoryItemPO;
+	}
+
+	public void delete(String inventoryItmeId, IUser user) {
+		SpdInventoryItem inventoryItemPO = iiRepository.findOne(inventoryItmeId);
+		iiRepository.delete(inventoryItemPO);
+	}
+
+	public SpdInventoryItem updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException("盘点明细不支持该行为");
+	}	
+	
+}

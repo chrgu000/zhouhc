@@ -1,0 +1,94 @@
+package cn.ak4j.yard.spd.reconciliation.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdFinacialReconciliationRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBizs;
+import cn.ak4j.yard.spd.reconciliation.params.SpdFinacialReconciliationBizParams;
+import lombok.Getter;
+
+@Repository
+public class SpdFinacialReconciliationBizRepository extends BaseRepository<SpdFinacialReconciliationBiz, SpdFinacialReconciliationBizs, SpdFinacialReconciliationBizParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdFinacialReconciliationItemRepository friRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	
+	public SpdFinacialReconciliationBizs find(SpdFinacialReconciliationBizParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			return new SpdFinacialReconciliationBizs(doQuery(params, order, pageNo, pageSize));
+		}
+		
+		return new SpdFinacialReconciliationBizs();
+	}
+	
+
+	public int count(SpdFinacialReconciliationBizParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+
+	private boolean setRelationParams(SpdFinacialReconciliationBizParams params) {
+		if(params != null){
+			
+			SpdFinacialReconciliationBizParams theParams = new SpdFinacialReconciliationBizParams();
+			theParams.setBizCode(params.getBeginingRecCode());
+			if(theParams.isNotEmpty()){
+				String hql = String.format("from SpdFinacialReconciliationBiz spdFinacialReconciliationBiz where bizCode = '%s'", theParams.getBizCode().getValue().get(0));
+				SpdFinacialReconciliationBizs theFinRecs = find(hql, theParams, null, -1, -1);
+				if(CollectionUtils.isEmpty(theFinRecs)){
+					return false;
+				}
+				params.setBeginingReconciliationId(new ListParam<String>(theFinRecs.get(0).getBizId()));
+			}
+			
+			SpdFinacialReconciliationRuleParams ruleParams = new SpdFinacialReconciliationRuleParams();
+			ruleParams.setPrimaryName(params.getPrimaryName());
+			if(ruleParams.isNotEmpty()){
+				SpdFinacialReconciliationRules rules = new SpdFinacialReconciliationRules(brRepository.findAllWithRelations().getAllFinacialReconciliationRules().find(ruleParams));
+				if(CollectionUtils.isEmpty(rules)){
+					return false;
+				}
+				params.setBizRuleId(new ListParam<String>(rules.getIds()));
+			}
+		}
+		
+		return true;
+	}
+
+	public SpdFinacialReconciliationBizs findCompletedByRuleIdAndWithoutNextConciliation(String ruleId) {
+		String hql = "from SpdFinacialReconciliationBiz spdFinacialReconciliationBiz where spdFinacialReconciliationBiz.nextReconciliationId is null";
+		SpdFinacialReconciliationBizParams params = new SpdFinacialReconciliationBizParams();
+		params.setBizRuleId(new ListParam<String>(ruleId));
+		params.setCheckStateCode(new ListParam<Boolean>(CheckState.completed.getCode()));
+		return find(hql, params, null, -1, -1);
+	}
+
+	public void saveWithItems(SpdFinacialReconciliationBiz reconciliation) {
+		save(reconciliation);
+		reconciliation.getItems().forEach(item->item.setReconciliationId(reconciliation.getBizId()));
+		friRepository.saveAll(reconciliation.getItems());
+	}
+
+	public SpdFinacialReconciliationBiz findByBizRuleAndBeginingReconciliationIds(String bizRuleId, String beginingReconciliationIds) {
+		SpdFinacialReconciliationBizParams params = new SpdFinacialReconciliationBizParams();
+		params.setBizRuleId(new ListParam<String>(bizRuleId));
+		params.setBeginingReconciliationId(new ListParam<String>(beginingReconciliationIds));
+		SpdFinacialReconciliationBizs reconciliations = find(params);
+		return CollectionUtils.isEmpty(reconciliations)?null:reconciliations.get(0);
+	}
+	
+}

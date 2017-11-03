@@ -1,0 +1,3 @@
+delete spd_feedback_rule where id = 'as_fb_id_04';
+insert into spd_feedback_rule(id, name, auto_commit_adjust_stock, auto_review_adjust_stock, auto_create_dispatcher, auto_review_dispatcher, auto_review_depot_task ,create_time,last_update_time,biz_type, empty_biz_auto_feedback) 
+values ('as_fb_id_04','库存调节自动反馈','1','1','1','1','1',sysDate,sysDate,'adjust_stock','1');

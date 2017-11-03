@@ -1,0 +1,13 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.report.rep_aggr_by_goods;
+
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportItem;
+import lombok.Getter;
+import lombok.Setter;
+
+
+public class Item extends SpdReconciliationReportItem{
+
+	@Getter @Setter private String edsGoodsFormatName;
+}

@@ -1,0 +1,92 @@
+package cn.ak4j.yard.yds.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfo;
+import cn.ak4j.yard.yds.repository.YdsGoodsInfoRepository;
+import lombok.extern.slf4j.Slf4j;
+
+
+@Slf4j
+@Service
+public class YdsGoodsInfoService extends IYardService<YdsGoodsInfo> {
+
+	@Autowired private YdsGoodsInfoRepository goodsInfoRepository;
+//	@Autowired private YdsGoodsRepository goodsRepository;
+
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodsInfos\""),
+			@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public YdsGoodsInfo add(@Valid YdsGoodsInfo ydsGoodsInfo, IUser user) {
+		// 不能添加重复的资源，产品信息资源唯一
+		YdsGoodsInfo ydsGoodsInfoPO = goodsInfoRepository.findOne(ydsGoodsInfo.getGoodsId());
+		if (ydsGoodsInfoPO != null) {
+			throw new InvalidDataException("当前标准产品价格维护信息已存在");
+		}
+
+		ydsGoodsInfo = goodsInfoRepository.save(ydsGoodsInfo);
+		return ydsGoodsInfo;
+	}
+
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodsInfos\""),
+			@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public void delete(String goodsId, IUser user) {
+		YdsGoodsInfo ydsGoodsInfo = goodsInfoRepository.findOne(goodsId);
+		if (!ydsGoodsInfo.canDelete()) {
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, "id:" + ydsGoodsInfo.getGoodsId());
+		}
+
+		goodsInfoRepository.delete(ydsGoodsInfo);
+	}
+
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodsInfos\""),
+			@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public YdsGoodsInfo modify(@Valid YdsGoodsInfo goodsInfo, IUser user) {
+		YdsGoodsInfo goodsInfoPO = goodsInfoRepository.findOne(goodsInfo.getGoodsId());
+		goodsInfoPO.update(goodsInfo, user.getOrgId(), user.getUserId());
+		goodsInfoRepository.save(goodsInfoPO);
+		log.debug("prepareTaxRate:{}, consumeTaxRate:{}", goodsInfo.getPrepareTaxRate(), goodsInfo.getConsumeTaxRate());
+		return goodsInfoPO;
+	}
+
+	@Override
+	public YdsGoodsInfo updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException("标准产品价格维护不支持该行为");
+	}
+
+//	@Transactional
+//	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodsInfos\""),
+//			@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+//			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})	
+//	public void modifyGoodInfosPrice(float purchPrice, String goodsId) {
+//		YdsGoodsInfo ydsGoodsInfoPO = goodsInfoRepository.findOne(goodsId);
+//		if(ydsGoodsInfoPO==null){
+//			throw new InvalidDataException("当前标准产品的信息未维护完全,价格维护中未找到该产品信息");
+//		}
+//		YdsGoods ydsGoodsCK = goodsRepository.findAll().findById(goodsId);
+//		if (ydsGoodsInfoPO != null) {
+//			ydsGoodsInfoPO.setPreparePrice(ydsGoodsCK.getPrice(ydsGoodsCK.getPrepareUnitLv()));
+//			ydsGoodsInfoPO.setConsumePrice(ydsGoodsCK.getPrice(ydsGoodsCK.getConsumeUnitLv()));
+//			ydsGoodsInfoPO.setStorePrice(ydsGoodsCK.getPrice(ydsGoodsCK.getStoreUnitLv()));
+//		}
+//		goodsInfoRepository.save(ydsGoodsInfoPO);
+//	}
+}

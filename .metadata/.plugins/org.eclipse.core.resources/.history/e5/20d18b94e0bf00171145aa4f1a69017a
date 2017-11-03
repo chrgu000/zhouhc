@@ -1,0 +1,87 @@
+package cn.ak4j.yard.spd.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfig;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.params.SpdDepotGoodsConfigParams;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdDepotGoodsConfigRepository extends BaseRepository<SpdDepotGoodsConfig, SpdDepotGoodsConfigs, SpdDepotGoodsConfigParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+
+	public SpdDepotGoodsConfigs find(SpdDepotGoodsConfigParams params, OrderParam order, int pageNo, int pageSize) {
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			return new SpdDepotGoodsConfigs(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdDepotGoodsConfigs();
+	}
+	
+	public int count(SpdDepotGoodsConfigParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+
+	private boolean setRelationParams(SpdDepotGoodsConfigParams params) {
+		if(params == null){
+			return true;
+		}
+		
+		YdsGoodsParams goodsParams = new YdsGoodsParams();
+		goodsParams.setGoodsId(params.getGoodsId());
+		goodsParams.setFormatName(params.getFormatName());
+		
+		if(!goodsParams.isEmpty()){
+			YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams));
+			if(goodss.size() == 0){
+				return false;
+			}
+			params.setGoodsId(new ListParam<String>(goodss.getIds()));
+		}
+		
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setDepotId(params.getDepotId());
+		depotParams.setDepotName(params.getDepotName());
+		if(!depotParams.isEmpty()){
+			PcsDepots depots = new PcsDepots(depotRepository.findAll().find(depotParams));
+			if(CollectionUtils.isEmpty(depots)){
+				return false;
+			}
+			params.setDepotId(new ListParam<String>(depots.getIds()));
+		}
+		
+		return true;
+	}
+	
+	public SpdDepotGoodsConfigs findByDepotIdAndGoodsIds(String depotId, List<String> goodsIds){
+		SpdDepotGoodsConfigParams params = new SpdDepotGoodsConfigParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		params.setGoodsId(new ListParam<String>(goodsIds));
+		return find(params);
+	}
+	
+}

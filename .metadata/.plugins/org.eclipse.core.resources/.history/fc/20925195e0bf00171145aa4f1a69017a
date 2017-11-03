@@ -1,0 +1,87 @@
+package cn.ak4j.yard.factory;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.io.IOUtils;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.Global;
+import cn.ak4j.utils.ExcelFormat;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class YardExcelFormatFactory {
+	
+	private Map<String, List<ExcelFormat>> allExcelFormats = new HashMap<String, List<ExcelFormat>>();
+	private static final String header = "[header]";
+	private static final String footer = "[footer]";
+	
+	public YardExcelFormatFactory(){
+		try{
+			Reader in = new InputStreamReader(new ByteArrayInputStream(IOUtils.toByteArray(this.getClass().getResource("/excel_format.csv"))), Global.defaultCharset);
+			Iterator<CSVRecord> it = CSVFormat.RFC4180.withFirstRecordAsHeader().parse(in).iterator();
+			
+			Set<String> types = new HashSet<String>();
+			List<CSVRecord> records = new ArrayList<CSVRecord>();
+			while(it.hasNext()){
+				CSVRecord record = it.next();
+				String type = record.get("type");
+				type = type.replaceAll("\\[header\\]", "");
+				type = type.replaceAll("\\[footer\\]", "");
+				types.add(type);
+				records.add(record);
+			}
+			
+			for(String type : types){
+				List<ExcelFormat> excelFormats = new ArrayList<ExcelFormat>();
+				for(CSVRecord record : records){
+					if(record.get("type").equals(type) 
+							|| record.get("type").equals(type+header)
+							|| record.get("type").equals(type+footer)){
+						excelFormats.add(buildEF(record));
+					}
+				}
+				allExcelFormats.put(type, excelFormats);
+			}
+			log.info("解析到{}个excel文件格式:{}", types.size(), types);
+		}catch(Exception e){
+			e.printStackTrace();
+			System.out.println("excel_format.csv解析失败");
+			System.exit(1);
+		}
+	}
+
+	public List<ExcelFormat> getExcelFormats(String type) {
+		return allExcelFormats.get(type);
+	}
+	
+	private ExcelFormat buildEF(CSVRecord record){
+		String label = record.get("columnName");
+		String columnNm = record.get("fieldName");
+		String columnWidth = record.get("columnWidth");
+		String type = record.get("type");
+		ExcelFormat excelFormat = new ExcelFormat();
+		if(type.indexOf(header) > 0){
+			excelFormat.setSection(ExcelFormat.excel_header);
+		}else if(type.indexOf(footer) > 0){
+			excelFormat.setSection(ExcelFormat.excel_footer);
+		}
+		excelFormat.setColumnName(label);
+		excelFormat.setFieldName(columnNm);
+		excelFormat.setLabelWidth(Integer.parseInt(columnWidth));
+		return excelFormat;
+	}
+	
+}

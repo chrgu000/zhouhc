@@ -1,0 +1,25 @@
+package cn.ak4j.yard.yds.domain;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class YdsGoodsIndexNameTest extends BaseTest{
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	
+	@Test public void testGetFormatNamePY(){
+		YdsGoods goods = goodsRepository.findAll().findById("goods_id_003");
+//		log.debug("{} : {}, {}", goods.getFormatName(), goods.getIndexName().getFormatNamePY(), goods.getIndexName().getFormatNameSimplePY());
+//		log.debug("{} : {}", goods.getFormatName(), goods.getIndexName().getFormatNameSimplePY());
+//		log.debug("{} : {}", goods.getFormatName(), goods.getIndexName().getFormatNameWB());
+		assertEquals("gc_170320059 toutengyao 0.3g*18s pianji diaojituanchengdouyaoyegufenyouxiangongsi", goods.getIndexName().getFormatNamePY());
+		assertEquals("gc_170320059 tty 0.3g*18s pj dajtcdyygfyxgs", goods.getIndexName().getFormatNameSimplePY());
+		assertEquals("gc_170320059 uua 0.3g*18s ty ftwldfaoewdbwn", goods.getIndexName().getFormatNameWB());
+	}
+	
+}

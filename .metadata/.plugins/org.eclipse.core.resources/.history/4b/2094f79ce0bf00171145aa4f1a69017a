@@ -1,0 +1,1 @@
+ALTER TABLE yds_goods RENAME COLUMN market_price TO unit_price;

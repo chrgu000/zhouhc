@@ -1,0 +1,72 @@
+package cn.ak4j.yard.extend.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.util.List;
+
+import org.junit.Ignore;
+import org.junit.Test;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.yard.BaseTest;
+import lombok.Getter;
+import lombok.Setter;
+
+@Ignore
+public class ScheduleTaskResourceTest extends BaseTest{
+
+	@Test public void testGetScheduleTasks() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		List<ScheduleTaskTO> scheduleTasks = mockMvcHelper.mockGet(new TypeReference<List<ScheduleTaskTO>>() {}, "/sys/scheduleTasks?accessToken={accessToken}", accessToken);
+
+		assertEquals(1, scheduleTasks.size());
+		for(ScheduleTaskTO scheduleTask : scheduleTasks){
+			assertTrue(scheduleTask.isActive());
+		}
+	}
+	
+	@Test public void changeScheduleTask() throws Exception{
+		wait(40);
+		String accessToken = getAccessToken(testUserCode);
+		List<ScheduleTaskTO> scheduleTasks = mockMvcHelper.mockGet(new TypeReference<List<ScheduleTaskTO>>() {}, "/sys/scheduleTasks?accessToken={accessToken}", accessToken);
+		ScheduleTaskTO scheduleTask = scheduleTasks.get(0);
+		
+		String beanName = scheduleTask.getBeanName();
+		ScheduleTaskTO theScheduleTask = mockMvcHelper.mockPut(ScheduleTaskTO.class, null, "/sys/scheduleTasks/{beanName}/active?active={active}&accessToken={accessToken}", beanName, false,accessToken);
+		assertFalse(theScheduleTask.isActive());
+		wait(40);
+		
+		mockMvcHelper.mockPut(ScheduleTaskTO.class, null, "/sys/scheduleTasks/{beanName}/active?active={active}&accessToken={accessToken}", beanName, true, accessToken);
+		
+		wait(40);
+	}
+	
+	@Test public void testExecuteScheduleTask() throws Exception{
+		wait(40);
+		String accessToken = getAccessToken(testUserCode);
+		List<ScheduleTaskTO> scheduleTasks = mockMvcHelper.mockGet(new TypeReference<List<ScheduleTaskTO>>() {}, "/sys/scheduleTasks?accessToken={accessToken}", accessToken);
+		ScheduleTaskTO scheduleTask = scheduleTasks.get(0);
+		
+		mockMvcHelper.mockPost(ScheduleTaskTO.class, null, "/sys/scheduleTasks/{beanName}/instances?accessToken={accessToken}", scheduleTask.getBeanName(), accessToken);
+		wait(40);
+		
+	}
+	
+}
+
+class ScheduleTaskTO{
+	@Setter @Getter
+	private boolean active;
+	
+	@Setter @Getter
+	private String name;
+	
+	@Setter @Getter
+	private String beanName;
+	
+	@Setter @Getter
+	private boolean running;
+}

@@ -1,0 +1,126 @@
+package cn.ak4j.yard.yds.web;
+
+import java.util.Arrays;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsLotParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+
+@RestController
+public class YdsEdsGoodsLotResource {
+
+	@Autowired private YdsEdsGoodsLotRepository eglRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	
+	/**
+	 * 得到当前用户所属机构的可用的企业产品的批次
+	 */
+	@SuppressWarnings("unchecked")
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodsLots/mine", method = RequestMethod.GET)
+	public YdsEdsGoodsLots findByEdsGoodsLots(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1")int currentPage,
+            @RequestParam(value = "pageSize", required = false, defaultValue = "20")int pageSize,
+            @RequestParam(value = "params", required = false) String paramsStr,
+            @RequestParam(value = "orders", required = false) String orders,
+            HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		YdsEdsGoodsLotParams params = QueryParams.buildParamsFromJson(paramsStr, YdsEdsGoodsLotParams.class);
+		if(params == null){
+			params = new YdsEdsGoodsLotParams();
+		}
+		params.setOwnerOrgId(new ListParam<String>(user.getOrgId()));
+		YdsEdsGoodsLots allEdsGoodsLots = new YdsEdsGoodsLots();
+		YdsEdsGoodss allEdsGoodss = new YdsEdsGoodss();
+		if(params.getEdsGoodsType() != null && params.getEdsGoodsType().getValue().contains(YdsGoodsType.drug.getCode())){
+			allEdsGoodss = egRepository.findAll().getAllDrugs();
+			allEdsGoodsLots = eglRepository.findAll().findByEdsGoodsIds(allEdsGoodss.getIds());
+		}
+		if(params.getEdsGoodsType() != null && params.getEdsGoodsType().getValue().contains(YdsGoodsType.equipment.getCode())){
+			allEdsGoodss = egRepository.findAll().getAllEquipments();
+			allEdsGoodsLots = eglRepository.findAll().findByEdsGoodsIds(allEdsGoodss.getIds());
+		}
+		OrderParam order = OrderParam.buildFromJson(orders);
+		return allEdsGoodsLots.findByPage(allEdsGoodss, params, order, currentPage-1, pageSize);
+	}
+	
+	@SuppressWarnings("unchecked")
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodsLots/mine/count", method = RequestMethod.GET)
+	public long findByEdsGoodsLotsCount(
+			@RequestParam(value = "params",required=false)String paramsStr,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		YdsEdsGoodsLotParams params = QueryParams.buildParamsFromJson(paramsStr, YdsEdsGoodsLotParams.class);
+		if(params == null){
+			params = new YdsEdsGoodsLotParams();
+		}
+		params.setOwnerOrgId(new ListParam<String>(user.getOrgId()));
+		
+		YdsEdsGoodsLots allEdsGoodsLots = eglRepository.findAll();
+		YdsEdsGoodss allEdsGoodss = egRepository.findAll();
+		if(params.getEdsGoodsType() != null && params.getEdsGoodsType().getValue().contains(YdsGoodsType.drug.getCode())){
+			allEdsGoodss = allEdsGoodss.getAllDrugs();
+			allEdsGoodsLots = allEdsGoodsLots.findByEdsGoodsIds(allEdsGoodss.getIds());
+		}
+		if(params.getEdsGoodsType() != null && params.getEdsGoodsType().getValue().contains(YdsGoodsType.equipment.getCode())){
+			allEdsGoodss = allEdsGoodss.getAllEquipments();
+			allEdsGoodsLots = allEdsGoodsLots.findByEdsGoodsIds(allEdsGoodss.getIds());
+		}
+		
+		return allEdsGoodsLots.findByPage(allEdsGoodss, params, new OrderParam(), -1, -1).size();
+	}
+	
+	/**
+	 * 根据产品的ID来获取对应的所有的批号信息
+	 * @param edsGoodsId
+	 * @return
+	 */
+	@RequestMapping(value = "/yard/yds/ydsEdsGoodsLots/edsGoodsId,{edsGoodsId}", method = RequestMethod.GET)
+	public YdsEdsGoodsLots findByEdsGoodsLotByEdsGoodsId(@PathVariable("edsGoodsId")String edsGoodsId){
+		return eglRepository.findAll().findByEdsGoodsId(edsGoodsId);
+	}
+	
+	@RequestMapping(value="/yard/yds/ydsEdsGoodsLots", method = RequestMethod.GET)
+	public YdsEdsGoodsLots findAll(@RequestParam(value = "currentPage", required = false, defaultValue = "1")int currentPage,
+            @RequestParam(value = "pageSize", required = false, defaultValue = "20")int pageSize,
+            @RequestParam(value = "params", required = false) String paramsStr,
+            @RequestParam(value = "orders", required = false) String orders,
+            HttpServletRequest request){
+		YdsEdsGoodsLotParams params = YdsEdsGoodsLotParams.buildParamsFromJson(paramsStr, YdsEdsGoodsLotParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		YdsEdsGoodss allEdsGoodss = egRepository.findAll();
+		return eglRepository.findAll().findByPage(allEdsGoodss, params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value="/yard/yds/ydsEdsGoodsLots/count", method = RequestMethod.GET)
+	public int getCount(@RequestParam(value = "params", required = false) String paramsStr){
+		YdsEdsGoodsLotParams params = YdsEdsGoodsLotParams.buildParamsFromJson(paramsStr, YdsEdsGoodsLotParams.class);
+		return eglRepository.findAll().findByPage(egRepository.findAll(), params, new OrderParam(), -1, -1).size();
+	}
+	
+	@RequestMapping(value="/yard/yds/ydsEdsGoodsLots/{edsGoodsLotId}", method = RequestMethod.GET)
+	public YdsEdsGoodsLot findOne(@PathVariable("edsGoodsLotId")String edsGoodsLotId){
+		return eglRepository.findAll().findById(edsGoodsLotId);
+	}
+	
+	@RequestMapping(value="/yard/yds/ydsEdsGoodsLots/ids,{ids}", method = RequestMethod.GET)
+	public YdsEdsGoodsLots findByIds(@PathVariable("ids")String ids){
+		return eglRepository.findAll().findByIds(Arrays.asList(ids.split(",")));
+	}
+}

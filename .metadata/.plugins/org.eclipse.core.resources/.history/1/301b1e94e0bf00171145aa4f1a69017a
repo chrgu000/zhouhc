@@ -1,0 +1,15 @@
+package cn.ak4j.yard.sys.to;
+
+import lombok.Data;
+
+@Data
+public class SpdDepotCardImportTO {
+
+	private String goodsCode;
+	private String goodsName;
+	private String depotCode;
+	private String normalAreaShelfCode;
+	private String isolationAreaShelfCode;
+	private String unqualifiedAreaShelfCode;
+	
+}

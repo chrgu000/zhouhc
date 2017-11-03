@@ -1,0 +1,2 @@
+update sys_global_info set key = 'zsy_integration_params' where key ='intigration_params';
+update sys_global_info set name = '中山医集成参数' where name = '集成参数';

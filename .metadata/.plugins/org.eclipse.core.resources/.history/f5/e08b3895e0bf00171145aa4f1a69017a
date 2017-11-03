@@ -1,0 +1,17 @@
+package cn.ak4j.yard.pcs.params;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class PcsUserTokenParams extends QueryParams{
+	
+	private ListParam<String> userId;
+	private ListParam<String> clientType;
+
+}

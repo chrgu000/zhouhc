@@ -1,0 +1,162 @@
+package cn.ak4j.yard.configuration;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.AbstractEnvironment;
+import org.springframework.core.env.EnumerablePropertySource;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertySource;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.utils.AKStringUtils;
+import cn.ak4j.yard.domain.ScheduleTaskDefine;
+import cn.ak4j.yard.extend.DefaultSupplierProxy;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveEventProcessor;
+import cn.ak4j.yard.spd.service.SpdDepotCardEventProcessor;
+import cn.ak4j.yard.yds.service.YdsEdsGoodsEventProcessor;
+import cn.ak4j.yard.yds.service.YdsGoodsEventProcessor;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Configuration
+public class DynamicBeanConfiguration {
+	
+	@Bean public BeanDefinitionRegistryPostProcessor supplieryProxyFactory(final Environment env){
+		
+		List<DynamicBean> beans = new ArrayList<DynamicBean>();
+		beans.add(new DynamicBean("ak.components.goodsEventProcessor",  YdsGoodsEventProcessor.class, "defaultGoodsEventProcessor", "标准产品事件处理器"));
+		beans.add(new DynamicBean("ak.components.edsGoodsEventProcessor",  YdsEdsGoodsEventProcessor.class, "defaultEdsGoodsEventProcessor", "企业产品事件处理器"));
+		beans.add(new DynamicBean("ak.components.depotCardEventProcessor",  SpdDepotCardEventProcessor.class, "defaultDepotCardEventProcessor", "账页事件处理器"));
+		beans.add(new DynamicBean("ak.components.receiveEventProcessor",  SpdReceiveEventProcessor.class, "defaultReceiveEventProcessor", "收货事件处理器"));
+
+		return new BeanDefinitionRegistryPostProcessor() {
+			
+			@SuppressWarnings("rawtypes") @Override
+			public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+				try {
+					 Iterator<PropertySource<?>> it = ((AbstractEnvironment) env).getPropertySources().iterator();
+					 while(it.hasNext()){
+						 PropertySource<?> propertySource = it.next();
+						 if(!propertySource.getName().equals("applicationConfigurationProperties")){
+							 continue;
+						 }
+						 if(propertySource instanceof EnumerablePropertySource){
+							 EnumerablePropertySource source = (EnumerablePropertySource)propertySource;
+							 int supplierProxyCount = 0;
+							 for(String name : source.getPropertyNames()){
+								 if(name.indexOf("ak.components.supplierProxy") != -1){
+									 String className = source.getProperty(name).toString();
+									 String beanName = name.substring(name.indexOf("ak.components.supplierProxy.")+ 28);
+									 beans.add(new DynamicBean(name, Class.forName(className), beanName + "SupplierProxy", beanName+"供应商代理组件"));
+									 supplierProxyCount++;
+								 }
+							 }
+							 if(supplierProxyCount == 0){
+								 beans.add(new DynamicBean("ak.components.supplierProxy",  DefaultSupplierProxy.class, "defaultSupplierProxy", "供应商代理组件"));
+							 }
+						 }
+					 }
+					
+					 
+					for(DynamicBean bean : beans){
+						String component = env.getProperty(bean.getProperty());
+						Class componentClass = null;
+						if(StringUtils.isNotEmpty(component)){
+							componentClass = Class.forName(component);
+						}else{
+							componentClass = bean.getDefaultClass();
+						}
+						registry.registerBeanDefinition(bean.getBeanName(), BeanDefinitionBuilder.rootBeanDefinition(componentClass)
+							.getBeanDefinition());
+						log.info("动态创建{}:{}", bean.getDescription(), componentClass.getName());
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+					System.exit(1);
+				}
+				
+			}
+			
+			@Override
+			public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+				
+			}
+		};
+	}
+	
+	@Bean public BeanDefinitionRegistryPostProcessor scheduleTaskFactory(final Environment env){
+		
+		return new BeanDefinitionRegistryPostProcessor() {
+			
+			@SuppressWarnings("rawtypes")
+			@Override
+			public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+				try{
+					String scheduleConfFile = env.getProperty("ak.scheduleConfFile");
+					if(StringUtils.isEmpty(scheduleConfFile)){
+						log.info("scheduleConfFile为空，没有定时任务组件动态创建");
+						return ;
+					}
+					String json = new String(IOUtils.toByteArray(this.getClass().getResource("/"+scheduleConfFile)), Global.defaultCharset);
+					List<ScheduleTaskDefine> scheduleTaskDefines = Global.defaultObjectMapper.readValue(json, new TypeReference<List<ScheduleTaskDefine>>() {});
+					for(ScheduleTaskDefine taskDefine : scheduleTaskDefines){
+						Class taskClass = Class.forName(taskDefine.getClassName());
+						registry.registerBeanDefinition(AKStringUtils.lowerCaseFirstChar(taskClass.getSimpleName()), BeanDefinitionBuilder.rootBeanDefinition(taskClass)
+									.addConstructorArgValue(taskDefine.getTaskName())
+									.getBeanDefinition());
+						log.info("动态创建定时任务组件:{}", taskDefine.getClassName());
+					}
+				}catch(Exception e){
+					e.printStackTrace();
+					System.exit(1);
+				}
+				
+			}
+			
+			@Override
+			public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+				
+			}
+		};
+	}
+
+}
+
+@SuppressWarnings("rawtypes")
+class DynamicBean{
+	
+	@Setter @Getter
+	private String property;
+	
+	@Setter @Getter
+	private Class defaultClass;
+	
+	@Setter @Getter
+	private String beanName;
+	
+	@Setter @Getter
+	private String description;
+	
+	public DynamicBean(String property, Class defaultClass, String beanName, String description) {
+		this.property = property;
+		this.defaultClass = defaultClass;
+		this.beanName = beanName;
+		this.description = description;
+	}
+}
+

@@ -1,0 +1,1 @@
+update SYS_GLOBAL_INFO set value = 'off_shelf_task_report' where key = '{"pdfFileName":"拣配作业单","jasperFilePath":"/reports/spd/task/off_shelf_task_02"}'

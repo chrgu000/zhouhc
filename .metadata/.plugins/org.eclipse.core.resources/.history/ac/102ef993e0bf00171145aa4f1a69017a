@@ -1,0 +1,43 @@
+package cn.ak4j.yard.yds.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class NewYdsGoodsTO {
+	private String goodsCode;// 产品编码
+	private String goodsType;// 商品类型
+	private String wareName;// 商品名称
+	private String goodsName;// 通用名称
+	private String goodsSpec;// 产品规格
+	private String goodsModel;// 型号/剂型
+	private String packingSpec;// 包装规格
+	private Float unitPrice;// 单位价格
+	private String factName;// 生产企业
+	private String bigName;// 大包装单位
+	private Integer bigSum;// 大包转换比
+	private String midName;// 中包装单位
+	private Integer midSum;// 中包装转换比
+	private String minName;// 小包装单位
+	private String minSum;// 小包装转换比
+	private String baseName;// 最小包装单位
+	private String prepareUnitLv;// 备货单位级别
+	private String storeUnitLv;// 存储单位级别
+	private String consumeUnitLv;// 消耗单位级别
+	private String settleUnitLv;// 结算单位级别
+	private String formatName;// 格式化名称
+	private String storeType;//存储类型
+	private Boolean enabled;// 禁用标记
+	private String mCode;// 产品助记码
+	private String goodsSpId;// 南交所产品ID
+	private String goodsDesc;// 产品描述
+	private String regDoc;// 注册证号
+	private String athDoc;// 批准文号
+	private String channelType;// 产品来源
+
+	private String equipmentSortName;//器械分类
+	private String equipmentLevel;//器械类别
+	private Boolean checkValidity;//是否检查批次
+}

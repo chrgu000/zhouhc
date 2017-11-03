@@ -1,0 +1,38 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SyncResourceType implements ITypeEnum{
+
+	goods("goods", "标准产品", ""),
+	receive("receive", "收货单", ""),
+	workbook("workbook", "字典数据", ""),
+	goodsLot("goodsLot", "产品批次", ""),
+	apply("apply", "申领单", ""),
+	usedType("usedType", "消耗类型", ""),
+	used("used", "消耗单", ""),
+	depot("depot","仓库", ""),
+	dept("dept","部门", ""),
+	supplier("supplier","供应商", ""),
+	shelf("shelf","货位", ""),
+	depotCard("depotCard","账页", ""),
+	user("user","用户", ""),
+	edsGoods("edsGoods", "企业产品", ""),
+	returnGoods("returnGoods", "备货退货", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private SyncResourceType(String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+
+}
+

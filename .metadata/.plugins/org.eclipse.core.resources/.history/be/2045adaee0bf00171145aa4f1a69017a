@@ -1,0 +1,27 @@
+package cn.ak4j.yard.extend.gep;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+
+@Ignore
+public class SpdGepProxyTest extends BaseTest{
+
+	@Autowired private SpdGepProxy proxy;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	
+	@Test public void testCreatePrepareInform() throws Exception{
+		SpdPrepareInformBiz prepareInform = new SpdPrepareInformBiz();
+		SpdBizItems bizItems = new SpdBizItems();
+		bizItems.add(new SpdBizItem());
+		
+		prepareInform.setItems(bizItems);
+		proxy.syncPrepareInform(prepareInform, egRepository);
+	}
+}

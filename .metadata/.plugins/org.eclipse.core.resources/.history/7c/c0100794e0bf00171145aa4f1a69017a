@@ -1,0 +1,26 @@
+package cn.ak4j.yard.yds.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+@SuppressWarnings({"serial"})
+public class YdsEdsGoodsLotParams extends QueryParams{
+	
+	private ListParam<String> edsGoodsLotId;
+	private ListParam<String> yardGoodsLotId;
+	private ListParam<String> edsGoodsId;
+	private ListParam<String> edsLotNo;
+	private DateRangeParam edsLotValidity;
+	private DateRangeParam produceDate;
+	private ListParam<String> ownerOrgId;
+	private ListParam<Boolean> enabled;
+	private ListParam<String> edsGoodsFormatName;
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	
+	private ListParam<String> edsGoodsType;//产品类型
+}

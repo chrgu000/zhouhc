@@ -1,0 +1,160 @@
+package cn.ak4j.yard.yds.domain;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YdsEquipmentLevel;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class YdsGoodsTest extends BaseTest{
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsUserRepository userRepository;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testValidate(){
+		YdsGoods goods = createGoods1();
+		//System.out.println(goods.getValidateMsg());
+		assertTrue(goods.isValid());
+	}
+	
+	@Test public void testSetPackageSpecifications(){
+		PcsUser user = userRepository.findAll().findByUserCode("xyk");
+		YdsGoods goods1 = createGoods1();
+		goods1.setBaseName("");
+		goods1.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		YdsGoods goods2 = createGoods1();
+		goods2.setMaintenanceInfo(new MaintenanceInfo(user));
+
+		thrown.expect(OperateForbiddenException.class);
+		goods1.updatePackageSpecifications(goods2, user);
+		
+		goods1 = createGoods1();
+		goods1.setMinName("");
+		goods1.setMaintenanceInfo(new MaintenanceInfo(user));
+		goods1.updatePackageSpecifications(goods2, user);
+		assertEquals(goods1.getMinName(), goods2.getMinName());
+	}
+	
+	@Test public void testSetPackageSpecificationsWithError(){
+		PcsUser user = userRepository.findAll().findByUserCode("xyk");
+		YdsGoods goodsPO = goodsRepository.findAll().findById("goods_id_009");
+		goodsPO.setCheckStateCode(CheckState.new_created.getCode());
+		
+		YdsGoods goods = createGoods2();
+		goods.setMaintenanceInfo(goodsPO.getMaintenanceInfo());
+
+		thrown.expect(OperateForbiddenException.class);
+		goodsPO.updatePackageSpecifications(goods, user);
+	}
+	
+	@Test public void testUpdate(){
+		PcsUser user = userRepository.findAll().findByUserCode("xyk");
+		YdsGoods goodsPO = goodsRepository.findAll().findById("goods_id_009");
+		goodsPO.setCheckStateCode(CheckState.new_created.getCode());
+		
+		YdsGoods goods = createGoods2();
+		goods.setMaintenanceInfo(goodsPO.getMaintenanceInfo());
+		
+		goodsPO.updateBaseInfo(goods, user);
+		
+		assertEquals(goodsPO.getAthDoc(), goods.getAthDoc());
+		assertEquals(goodsPO.getCheckValidity(), goods.getCheckValidity());
+		assertEquals(goodsPO.getEquipmentLevel(), goods.getEquipmentLevel());
+		assertEquals(goodsPO.getEquipmentSortName(), goods.getEquipmentSortName());
+		assertEquals(goodsPO.getFactName(), goods.getFactName());
+		assertEquals(goodsPO.getGoodsName(), goods.getGoodsName());
+		assertEquals(goodsPO.getGoodsModel(), goods.getGoodsModel());
+		assertEquals(goodsPO.getGoodsDesc(), goods.getGoodsDesc());
+		assertEquals(goodsPO.getGoodsSpec(), goods.getGoodsSpec());
+		assertEquals(goodsPO.getMCode(), goods.getMCode());
+		assertEquals(goodsPO.getRegDoc(), goods.getRegDoc());
+		assertEquals(goodsPO.getStoreType(), goods.getStoreType());
+		assertEquals(goodsPO.getUnitPrice(), goods.getUnitPrice(), 0.01);
+		assertEquals(goodsPO.getWareName(), goods.getWareName());
+		
+		assertNotEquals(goodsPO.getBaseName(), goods.getBaseName());
+		assertNotEquals(goodsPO.getBigName(), goods.getBigName());
+		assertNotEquals(goodsPO.getBigSum(), goods.getBigSum());
+		assertNotEquals(goodsPO.getMidName(), goods.getMidName());
+		assertNotEquals(goodsPO.getMidSum(), goods.getMidSum());
+		assertNotEquals(goodsPO.getMinName(), goods.getMinName());
+		assertNotEquals(goodsPO.getMinSum(), goods.getMinSum());
+		assertNotEquals(goodsPO.getMinName(), goods.getMinName());
+		assertNotEquals(goodsPO.getConsumeUnitLv(), goods.getConsumeUnitLv());
+		assertNotEquals(goodsPO.getPrepareUnitLv(), goods.getPrepareUnitLv());
+		assertNotEquals(goodsPO.getSettleUnitLv(), goods.getSettleUnitLv());
+		assertNotEquals(goodsPO.getStoreUnitLv(), goods.getStoreUnitLv());
+	}
+	
+	private YdsGoods createGoods1(){
+		YdsGoods goods = new YdsGoods();
+		goods.setFactName("上海制药");
+		goods.setBigName("箱");
+		goods.setMidName("盒");
+		goods.setGoodsSpec("规格");
+		goods.setMidSum(1);
+		goods.setMinSum(1);
+		goods.setMinName("小包装单位");
+		goods.setSettleUnitLv(4);
+		goods.setPackingSpec("pacingSpec");
+		goods.setWareName("wareName");
+		goods.setStoreUnitLv(3);
+		goods.setConsumeUnitLv(2);
+		goods.setPrepareUnitLv(4);
+		goods.setGoodsCode("goodsCode");
+		goods.setBigSum(3);
+		goods.setGoodsModel("goodsModel");
+		goods.setBaseName("baseName");
+		goods.setGoodsName("goodsName");
+		goods.setGoodsType("goodsType");
+		
+		return goods;
+	}
+	
+	private YdsGoods createGoods2(){
+		YdsGoods goods = new YdsGoods();
+		goods.setAthDoc("newAthDoc");
+		goods.setBaseName("newBaseName");
+		goods.setBigName("newBigName");
+		goods.setBigSum(100);
+		goods.setCheckValidity(false);
+		goods.setConsumeUnitLv(1);
+		goods.setEquipmentLevel(YdsEquipmentLevel.four.getCode());
+		goods.setEquipmentSortName("newEquipmentSortName");
+		goods.setFactName("newFactName");
+		goods.setGoodsName("newGoodsName");
+		goods.setGoodsModel("newGoodsModel");
+		goods.setGoodsDesc("newGoodsDesc");
+		goods.setGoodsSpec("newGoodsSpec");
+		goods.setMCode("newMCode");
+		goods.setMidName("newMidName");
+		goods.setMidSum(100);
+		goods.setMinName("newMinName");
+		goods.setMinSum(100);
+		goods.setPrepareUnitLv(1);
+		goods.setRegDoc("newRegDoc");
+		goods.setSettleUnitLv(1);
+		goods.setStoreType("newStoreType");
+		goods.setStoreUnitLv(1);
+		goods.setUnitPrice(1000);
+		goods.setWareName("newWareName");
+		
+		return goods;
+	}
+	
+}

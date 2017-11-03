@@ -1,0 +1,108 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.Date;
+
+import javax.persistence.DiscriminatorColumn;
+import javax.persistence.DiscriminatorType;
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Inheritance;
+import javax.persistence.InheritanceType;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.springframework.beans.BeanUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdGoodsItem;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: 业务计划明细
+* @author zhengyf
+* @date 2017年3月29日 下午1:39:09
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Slf4j
+@Entity
+@Table(name="spd_biz_item")
+@Inheritance(strategy=InheritanceType.SINGLE_TABLE) 
+@DiscriminatorColumn(name="biz_item_type", discriminatorType=DiscriminatorType.STRING)
+@DiscriminatorValue("common") 
+@JsonIgnoreProperties(ignoreUnknown=true)
+@NoArgsConstructor
+public class SpdBizItem extends SpdGoodsItem{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String bizItemId;
+	
+	@Getter @Setter
+	private String bizId;
+	
+	@Getter @Setter
+	private Boolean asPlanned;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdDepotCard depotCard;
+	
+	@Getter @Setter
+	private Date createTime = new Date();
+	
+	@Getter @Setter
+	private Date lastUpdateTime = new Date();
+	
+	@Getter @Setter
+	private String originId;
+	
+	@Getter @Setter
+	private String originItemId;
+	
+	public SpdBizItem(String goodsId, String lotId, Integer unitLv, Integer planQty, Integer confirmQty, Float unitPrice){
+		super(goodsId, lotId, unitLv, planQty, confirmQty, unitPrice);
+		initDateInfo();
+		updateAsPlaned();
+	}
+
+	public void update(SpdBizItem bizItem) {
+		if(checkTimeStamp(bizItem.getLastUpdateTime()) != 0){
+			throw new InvalidDataException(YardExceptionType.invalid_inconsistent_timestamp, getLastUpdateTime().getTime(), bizItem.getLastUpdateTime().getTime());
+		}
+		
+		try{
+			BeanUtils.copyProperties(bizItem, this, "goods");
+			updateLastUpdateTime();
+		}catch(Exception e){
+			log.error(ExceptionUtils.getStackTrace(e));
+		}
+	}
+	
+	public void updateAsPlaned(){
+		if(getConfirmQty() >= 0){
+			setAsPlanned(getConfirmQty().equals(getPlanQty()));
+		}else{
+			setAsPlanned(false);
+		}
+	}
+	
+	public void confirmAsPlaned() {
+		setConfirmQty(getPlanQty());
+		setAsPlanned(true);
+	}
+}

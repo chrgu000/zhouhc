@@ -1,0 +1,1 @@
+alter table spd_fin_rec_biz add(begining_rec_ids varchar2(500));

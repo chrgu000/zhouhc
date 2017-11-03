@@ -1,0 +1,109 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.domain.SpdGoodsItem;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 物权变更记录明细
+* @author zhengyf
+* @date 2017年8月8日 下午7:59:41
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@EqualsAndHashCode(callSuper=false)
+@Entity
+@Table(name="spd_property_change_item")
+public class SpdPropertyChangeRecordItem extends YardEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid") 
+	@Getter @Setter
+	private String id;
+	
+	@Getter @Setter
+	private String recordId;
+	
+	@Getter @Setter
+	private String goodsId;
+	
+	@Getter @Setter
+	private String lotId;
+	
+	@Getter @Setter
+	private String unitName;
+	
+	@Getter @Setter
+	private Integer unitLv;
+	
+	@Getter @Setter
+	private Integer qty;
+	
+	/**
+	 * 来源明细id，可能是业务id，可能是作业id
+	 */
+	@Getter @Setter
+	private String originItemId;
+	
+	@Getter @Setter
+	private Date createTime;
+	
+	@Getter @Setter
+	private Date lastUpdateTime;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdGoodsItem originItem;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdReceiveItems dealItems;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdPropertyChangeRelationItems items;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private YdsGoods goods;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private YdsGoodsLot goodsLot;
+	
+	public SpdPropertyChangeRecordItem(){
+		this.createTime = new Date();
+		this.lastUpdateTime = new Date();
+	}
+
+	public void addItem(SpdPropertyChangeRelationItem relationItem) {
+		if(items == null){
+			items = new SpdPropertyChangeRelationItems();
+		}
+		items.add(relationItem);
+	}
+	
+	@Transient @JsonIgnore
+	public int getQtyByUnitLv(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), getUnitLv());
+		return (int)(getQty()*unitRatio);
+	}
+	
+}

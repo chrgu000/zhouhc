@@ -1,0 +1,18 @@
+package cn.ak4j.yard.web;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.Map;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.BaseTest;
+
+@SuppressWarnings({"unchecked"})
+public class YardResourceTest extends BaseTest{
+
+	@Test public void testGetAllEnums() throws Exception{
+		Map<String,Object> enums =  mockMvcHelper.mockGet(Map.class, "/enums");
+		assertEquals(31, enums.size());
+	}
+}

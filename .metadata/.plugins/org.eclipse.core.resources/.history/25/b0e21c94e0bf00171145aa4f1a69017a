@@ -1,0 +1,15 @@
+/**
+ */
+package cn.ak4j.yard.sys.to;
+
+import lombok.Data;
+
+@Data
+public class SpdPrepareInformItemImportTO {
+
+	private String goodsCode;
+	private String depotCode;
+	private String supplierCode;
+	private String unitName;
+	private Integer prepareQty;
+}

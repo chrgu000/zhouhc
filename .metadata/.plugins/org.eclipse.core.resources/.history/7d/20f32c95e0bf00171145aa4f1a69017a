@@ -1,0 +1,19 @@
+package cn.ak4j.yard.pcs.to;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewPcsRoleApiTO {
+
+	private String id;
+	private String roleId;
+	private String uri;
+	private String requestMethod;
+	private Date createTime;
+	private Date lastUpdateTime;
+}

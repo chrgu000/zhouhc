@@ -1,0 +1,54 @@
+package cn.ak4j.yard.spd.stock.web;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStocks;
+import cn.ak4j.yard.spd.stock.params.SpdDepotStockParams;
+
+public class SpdDepotStockResourceTest extends BaseTest{
+	private String accessToken;
+	
+	@Before
+	public void init() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+	}
+	
+	@Test public void testGetListWithParams() throws Exception{
+		String depotId = "depot_id_003";
+		
+		String urlTemplate = "/spd/spdShelfStocks?params={params}&accessToken={accessToken}&pageSize=-1";
+		
+		SpdDepotStockParams params = new SpdDepotStockParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		String paramsStr = Global.defaultObjectMapper.writeValueAsString(params);
+		
+		SpdDepotStocks stocks = mockMvcHelper.mockGet(SpdDepotStocks.class, urlTemplate, paramsStr, accessToken);
+		
+		assertEquals(11, stocks.size());
+		stocks.forEach(stock->{
+			assertEquals(depotId, stock.getDepotId());
+		});
+
+	}
+	
+	@Test public void testGetCountWithParams() throws Exception{
+		String depotId = "depot_id_003";
+		
+		String urlTemplate = "/spd/spdShelfStocks/count?params={params}&accessToken={accessToken}";
+		
+		SpdDepotStockParams params = new SpdDepotStockParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		String paramsStr = Global.defaultObjectMapper.writeValueAsString(params);
+		
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, paramsStr, accessToken);
+		
+		assertEquals(11, count);
+	}
+	
+}

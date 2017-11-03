@@ -1,0 +1,112 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.factory;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfig;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.params.SpdDepotGoodsConfigParams;
+import cn.ak4j.yard.spd.repository.SpdDepotGoodsConfigRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdGoodsLotStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdGoodsStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdStockReport;
+import cn.ak4j.yard.spd.stock.to.SpdStockReportItem;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+
+@Component
+public class SpdStockReportFactory {
+
+	@Autowired private SpdDepotGoodsConfigRepository dgcRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	
+	public SpdStockReport buildGoodsLotStockReport(SpdGoodsLotStocks goodsLotStocks){
+		SpdStockReport result = new SpdStockReport();
+		goodsLotStocks.forEach(stock->{
+			SpdStockReportItem report = new SpdStockReportItem();
+			report.setGoodsFormatName(stock.getGoods().getFormatName());
+			report.setLotNo(stock.getGoodsLot().getLotNo());
+			report.setLotValidity(stock.getGoodsLot().getLotValidity());
+			report.setProduceDate(stock.getGoodsLot().getProduceDate());
+			report.setDepotName(stock.getDepot().getDepotName());
+			report.setStoreUnitName(SpdUnitUtils.computeGoodsUnitName(stock.getGoods(), stock.getGoods().getStoreUnitLv()));
+			report.setNormalQtyByStoreUnit(stock.getNormalQtyByStoreUnit());
+			report.setIsolationQtyByStoreUnit(stock.getIsolationQtyByStoreUnit());
+			report.setUnqualifiedQtyByStoreUnit(stock.getUnqualifiedQtyByStoreUnit());
+			result.add(report);
+		});
+		
+		return result;
+	}
+	
+	public SpdStockReport buildGoodsStockReport(SpdGoodsStocks goodsStocks){
+		SpdStockReport result = new SpdStockReport();
+		
+		SpdDepotGoodsConfigParams params = new SpdDepotGoodsConfigParams();
+		params.setGoodsId(new ListParam<String>(CollectionUtils.pluck("goodsId", goodsStocks)));
+		SpdDepotGoodsConfigs goodsConfigs = dgcRepository.find(params);
+		
+		String[] fieldNames = {"goodsId", "depotId"};
+		goodsStocks.forEach(stock->{
+			SpdDepotGoodsConfig goodsConfig = CollectionUtils.findWhere(fieldNames, goodsConfigs, stock.getGoodsId(), stock.getDepotId());
+			SpdStockReportItem report = new SpdStockReportItem();
+			report.setGoodsFormatName(stock.getGoods().getFormatName());
+			report.setDepotName(stock.getDepot().getDepotName());
+			report.setStoreUnitName(SpdUnitUtils.computeGoodsUnitName(stock.getGoods(), stock.getGoods().getStoreUnitLv()));
+			report.setNormalQtyByStoreUnit(stock.getNormalQtyByStoreUnit());
+			report.setIsolationQtyByStoreUnit(stock.getIsolationQtyByStoreUnit());
+			report.setUnqualifiedQtyByStoreUnit(stock.getUnqualifiedQtyByStoreUnit());
+			if(goodsConfig != null){
+				report.setUpperLimit(goodsConfig.getUpperLimit());
+				report.setLowerLimit(goodsConfig.getLowerLimit());
+			}
+			result.add(report);
+		});
+		
+		return result;
+	}
+	
+	public SpdStockReport buildSupplierGoodsStockReport(SpdGoodsStocks goodsStocks, PcsUser user){
+		SpdStockReport result = new SpdStockReport();
+		
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", goodsStocks);
+		YdsEdsGoodss edsGoods = egRepository.findAll().findSupplierUseabledWithGoodsIds(goodsIds, user.getOrgId());
+		SpdDepotGoodsConfigParams params = new SpdDepotGoodsConfigParams();
+		
+		params.setGoodsId(new ListParam<String>(goodsIds));
+		SpdDepotGoodsConfigs goodsConfigs = dgcRepository.find(params);
+		
+		String[] fieldNames = {"goodsId", "depotId"};
+		goodsStocks.forEach(stock->{
+			YdsEdsGoods egsGoods = CollectionUtils.findWhere("yardGoodsId", stock.getGoodsId(), edsGoods);
+			SpdDepotGoodsConfig goodsConfig = CollectionUtils.findWhere(fieldNames, goodsConfigs, stock.getGoodsId(), stock.getDepotId());
+			
+			SpdStockReportItem report = new SpdStockReportItem();
+			if(egsGoods != null){
+				report.setEdsGoodsFormatName(egsGoods.getEdsGoodsFormatName());
+			}
+			report.setGoodsFormatName(stock.getGoods().getFormatName());
+			report.setDepotName(stock.getDepot().getDepotName());
+			report.setStoreUnitName(SpdUnitUtils.computeGoodsUnitName(stock.getGoods(), stock.getGoods().getStoreUnitLv()));
+			report.setNormalQtyByStoreUnit(stock.getNormalQtyByStoreUnit());
+			report.setIsolationQtyByStoreUnit(stock.getIsolationQtyByStoreUnit());
+			report.setUnqualifiedQtyByStoreUnit(stock.getUnqualifiedQtyByStoreUnit());
+			if(goodsConfig != null){
+				report.setUpperLimit(goodsConfig.getUpperLimit());
+				report.setLowerLimit(goodsConfig.getLowerLimit());
+			}
+			result.add(report);
+		});
+		
+		return result;
+	}
+}

@@ -1,0 +1,58 @@
+package yard_service;
+
+import java.io.File;
+
+import org.apache.commons.io.FileUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.utils.ExcelBuilder;
+import cn.ak4j.yard.factory.YardExcelFormatFactory;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportType;
+import cn.ak4j.yard.spd.reconciliation.report.hspt_credit_rep_aggr_by_goods.Report;
+
+public class FinacialReconciliationExcelTest {
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static void main(String[] args) throws Exception{
+		String json = "{\n" + 
+				"    \"reconciliationCode\": \"1504627200000\",\n" + 
+				"    \"startDate\": 1504627200000,\n" + 
+				"    \"endDate\": 1504713600000,\n" + 
+				"    \"reconciliationCode\": null,\n" + 
+				"    \"supplierCode\": \"orgcodezsy001\",\n" + 
+				"    \"supplierName\": \"中山医医药有限公司\",\n" + 
+				"    \"generateTime\": 1508323402173,\n" + 
+				"    \"totalAmount\": 34000,\n" + 
+				"    \"targetDepotNames\": [\n" + 
+				"        \"门诊仓库\",\n" + 
+				"        \"雅和仓库\"\n" + 
+				"    ],\n" + 
+				"    \"items\": [\n" + 
+				"        {\n" + 
+				"            \"goodsCode\": \"gc_170320073\",\n" + 
+				"            \"goodsName\": \"[gc_170320073] 福辛普利钠片（蒙诺） 10mg*14s 片剂 中美上海施贵宝制药有限公司\",\n" + 
+				"            \"packageSpecification\": \"10mg*14s\",\n" + 
+				"            \"factorName\": \"中美上海施贵宝制药有限公司\",\n" + 
+				"            \"unitPrice\": 2.88,\n" + 
+				"            \"unitName\": \"片\",\n" + 
+				"            \"qty\": -10,\n" + 
+				"            \"amount\": -28.800001\n" + 
+				"        }\n" + 
+				"    ],\n" + 
+				"    \"reportType\": {\n" + 
+				"        \"code\": \"hospital_credit_replenish_detail\",\n" + 
+				"        \"name\": \"医院贷出申领明细\",\n" + 
+				"        \"queryParamNames\": [],\n" + 
+				"        \"orderParamNames\": []\n" + 
+				"    }\n" + 
+				"}";
+		
+		Report report = Global.defaultObjectMapper.readValue(json, Report.class);
+		report.setReconciliationCode("1504627200000");
+		ExcelBuilder exportExcel = new ExcelBuilder<Report>();
+		YardExcelFormatFactory excelFormatFactory = new YardExcelFormatFactory();
+		byte[] bytes = exportExcel.buildExcel(report.getReportType().getName(), report, report.getItems(), excelFormatFactory.getExcelFormats(SpdReconciliationReportType.hospital_credit_replenish_aggregate_by_goods.getCode()));
+		
+		FileUtils.writeByteArrayToFile(new File("/Users/zhengyafeng/Desktop/report.xls"), bytes);
+	}
+}

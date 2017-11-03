@@ -1,0 +1,20 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import lombok.Getter;
+import lombok.Setter;
+
+public class ZsyIntigrationParams{
+
+	@Getter @Setter
+	private String outClientId;
+	
+	@Getter @Setter
+	private String outClientName;
+	
+	@Getter @Setter
+	private String outAddressId;
+	
+	@Getter @Setter
+	private String outAddressName;
+
+}

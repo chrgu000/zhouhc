@@ -1,0 +1,41 @@
+<!-- 支持自动更新日志配置 -->
+<configuration debug="true" scan="true">
+
+	<!--property resource="./logback.properties"/-->
+
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36}\(%line\) - %msg%n
+			</pattern>
+		</encoder>
+	</appender>
+
+	<logger name="cn.ak4j.entity" additivity="false" level="info">
+		<appender-ref ref="STDOUT" />
+	</logger>
+	
+<!-- 	<logger name="net.sf.jasperreports" additivity="false" level="debug">
+		<appender-ref ref="STDOUT" />
+	</logger> -->
+	
+	<!--logger name="org.springframework.web.client" additivity="false" level="debug">
+		<appender-ref ref="STDOUT" />
+	</logger-->
+	
+<!-- 	<logger name="org.apache.tomcat.jdbc.pool"  additivity="false" level="debug">
+		<appender-ref ref="STDOUT" />
+	</logger> -->
+	
+<!-- 	<logger name="org.springframework.jdbc.datasource" additivity="false" level="debug">
+		<appender-ref ref="STDOUT" />
+	</logger> -->
+	
+	<logger name="cn.ak4j" additivity="false" level="debug">
+		<!--appender-ref ref="FILE" / -->
+		<appender-ref ref="STDOUT" />
+	</logger>
+
+	<root level="warn">
+		<appender-ref ref="STDOUT" />
+	</root>
+</configuration>

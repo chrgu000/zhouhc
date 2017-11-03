@@ -1,0 +1,1 @@
+alter table yds_eds_goods modify (eds_goods_desc varchar2(2000));

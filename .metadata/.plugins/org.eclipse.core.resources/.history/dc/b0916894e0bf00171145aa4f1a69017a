@@ -1,0 +1,114 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.List;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBoxs;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class SpdLogisticsTaskItems extends SpdTaskItems<SpdLogisticsTaskItem>{
+
+	public SpdLogisticsTaskItems(List<SpdLogisticsTaskItem> items) {
+		super(items);
+	}
+	
+	public boolean isAllReceived() {
+		for(SpdLogisticsTaskItem item : this){
+			if(item.getReceiveQty() == null || item.getReceiveQty() < 0){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public boolean isAllReceiveEmpty(){
+		for(SpdLogisticsTaskItem item : this){
+			if(item.getReceiveQty() > 0){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public void receiveAsConfirm(){
+		this.forEach(item->{
+			item.receiveAsConfirm();
+		});
+	}
+	
+	public int getSameLotConfirmQtyByStoreUnit(String lotId) {
+		SpdLogisticsTaskItems sameLotItems = new SpdLogisticsTaskItems(CollectionUtils.find("lotId", lotId, this));
+		int qty = 0;
+		for(SpdLogisticsTaskItem item : sameLotItems){
+			qty += item.getConfirmQty();
+		}
+		return qty;
+	}
+	
+	public int getSameLotConfirmQtyByBaseUnit(String lotId) {
+		SpdLogisticsTaskItems sameLotItems = new SpdLogisticsTaskItems(CollectionUtils.find("lotId", lotId, this));
+		int qty = 0;
+		for(SpdLogisticsTaskItem item : sameLotItems){
+			qty += item.getConfirmQtyByBaseUnit();
+		}
+		return qty;
+	}
+
+	public SpdLogisticsTaskItems removeNonePlanQtyItems() {
+		SpdLogisticsTaskItems result = new SpdLogisticsTaskItems();
+		this.forEach(item->{
+			if(item.getPlanQty() > 0){
+				result.add(item);
+			}
+		});
+		return result;
+	}
+	
+	public SpdLogisticsTaskItems getAllNotEntireReceiveItems(){
+		SpdLogisticsTaskItems result = new SpdLogisticsTaskItems();
+		this.forEach(item->{
+			if(!item.isEntireReceive()){
+				result.add(item);
+			}
+		});
+		
+		return result;
+	}
+
+	public SpdLogisticsTaskItems mergeByGoods() {
+		SpdLogisticsTaskItems result = new SpdLogisticsTaskItems();
+		
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", this);
+		goodsIds.forEach(goodsId->{
+			SpdLogisticsTaskItems logsticsItems = new SpdLogisticsTaskItems(CollectionUtils.find("goodsId", goodsId, this));
+			
+			Integer planQty = 0;
+			for(SpdLogisticsTaskItem item : logsticsItems){
+				planQty += item.getPlanQty();
+			}
+			
+			SpdLogisticsTaskItem newLogisticsItem = new SpdLogisticsTaskItem();
+			newLogisticsItem.setTaskId(logsticsItems.get(0).getTaskId());
+			newLogisticsItem.setGoodsId(goodsId);
+			newLogisticsItem.setPlanQty(planQty);
+			
+			result.add(newLogisticsItem);
+		});
+		
+		return result;
+	}
+
+	public List<String> getAllParentWrapperIds() {
+		return CollectionUtils.pluck("parentWrapperId", this);
+	}
+
+	public void fillParentWrapper(SpdTurnoverBoxRepository tbRepository) {
+		SpdTurnoverBoxs turnoverBoxs = tbRepository.findAll();
+		this.forEach(item->{
+			item.setParentWrapper(CollectionUtils.findWhere("id", item.getParentWrapperId(), turnoverBoxs));
+		});
+	}
+}

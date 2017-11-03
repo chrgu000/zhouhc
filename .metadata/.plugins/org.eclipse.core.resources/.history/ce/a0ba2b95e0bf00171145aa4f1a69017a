@@ -1,0 +1,28 @@
+package cn.ak4j.yard.pcs.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class NewPcsDepotTO {
+
+	private String manageOrgId;// 管理机构
+	private String manageDeptId;// 管理部门
+	private String depotType;// 仓库类型
+	private boolean fixed;// 定数存储
+	private String depotName;// 仓库名称
+	private String depotCode;// 仓库编码
+	private String depotHisCode;// his的仓库编码
+	private String depotAddress;// 仓库地址
+	private boolean enabled;// 是否禁用
+	private boolean central;// 是否中心库
+	private String linkMan;// 联系人
+	private String linkTel;// 联系电话
+	private String goodsType;//产品类型
+
+	private Integer createYrad;
+	private Integer lastYrad;
+	private Integer yardId;// 业务场Id
+}

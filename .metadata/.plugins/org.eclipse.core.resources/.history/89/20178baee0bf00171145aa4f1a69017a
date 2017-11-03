@@ -1,0 +1,399 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdFinancialReconciliationBizSteps;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdRecItemsGenerateStatuses;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdDailyCleanBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationItemRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdReconciliationBizServiceTest extends BaseTest{
+
+	@Autowired private SpdFinacialReconciliationBizRepository frbRepository;
+	@Autowired private SpdFinacialReconciliationBizService frbService;
+	@Autowired private SpdDailyCleanBizRepository dcbRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdFinacialReconciliationItemRepository friRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdRecItemsGenerateStatuses itemsGenerateStatuses;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Before
+	public void setUp() throws Exception{
+		frbRepository.deleteAll();
+		friRepository.deleteAll();
+	}
+	
+	@Test public void testCreateInitReconciliation(){
+		//准备参数
+		String bizRuleId = "fin_rec_rule_id_01";
+		PcsUser user = userRepository.findAll().findById(testUserId);
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put("goods_lot_id_061", 100);
+		map.put("goods_lot_id_024", 100);
+		map.put("goods_lot_id_018", 100);
+		map.put("goods_lot_id_066", 100);
+		map.put("goods_lot_id_021", 100);
+		map.put("goods_lot_id_017", 100);
+		SpdFinacialReconciliationItems items = buildReconcilicationItems(map);
+		
+		//创建初始化对账
+		SpdFinacialReconciliationBiz reconciliation = frbService.createInitReconciliation(bizRuleId, items, user);
+		
+		//断言初始化对账
+		assertNotNull(reconciliation.getBizId());
+		assertEquals(CheckState.completed, reconciliation.getCheckState());
+		assertEquals(reconciliation.getBizRule().getSupplierDeptId(), reconciliation.getSupplierDeptId());
+		assertTrue(reconciliation.getItemGenerated());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.caiwudan);
+		assertEquals(CodeSort.caiwudan.getCode()+getCurrentDateCode()+sequenceCode, reconciliation.getBizCode());
+		
+		SpdFinacialReconciliationItems itemPOs = friRepository.findByReconciliationId(reconciliation.getBizId());
+		assertEquals(6, itemPOs.size());
+		itemPOs.forEach(itemPO->{
+			assertEquals(map.get(itemPO.getLotId()), itemPO.getEndingQty());
+		});
+		
+		thrown.expect(InvalidDataException.class);
+		frbService.createInitReconciliation(bizRuleId, items, user);
+	}
+	
+	//新增无结转的财务对账
+	@Test public void testAddWithoutCarryOver() throws Exception{
+		//创建日清对账
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		
+		dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		wait(1);
+		
+		//构造财务对账业务对象
+		List<Date> cleanDates = new ArrayList<Date>(); 
+		cleanDates.add(Global.sdfYMD.parse("2017-09-06"));
+		cleanDates.add(Global.sdfYMD.parse("2017-09-07"));
+		PcsUser user = userRepository.findAll().findById(testUserId);
+		SpdFinacialReconciliationBiz reconciliation = new SpdFinacialReconciliationBiz("fin_rec_rule_id_01", cleanDates);
+		
+		//新增财务对账业务
+		reconciliation = frbService.add(reconciliation, user);
+		wait(8);
+		
+		//断言财务对账业务
+		assertNotNull(reconciliation.getBizId());
+		assertEquals(CheckState.new_created, reconciliation.getCheckState());
+		assertFalse(reconciliation.getItemGenerated());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.caiwudan);
+		assertEquals(CodeSort.caiwudan.getCode()+getCurrentDateCode()+sequenceCode, reconciliation.getBizCode());
+		
+		SpdFinacialReconciliationItems items = friRepository.findByReconciliationId(reconciliation.getBizId());
+		assertEquals(10, items.size());
+	}
+	
+	private SpdFinacialReconciliationBiz createInitReconciliation(String bizRuleId, PcsUser user){
+		Map<String, Integer> map = new HashMap<String, Integer>();
+		map.put("goods_lot_id_061", 100);
+		map.put("goods_lot_id_024", 100);
+		map.put("goods_lot_id_018", 100);
+		map.put("goods_lot_id_066", 100);
+		map.put("goods_lot_id_021", 100);
+		map.put("goods_lot_id_017", 100);
+		SpdFinacialReconciliationItems items = buildReconcilicationItems(map);
+		
+		//创建初始化对账
+		SpdFinacialReconciliationBiz reconciliation = frbService.createInitReconciliation(bizRuleId, items, user);
+		return reconciliation;
+	}
+	
+	@Test public void testAddWithCarryOver() throws Exception{
+		//创建初始财务对账
+		SpdFinacialReconciliationBiz initReconciliation = createInitReconciliation("fin_rec_rule_id_01", userRepository.findAll().findById(testUserId));
+		
+		//创建日清对账
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		
+		dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		wait(1);
+		
+		//构造财务对账业务对象
+		List<Date> cleanDates = new ArrayList<Date>(); 
+		cleanDates.add(Global.sdfYMD.parse("2017-09-06"));
+		cleanDates.add(Global.sdfYMD.parse("2017-09-07"));
+		PcsUser user = userRepository.findAll().findById(testUserId);
+		SpdFinacialReconciliationBiz reconciliation = new SpdFinacialReconciliationBiz("fin_rec_rule_id_01", initReconciliation.getBizId(), cleanDates);
+		
+		//新增财务对账业务
+		reconciliation = frbService.add(reconciliation, user);
+		wait(8);
+		
+		//断言财务对账业务
+		assertNotNull(reconciliation.getBizId());
+		assertEquals(CheckState.new_created, reconciliation.getCheckState());
+		assertEquals(reconciliation.getBizRule().getSupplierDeptId(), reconciliation.getSupplierDeptId());
+		assertFalse(reconciliation.getItemGenerated());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.caiwudan);
+		assertEquals(CodeSort.caiwudan.getCode()+getCurrentDateCode()+sequenceCode, reconciliation.getBizCode());
+		
+		SpdFinacialReconciliationItems items = friRepository.findByReconciliationId(reconciliation.getBizId());
+		assertEquals(16, items.size());
+	}
+	
+	@Test public void testModify() throws Exception{
+		PcsUser user = userRepository.findAll().findById(testUserId);
+		//创建初始财务对账
+		SpdFinacialReconciliationBiz initReconciliation = createInitReconciliation("fin_rec_rule_id_01", user);
+		
+		//创建日清对账
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		
+		dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		wait(1);
+		
+		//构造财务对账业务对象
+		List<Date> cleanDates = new ArrayList<Date>(); 
+		cleanDates.add(Global.sdfYMD.parse("2017-09-06"));
+		SpdFinacialReconciliationBiz reconciliation = new SpdFinacialReconciliationBiz("fin_rec_rule_id_01", initReconciliation.getBizId(), cleanDates);
+		
+		//新增财务对账业务
+		reconciliation = frbService.add(reconciliation, user);
+		wait(8);
+		
+		//断言财务对账业务
+		reconciliation = frbRepository.findOne(reconciliation.getBizId());
+		assertNotNull(reconciliation.getBizId());
+		assertEquals(CheckState.new_created, reconciliation.getCheckState());
+		assertTrue(reconciliation.getItemGenerated());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.caiwudan);
+		assertEquals(CodeSort.caiwudan.getCode()+getCurrentDateCode()+sequenceCode, reconciliation.getBizCode());
+		
+		SpdFinacialReconciliationItems items = friRepository.findByReconciliationId(reconciliation.getBizId());
+		assertEquals(16, items.size());
+		
+		//更新对账业务
+		reconciliation.setCleanDays("2017-09-06;2017-09-07");
+		reconciliation.setDescription("test description");
+		reconciliation = frbService.modify(reconciliation, user);
+		wait(8);
+		
+		//断言更新后的对账业务
+		reconciliation = frbRepository.findOne(reconciliation.getBizId());
+		assertTrue(reconciliation.getItemGenerated());
+		assertEquals("test description", reconciliation.getDescription());
+		assertEquals(SpdRecItemsGenerateStatuses.status_generate_success, itemsGenerateStatuses.get(reconciliation.getBizId()).intValue());
+		
+		items = friRepository.findByReconciliationId(reconciliation.getBizId());
+		assertEquals(16, items.size());
+	}
+	
+	@SuppressWarnings({ "unchecked" })
+	private SpdFinacialReconciliationItems buildReconcilicationItems(Map<String, Integer> map){
+		SpdFinacialReconciliationItems items = new SpdFinacialReconciliationItems();
+		
+		YdsGoodsLots lots = glRepository.findAll().findByIds(new ArrayList<String>(map.keySet()));
+		lots.fillGoodss(goodsRepository.findAll().findByIds(lots.pluck("goodsId")));
+		lots.forEach(lot->{
+			float unitPrice = lot.getGoods().getPrice(YdsUnitLv.base.getLv());
+			int endingQty = map.get(lot.getGoodsLotId());
+			SpdFinacialReconciliationItem item = 
+					new SpdFinacialReconciliationItem(lot.getGoodsId(), 
+													  lot.getGoodsLotId(), 
+													  unitPrice, 
+													  lot.getGoods().getBaseName(), 
+													  lot.getGoods().getSettleUnitLv(), 
+													  lot.getGoods().getSettlementUnitName(), 
+													  endingQty);
+			items.add(item);
+		});
+		
+		return items;
+	}
+	
+	@Test public void testDelete() throws Exception{
+		PcsUser user = userRepository.findAll().findById(testUserId);
+		//创建初始财务对账
+		SpdFinacialReconciliationBiz initReconciliation = createInitReconciliation("fin_rec_rule_id_01", user);
+		
+		//创建日清对账
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		
+		dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		wait(1);
+		
+		//构造财务对账业务对象
+		List<Date> cleanDates = new ArrayList<Date>(); 
+		cleanDates.add(Global.sdfYMD.parse("2017-09-06"));
+		cleanDates.add(Global.sdfYMD.parse("2017-09-07"));
+		SpdFinacialReconciliationBiz reconciliation = new SpdFinacialReconciliationBiz("fin_rec_rule_id_01", initReconciliation.getBizId(), cleanDates);
+		
+		//新增财务对账业务
+		reconciliation = frbService.add(reconciliation, user);
+		wait(5);
+		
+		//删除对账业务
+		frbService.delete(reconciliation.getBizId(), user);
+		
+		//断言
+		String reconciliationId = reconciliation.getBizId();
+		String beginingReconciliationId = reconciliation.getBeginingReconciliationId();
+		
+		SpdFinacialReconciliationBiz beginingReconciliation = frbRepository.findOne(beginingReconciliationId);
+		assertNull(beginingReconciliation.getNextReconciliationId());
+		
+		reconciliation = frbRepository.findOne(reconciliationId);
+		assertNull(reconciliation);
+		
+		SpdDailyCleanBizs dailyCleans = dcbRepository.findByFinacialConciliationId(reconciliationId);
+		assertTrue(CollectionUtils.isEmpty(dailyCleans));
+	}
+	
+	@Test public void testModifyItem() throws Exception{
+		PcsUser user = userRepository.findAll().findById(testUserId);
+		//创建初始财务对账
+		SpdFinacialReconciliationBiz initReconciliation = createInitReconciliation("fin_rec_rule_id_01", user);
+		//创建日清对账
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		
+		dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		wait(1);
+		
+		//构造财务对账业务对象
+		List<Date> cleanDates = new ArrayList<Date>(); 
+		cleanDates.add(Global.sdfYMD.parse("2017-09-06"));
+		cleanDates.add(Global.sdfYMD.parse("2017-09-07"));
+		SpdFinacialReconciliationBiz reconciliation = new SpdFinacialReconciliationBiz("fin_rec_rule_id_01", initReconciliation.getBizId(), cleanDates);
+		
+		//新增财务对账业务
+		reconciliation = frbService.add(reconciliation, user);
+		wait(8);
+		
+		SpdFinacialReconciliationItems items = friRepository.findByReconciliationId(reconciliation.getBizId());
+		SpdFinacialReconciliationItem item = CollectionUtils.findWhere("lotId", "goods_lot_id_066", items);
+		item.setSettlementQty(200);
+		thrown.expect(InvalidDataException.class);
+		frbService.modifyItem(item, user);
+		
+		item.setSettlementQty(90);
+		frbService.modifyItem(item, user);
+		
+		item = friRepository.findOne(item.getId());
+		assertEquals(20, item.getEndingQty().intValue());
+	}
+	
+	@Test public void testUpdateCheckState() throws Exception{
+		PcsUser user = userRepository.findAll().findById(testUserId);
+		//创建初始财务对账
+		SpdFinacialReconciliationBiz initReconciliation = createInitReconciliation("fin_rec_rule_id_01", user);
+		
+		//创建日清对账
+		SpdDailyCleanBiz dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-07 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		CheckStateTO checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		
+		dailyClean = new SpdDailyCleanBiz("daily_clean_rule_01", Global.sdfYMDHms.parse("2017-09-06 11:23:36"));
+		dailyClean = mockMvcHelper.add(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", dailyClean, status().isOk(), null);
+		checkState = new CheckStateTO(CheckState.reviewed.getCode(), dailyClean.getLastUpdateTime());
+		checkState = mockMvcHelper.updateCheckState(SpdDailyCleanBiz.class, mzmanagerUserCode, "spd", "spdDailyCleans", checkState, false, dailyClean.getBizId(), status().isOk(), null);
+		wait(1);
+		
+		//构造财务对账业务对象
+		List<Date> cleanDates = new ArrayList<Date>(); 
+		cleanDates.add(Global.sdfYMD.parse("2017-09-06"));
+		cleanDates.add(Global.sdfYMD.parse("2017-09-07"));
+		SpdFinacialReconciliationBiz reconciliation = new SpdFinacialReconciliationBiz("fin_rec_rule_id_01", initReconciliation.getBizId(), cleanDates);
+		
+		//新增财务对账业务
+		reconciliation = frbService.add(reconciliation, user);
+		wait(8);
+		
+		String bizId = reconciliation.getBizId();
+		reconciliation = frbRepository.findOne(bizId);
+		thrown.expect(OperateForbiddenException.class);
+		frbService.updateCheckState(bizId, CheckState.commited.getCode(), reconciliation.getLastUpdateTime(), user);
+		
+		SpdFinacialReconciliationItems items = friRepository.findByReconciliationId(reconciliation.getBizId());
+		items.forEach(item->item.setSettlementQty(item.getReconciliationQty()));
+		friRepository.saveAll(items);
+		
+		reconciliation = frbRepository.findOne(bizId);
+		frbService.updateCheckState(bizId, CheckState.commited.getCode(), reconciliation.getLastUpdateTime(), user);
+		wait(2);
+		reconciliation = frbRepository.findOne(bizId);
+		assertEquals(CheckState.commited, reconciliation.getCheckState());
+		
+		frbService.updateCheckState(bizId, CheckState.reviewed.getCode(), reconciliation.getLastUpdateTime(), user);
+		wait(2);
+		reconciliation = frbRepository.findOne(bizId);
+		assertEquals(CheckState.reviewed, reconciliation.getCheckState());
+		assertEquals(SpdFinancialReconciliationBizSteps.complete_financial_reconciliation, reconciliation.getCurrentBizStep());
+	}
+}

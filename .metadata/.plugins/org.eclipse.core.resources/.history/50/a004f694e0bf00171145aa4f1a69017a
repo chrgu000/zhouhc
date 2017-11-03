@@ -1,0 +1,117 @@
+package cn.ak4j.yard.spd.bizplan.service.assistant;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBiz;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdConsumeBizSteps;
+import cn.ak4j.yard.spd.bizplan.repository.SpdConsumeBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdConsumeBizService;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.factory.SpdDispatcherFactory;
+import cn.ak4j.yard.spd.task.service.SpdDepotTaskService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class SpdConsumeBizAssistantService extends SpdBizAssistantService<SpdConsumeBiz>{
+
+	@Autowired private SpdConsumeBizService consumeService;
+	@Autowired private SpdConsumeBizRepository consumeRepository;
+	@Autowired private SpdDispatcherFactory dispatcherFactory;
+	@Autowired private SpdDepotTaskService dtService;
+	@Autowired private SpdDepotStockService dsService;
+	
+	@Override public void process(SpdConsumeBiz consume, String taskId, String userId, String action) {
+		if(consume.isCompleted()){
+			log.warn("收到消息[{}]，但是消耗业务[{}]已完成", action, consume.getBizCode());
+			return ;
+		}
+		consumeService.fillAllRelations(consume);
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		consume = forwardBizStep(consume, taskId, action);
+		
+		try{
+			if(consume.getCurrentBizStep().equals(SpdConsumeBizSteps.create_consume)){
+				if(consume.getBizRule().getFeedbackRule().getAutoReviewConsume() && consume.hasItems()){
+					List<SpdGoodsQty> planGoodsQtys = consume.getItems().getPlanGoodsQtysByStoreUnit();
+					List<SpdGoodsQty> realQtysByStoreUnit = dsService.findRealShelfStoreUnitStocks(consume.getDepotId(), consume.getAreaType(), planGoodsQtys);
+					consume.getItems().confirm(realQtysByStoreUnit);
+					consumeService.reviewConsume(consume, consume.getLastUpdateTime(), user);
+				}
+			}
+			
+			else if(consume.getCurrentBizStep().equals(SpdConsumeBizSteps.review_consume)){
+				if(consume.getBizRule().getFeedbackRule().getAutoCreateDispatcher()){
+					SpdDispatcher dispatcher = dispatcherFactory.buildDispatcherFromBiz(consume, SpdDispatcherType.off_shelf, user);
+					dispatcherService.add(dispatcher, user);
+				}
+			}
+			
+			else if(consume.getCurrentBizStep().equals(SpdConsumeBizSteps.create_dispatcher)){
+				if(consume.getBizRule().getFeedbackRule().getAutoReviewDispatcher()){
+					reviewDispatcher(consume, user, SpdDispatcherType.off_shelf);
+				}
+			}
+			
+			else if(consume.getCurrentBizStep().equals(SpdConsumeBizSteps.create_off_shelf_task)){
+				if(consume.getBizRule().getFeedbackRule().getAutoReviewDepotTask()){
+					consume.getOffShelfTask().getItems().confirmAsPlan();
+					biRepository.saveAll(consume.getItems());
+					dtService.reviewDepotTask(consume.getOffShelfTask(), user);
+				}
+			}
+			
+			else if(consume.getCurrentBizStep().equals(SpdConsumeBizSteps.complete_off_shelf_task)){
+				if(consume.getBizRule().getFeedbackRule().getAutoCompleteConsume()){
+					consumeService.completeConsume(consume, user);
+				}
+			}
+		}catch(Exception e){
+			handleException(action, consume, e);
+		}
+		
+		saveBizLog(consume, user);
+		consumeRepository.save(consume);
+	}
+
+	@Override
+	protected SpdConsumeBiz forwardBizStep(SpdConsumeBiz biz, String taskId, String action) {
+		SpdBizStep currentStep = biz.getCurrentBizStep();
+		
+		if(currentStep == null){
+			biz.setBizStatusCode(biz.getBizSteps().get(0).getStatusCode());
+		}else{
+			SpdBizStep nextStep = biz.getNextStep();
+			if(nextStep == null){
+				log.warn("已经完成了最后一个步骤，不需要步进");
+				return biz;
+			}
+			
+			if((nextStep == SpdConsumeBizSteps.review_consume && action.equals(AmqpMsgType.REVIEW_CONSUME_BIZ.getCode()))
+				|| (nextStep == SpdConsumeBizSteps.create_dispatcher && action.equals(AmqpMsgType.CREATE_OFF_SHELF_DISPATCHER.getCode()))
+				|| (nextStep == SpdConsumeBizSteps.create_off_shelf_task && action.equals(AmqpMsgType.CREATE_OFF_SHELF_TASK.getCode()))
+				|| (nextStep == SpdConsumeBizSteps.complete_off_shelf_task && action.equals(AmqpMsgType.CONFIRM_OFF_SHELF_TASK.getCode()))
+				|| (nextStep == SpdConsumeBizSteps.complete_consume && action.equals(AmqpMsgType.COMPLETE_CONSUME_BIZ.getCode()))){
+				biz.setBizStatusCode(nextStep.getStatusCode());
+			}else{
+				log.info("{}, {}, {}", currentStep.getStatusCode(), nextStep.getStatusCode(), action);
+				throw new OperateFailException(YardExceptionType.biz_forward_fail, action, nextStep.getStatusName());
+			}
+		}
+		
+		return biz;
+	}
+	
+}

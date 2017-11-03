@@ -1,0 +1,39 @@
+package cn.ak4j.yard.spd.service;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.pcs.service.PcsDepotService;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdDepotCardServiceTest extends BaseTest{
+	
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotService depotService;
+	@Autowired private SpdDepotCardService dcService;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+
+	@Test public void testInitDepotCards(){
+		String depotId = "depot_id_005";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		
+		PcsDepot depot = depotRepository.findAll().findById(depotId);
+		
+		YdsGoodss allGoodss = goodsRepository.findAll().getEnableGoodss().findByGoodsType(depot.getGoodsType());
+		
+		depotService.initDepotAreaAndShelf(depotId, user);
+		int cardCount = dcService.initDepotCards(depotId, user);
+		assertEquals(allGoodss.size(), cardCount);
+		
+	}
+	
+}

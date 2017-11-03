@@ -1,0 +1,15 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdFinacialReconciliationBizs extends Entities<SpdFinacialReconciliationBiz>{
+
+	public SpdFinacialReconciliationBizs(List<SpdFinacialReconciliationBiz> entities){
+		super(entities);
+	}
+}

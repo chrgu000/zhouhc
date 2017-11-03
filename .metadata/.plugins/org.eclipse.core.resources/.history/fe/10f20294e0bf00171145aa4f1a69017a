@@ -1,0 +1,80 @@
+package cn.ak4j.yard.yds.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfo;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfos;
+import cn.ak4j.yard.yds.params.YdsGoodsInfoParams;
+import lombok.Getter;
+
+@Repository
+public class YdsGoodsInfoRepository extends BaseRepository<YdsGoodsInfo, YdsGoodsInfos, YdsGoodsInfoParams, String>  {
+	
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired @Lazy private YdsGoodsRepository ydsGoodsRepository;
+	
+	@Cacheable(value="longTimeCache", key="\"allGoodsInfos\"")
+	public YdsGoodsInfos findAll(){
+		YdsGoodsInfos result =  getAll();				
+		return result;
+	}
+	
+	@Deprecated
+	public YdsGoodsInfos find(YdsGoodsInfoParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+	@Deprecated
+	public int count(YdsGoodsInfoParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+//	@Deprecated
+//	public YdsGoodsInfos find(YdsGoodsInfoParams params, OrderParam order, int pageNo, int pageSize){
+//		if(setRelationParams(params)){
+//			if(order == null){
+//				order = OrderParam.getDefaultOrder();
+//			}
+//			return new YdsGoodsInfos(doQuery(params, order, pageNo, pageSize));
+//		}
+//		return new YdsGoodsInfos();
+//	}
+	 
+
+	//	public boolean setRelationParams(YdsGoodsInfoParams params){
+//		if(params != null){
+//			YdsGoodsParams goodsParams = new YdsGoodsParams();
+//			goodsParams.setFormatName(params.getFormatName());
+//			goodsParams.setPurch(params.getPurchUnitLvName());
+//			goodsParams.setStore(params.getStoreUnitLvName());
+//			goodsParams.setSale(params.getSaleUnitLvName());
+//			goodsParams.setBigSum(params.getBigSum());
+//			goodsParams.setMidSum(params.getMidSum());
+//			goodsParams.setMinSum(params.getMinSum());
+//			if(!goodsParams.isEmpty()){
+//				YdsGoodss goodss = new YdsGoodss(ydsGoodsRepository.findAll().find(goodsParams, depotRepository, dcRepository));
+//				if(goodss.size() == 0){
+//					return false;
+//				}			
+//				params.setGoodsId(new ListParam<String>(goodss.getIds()));
+//			}
+//		}		
+//		return true;
+//	}
+
+//	public YdsGoodsInfos getGoodsInfos(String ids) {
+//		YdsGoodsInfoParams params = new YdsGoodsInfoParams();
+//		List<String> idList = Arrays.asList(ids.split(","));
+//		params.setGoodsId(new ListParam<String>(idList));
+//		return find(params);
+//	}
+	
+}

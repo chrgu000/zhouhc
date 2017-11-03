@@ -1,0 +1,61 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizplan.service;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveItemRepository;
+
+/**
+ * @Description:
+ * @author wuyw
+ * @date 2017年7月25日下午12:27:32
+ *
+ */
+@Service
+public class SpdReceiveItemService extends IYardService<SpdReceiveItem>{
+
+	@Autowired private SpdReceiveItemRepository riRepository;
+	
+	@Override @Transactional
+	public SpdReceiveItem add(SpdReceiveItem receiveItem, IUser user) {
+		SpdReceiveItems items = riRepository.findByBizId(receiveItem.getBizId());
+		SpdReceiveItem theItem = items.findByGoodsIdAndLotId(receiveItem.getGoodsId(), receiveItem.getLotId());
+		if(theItem != null){
+			throw new InvalidDataException("当前产品已存在，不能重复添加，请检查！");
+		};
+		receiveItem.updateLastUpdateTime();
+		return riRepository.save(receiveItem);
+	}
+
+	@Override @Transactional
+	public void delete(String bizItemId, IUser user) {
+		SpdReceiveItem receiveItemPO = riRepository.findOne(bizItemId);
+		riRepository.delete(receiveItemPO);
+	}
+
+	@Override @Transactional
+	public SpdReceiveItem modify(SpdReceiveItem receiveItem, IUser user) {
+		SpdReceiveItem receiveItemPO = riRepository.findOne(receiveItem.getBizItemId());
+		receiveItemPO.update(receiveItem);
+		receiveItemPO = riRepository.save(receiveItemPO);
+		return receiveItemPO;
+	}
+	
+	@Override
+	public SpdReceiveItem updateCheckState(String bizItemId, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+	
+}

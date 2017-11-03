@@ -1,0 +1,35 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum YardBatchTaskStatus implements ITypeEnum{
+
+	task_status_created("created", "新增", ""),
+	task_status_processing("processing", "正在处理", ""),
+	task_status_success("success", "成功", ""),
+	task_status_failure("failure", "失败", ""),
+	task_status_pending("pending", "等待", "");
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private YardBatchTaskStatus(String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static YardBatchTaskStatus typeOf(String code){
+		for(YardBatchTaskStatus status : YardBatchTaskStatus.values()){
+			if(status.getCode().equals(code)){
+				return status;
+			}
+		}
+		return null;
+	}
+}

@@ -1,0 +1,75 @@
+package cn.ak4j.yard.sys.datacheck.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+
+@Entity
+@Table(name="SYS_DATA_CHECK_TASK_REPORT")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SysDataCheckTaskReport implements IEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name = "uuidGenerator", strategy = "uuid")
+	private String id;
+	private String taskId;
+	private Integer checkDataCount;
+	private Integer errorDataCount;
+	private Integer warnDataCount;
+	private Integer dataTypeCount;
+
+	
+	public SysDataCheckTaskReport() {
+		 setCheckDataCount(0);
+		 setErrorDataCount(0);
+		 setWarnDataCount(0);
+		 setDataTypeCount(0);
+	}
+	
+	public String getId() {
+		return id;
+	}
+	public void setId(String id) {
+		this.id = id;
+	}
+	public String getTaskId() {
+		return taskId;
+	}
+	public void setTaskId(String taskId) {
+		this.taskId = taskId;
+	}
+	public Integer getCheckDataCount() {
+		return checkDataCount;
+	}
+	public void setCheckDataCount(Integer checkDataCount) {
+		this.checkDataCount = checkDataCount;
+	}
+	public Integer getErrorDataCount() {
+		return errorDataCount;
+	}
+	public void setErrorDataCount(Integer errorDataCount) {
+		this.errorDataCount = errorDataCount;
+	}
+	public Integer getWarnDataCount() {
+		return warnDataCount;
+	}
+	public void setWarnDataCount(Integer warnDataCount) {
+		this.warnDataCount = warnDataCount;
+	}
+	public Integer getDataTypeCount() {
+		return dataTypeCount;
+	}
+	public void setDataTypeCount(Integer dataTypeCount) {
+		this.dataTypeCount = dataTypeCount;
+	}
+}

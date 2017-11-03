@@ -1,0 +1,1 @@
+ALTER TABLE PCS_USER_TOKEN ADD(CLIENT_TYPE VARCHAR2(20) default 'spd_web' not null);

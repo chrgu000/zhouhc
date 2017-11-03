@@ -1,0 +1,89 @@
+package cn.ak4j.yard.spd.bizrule.repository;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRules;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAdjustStockRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdConsumeRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdMoveAreaRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReceiveRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsRule;
+
+public class SpdBizRuleRepositoryTest extends BaseTest{
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	
+	@Test @SuppressWarnings({ "rawtypes"})
+	public void testFindAllWithRelation(){
+		SpdAbstractBizRules rules = brRepository.findAllWithRelations();
+		assertEquals(96, rules.size());
+		assertEquals(39, rules.getAllReplenishRules().size());
+		for(SpdAbstractBizRule rule : rules){
+			assertNotNull(rule.getFeedbackRule());
+			if(rule instanceof SpdAdjustStockRule){
+				assertNotNull(((SpdAdjustStockRule) rule).getDepot());
+			}
+			
+			else if(rule instanceof SpdMoveAreaRule){
+				assertNotNull(((SpdMoveAreaRule) rule).getDirectionRule().getDepot());
+			}
+			
+			else if(rule instanceof SpdReplenishRule){
+				assertNotNull(((SpdReplenishRule) rule).getDirectionRule().getFromDepot());
+				assertNotNull(((SpdReplenishRule) rule).getDirectionRule().getToDepot());
+			}
+			
+			else if(rule instanceof SpdReceiveRule){
+				assertNotNull(((SpdReceiveRule) rule).getDirectionRule().getFromDept());
+				assertNotNull(((SpdReceiveRule) rule).getDirectionRule().getToDepot());
+			}
+			
+			else if(rule instanceof SpdPrepareInformRule){
+				assertNotNull(((SpdPrepareInformRule) rule).getDirectionRule().getFromDept());
+				assertNotNull(((SpdPrepareInformRule) rule).getDirectionRule().getToDepot());
+				assertNotNull(((SpdPrepareInformRule) rule).getConfirmDept());
+			}
+			
+			else if(rule instanceof SpdConsumeRule){
+				assertNotNull(((SpdConsumeRule) rule).getDepot());
+			}
+			
+			else if(rule instanceof SpdReturnGoodsRule){
+				assertNotNull(((SpdReturnGoodsRule) rule).getDirectionRule().getFromDepot());
+				assertNotNull(((SpdReturnGoodsRule) rule).getDirectionRule().getToDept());
+				if(rule.getId().equals("ret_rule_id_01") || rule.getId().equals("ret_rule_id_02")){
+					assertNotNull(((SpdReturnGoodsRule) rule).getOriginRule());
+				}
+			}
+			
+			else if(rule instanceof SpdDailyCleanRule){
+				assertNotNull(((SpdDailyCleanRule) rule).getDepot());
+			}
+			
+			else if(rule instanceof SpdFinacialReconciliationRule){
+				assertNotNull(((SpdFinacialReconciliationRule) rule).getApplyDept());
+				assertNotNull(((SpdFinacialReconciliationRule) rule).getSupplierDept());
+				assertTrue(((SpdFinacialReconciliationRule) rule).getTargetDepots().size()>0);
+			}
+		}
+		
+		SpdReplenishRules replenishRules = rules.getAllReplenishRules();
+		for(SpdReplenishRule replenishRule : replenishRules){
+			assertNotNull(replenishRule.getDirectionRule().getFromDepot());
+			assertNotNull(replenishRule.getDirectionRule().getToDepot());
+		}
+	}
+	
+}

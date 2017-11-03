@@ -1,0 +1,19 @@
+package cn.ak4j.yard.sys.domain;
+
+import cn.ak4j.entity.Entities;
+
+@SuppressWarnings("rawtypes")
+public class YardBatchTasks extends Entities<YardBatchTask>{
+
+	private static final long serialVersionUID = -4274964047846942704L;
+
+	public YardBatchTask findById(String taskId) {
+		for(YardBatchTask task : this){
+			if(task.getId().equals(taskId)){
+				return task;
+			}
+		}
+		return null;
+	}
+	
+}

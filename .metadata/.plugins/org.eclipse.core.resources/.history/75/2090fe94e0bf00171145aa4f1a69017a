@@ -1,0 +1,105 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdMoveAreaBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdMoveAreaBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdMoveAreaBizParams;
+import lombok.Getter;
+
+@Repository
+public class SpdMoveAreaBizRepository extends BaseRepository<SpdMoveAreaBiz, SpdMoveAreaBizs, SpdMoveAreaBizParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	
+	public SpdMoveAreaBizs find(SpdMoveAreaBizParams params,OrderParam order,int pageNo,int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			return new SpdMoveAreaBizs(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdMoveAreaBizs();
+	}
+
+	public int count(SpdMoveAreaBizParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdMoveAreaBizParams params){
+		if(params != null){
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			depotParams.setDepotId(params.getDepotId());
+			if(!depotParams.isEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);	
+				if(depots.size() == 0){
+					return false;
+				}
+				params.setDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+		}
+		return true;	
+	}
+
+	public SpdMoveAreaBiz saveWithItems(SpdMoveAreaBiz moveArea) {
+		save(moveArea);
+		moveArea.updateItemsBizIdAndTime();
+		biRepository.saveAll(moveArea.getItems());
+		return moveArea;
+	}
+
+	public SpdMoveAreaBizs find(SpdMoveAreaBizParams params, OrderParam order, int pageNo, int pageSize, PcsUser user) {
+		params = getParams(params, user);
+		if(order == null){
+			order = new OrderParam();
+		}
+		return find(params, order, pageNo, pageSize);
+	}
+
+	public int countByParams(SpdMoveAreaBizParams params, PcsUser user) {
+		params = getParams(params, user);
+		return count(params);
+	}
+	
+	private SpdMoveAreaBizParams getParams(SpdMoveAreaBizParams params, PcsUser user){
+		if(params == null){
+			params = new SpdMoveAreaBizParams();
+		}
+		PcsDepotParams depotParams = new PcsDepotParams();
+		depotParams.setManageDeptId(new ListParam<String>(user.getDeptId()));
+		PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+		
+		params.setDepotId(new ListParam<String>(depots.pluck("depotId")));
+		return params;
+	}
+
+	public SpdMoveAreaBiz getWithItems(String bizId) {
+		SpdMoveAreaBiz moveAreaBiz = findOne(bizId);
+		SpdBizItems items = biRepository.findWithGoodsByBizId(bizId);
+		moveAreaBiz.setItems(items);
+		return moveAreaBiz;
+	}
+
+}

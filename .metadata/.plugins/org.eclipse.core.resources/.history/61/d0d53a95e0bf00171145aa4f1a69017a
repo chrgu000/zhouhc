@@ -1,0 +1,41 @@
+package cn.ak4j.yard.pcs.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class PcsOrgParams extends QueryParams{
+	
+	private ListParam<String> orgId;
+	private ListParam<String> orgCode;
+	private ListParam<String> orgName;
+	private ListParam<String> orgAbbr;
+	private ListParam<String> orgBusNo;
+	private ListParam<String> orgRegNo;
+	private ListParam<String> orgTaxNo;
+	private ListParam<String> orgCAddress;
+	private ListParam<String> orgOAddress;
+	private ListParam<String> orgTypeName;
+	private ListParam<String> orgLegal;
+	private ListParam<String> orgScope;
+	private DateRangeParam orgCreateDate;
+	private DateRangeParam orgExpDate;
+	private ListParam<Boolean> enabled;
+	private ListParam<Integer> checkStateCode;
+	private ListParam<String> weixinCode;
+	
+	private ListParam<Boolean> saler;
+	private ListParam<Boolean> buyer;
+	private ListParam<Boolean> storage;
+	private ListParam<Boolean> trans;
+	private ListParam<Boolean> agent;
+	private ListParam<Boolean> gov;
+	private ListParam<Boolean> bank;
+	
+	
+}

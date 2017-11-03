@@ -1,0 +1,31 @@
+package cn.ak4j.yard.pcs.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsUserToken;
+import cn.ak4j.yard.pcs.domain.PcsUserTokens;
+import cn.ak4j.yard.pcs.params.PcsUserTokenParams;
+import lombok.Getter;
+
+@Repository
+public class PcsUserTokenRepository extends BaseRepository<PcsUserToken, PcsUserTokens, PcsUserTokenParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+
+	public PcsUserToken findByUserIdAndClientType(String userId, String clientType) {
+		PcsUserTokenParams tokenParams = new PcsUserTokenParams();
+		tokenParams.setClientType(new ListParam<String>(clientType));
+		tokenParams.setUserId(new ListParam<String>(userId));
+		
+		PcsUserTokens tokens = find(tokenParams, new OrderParam(), -1, -1);
+		return CollectionUtils.isEmpty(tokens)?null:tokens.get(0);
+	}
+	
+}

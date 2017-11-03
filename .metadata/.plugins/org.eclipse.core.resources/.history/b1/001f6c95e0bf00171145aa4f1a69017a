@@ -1,0 +1,22 @@
+package cn.ak4j.yard.extend.gep.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
+
+@SuppressWarnings("serial")
+@XmlRootElement(name="BillList")
+public class InmAllotNotices extends ArrayList<InmAllotNotice>{
+
+	public List<InmAllotNotice> getInmAllotNotices() {
+		return this;
+	}
+
+	@XmlElement(name="Bill")
+	public void setInmAllotNotices(List<InmAllotNotice> inmAllotNoticeList) {
+		this.addAll(inmAllotNoticeList);
+	} 
+	
+}

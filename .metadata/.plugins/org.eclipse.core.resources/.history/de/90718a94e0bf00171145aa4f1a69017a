@@ -1,0 +1,247 @@
+package cn.ak4j.yard.spd.service;
+
+import java.util.Date;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.validation.Valid;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StopWatch;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDepotShelfParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.factory.SpdDepotCardFactory;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Slf4j
+public class SpdDepotCardService extends IYardService<SpdDepotCard>{
+	@PersistenceContext
+	@Autowired private EntityManager em;
+	@Autowired private SpdDepotCardRepository dcRepository ;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	@Autowired private SpdDepotCardFactory dcFactory;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	
+	public SpdDepotCards find(SpdDepotCardParams params, OrderParam order, int pageNo, int pageSize) {
+		if(setRelationParams(params)){
+			SpdDepotCards allCards = dcRepository.findAll();
+			if(order != null && order.isNotEmpty() && order.getPropName().indexOf("formatName") > 0){
+				allCards.fillGoodss(goodsRepository.findAll());
+			}
+			if(order != null && order.isNotEmpty() && order.getPropName().indexOf("depotName") > 0){
+				allCards.fillDepot(depotRepository.findAll());
+			}
+			if(order != null && order.isNotEmpty() && order.getPropName().indexOf("shelfName") > 0){
+				allCards.fillDepotShelf(dsRepository);
+			}
+			SpdDepotCards result = new SpdDepotCards(allCards.findByPage(params, order, pageNo, pageSize));
+			return result;
+		}
+		return new SpdDepotCards();
+	}
+	
+	private boolean setRelationParams(SpdDepotCardParams params) {
+		if (params != null) {
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			if(!depotParams.isEmpty()){
+				PcsDepots pcsDepots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+				if (pcsDepots.size() == 0) {
+					return false;
+				}
+				params.setDepotId(new ListParam<String>(pcsDepots.getIds()));
+			}
+			
+			PcsDepotShelfParams shelfParams = new PcsDepotShelfParams();
+			shelfParams.setShelfName(params.getShelfName());
+			shelfParams.setShelfCode(params.getShelfCode());
+			shelfParams.setAreaId(params.getAreaId());
+			if(!shelfParams.isEmpty()){
+				PcsDepotShelfs shelfs = new PcsDepotShelfs(dsRepository.findAll().find(shelfParams));
+				if (shelfs.size() == 0) {
+					return false;
+				} 
+				params.setShelfId(new ListParam<String>(shelfs.getIds()));
+			}
+			
+			YdsGoodsParams goodsParams = new YdsGoodsParams();
+			goodsParams.setFormatName(params.getFormatName());
+			if(!goodsParams.isEmpty()){
+				YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams, depotRepository, dcRepository));
+				if (goodss.size() == 0) {
+					return false;
+				}
+				params.setGoodsId(new ListParam<String>(goodss.getIds()));
+			}
+			
+		}
+		return true;
+	}
+	
+	
+	public SpdDepotCards findByShelfCode(SpdDepotCardParams params) {
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(params.getDepotId().getValue().get(0));
+		if(depot == null){
+			throw new NotFoundException(YardExceptionType.not_found_depot, params.getDepotId().getValue().get(0));
+		}
+		
+		PcsDepotArea depotArea = depot.getAreas().findById(params.getAreaId().getValue().get(0));
+		if(depotArea == null){
+			throw new NotFoundException(YardExceptionType.not_found_area, depot.getDepotName(), params.getAreaId().getValue().get(0));
+		}
+		
+		PcsDepotShelf depotShelf = depotArea.getShelfs().findByShelfCode(params.getShelfCode().getValue().get(0));
+		if(depotShelf == null){
+			throw new NotFoundException(YardExceptionType.not_found_shelf, depot.getDepotName(), depotArea.getAreaName(), params.getShelfCode().getValue().get(0));
+		}
+		params.setShelfId(new ListParam<String>(depotShelf.getDepotShelfId()));
+		SpdDepotCards depotCards = new SpdDepotCards(dcRepository.findAll().find(params));
+		return depotCards;
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allSpdDepotCards\"")
+	public SpdDepotCard add(@Valid SpdDepotCard depotCard, IUser user){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotCard.getDepotId());
+		depot.fillCards(dcRepository);
+		SpdDepotCard card = depot.getCards().findEnableCardByGoodsId(depotCard.getGoodsId());
+		if (card != null){
+			YdsGoods goods = goodsRepository.findAll().findById(depotCard.getGoodsId());
+			throw new InvalidDataException(YardExceptionType.invalid_exist_depot_card, goods.getFormatName(), depot.getDepotName());
+		}
+		if(StringUtils.isEmpty(depotCard.getCardCode())){
+			depotCard.setCardCode(codeService.publishCode(CodeSort.zhangye).getCode());	
+		}
+		
+		return dcRepository.save(depotCard);
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allSpdDepotCards\"")
+	public void delete(String cardId, IUser user){
+		SpdDepotCard spdDepotCard = dcRepository.findAll().findById(cardId);
+		if (!spdDepotCard.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, "code:" + spdDepotCard.getCardCode());
+		}
+		dcRepository.delete(spdDepotCard);
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allSpdDepotCards\"")
+	public SpdDepotCard modify (@Valid SpdDepotCard depotCard,IUser user ){
+		SpdDepotCard depotCardPo = dcRepository.findAll().findById(depotCard.getDepotCardId());
+		
+		//启用帐页时，判断当前产品在当前仓库是否已经存了启用账页
+		log.debug("depotCardPo:{}, depotCard:{}", depotCardPo, depotCard);
+		if(!depotCardPo.isEnabled()&&depotCard.isEnabled()){
+			PcsDepot depot = depotRepository.findAllWithRelations().findById(depotCard.getDepotId());
+			depot.fillCards(dcRepository);
+			SpdDepotCard card = depot.getCards().findEnableCardByGoodsId(depotCard.getGoodsId());
+			if(card != null && !(card.getDepotCardId().equals(depotCard.getDepotCardId()))){
+				throw new OperateForbiddenException(YardExceptionType.forbid_goods_exist_enabled_depot_card, depotCard.getGoodsId() ,depot.getDepotName());
+			}
+		}
+		
+		//禁用帐页时，判断当前帐页的产品是否存在未完成作业
+		if(depotCardPo.isEnabled()&&!depotCard.isEnabled()){
+			boolean  uncompleteDepotTask = dtRepository.findUncompleteDepotTask(depotCard.getDepotId(), depotCard.getGoodsId());
+			if(uncompleteDepotTask){
+				throw new OperateForbiddenException(YardExceptionType.forbid_exist_uncomplete_task);
+			}
+		}
+		
+		depotCardPo.update(depotCard, user.getOrgId(), user.getUserId());
+		dcRepository.save(depotCardPo);
+		return depotCardPo;
+	}
+	
+	@CacheEvict(value = "longTimeCache", key = "\"allSpdDepotCards\"")
+	public SpdDepotCard updateCheckState(String cardId, int checkStateCode, Date lastDate,IUser user){
+		SpdDepotCard depotCard = dcRepository.findAll().findById(cardId);
+		if(CheckState.commited.getCode() == checkStateCode){
+			if(!depotCard.isEnabled()){
+				throw new OperateForbiddenException("禁止提交未启用的账页", YardExceptionType.forbide_update, depotCard.getCardCode());
+			}
+		}
+		depotCard.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		dcRepository.save(depotCard);
+		
+		return depotCard;
+	}
+	
+	/**
+	 * 初始化仓库账页，为没有账页的产品建立账页
+	 */
+	@CacheEvict(value = "longTimeCache", key = "\"allSpdDepotCards\"")
+	public int initDepotCards(String depotId, IUser user){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		depot.fillCards(dcRepository);
+		//根据仓库的产品类型获取对应的产品的信息
+		YdsGoodss allGoodss = goodsRepository.findAll().getEnableGoodss().findByGoodsType(depot.getGoodsType());
+		SpdDepotCards allCards = depot.getCards().getEnableCards();
+		
+		//遍历查找没有账页的产品，查找名为虚拟货位的货位，如果没有名为虚拟货位的账页则抛出异常，然后根据货位以及产品建立账页
+		YdsGoodss notExsitCardGoodss = new YdsGoodss();
+		allGoodss.forEach(goods->{
+			SpdDepotCard theCard = CollectionUtils.findWhere("goodsId", goods.getGoodsId(), allCards);
+			if(theCard == null){
+				notExsitCardGoodss.add(goods);
+			}
+		});
+		log.info("find {} goods without card", notExsitCardGoodss.size());
+		SpdDepotCards depotCards = dcFactory.buildAutoCard(depot, notExsitCardGoodss, user);
+		StopWatch sw = new StopWatch("初始化账页");
+		int i = 0;
+		for(SpdDepotCard depotCard : depotCards){
+			sw.start();
+			depotCard.updateCheckState(CheckState.commited.getCode(), depotCard.getMaintenanceInfo().getLastDate(), user.getOrgId(), user.getUserId());
+			dcRepository.save(depotCard);
+			sw.stop();
+			int averageTime = (int)sw.getTotalTimeMillis()/(i+1);
+			int restTime = (int)(averageTime)*(depotCards.size()-i)/1000;
+			log.info("初始化账页[{}-{}], 耗时:{}ms, 预计剩余:{}s", depotCards.size(), i, sw.getLastTaskTimeMillis(), restTime);
+			i++;
+		};
+		
+		log.info("init depot cards, create {} cards", depotCards.size());
+		return depotCards.size();
+	}
+
+}

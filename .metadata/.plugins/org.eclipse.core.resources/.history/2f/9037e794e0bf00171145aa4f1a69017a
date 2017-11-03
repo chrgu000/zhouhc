@@ -1,0 +1,66 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.io.Serializable;
+
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.IDescribable;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * @Description:
+ * @author wuyw
+ * @date 2017年8月2日上午10:05:03
+ *
+ */
+@SuppressWarnings("serial")
+@Embeddable
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class SpdMoveAreaDirectionRule implements Serializable, IChildRule, IDescribable {
+	@Column(name = "from_depot_id")
+	@NotNull(message="来源仓库不能为空") @Setter @Getter 
+	private String depotId;
+	
+	@NotNull(message="来源货区类型不能为空") @Setter @Getter 
+	private String fromAreaType;
+	
+//	private String toDepotId;
+	
+	@NotNull(message="目标货区类型不能为空") @Setter @Getter 
+	private String toAreaType;
+	
+	@Transient @Setter @Getter
+	private PcsDepot depot;
+	
+	@Override
+	public String getDescription() {
+		if(depot != null){
+			return String.format("由%s的%s货区移动%s货区", depot.getDepotName(), fromAreaType, toAreaType);
+		}
+		return null;
+	}
+	
+	public boolean equals(Object obj){
+		if(obj == null || !(obj instanceof SpdMoveAreaDirectionRule)){
+			return false;
+		}
+		
+		SpdMoveAreaDirectionRule directionRule = (SpdMoveAreaDirectionRule)obj;
+		if(getDepotId().equals(directionRule.getDepotId())
+				&& getFromAreaType().equals(directionRule.getFromAreaType())
+				&& getToAreaType().equals(directionRule.getToAreaType())){
+			return true;
+		}
+		
+		return false;
+	}
+}

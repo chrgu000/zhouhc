@@ -1,0 +1,104 @@
+package cn.ak4j.yard.yds.service;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.yds.domain.YdsWorkBook;
+import cn.ak4j.yard.yds.repository.YdsWorkBookRepository;
+import static org.junit.Assert.*;
+
+public class YdsWorkBookServiceTest extends BaseTest{
+	
+	@Autowired private YdsWorkBookRepository wbRepository;
+	@Autowired private YdsWorkBookService wbService;
+	@Autowired private PcsUserRepository userRepository;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+
+	@Test public void testAdd(){
+		PcsUser user = userRepository.findAll().findByUserCode("xyk");
+		YdsWorkBook workBook = wbService.add(createWorkBook(user), user);
+		
+		//重复数据
+		thrown.expect(InvalidDataException.class);
+		thrown.expectMessage(String.format("字典[类别编码:%s, 字典类别名称:%s, 字典键名:%s]已经存在！", workBook.getSortCode(), workBook.getSortName(), workBook.getKeyName()));
+		wbService.add(workBook, user);
+		
+		//重复keyInx
+		workBook.setKeyName("testKeyName");
+		workBook.setKeyInx(2);
+		thrown.expect(InvalidDataException.class);
+		thrown.expectMessage(String.format("字典[类别编码:%s, 字典类别名称:%s, 字典键序:%d]已经存在！", workBook.getSortCode(), workBook.getSortName(), workBook.getKeyInx()));
+		wbService.add(workBook, user);
+		
+		//空对象
+		thrown.expect(InvalidDataException.class);
+		wbService.add(new YdsWorkBook(), user);
+		
+	}
+	
+	@Test public void testUpdate(){
+		PcsUser user = userRepository.findAll().findByUserCode("xyk");
+		
+		String id = "eqp_sort_name_011";
+		YdsWorkBook workBook = wbRepository.findAll().findById(id);
+		workBook = wbService.modify(workBook, user);
+		
+		workBook.setKeyName("testKeyName");
+		workBook = wbService.modify(workBook, user);
+		
+		//重复keyName
+		workBook.setKeyName("库房调拨");
+		thrown.expect(InvalidDataException.class);
+		wbService.modify(workBook, user);
+		
+		//重复字典键序
+		workBook.setKeyName("科室调拨");
+		workBook.setKeyInx(2);
+		thrown.expect(InvalidDataException.class);
+		wbService.modify(workBook, user);
+
+		//空值
+		thrown.expect(InvalidDataException.class);
+		wbService.modify(new YdsWorkBook(), user);
+	}
+	
+	@Test public void testUpdateCheckState(){
+		PcsUser user = userRepository.findAll().findByUserCode("test");
+		String normalId = "eqp_sort_name_011";
+		String forbiddenId = "eqp_sort_name_012";
+		YdsWorkBook normalWorkBook = wbRepository.findAll().findById(normalId);
+		YdsWorkBook forbiddenWorkBook = wbRepository.findAll().findById(forbiddenId);
+		
+		normalWorkBook = wbService.updateCheckState(normalId, CheckState.commited.getCode(), normalWorkBook.getLastUpdateTime(), user);
+		assertEquals(CheckState.commited.getCode(), normalWorkBook.getCheckStateCode().intValue());
+		
+		thrown.expect(OperateForbiddenException.class);
+		thrown.expectMessage(String.format(YardExceptionType.forbid_edit_uneditable_workbook.getDescription(), forbiddenWorkBook.getKeyName()));
+		wbService.updateCheckState(forbiddenId, CheckState.commited.getCode(), forbiddenWorkBook.getLastUpdateTime(), user);
+	}
+	
+	private YdsWorkBook createWorkBook(PcsUser user) {
+		YdsWorkBook workBook = new YdsWorkBook();
+		workBook.setSortCode("test");
+		workBook.setSortName("test");
+		workBook.setKeyName("test");
+		workBook.setKeyValue("test");
+		workBook.setKeyInx(1);
+		workBook.setEnabled(true);
+		workBook.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		return workBook;
+	}
+	
+}

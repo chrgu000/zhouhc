@@ -1,0 +1,5 @@
+update yds_goods set prepare_unit_lv = 2;
+update yds_goods set settle_unit_lv = 1;
+update yds_goods set UNIT_MIN_NAME = UNIT_MID_NAME;
+update yds_goods set UNIT_MIN_SUM = UNIT_MID_SUM;
+update yds_goods set UNIT_MID_SUM = 1;

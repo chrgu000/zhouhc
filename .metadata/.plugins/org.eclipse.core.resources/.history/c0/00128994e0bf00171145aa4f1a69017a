@@ -1,0 +1,250 @@
+package cn.ak4j.yard.spd.service;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.SpdInventoryType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotAreaRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBizs;
+import cn.ak4j.yard.spd.bizplan.factory.SpdAdjustStockFactory;
+import cn.ak4j.yard.spd.bizplan.service.SpdAdjustStockBizService;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventoryItems;
+import cn.ak4j.yard.spd.domain.SpdInventorys;
+import cn.ak4j.yard.spd.factory.SpdInventoryFactory;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.repository.SpdInventoryItemRepository;
+import cn.ak4j.yard.spd.repository.SpdInventoryRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Service
+@SuppressWarnings({"unchecked"})
+public class SpdInventoryService extends IYardService<SpdInventory>{
+	
+	@PersistenceContext @Autowired 
+	EntityManager em;
+	@Autowired private SpdInventoryItemRepository iiRepository;
+	@Autowired private PcsDepotShelfRepository dsRepository;
+	@Autowired private SpdInventoryRepository inventoryRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotAreaRepository daRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdAdjustStockFactory asFactory;
+	@Autowired private SpdAdjustStockBizService asbService;
+	@Autowired private SpdInventoryFactory inventoryFactory;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+
+	@Transactional
+	public SpdInventory add(SpdInventory inventory, IUser user){
+		inventory.setInventoryCode(codeService.publishCode(CodeSort.pandiandan).getCode());
+		inventoryRepository.saveWithItems(inventory);
+		return inventory;		
+	} 
+	
+	@Transactional
+	public void delete(String inventoryId, IUser user) {		
+		SpdInventory inventory = inventoryRepository.findByIdWithRelations(inventoryId);
+		if(!inventory.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, String.format("盘点编码:%s", inventory.getInventoryCode()));
+		}
+
+		if(CollectionUtils.isNotEmpty(inventory.getItems())){
+			iiRepository.delete(inventory.getItems());;
+		}
+
+		inventoryRepository.delete(inventory);
+	}
+	
+	@Transactional
+	public SpdInventory modify(SpdInventory inventory, IUser user) {
+		SpdInventory inventoryPO = inventoryRepository.findOne(inventory.getInventoryId());
+		if(!inventoryPO.canUpdate()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_update, String.format("盘点编码:%s", inventoryPO.getInventoryCode()));
+		}
+		
+		inventoryPO.update(inventory, user.getOrgId(), user.getUserId());
+		inventoryRepository.save(inventoryPO);
+		
+		return inventoryPO;
+	}
+	
+	@Transactional
+	public SpdInventory updateCheckState(String inventoryId, int checkStateCode, Date lastDate, IUser user) {
+		SpdInventory spdDepotInventoryPO = inventoryRepository.findOne(inventoryId);
+		if(CheckState.commited.getCode()  == checkStateCode){
+			return commit(inventoryId, checkStateCode, lastDate, (PcsUser)user);
+			
+		}else if(CheckState.reviewed.getCode()  == checkStateCode){
+			return review(inventoryId, checkStateCode, lastDate, (PcsUser)user);
+		}
+		
+		spdDepotInventoryPO.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		spdDepotInventoryPO = inventoryRepository.save(spdDepotInventoryPO);
+		return spdDepotInventoryPO;
+	}
+
+	public SpdInventory commit(String inventoryId, int checkStateCode, Date lastDate, PcsUser user) {
+		throw new UnsupportedOperationException("盘点单不支持该行为");
+	}
+
+	
+	public SpdInventory review(String inventoryId, int checkStateCode, Date lastDate, PcsUser user) {
+		SpdInventory inventoryPO = inventoryRepository.findByIdWithRelations(inventoryId);
+		//判断是否存在盘点明细
+		if(CollectionUtils.isEmpty(inventoryPO.getItems())){
+			 throw new InvalidDataException(YardExceptionType.invalid_item_not_data, inventoryPO.getInventoryCode());
+		}
+		
+		//判断是否已经完全盘点
+		if(inventoryPO.getFixed().equals(SpdInventoryType.spare_parts.getCode())){
+			if(!inventoryPO.getItems().isCompletelyInventory()){
+				throw new InvalidDataException("当前盘点单未完全盘点");
+			}
+		}
+		
+		fillAllRelations(inventoryPO);
+		SpdAdjustStockBizs adjustStocks =  asFactory.buildAdjustStockFromInventory(inventoryPO, user);
+		asbService.batchAdd(adjustStocks, user);
+		
+		inventoryPO.updateCheckState(checkStateCode, lastDate, user);
+		return inventoryPO;
+	}
+
+
+		
+	/**
+	 * 根据当前盘点计划自动创建盘点明细
+	 * @param inventoryId
+	 * @param user
+	 */
+	public void autoCreateInventoryItems(String inventoryId, PcsUser user){
+		SpdInventory inventory = inventoryRepository.findByIdWithRelations(inventoryId);
+		//查找这个货区下的所有货位
+		PcsDepotShelfs depotShelfs = dsRepository.findAll().findByAreaId(inventory.getAreaId());
+		
+		//查找这些货位的所有帐页
+		SpdDepotCards depotCards = dcRepository.findAll().findEnableCardByShelfIds(depotShelfs.getIds(), inventory.getDepotArea().getAreaType());
+		SpdShelfStocks shelfStocks = ssRepository.findByShelfTypeAndGoodss(inventory.getDepotId(), inventory.getDepotArea().getAreaType(), CollectionUtils.pluck("goodsId", depotCards), 0);
+		shelfStocks.fillGoodsLots(glRepository);
+		
+		if(CollectionUtils.isEmpty(shelfStocks)){
+			throw new InvalidDataException(String.format("当前仓库[%s],货区[%s]无库存", inventory.getDepotArea().getDepot().getDepotName(), 
+					inventory.getDepotArea().getAreaName()));
+		}
+		
+		inventory.setItems(inventoryFactory.buildInventoryItemsFromShelfStocks(inventory, shelfStocks, user));
+		inventory.updateItemsId();
+		iiRepository.saveAll(inventory.getItems());
+	}
+	
+	/**
+	 * 拆分当前盘点计划
+	 * @param inventoryId
+	 * @param batchGoodsSize
+	 * @param user
+	 */
+	public void splitInventory(String inventoryId, int batchGoodsSize, PcsUser user){
+		SpdInventory originInventory = inventoryRepository.findByIdWithRelations(inventoryId);
+		SpdInventorys inventorys = originInventory.splitInventory(originInventory, batchGoodsSize);
+		for(SpdInventory inventory : inventorys){
+			add(inventory, user);
+		}
+	}
+	
+	
+	public void autoCreateInventoryItemsAndSplit(String inventoryId, int batchGoodsSize, PcsUser user){
+		autoCreateInventoryItems(inventoryId, user);
+		splitInventory(inventoryId, batchGoodsSize, user);
+	}
+	
+	public SpdInventory getInventoryForReport(String inventoryId) {
+		SpdInventory inventory = inventoryRepository.findOne(inventoryId);
+		
+		fillAllRelations(inventory);
+		
+		SpdInventoryItems items = iiRepository.findByInventoryId(inventoryId);
+		
+		//查找货架，并同作业明细关联
+//		List<String> shelfIds = items.pluck("shelfId");
+//		PcsDepotShelfs shelfs = dsRepository.findByIds(shelfIds);
+//		items.fillShelfs(shelfs);
+		items.orderByDepotShelf(inventory.getDepot());
+		
+		//查找产品批次，并同作业明细关联
+		
+		List<String> lotIds = items.pluck("stockGoodsLotId");
+		YdsGoodsLotParams lotParam = new YdsGoodsLotParams();
+		lotParam.setGoodsLotId(new ListParam<String>(lotIds));
+		YdsGoodsLots goodsLots = new YdsGoodsLots(glRepository.findAll().find(lotParam));
+		items.fillGoodsLots(goodsLots);
+		items.fillGoods(goodsRepository);
+		
+		//关联盘点单明细
+		inventory.setItems(items);
+		return inventory;
+	}
+
+	
+	public void fillAllRelations(SpdInventory inventory){
+		//查找仓库关联
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		PcsDepot depot = CollectionUtils.findWhere("depotId", inventory.getDepotId(),  allDepots);
+		depot.fillCards(dcRepository);
+		inventory.setDepot(depot);
+		
+		//查找货区
+		PcsDepotArea depotArea = daRepository.findAllWithRelation().findById(inventory.getAreaId());
+		inventory.setDepotArea(depotArea);
+		
+		//查找机构用户部门并关联
+		PcsOrg pcsOrg = orgRepository.findAll().findById(inventory.getOrgId());
+		inventory.setOrg(pcsOrg);
+		
+		PcsDept dept = deptRepository.findAll().findById(inventory.getDeptId());
+		inventory.setDept(dept);
+		
+		PcsUser user = userRepository.findAll().findById(inventory.getInventoryUser());
+		inventory.setUser(user);
+	}
+}

@@ -1,0 +1,61 @@
+package cn.ak4j.yard.yds.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfos;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import lombok.Getter;
+
+@Repository
+public class YdsGoodsRepository extends BaseRepository<YdsGoods, YdsGoodss, YdsGoodsParams, String> {
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private YdsGoodsInfoRepository giRepository;
+	
+	
+	@Cacheable(value="longTimeCache", key="\"allGoodss\"")
+	public YdsGoodss findAll(){
+		YdsGoodss result =  getAll();	
+		YdsGoodsInfos infos = giRepository.findAll();
+		result.fillGoodsInfos(infos);
+		
+		return result;
+	}
+	
+//	@Deprecated
+//	public YdsGoods findOne(String goodsId){
+//		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+//	}
+	
+	@Deprecated
+	public int count(YdsGoodsParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsGoodss find(YdsGoodsParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsGoodss findByIds(List<String> ids){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsGoodss find(YdsGoodsParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+}

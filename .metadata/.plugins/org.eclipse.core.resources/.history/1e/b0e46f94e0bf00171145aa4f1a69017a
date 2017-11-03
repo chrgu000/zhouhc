@@ -1,0 +1,25 @@
+package cn.ak4j.yard.spd.task.assember;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.Date;
+
+import org.apache.commons.beanutils.BeanUtils;
+
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.to.NewSpdTurnoverBoxItemTO;
+
+public class SpdOffShelfTaskItemAssember {
+
+	public static SpdOffShelfTaskItem buildSpdOffShelfTaskItem(NewSpdTurnoverBoxItemTO newSpdTurnoverBoxItemTO,PcsUser user){
+		SpdOffShelfTaskItem offShelfItem = new SpdOffShelfTaskItem();
+		try {
+			BeanUtils.copyProperties(offShelfItem, newSpdTurnoverBoxItemTO);
+		} catch (IllegalAccessException | InvocationTargetException e) {
+			e.printStackTrace();
+		}
+		offShelfItem.setCreateTime(new Date());
+		offShelfItem.setLastUpdateTime(new Date());
+		return offShelfItem;
+	}
+}

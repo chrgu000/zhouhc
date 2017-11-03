@@ -1,0 +1,60 @@
+package cn.ak4j.yard.spd.supply.web;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.extend.gep.domain.SpdGepPrepareInformBizTO;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveItemRepository;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.spd.supply.service.SpdDeliveryOrderService;
+
+@RestController
+public class SpdSupplyResource {
+
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	@Autowired private SpdReceiveItemRepository riRepository;
+	
+	@Autowired private SpdDeliveryOrderService doService;
+	
+	@RequestMapping(value="/yard/spd/supplyCodeType")
+	public Map<String, String> getCodeType(@RequestParam(value="code", required=true)String code){
+		Map<String, String> result = new HashMap<String, String>();
+		SpdReceiveBizParams receiveParams = new SpdReceiveBizParams();
+		receiveParams.setSendCode(new ListParam<String>(code));
+		SpdReceiveBizs receives = rbRepository.find(receiveParams);
+		if(CollectionUtils.isNotEmpty(receives)){
+			result.put(code, "sendCode");
+			return result;
+		}
+		
+		SpdReceiveItemParams itemParams = new SpdReceiveItemParams();
+		itemParams.setBoxNo(new ListParam<String>(code));
+		SpdReceiveItems receiveItems = riRepository.find(itemParams);
+		if(CollectionUtils.isNotEmpty(receiveItems)){
+			result.put(code, "boxNo");
+			return result;
+		}else{
+			result.put(code, "unknown");
+			return result;
+		}
+	}
+	
+	@RequestMapping(value="/yard/spd/spdDeliveryOrders/prepareDeliveryOrders", method = RequestMethod.POST)
+	public SpdDeliveryOrders deliveryAsPlan(@RequestBody SpdGepPrepareInformBizTO prepareInformBizTO) throws Exception{
+		return doService.deliveryAsPlan(prepareInformBizTO);
+	}
+}

@@ -1,0 +1,27 @@
+package cn.ak4j.yard.spd.reconciliation.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+@SuppressWarnings("serial")
+public class SpdDailyCleanBizParams extends QueryParams{
+
+	private ListParam<String> finacialReconciliationId;
+	private DateRangeParam targetDate;
+	private ListParam<String> bizId;
+	private ListParam<String> bizCode;
+	private ListParam<String> depotId;
+	private ListParam<String> reviewUserId;
+	private ListParam<String> bizRuleId;
+	private ListParam<Integer> checkStateCode;
+//	private ListParam<String> relatedDeptId;
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	
+	private ListParam<String> depotName;
+	
+}

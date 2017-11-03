@@ -1,0 +1,16 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.report.rep_aggr_by_goods;
+
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReport;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportType;
+
+public class Report extends SpdReconciliationReport<Items>{
+
+	
+	@Override
+	public SpdReconciliationReportType getReportType() {
+		return SpdReconciliationReportType.replenish_aggregate_by_goods;
+	}
+
+}

@@ -1,0 +1,40 @@
+package cn.ak4j.yard.spd.reconciliation.factory;
+
+import java.util.Date;
+
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedgerItem;
+
+@Component
+public class SpdGeneralLedgerFactory {
+
+	public SpdGeneralLedgerItem build(PcsDept dept, SpdBizItem receiveItem){
+		int unitLv = YdsUnitLv.base.getLv();
+		SpdGeneralLedgerItem generalLedgerItem = new SpdGeneralLedgerItem();
+		generalLedgerItem.setGoodsId(receiveItem.getGoodsId());
+		generalLedgerItem.setLotId(receiveItem.getLotId());
+		generalLedgerItem.setUnitLv(unitLv);
+		
+		int qty = receiveItem.getConfirmQty(unitLv);//结算单位的数量
+		float unitPrice = receiveItem.getConfirmAmount()/qty;//结算单位的单价
+		
+		generalLedgerItem.setStorageQty(qty);
+		generalLedgerItem.setCurrentStorageQty(qty);
+		generalLedgerItem.setUnitPrice(unitPrice);
+		generalLedgerItem.setTotalAmount(receiveItem.getConfirmAmount());
+		generalLedgerItem.setDealQty(0);
+		generalLedgerItem.setReturnQty(0);
+		
+		generalLedgerItem.setOwnerDeptId(dept.getDeptId());
+		generalLedgerItem.setOwnerOrgId(dept.getOrgId());
+		
+		generalLedgerItem.setCreateTime(new Date());
+		generalLedgerItem.setLastUpdateTime(new Date());
+		return generalLedgerItem;
+	}
+	
+}

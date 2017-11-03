@@ -1,0 +1,131 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.DateRange;
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdReceiveItemsResourceTest extends BaseTest{
+	
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+
+	@Test public void testListByBizId() throws Exception{
+		String bizId = "rece_biz_id_001";
+		SpdReceiveItemParams params = new SpdReceiveItemParams();
+		params.setBizId(new ListParam<String>(bizId));
+		SpdBizItems bizItems = mockMvcHelper.findList(SpdBizItems.class, xykUserCode, "spd", "spdReceiveItems", params, status().isOk(), null);
+		SpdBizItems getBizItems = biRepository.findWithGoodsByBizId(bizId);
+		assertEquals(getBizItems.size(), bizItems.size());
+		getBizItems.forEach(item->{
+			SpdBizItem theItem = CollectionUtils.findWhere("bizItemId", item.getBizItemId(), bizItems);
+			assertNotNull(theItem);
+			assertEquals(item.getBizId(), theItem.getBizId());
+		});
+		
+
+		Date end = Calendar.getInstance().getTime();
+		Calendar start = Calendar.getInstance();
+		start.add(Calendar.DAY_OF_YEAR, -130);
+		params.setSterilizeLotNo(new ListParam<String>("gsNO009"));
+		params.setSterilizeTime(new DateRangeParam(new DateRange(start.getTime(), end)));
+		SpdBizItems paramsBizItems = mockMvcHelper.findList(SpdBizItems.class, xykUserCode, "spd", "spdReceiveItems", params, status().isOk(), null);
+		assertEquals(0, paramsBizItems.size());
+		
+	}
+
+	@Test public void testCountByBizId() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String bizId = "rece_biz_id_001";
+		String url = "/spd/spdReceiveItems/count?params={params}&accessToken={accessToken}";
+		SpdReceiveItemParams params = new SpdReceiveItemParams();
+		params.setBizId(new ListParam<String>(bizId));
+		int count = mockMvcHelper.mockGet(Integer.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(2, count);
+	}
+	
+	@Test public void testListByBizIds() throws Exception{
+		List<String> bizIds = new ArrayList<String>();
+		bizIds.add("rece_biz_id_001");
+		bizIds.add("rece_biz_id_002");
+		bizIds.add("rece_biz_id_003");
+		
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(bizIds));
+		SpdBizItems items = biRepository.find(params);
+		SpdBizItems bizItems = mockMvcHelper.findList(SpdBizItems.class, xykUserCode, params);
+		assertEquals(items.size(), bizItems.size());
+		
+		items.forEach(item->{
+			SpdBizItem theItem = CollectionUtils.findWhere("bizItemId", item.getBizItemId(), bizItems);
+			assertNotNull(theItem);
+			assertEquals(item.getBizId(), theItem.getBizId());
+		});
+		
+	}
+	
+	@Test public void testListByBizCode() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String bizCode = "1041703311";
+		
+		String url = "/spd/spdBizItems/bizCode,{bizCode}?accessToken={accessToken}";
+		SpdBizItems bizItems = mockMvcHelper.mockGet(SpdBizItems.class, url, bizCode, accessToken);
+		SpdBizItems getBizItems = biRepository.findByBizCode(new SpdBizItemParams(), new OrderParam(), bizCode);		
+		assertEquals(getBizItems.size(), bizItems.size());
+		
+		getBizItems.forEach(item->{
+			SpdBizItem theItem = CollectionUtils.findWhere("bizItemId", item.getBizItemId(), bizItems);
+			assertNotNull(theItem);
+			assertEquals(item.getBizId(), item.getBizId());
+		});
+	}
+
+	@Test public void testFindReceiveItemsByBoxNos() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReceiveItems?params={params}&accessToken={accessToken}";
+		SpdReceiveItemParams params = new SpdReceiveItemParams();
+		String boxNo = "NO2";
+		params.setBoxNo(new ListParam<String>(boxNo));
+		SpdReceiveItems items = mockMvcHelper.mockGet(SpdReceiveItems.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		items.forEach(item->{
+			assertEquals(boxNo, item.getBoxNo());
+		});
+	}
+	
+	@Test public void testFindUncompleteReceiveItems() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/uncompletedDealItems(depotId,{depotId})?accessToken={accessToken}&pageSize=-1";
+		SpdReceiveItems items = mockMvcHelper.mockGet(SpdReceiveItems.class, url, "depot_id_001", accessToken);
+		assertEquals(24, items.size());
+		items.fillGoods(goodsRepository);
+		items.forEach(item->{
+			assertTrue(item.getConfirmQtyByBaseUnit()>(item.getDealQtyByBaseUnit()+item.getReturnQty(YdsUnitLv.base.getLv())));
+		});
+		
+	}
+	
+}

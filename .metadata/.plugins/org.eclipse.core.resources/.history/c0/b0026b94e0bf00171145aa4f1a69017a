@@ -1,0 +1,23 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+
+@SuppressWarnings({"unchecked", "rawtypes", "serial"})
+public class SpdDispatcherRefs extends Entities<SpdDispatcherRef>{
+
+	public SpdDispatcherRefs(){}
+	
+	public SpdDispatcherRefs(List entities){
+		super(entities);
+	}
+	
+	public SpdBizItems getAllBizItems(){
+		SpdBizItems result = new SpdBizItems();
+		this.forEach(ref->result.addAll(ref.getGoodsItems()));
+		return result;
+	}
+	
+}

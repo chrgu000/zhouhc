@@ -1,0 +1,1 @@
+alter table spd_fin_rec_item add(reconciliation_id varchar2(32));

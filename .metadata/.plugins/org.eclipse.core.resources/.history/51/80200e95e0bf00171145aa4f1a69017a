@@ -1,0 +1,37 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import java.util.Collections;
+
+import cn.ak4j.yard.enums.AmqpMsgType;
+
+/**
+* @Description: TODO(描述该文件做什么)
+* @author zhengyf
+* @date 2017年7月31日 下午5:38:23
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+public class SpdReturnGoodsBizSteps extends SpdBizSteps{
+
+	public static SpdBizStep create_return_goods = new SpdBizStep(1, AmqpMsgType.CREATE_RETURN_GOODS_BIZ.getCode(), "作业步骤模板", "return_goods_created", "退货已创建");
+	public static SpdBizStep review_return_goods = new SpdBizStep(2, AmqpMsgType.REVIEW_RETURN_GOODS_BIZ.getCode(), "作业步骤模板", "return_goods_confirmed", "已确认退货");
+	public static SpdBizStep create_off_shelf_dispatcher = new SpdBizStep(3, AmqpMsgType.CREATE_OFF_SHELF_DISPATCHER.getCode(), "作业步骤模板", "dispatcher_created", "调度待审核");
+	public static SpdBizStep create_off_shelf_task = new SpdBizStep(4, AmqpMsgType.CREATE_OFF_SHELF_TASK.getCode(), "作业步骤模板", "off_shelf_task_created", "下架待审核");
+	public static SpdBizStep complete_off_shelf_task = new SpdBizStep(5, AmqpMsgType.CONFIRM_OFF_SHELF_TASK.getCode(), "作业步骤模板", "off_shelf_task_completed", "下架完成");
+	public static SpdBizStep sync_to_supplier = new SpdBizStep(6, AmqpMsgType.SYNC_RETURN_GOODS_BIZ_TO_SUPPLIER.getCode(), "作业步骤模板", "synchronized", "退货已同步");
+	public static SpdBizStep complete_return_goods = new SpdBizStep(7, AmqpMsgType.COMPLETE_RETURN_GOODS_BIZ.getCode(), "作业步骤模板", "return_goods_completed", "退货完成");
+	
+	public SpdReturnGoodsBizSteps(){
+		this.add(create_return_goods);
+		this.add(review_return_goods);
+		this.add(create_off_shelf_dispatcher);
+		this.add(create_off_shelf_task);
+		this.add(complete_off_shelf_task);
+		this.add(sync_to_supplier);
+		this.add(complete_return_goods);
+		
+		Collections.sort(this, comparator);
+	}
+	
+}

@@ -1,0 +1,50 @@
+package cn.ak4j.yard.sys.domain;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 时间资料码
+* @author zhengyf
+* @date 2017年3月16日 下午2:32:10
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+public class YardTimeSequenceCode extends AbstractYardCode{
+
+	//日期码
+	@Getter @Setter private String dateCode;
+	
+	//步进码
+	@Getter @Setter private Integer sequenceCode;
+	
+	public YardTimeSequenceCode(CodeSort codeSort){
+		super(codeSort);
+	}
+	
+	public YardTimeSequenceCode(CodeSort codeSort, String dateCode, Integer sequenceCode){
+		this(codeSort);
+		this.dateCode = dateCode;
+		this.sequenceCode = sequenceCode;
+		
+	}
+	
+	public String getCode(){
+		StringBuffer buf = new StringBuffer();
+		buf.append(getSortCode())
+		   .append(getDateCode())
+		   .append(getSequenceCode());
+		String result = buf.toString();
+		return result;
+	}
+	
+	@Override
+	public String getMeterialCode() {
+		return dateCode+sequenceCode;
+	}
+	
+	public boolean equals(Object yardCode){
+		return getCode().equals(((YardTimeSequenceCode)yardCode).getCode());
+	}
+	
+}

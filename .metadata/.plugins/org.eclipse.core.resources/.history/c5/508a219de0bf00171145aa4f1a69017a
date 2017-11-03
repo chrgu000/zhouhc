@@ -1,0 +1,1 @@
+update yds_eds_goods set eds_yds_unit_tatio = 1 where eds_yds_unit_tatio != 1;

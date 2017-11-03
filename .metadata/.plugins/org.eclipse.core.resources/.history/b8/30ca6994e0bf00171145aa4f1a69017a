@@ -1,0 +1,18 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+/**
+* @Description: 无包装的作业明细
+* @author zhengyf
+* @date 2017年3月8日 上午8:53:57
+* @version V1.0.0
+*/
+@Entity
+@Table(name="SPD_ON_SHELF_TASK_ITEM")
+@SuppressWarnings({"serial"})
+public class SpdOnShelfTaskItem extends SpdDepotTaskItem{
+
+	
+}

@@ -1,0 +1,21 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class B2BTaskBillAffirm {
+
+	private String synRemarks;
+	private String taskId;
+	private String taskInfoJson;
+	private String taskType;
+	
+	public B2BTaskBillAffirm(String taskId){
+		this.taskId = taskId;
+	}
+}

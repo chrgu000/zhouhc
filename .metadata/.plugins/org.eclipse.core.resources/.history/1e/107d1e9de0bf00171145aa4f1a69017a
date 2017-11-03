@@ -1,0 +1,6 @@
+delete from yds_workbook where workbook_id in('consume_rule_006','consume_rule_003');
+
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) 
+values ('consume_usage_001','仓库消耗用途','consume_usage','护士领用','护士领用',1,'1','626',1,'626','626',sysDate,'626','626',sysDate,null,'0');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able)
+values ('consume_usage_002','仓库消耗用途','consume_usage','处方消耗','处方消耗',2,'1','626',1,'626','626',sysDate,'626','626',sysDate,null,'0');

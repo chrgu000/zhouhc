@@ -1,0 +1,134 @@
+package cn.ak4j.yard.spd.reconciliation.report.rep_detail;
+
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecord;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportQuerier;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.domain.SpdTaskItem;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Component
+public class SpdReplenishDetailQuerier extends SpdReconciliationReportQuerier<Report>{
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private SpdLogisticsTaskItemRepository ltiRepository;
+	
+	@Override
+	public Report query(SpdFinacialReconciliationBiz reconciliation, Map<String, Object> queryParams,
+			OrderParam orderParam) {
+		SpdPropertyChangeRecordItems changeRecordItems = reconciliation.getDailyCleans().getAllPropertyChangeItems();
+		changeRecordItems.fillGoods(goodsRepository);
+		
+		Report report = build(reconciliation);
+		return report;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private Report build(SpdFinacialReconciliationBiz reconciliation){
+		Report report = new Report();
+		report.setReconciliationCode(reconciliation.getBizCode());
+		report.setStartDate(reconciliation.getStartDate());
+		report.setEndDate(reconciliation.getEndDate());
+		PcsOrg org = reconciliation.getBizRule().getSupplierDept().getOrg();
+		report.setSupplierCode(org.getOrgCode());
+		report.setSupplierName(org.getOrgName());
+		PcsDepots depots = reconciliation.getBizRule().getTargetDepots();
+		report.setTargetDepotNames((String[])depots.pluck("depotName").toArray(new String[depots.size()]));
+		report.setItems(buildItems(reconciliation));
+		report.setGenerateTime(new Date());
+		report.setTotalAmount(report.getItems().getTotalAmount());
+		return report;
+	}
+	
+	private Items buildItems(SpdFinacialReconciliationBiz reconciliation){
+		Items items = new Items();
+		YdsEdsGoodss edsGoodss = egRepository.findAll().findByOrgId(reconciliation.getBizRule().getSupplierDept().getOrgId());
+		
+		SpdPropertyChangeRecordItems changeRecordItems = reconciliation.getDailyCleans().getAllPropertyChangeItems();
+		
+		SpdPropertyChangeRecords changeRecords = reconciliation.getDailyCleans().getAllPropertyChanges();
+		SpdPropertyChangeRules rules = pcrRepository.findAllWithRelations();
+		changeRecords.fillRules(rules);
+		
+		if(rules.isAllTriggerBy(SpdReplenishBizSteps.review_delivery_task)){
+			buildFromLogisticsTasks(items, changeRecords, changeRecordItems);
+		}else{
+			throw new UnsupportedOperationException("当前物权变更规则的对账报表还未实现");
+		}
+		items.sort(new Comparator<Item>() {
+			@Override
+			public int compare(Item item1, Item item2) {
+				return (int)(item1.getCreateTime().getTime() - item2.getCreateTime().getTime());
+			}
+		});
+		
+		//设置企业产品名称
+		items.fillEdsGoodsFormatName(edsGoodss);
+		
+		return items;
+	}
+	
+	@SuppressWarnings("unchecked")
+	private void buildFromLogisticsTasks(Items items, SpdPropertyChangeRecords changeRecords, SpdPropertyChangeRecordItems changeRecordItems){
+		List<String> taskIds = changeRecords.pluck("taskId");
+		SpdLogisticsTaskItems taskItems = ltiRepository.findByTaskIds(taskIds);
+		changeRecordItems.forEach(changeRecordItem->{
+			changeRecordItem.getItems().forEach(relationItem->{
+				Item item = new Item();
+				YdsGoods goods = changeRecordItem.getGoods();
+				item.setFactorName(goods.getFactName());
+				item.setGoodsId(goods.getGoodsId());
+				item.setGoodsCode(goods.getGoodsCode());
+				item.setGoodsName(goods.getFormatName());
+				item.setPackageSpecification(goods.getPackingSpec());
+				item.setQty(changeRecordItem.getQty());
+				item.setUnitName(goods.getBaseName());
+				
+				//设置明细的id以及业务id和业务编码
+				SpdPropertyChangeRecord changeRecord = CollectionUtils.findWhere("id", changeRecordItem.getRecordId(), changeRecords);
+				item.setBizId(changeRecord.getBizId());
+				item.setBizCode(changeRecord.getBizCode());
+				item.setBizItemId(changeRecordItem.getOriginItemId());
+				
+				//设置申领原单id和明细id
+				item.setUnitPrice(relationItem.getUnitPrice());
+				item.setQty(relationItem.getDealQty());
+				item.setAmount(item.getQty()*item.getUnitPrice());
+				
+				SpdTaskItem taskItem = CollectionUtils.findWhere("taskItemId", changeRecordItem.getOriginItemId(), taskItems);
+//				log.debug("replenish item id:{}", changeRecordItem.getOriginItemId());
+				item.setCreateTime(taskItem.getCreateTime());
+				items.add(item);
+			});
+		});
+	}
+	
+	@Override
+	public String getDescription() {
+		return "查询所有申领明细的流水";
+	}	
+	
+}

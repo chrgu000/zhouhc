@@ -1,0 +1,81 @@
+package cn.ak4j.yard.yds.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="yds_workbook")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class YdsWorkBook extends YardMaintenceEntity {
+	
+	 @Id
+	 @GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	 @GenericGenerator(name="uuidGenerator", strategy="uuid")
+	 @Getter @Setter
+	 private String workbookId;
+	 
+	 @NotEmpty(message = "字典类别不能为空") @Getter @Setter
+	 private String sortName;
+	 
+	 @NotEmpty(message = "字典类别编码不能为空") @Getter @Setter
+	 private String sortCode;
+	 
+	 @NotEmpty(message = "字典键名不能为空") @Getter @Setter
+	 private String keyName;
+	 
+	 @NotEmpty(message = "字典键值不能为空") @Getter @Setter
+	 private String keyValue;
+	 
+	 @NotNull(message = "字典键序不能为空") @Getter @Setter
+	 private Integer keyInx;
+	 
+	 @Getter @Setter
+	 private boolean enabled;
+	 
+	 @Getter @Setter 
+	 private boolean editable;
+	 
+	 @Getter @Setter
+	 private Integer checkStateCode = CheckState.new_created.getCode();
+	 
+	 @Embedded @Getter @Setter
+     private MaintenanceInfo maintenanceInfo;
+	 
+	 @Transient
+	 private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+	public String getYdsWorkBookEnabled(){
+		return this.enabled?"是":"否";
+	}
+
+	public boolean equals(Object obj){
+		YdsWorkBook theWorkBook = (YdsWorkBook)obj;
+		if(theWorkBook.getSortName().equals(getSortName())
+			&& theWorkBook.getSortCode().equals(getSortCode())
+			&& theWorkBook.getKeyValue().equals(getKeyValue())
+			&& theWorkBook.getKeyName().equals(getKeyName())){
+			return true;
+		}
+		return false;
+	}
+	 
+}

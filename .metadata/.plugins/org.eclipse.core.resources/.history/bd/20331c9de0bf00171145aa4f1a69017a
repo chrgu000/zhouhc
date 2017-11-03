@@ -1,0 +1,1 @@
+insert into SYS_GLOBAL_INFO (KEY,NAME,VALUE,DESCRIPTION,CREATE_TIME,LAST_UPDATE_TIME,EDITABLE) values ('receive_price_prior','收货产品策略','[{"orgId":"ff8080815f1e8082015f1f49169b0043","pricePrior":"goods_info_prepare_price"}]','配置收货产品价格的来源',to_date('2017-10-31 17:41:17','YYYY-MM-DD HH24:MI:SS'),to_date('2017-10-31 17:41:17','YYYY-MM-DD HH24:MI:SS'),'1');

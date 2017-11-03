@@ -1,0 +1,178 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 财务对账明细
+* 对账明细的单位级别统一是最小单位级别，这样对于同一批次产品业务单位级别发生变更时才能有效汇总
+* 所以单位级别统一为最小单位级别。
+* @author zhengyf
+* @date 2017年8月15日 下午2:06:23
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+@Entity
+@Table(name="spd_fin_rec_item")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdFinacialReconciliationItem extends YardEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String id;
+	
+	@Getter @Setter
+	private String reconciliationId;
+	
+	@Getter @Setter @NotNull(message="产品id不能为空")
+	private String goodsId;
+	
+	@Getter @Setter @NotNull(message="批次id不能为空")
+	private String lotId;
+	
+	@Getter @Setter @NotNull(message="单价不能为空")
+	private Float unitPrice;
+	
+	@Transient @JsonIgnore @Getter
+	private YdsUnitLv unitLv = YdsUnitLv.base;
+	
+	@Getter @Setter @NotNull(message="单位名称不能为空")
+	private String unitName;
+	
+	@Getter @Setter
+	private Integer reconciliationQty = 0;
+	
+	@Getter @Setter @NotNull(message="结算单位级别不能为空")
+	private Integer settlementUnitLv;
+	
+	@Getter @Setter @NotNull(message="结算单位名称不能为空")
+	private String settlementUnitName;
+	
+	@Getter @Setter  @NotNull(message="结算数量不能为空")
+	private Integer settlementQty = -1;
+	
+	@Getter @Setter
+	private Integer beginningQty = 0;
+	
+	@Getter @Setter
+	private Integer endingQty = 0;
+	
+	@Getter @Setter
+	private Integer adjustmentQty = 0;
+	
+	@Getter @Setter
+	private Date createTime;
+	
+	@Getter @Setter
+	private Date lastUpdateTime;
+
+	@Getter @Setter @Transient @JsonIgnore
+	private YdsGoods goods;
+	
+	public SpdFinacialReconciliationItem(String goodsId, String lotId, float unitPrice, String unitName, int settlementUnitLv, String settlementUnitName, int endingQty){
+		this.goodsId = goodsId;
+		this.lotId = lotId;
+		this.unitPrice = unitPrice;
+		this.unitName = unitName;
+		this.settlementUnitLv = settlementUnitLv;
+		this.settlementUnitName = settlementUnitName;
+		this.endingQty = endingQty;
+		initDateInfo();
+	}
+	
+	public void update(SpdFinacialReconciliationItem item) {
+		setSettlementQty(item.getSettlementQty());
+		setAdjustmentQty(item.getAdjustmentQty());
+		
+		if(settlementQty>(beginningQty+reconciliationQty)){
+			throw new InvalidDataException(YardExceptionType.invalid_settlement_qty, settlementQty, beginningQty, reconciliationQty);
+		}
+		
+		int newEndingQty = beginningQty+reconciliationQty-settlementQty;
+		setEndingQty(newEndingQty);
+		updateLastUpdateTime();
+	}
+
+	@Transient
+	public float getEndingBalance() {
+		return getEndingQty()*unitPrice;
+	}
+	
+	@Override
+	public boolean equals(Object obj){
+		if(obj == null){
+			return false;
+		}
+		SpdFinacialReconciliationItem theItem = (SpdFinacialReconciliationItem)obj;
+		return getLotId().equals(theItem.getLotId())
+				&& getUnitPrice().equals(theItem.getUnitPrice());
+	}
+	
+	@Transient public int getSettlementQtyBySettlementUnit(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), goods.getSettleUnitLv());
+		return (int)(getSettlementQty()*unitRatio);
+	}
+	
+	@Transient public int getReconciliationQtyBySettlementUnit(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), goods.getSettleUnitLv());
+		return (int)(getReconciliationQty()*unitRatio);
+	}
+	
+	@Transient public int getBeginningQtyBySettlementUnit(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), goods.getSettleUnitLv());
+		return (int)(getBeginningQty()*unitRatio);
+	}
+	
+	@Transient public int getSettlementUnitRatio(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getSettleUnitLv(), YdsUnitLv.base.getLv());
+		return (int)unitRatio;
+	}
+	
+	@Transient public float getUnitPriceBySettlementUnit(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), goods.getSettleUnitLv());
+		return getUnitPrice()/unitRatio;
+	}
+
+	public void updateSettlementQty() {
+		int beginningQty = getBeginningQty()<0?0:getBeginningQty();
+		int reconciliationQty = getReconciliationQty()<0?0:getReconciliationQty();
+		int settlementQty =  (getBeginningQtyBySettlementUnit()+getReconciliationQtyBySettlementUnit())*getSettlementUnitRatio();
+		int endingQty = beginningQty + reconciliationQty - settlementQty;
+		setEndingQty(endingQty);
+		setSettlementQty(settlementQty);
+	}
+
+	/**
+	 * @return
+	 */
+	public float getTotalReconciliationAmount() {
+		return getReconciliationQty()*getUnitPrice();
+	}
+	
+}

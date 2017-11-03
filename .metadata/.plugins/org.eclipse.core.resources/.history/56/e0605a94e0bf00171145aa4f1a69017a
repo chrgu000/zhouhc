@@ -1,0 +1,285 @@
+package cn.ak4j.yard.spd.task.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOnShelfTaskItem;
+import cn.ak4j.yard.spd.task.params.SpdDepotTaskParams;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdOffShelfTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdOnShelfTaskItemRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import cn.ak4j.yard.spd.wrapper.service.SpdWrapperService;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+@Service
+public class SpdDepotTaskService extends IYardService<SpdDepotTask>{
+	
+	@Autowired private SpdDepotTaskRepository taskRepository;
+	@Autowired private SpdOnShelfTaskItemRepository ostiRepository;
+	@Autowired private SpdOffShelfTaskItemRepository ofstiRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private YardCodeService codeService;
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdTurnoverBoxRepository tbRepository;
+	@Autowired private SpdWrapperService wrapperService;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+
+	@Transactional public void batchReview(SpdDepotTasks tasks, IUser user) {
+		for(SpdDepotTask task : tasks){
+			reviewDepotTask(task, user);
+		}
+	}
+	
+	@Transactional public SpdDepotTask updateCheckState(String taskId, int checkStateCode, Date lastDate, IUser user) {
+		SpdDepotTask task = taskRepository.findWithItemsByTaskId(taskId);
+		task.fillDepotArea(depotRepository);
+		task.getItems().fillGoodsLots(glRepository);
+		return reviewDepotTask(task, user);
+	}
+	
+	@Transactional public SpdDepotTask reviewDepotTask(SpdDepotTask task, IUser user){
+		if(task.getCheckState() == CheckState.reviewed){
+			return task;
+		}
+		if(task.getItems().size() <= 0){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("仓库作业[%s]", task.getTaskCode()));
+		}
+		if(!task.getItems().isAllConfirmed()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("仓库作业[%s]", task.getTaskCode()));
+		}
+
+		if(task.getDepotArea() == null){
+			task.fillDepotArea(depotRepository);
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				AmqpMsgType msgType = task.isOnShelfTask()?AmqpMsgType.CONFIRM_ON_SHELF_TASK:AmqpMsgType.CONFIRM_OFF_SHELF_TASK;
+				rabbitProxy.sendBizMsg(task.getBizId(), task.getTaskId(), user.getUserId(), msgType);
+            }
+		});
+		
+		//更新库存
+		SpdShelfStockChanges stockChanges = task.getStockChanges();
+		stockChanges = stockChanges.sumByLot(); //合并同产品批次的库存变更集
+		if(task.isOnShelfTask()){
+			dsService.incrementShelfStocks(stockChanges);
+		}else if(task.isOffShelfTask()){
+			dsService.doDecrementShelfStocks(stockChanges, task.getBizId());
+		}
+		
+		//释放包装
+		wrapperService.releaseWrapper(task.getWrappers());
+		
+		//更新审核状态
+		task.review(task.getMaintenanceInfo().getLastDate(), user);
+		taskRepository.save(task);
+		
+		return task;
+	}
+
+	@Transactional public void removeWrapper(String taskId, String wrapperNo) {
+		SpdDepotTask task = taskRepository.findWithItemsByTaskId(taskId);
+		SpdTurnoverBox turnoverBox = tbRepository.findAll().findByWrapperNo(wrapperNo);
+		task.getItems().unwrap(turnoverBox);
+		wrapperService.removeDepotTaskWrapper(taskId, wrapperNo);
+	}
+
+	@Transactional public SpdOffShelfTaskItem addOffShelfTaskItem(SpdOffShelfTaskItem offShelfTaskItem, IUser user){
+		offShelfTaskItem.setItemCode(codeService.publishCode(CodeSort.xiajiamingxi).getCode());
+		if(!offShelfTaskItem.isValid()){
+			throw new InvalidDataException(offShelfTaskItem.getValidateMsg());
+		}
+		
+		offShelfTaskItem = ofstiRepository.save(offShelfTaskItem);
+		return offShelfTaskItem;
+	}
+	
+	@Transactional public SpdOnShelfTaskItem modifyOnShelfItem(@Valid SpdDepotTaskItem spdOnShelfTaskItem, IUser user) {
+		SpdOnShelfTaskItem spdOnShelfTaskItemPO = ostiRepository.findOne(spdOnShelfTaskItem.getTaskItemId());
+		spdOnShelfTaskItemPO.update(spdOnShelfTaskItem);
+		spdOnShelfTaskItemPO = ostiRepository.save(spdOnShelfTaskItemPO);
+
+		return spdOnShelfTaskItemPO;
+	}
+	
+	@Transactional public SpdOffShelfTaskItem modifyOffShelfItem(@Valid SpdOffShelfTaskItem item, IUser user) {
+		if(item.hasEffectiveParentWrapperId()){
+			SpdTurnoverBox turnoverBox = tbRepository.findAll().findById(item.getParentWrapperId());
+			if(turnoverBox.getSceneType() == SpdSceneType.idle){
+				wrapperService.addDepotTaskWrapper(item.getTaskId(), turnoverBox.getWrapperNo());
+			}else{
+				if(!turnoverBox.getOwnerId().equals(item.getTaskId())){
+					throw new OperateFailException(YardExceptionType.forbide_use_turnover_box, turnoverBox.getWrapperNo());
+				}
+			}
+		}
+		
+		SpdOffShelfTaskItem itemPO = ofstiRepository.findOne(item.getTaskItemId());
+		itemPO.update(item);
+
+		itemPO = ofstiRepository.save(itemPO);
+		return itemPO;
+	}
+	
+	/**
+	 * 查找指定用户所负责的未完成的作业，支持按照业务类型查找，但目前仅支持申领业务类型
+	 */
+	@SuppressWarnings("unchecked")
+	public SpdDepotTasks findITakeChargeOfUncompleteTasks(PcsUser user, SpdDepotTaskParams params, OrderParam order,
+			int pageNo, int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.isEmpty()){
+			return new SpdDepotTasks();
+		}
+		params.setTaskDepotId(new ListParam<String>(depots.getIds()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		SpdDepotTasks depotTasks = taskRepository.find(params, order, -1, -1, user);
+		
+		//是否有下架作业类型的查询参数
+		boolean hasOffShelfTaskTypeParam = params.getTaskType() != null 
+											&& !params.getTaskType().isEmpty()
+											&& params.getTaskType().getValue().get(0).equals(SpdDepotTaskType.off_shelf_task.getCode());
+
+		SpdDepotTaskParams theParams = new SpdDepotTaskParams();
+		if(hasOffShelfTaskTypeParam){
+			if(params.getBizType() != null && !params.getBizType().isEmpty()){
+				List<String> bizTypeCodes = params.getBizType().getValue();
+				List<String> allBizIds = depotTasks.pluck("bizId");
+				List<String> bizIds = new ArrayList<String>();
+				
+				for(String bizTypeCode : bizTypeCodes){
+					SpdBizType bizType = SpdBizType.valueOf(bizTypeCode);
+					switch (bizType) {
+					case replenish_biz:
+						SpdReplenishBizs replenishs = rbRepository.findByIds(allBizIds);
+						bizIds.addAll(replenishs.getIds());
+						break;
+					default:
+						throw new UnsupportedOperationException(String.format("[%s]类型的下架作业查询暂未实现", bizType.getName()));
+					}
+				}
+				
+				if(CollectionUtils.isNotEmpty(bizIds)){
+					theParams.setBizId(new ListParam<String>(bizIds));
+				}
+			}	
+		}
+		depotTasks = new SpdDepotTasks(depotTasks.findByPage(theParams, order, pageNo, pageSize));
+		return depotTasks;
+	}
+	
+	/**
+	 * 查找指定用户所负责的已完成的作业，目前不支持按照业务类型过滤
+	 */
+	public SpdDepotTasks findITakeChargeOfCompletedTasks(PcsUser user, SpdDepotTaskParams params, OrderParam order,
+			int pageNo, int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.isEmpty()){
+			return new SpdDepotTasks();
+		}
+		params.setTaskDepotId(new ListParam<String>(depots.getIds()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()));
+		SpdDepotTasks depotTasks = taskRepository.find(params, order, pageNo, pageSize, user);
+		
+		return depotTasks;
+	}
+	
+	public int countITakeChargeOfCompletedTasks(PcsUser user, SpdDepotTaskParams params){
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.isEmpty()){
+			return 0;
+		}
+		params.setTaskDepotId(new ListParam<String>(depots.getIds()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()));
+		
+		return taskRepository.countByParams(params, user);
+	}
+
+	public SpdDepotTask getTaskForReport(String taskId){
+		//查找仓库作业
+		SpdDepotTask task = taskRepository.findWithItemsByTaskId(taskId);
+		task.removeNoneItems();
+		
+		//关联作业人
+		PcsUser user = (PcsUser)CollectionUtils.findWhere("userId", task.getTaskUser(), userRepository.findAll());
+		task.setUser(user);
+
+		//查找作业的货区
+		PcsDepotArea depotArea = depotRepository.findAllWithRelations().findById(task.getTaskDepotId()).findAreayByAreaId(task.getTaskAreaId());
+		
+		//仓库作业关联货区
+		task.fillDepotArea(depotArea);
+		
+		//仓库作业明细关联货架
+		task.getItems().fillShelfs(depotArea.getShelfs());
+		
+		task.getItems().fillShelfStock(ssRepository, depotArea);
+		task.getItems().getAllShelfStocks().fillGoodsLots(glRepository);
+
+		task.getItems().orderByDepotShelfInx(depotArea.getDepot());
+		return task;
+	}
+	
+	public SpdDepotTask add(SpdDepotTask spdTask, IUser user) {
+		throw new UnsupportedOperationException("上下架不支持该行为");
+	}
+
+	public void delete(String taskId, IUser user) {
+		throw new UnsupportedOperationException("上下架不支持该行为");
+	}
+
+	public SpdDepotTask modify(SpdDepotTask spdTask, IUser user) {
+		throw new UnsupportedOperationException("上下架不支持该行为");
+	}
+
+	public SpdOnShelfTaskItem addOnShelfTaskItem(SpdDepotTaskItem depotTaskItem, IUser user){
+		return null;
+	}
+
+}

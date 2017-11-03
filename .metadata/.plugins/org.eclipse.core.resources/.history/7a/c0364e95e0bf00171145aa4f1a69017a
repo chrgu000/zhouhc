@@ -1,0 +1,136 @@
+package cn.ak4j.yard.pcs.domain;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="pcs_dept")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class PcsDept extends YardMaintenceEntity{
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String deptId;
+	
+	@Getter @Setter
+	private String parentId;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Getter @Setter
+	private String orgId;
+	
+	@NotEmpty(message="部门名称不能为空") @Getter @Setter
+	private String deptName;
+	
+	@NotEmpty(message="部门编码不能为空") @Getter @Setter
+	private String deptCode;
+	
+	@NotEmpty(message="部门类型不能为空") @Getter @Setter
+	private String deptType;
+	
+	@Getter @Setter
+	private boolean enabled;
+	
+	@Column(name="is_main_flag") @Getter @Setter
+	private boolean mainFlag;
+	
+	@Getter @Setter
+	private String defaultUserId;
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @Getter @Setter 
+	private PcsOrg org;
+	
+	@Transient @Getter @Setter
+	private PcsUser defaultUser;
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n;
+	
+	public String getPcsDeptEnabled(){
+		return this.enabled?"是":"否";
+	}
+
+	public void verify(PcsDeptRepository deptRepository, PcsUserRepository userRepository) {
+		verifyDefaultUser(userRepository);
+		verifyCode(deptRepository);
+		verifyName(deptRepository);
+	}
+
+	private void verifyDefaultUser(PcsUserRepository userRepository) {
+		PcsUser defaultUser = userRepository.findAll().findById(getDefaultUserId());
+		if(defaultUser!=null && !defaultUser.getDeptId().equals(getDeptId())){
+			throw new InvalidDataException("设置的默认用户，不隶属当前部门!");
+		}
+	}
+
+	private void verifyName(PcsDeptRepository deptRepository) {
+		PcsDeptParams deptParams = new PcsDeptParams();
+		deptParams.setDeptName(new ListParam<String>(getDeptName()));
+		deptParams.setOrgId(new ListParam<String>(getOrgId()));
+		PcsDepts deptPOs = new PcsDepts(deptRepository.findAll().find(deptParams));
+		
+		if(CollectionUtils.isEmpty(deptPOs)){
+			return ;
+		}
+		
+		if(StringUtils.isEmpty(getDeptId())){
+			throw new InvalidDataException(YardExceptionType.invalid_exist_dept_name, getDeptName());
+		}else{
+			if(!deptPOs.getIds().contains(getDeptId())){
+				throw new InvalidDataException(YardExceptionType.invalid_exist_dept_name, getDeptName());
+			}
+		}
+	}
+
+	private void verifyCode(PcsDeptRepository deptRepository) {
+		PcsDeptParams deptParams = new PcsDeptParams();
+		deptParams.setDeptCode(new ListParam<String>(getDeptCode()));
+		deptParams.setOrgId(new ListParam<String>(getOrgId()));
+		PcsDepts deptPOs = new PcsDepts(deptRepository.findAll().find(deptParams));
+		
+		if(CollectionUtils.isEmpty(deptPOs)){
+			return ;
+		}
+		
+		if(StringUtils.isEmpty(getDeptId())){
+			throw new InvalidDataException(YardExceptionType.invalid_resource_exist, getDeptCode());
+		}else{
+			if(!deptPOs.getIds().contains(getDeptId())){
+				throw new InvalidDataException(YardExceptionType.invalid_resource_exist, getDeptCode());
+			}
+		}
+	}
+}

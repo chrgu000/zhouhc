@@ -1,0 +1,69 @@
+package cn.ak4j.yard.spd.reconciliation.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItems;
+import cn.ak4j.yard.spd.reconciliation.params.SpdPropertyChangeRelationItemParams;
+import lombok.Getter;
+
+@Repository
+public class SpdPropertyChangeRelationItemRepository extends BaseRepository<SpdPropertyChangeRelationItem, SpdPropertyChangeRelationItems, SpdPropertyChangeRelationItemParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private SpdReceiveBizRepository rbRepository;
+	
+	public SpdPropertyChangeRelationItems find(SpdPropertyChangeRelationItemParams params, OrderParam order, int pageNo, int pageSize){
+		
+		if(setRelationParams(params)){
+			return new SpdPropertyChangeRelationItems(doQuery(params, order, pageNo, pageSize));
+		}
+		
+		return new SpdPropertyChangeRelationItems();
+	}
+	
+	public SpdPropertyChangeRelationItems findByChangeItems(List<String> itemIds) {
+		SpdPropertyChangeRelationItemParams params = new SpdPropertyChangeRelationItemParams();
+		params.setPropertyChangeItemId(new ListParam<String>(itemIds));
+		return find(params);
+	}
+	
+	public int count(SpdPropertyChangeRelationItemParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+
+	private boolean setRelationParams(SpdPropertyChangeRelationItemParams params) {
+		
+		if(params != null){
+			SpdReceiveBizParams receiveParams = new SpdReceiveBizParams();
+			receiveParams.setBizCode(params.getBizCode());
+			if(receiveParams.isNotEmpty()){
+				SpdReceiveBizs receives = rbRepository.find(receiveParams);
+				if(CollectionUtils.isEmpty(receives)){
+					return false;
+				}
+				
+				params.setReceiveId(new ListParam<String>(receives.getIds()));
+			}
+		}
+		
+		return true;
+	}
+
+
+}

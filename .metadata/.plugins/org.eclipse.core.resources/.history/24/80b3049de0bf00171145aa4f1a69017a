@@ -1,0 +1,2 @@
+alter table spd_biz_item add(return_qty_by_base_unit number(10,0) default 0);
+alter table spd_return_goods_biz add(auto_assign_receive char(1));

@@ -1,0 +1,74 @@
+package cn.ak4j.yard.configuration;
+
+
+import org.apache.tomcat.jdbc.pool.DataSource;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Configuration
+//@ConfigurationProperties("spring.datasource.yard")
+public class RepositoryConfig {
+
+	@Value("${spring.datasource.yard.driver-class-name}")
+	private String driverClassName;
+
+	@Value("${spring.datasource.yard.url}")
+	private String url;
+
+	@Value("${spring.datasource.yard.password}")
+	private String password;
+
+	@Value("${spring.datasource.yard.username}")
+	private String username;
+
+	@Value("${spring.datasource.yard.max-active}")
+	private int maxActive = 10;
+
+	@Value("${spring.datasource.yard.max-idle}")
+	private int maxIdle = 10;
+
+	@Value("${spring.datasource.yard.min-idle}")
+	private int minIdle = 6;
+
+	@Value("${spring.datasource.yard.initial-size}")
+	private int initialSize = 6;
+
+	@Value("${spring.datasource.yard.validation-query}")
+	private String validationQuery;
+
+	@Value("${spring.datasource.yard.test-on-borrow}")
+	private boolean testOnBorrow;
+
+	@Value("${spring.datasource.yard.test-while-idle}")
+	private boolean testWhileIdle;
+	
+	@Value("${spring.datasource.yard.validation-interval}")
+	private int validationInterval = 3000;
+
+	@Bean(name = "yardDataSource")
+	public DataSource dataSource(){
+		DataSource ds = new DataSource();
+		ds.setLogValidationErrors(true);
+	    ds.setUrl(url);
+	    ds.setUsername(username);
+	    ds.setPassword(password);
+	    ds.setDriverClassName(driverClassName);
+	    ds.setMaxActive(maxActive);
+	    ds.setMaxIdle(maxIdle);
+	    ds.setMinIdle(minIdle);
+	    ds.setInitialSize(initialSize);
+	    ds.setTestWhileIdle(testWhileIdle);
+	    ds.setTestOnBorrow(testOnBorrow);
+	    ds.setValidationQuery(validationQuery);
+	    ds.setValidationInterval(validationInterval);
+	    ds.setRemoveAbandoned(true);
+	    ds.setRemoveAbandonedTimeout(5000);
+		log.info("初始化数据源:{}", ds);
+		return ds;
+	}
+
+}

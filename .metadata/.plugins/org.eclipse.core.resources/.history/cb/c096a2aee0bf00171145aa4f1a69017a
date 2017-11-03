@@ -1,0 +1,138 @@
+package cn.ak4j.yard.pcs.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.Arrays;
+
+import org.junit.Ignore;
+import org.junit.Test;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.params.PcsDepotAreaParams;
+import cn.ak4j.yard.pcs.to.NewPcsDepotAreaTO;
+
+public class PcsDepotAreaResourceTest extends BaseTest{
+	
+	@Test public void testFindAll() throws Exception{
+		PcsDepotAreas areas  = mockMvcHelper.findList(PcsDepotAreas.class, testUserCode, null);
+		assertEquals(23, areas.size());
+	}
+	
+	@Test public void testGetCount() throws Exception{
+		int count  = mockMvcHelper.count(PcsDepotAreas.class, testUserCode, null);
+		assertEquals(23, count);
+	}
+	
+	@Test public void testGetIds() throws Exception{
+		String[] ids = new String[]{"area_id_016","area_id_005"};
+		
+		PcsDepotAreas areas  = mockMvcHelper.getByIds(PcsDepotAreas.class, testUserCode, Arrays.asList(ids));
+		assertEquals(2, areas.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("depotAreaId", id, areas));
+		}
+	}
+
+	@Test public void testFindByDepotId() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/pcs/pcsDepotAreas/depotId,{depotId}?accessToken={accessToken}&pageSize=-1";
+		String depotId001 = "depot_id_001";
+		
+		PcsDepotAreas areas  = mockMvcHelper.mockGet(PcsDepotAreas.class, urlTemplate, depotId001, accessToken);
+		assertEquals(4, areas.size());
+	}
+	
+	@Test public void testGetCountByDepotId() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = "/pcs/pcsDepotAreas/depotId,{depotId}/count?accessToken={accessToken}";
+		String depotId001 = "depot_id_001";
+		
+		int count  = mockMvcHelper.mockGet(Integer.class, urlTemplate, depotId001, accessToken);
+		assertEquals(4, count);
+	}
+	
+	@Test public void getDepotAreaById() throws Exception{
+		String depotAreaId = "area_id_003";
+		PcsDepotAreaParams params = new PcsDepotAreaParams();
+		params.setDepotAreaId(new ListParam<String>(depotAreaId));
+		
+		PcsDepotAreas depotAreas = mockMvcHelper.findList(PcsDepotAreas.class, xykUserCode, params);
+		assertEquals(1, depotAreas.size());
+		assertEquals(depotAreaId, depotAreas.get(0).getDepotAreaId());
+	}
+	
+	@Test public void testFindOne() throws Exception{
+		String depotAreaId = "area_id_003";
+		
+		PcsDepotArea depotArea = mockMvcHelper.findOne(PcsDepotArea.class, xykUserCode, depotAreaId);
+		assertEquals(depotAreaId, depotArea.getDepotAreaId());
+	}
+	
+	
+	@Test public void testAdd() throws Exception{
+		NewPcsDepotAreaTO areaTo = createDepotArea("test_001");
+		
+		PcsDepotArea area = mockMvcHelper.add(PcsDepotArea.class, testUserCode, areaTo);
+		assertNotNull(area);
+	}
+	
+	@Test public void testAddError() throws Exception{
+		NewPcsDepotAreaTO areaTo = createDepotArea("AXYKZC002");
+		mockMvcHelper.add(PcsDepotArea.class, testUserCode, "pcs", "pcsDepotAreas", areaTo, status().is4xxClientError(), YardExceptionType.invalid_data);
+	}
+	
+	@Test public void testModify() throws Exception{
+		String areaId = "area_id_016";
+		PcsDepotArea originArea = mockMvcHelper.findOne(PcsDepotArea.class, testUserCode, areaId);
+		String newAreaName = originArea.getAreaName()+"test";
+		originArea.setAreaName(newAreaName);
+		String areaJson = Global.defaultObjectMapper.writeValueAsString(originArea);
+		areaJson = areaJson.replace("201AXYKZC002", "AXYKZC002");
+		
+		PcsDepotArea newArea = mockMvcHelper.modify(PcsDepotArea.class, testUserCode, "pcs", "pcsDepotAreas", areaId, areaJson, status().isOk(), null);
+		assertEquals(newAreaName, newArea.getAreaName());
+	}
+	
+	@Test public void testModifyError() throws Exception{
+		String areaId = "area_id_016";
+		PcsDepotArea originArea = mockMvcHelper.findOne(PcsDepotArea.class, testUserCode, areaId);
+		String areaJson = Global.defaultObjectMapper.writeValueAsString(originArea);
+		areaJson = areaJson.replace("201AXYKZC002", "AXYKZC001");
+		
+		mockMvcHelper.modify(PcsDepotArea.class, testUserCode, "pcs", "pcsDepotAreas", areaId, areaJson, status().is4xxClientError(), YardExceptionType.invalid_data);
+	}
+	
+	@Ignore
+	@Test public void testDeleteError() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String urlTemplate = getUrlTemplate("/pcs/pcsDepotAreas/{depotAreaId}?accessToken={accessToken}");
+		String areaId = "area_id_016";
+		
+		mockMvc.perform(delete(urlTemplate, areaId, accessToken))
+		.andExpect(status().is4xxClientError());
+	}
+	
+	private NewPcsDepotAreaTO createDepotArea(String areaCode){
+		NewPcsDepotAreaTO area = new NewPcsDepotAreaTO();
+		area.setDepotId("depot_id_001");
+		area.setAreaType(PcsAreaType.normal.getCode());
+		area.setAreaName("西药库第五正常区");
+		area.setAreaCode(areaCode);
+		area.setLinkMan("测试");
+		area.setLinkTel("13698545215");
+		area.setPrimary(false);
+		
+		return area;
+	}
+	
+}

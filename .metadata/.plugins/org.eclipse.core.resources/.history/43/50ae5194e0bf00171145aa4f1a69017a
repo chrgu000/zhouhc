@@ -1,0 +1,100 @@
+package cn.ak4j.yard.spd.to;
+
+import java.util.Date;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.enums.SpdSellerSendType;
+import lombok.Data;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+@Data
+public class NewMixedSpdDeliverySheetTO implements Comparable<NewMixedSpdDeliverySheetTO> {
+	private String id;
+	
+	private String faxNo;//发票号
+
+	@JsonIgnore
+	private String sendId;
+	private String sendType = SpdSellerSendType.supply_receiveGoods.getCode();
+	
+	private String boxInputNo;
+
+	private String sendInputCode;
+	
+	@JsonIgnore
+	private String edsGoodsId;
+	
+	private String edsGoodsCode;
+	
+	@JsonIgnore
+	private String edsLotId;
+	
+	private String edsLotNo;
+	
+	@JsonFormat(pattern = "yyyy-MM-dd")
+	private Date edsLotValidity;
+	
+	@JsonFormat(pattern = "yyyy-MM-dd")
+	private Date edsProduceDate;
+	
+	private Integer checkQty;
+	
+	private String unitName;
+	
+	private Float unitPrice;
+	
+	private Boolean wholeFlag;
+	
+	@JsonIgnore
+	private String depotId;
+	private String depotCode;
+
+	public NewMixedSpdDeliverySheetTO() {
+
+	}
+
+	public NewMixedSpdDeliverySheetTO(String boxInputNo, String edsGoodsCode, String edsLotNo, Date edsLotValidity,
+			Date edsProduceDate, Integer checkQty,String unitName, float unitPrice, boolean wholeFlag, String sendInputCode,
+			String faxNo,String depotCode) {
+		this.boxInputNo = boxInputNo;
+		this.edsGoodsCode = edsGoodsCode;
+		this.edsLotNo = edsLotNo;
+		this.edsLotValidity = edsLotValidity;
+		this.edsProduceDate = edsProduceDate;
+		this.checkQty = checkQty;
+		this.unitName = unitName;
+		this.unitPrice = unitPrice;
+		this.wholeFlag = wholeFlag;
+		this.sendInputCode = sendInputCode;
+		this.faxNo = faxNo;
+		this.depotCode = depotCode;
+	}
+
+	public int compareTo(NewMixedSpdDeliverySheetTO o) {
+		int flg = 0;
+		String depot1 = this.getDepotId();
+		String depot2 = o.getDepotId();
+		String sendInputCode1 = this.getSendInputCode();
+		String sendInputCode2 = o.getSendInputCode();
+
+		flg = depot1.compareTo(depot2);
+		if (flg == 0) {
+			if (StringUtils.isEmpty(sendInputCode1) && StringUtils.isEmpty(sendInputCode2)) {
+			} else {
+				if (!StringUtils.isEmpty(sendInputCode1) && !StringUtils.isEmpty(sendInputCode2)) {
+					flg = sendInputCode1.compareTo(sendInputCode2);
+				} else {
+					flg = StringUtils.isEmpty(sendInputCode1) ? -1 : 1;
+				}
+			}
+		}
+		return flg;
+
+	}
+
+}

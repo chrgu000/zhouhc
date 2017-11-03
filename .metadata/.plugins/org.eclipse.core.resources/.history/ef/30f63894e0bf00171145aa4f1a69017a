@@ -1,0 +1,122 @@
+//package cn.ak4j.yard.sys.datacheck.task;
+//
+//import java.util.List;
+//
+//import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.context.annotation.Lazy;
+//import org.springframework.stereotype.Component;
+//
+//import cn.ak4j.entity.query.param.DateRangeParam;
+//import cn.ak4j.entity.query.param.ListParam;
+//import cn.ak4j.utils.CollectionUtils;
+//import cn.ak4j.yard.ScheduleTasks;
+//import cn.ak4j.yard.spd.domain.SpdDepotCard;
+//import cn.ak4j.yard.spd.domain.SpdDepotCards;
+//import cn.ak4j.yard.spd.domain.SpdReceive;
+//import cn.ak4j.yard.spd.domain.SpdReceiveItem;
+//import cn.ak4j.yard.spd.domain.SpdReceiveItems;
+//import cn.ak4j.yard.spd.domain.SpdReceives;
+//import cn.ak4j.yard.spd.domain.SpdSellerSendItem;
+//import cn.ak4j.yard.spd.domain.SpdSellerSendItems;
+//import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+//import cn.ak4j.yard.spd.params.SpdReceiveItemParams;
+//import cn.ak4j.yard.spd.params.SpdReceiveParams;
+//import cn.ak4j.yard.spd.params.SpdSellerSendItemParams;
+//import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+//import cn.ak4j.yard.spd.repository.SpdReceiveItemRepository;
+//import cn.ak4j.yard.spd.repository.SpdReceiveRepository;
+//import cn.ak4j.yard.spd.repository.SpdSellerSendItemRepository;
+//import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItem;
+//import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItems;
+//import cn.ak4j.yard.yds.domain.YdsGoods;
+//import cn.ak4j.yard.yds.domain.YdsGoodss;
+//import cn.ak4j.yard.yds.params.YdsGoodsParams;
+//import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+//
+//@Component
+//public class SpdReceiveItemTask {
+//
+//	@Autowired @Lazy private SpdReceiveItemRepository spdReceiveItemRepository;
+//	@Autowired @Lazy private SpdReceiveRepository spdReceiveRepository;
+//	@Autowired @Lazy private SpdDepotCardRepository spdDepotCardRepository;
+//	@Autowired @Lazy private YdsGoodsRepository ydsGoodsRepository;
+//	@Autowired @Lazy private SpdSellerSendItemRepository spdSellerSendItemRepository;
+//	
+//
+//	public int checkData(SysDataCheckTaskItems dataCheckErrorDetails, DateRangeParam dateRangeParam){
+//		//获取收货单明细
+//		SpdReceiveItemParams params = new SpdReceiveItemParams();
+//		params.setMaintenanceInfo_createDate(dateRangeParam);
+//		SpdReceiveItems spdReceiveItems = spdReceiveItemRepository.find(params);
+//		
+//		//获取收货单
+//		List<String> receiveIds = CollectionUtils.pluck("receiveId", spdReceiveItems);
+//		SpdReceiveParams receiveParams = new SpdReceiveParams();
+//		receiveParams.setReceiveId(new ListParam<String>(receiveIds));
+//		SpdReceives receiveList = spdReceiveRepository.find(receiveParams);
+//		
+//		//获取账页
+//		List<String> cardIds = CollectionUtils.pluck("cardId", spdReceiveItems);
+//		SpdDepotCardParams depotCardParams = new SpdDepotCardParams();
+//		depotCardParams.setDepotCardId(new ListParam<String>(cardIds));
+//		SpdDepotCards cardList = spdDepotCardRepository.find(depotCardParams);
+//		
+//		//获取标准产品
+//		List<String> goodsIds = CollectionUtils.pluck("goodsId", spdReceiveItems);
+//		YdsGoodsParams goodsParams = new YdsGoodsParams();
+//		goodsParams.setGoodsId(new ListParam<String>(goodsIds));
+//		YdsGoodss goodsList = ydsGoodsRepository.find(goodsParams);
+//		
+//		
+//		//获取送货单明细
+//		List<String> deliverySheetItemIds = CollectionUtils.pluck("sellerSendItemId", spdReceiveItems);
+//		SpdSellerSendItemParams deliverySheetItemParams = new SpdSellerSendItemParams();
+//		deliverySheetItemParams.setSendItemId(new ListParam<String>(deliverySheetItemIds));
+//		SpdSellerSendItems delivertySheetItems = spdSellerSendItemRepository.find(deliverySheetItemParams);
+//		
+//		if(spdReceiveItems.size() > 0){
+//			for(SpdReceiveItem spdReceiveItem : spdReceiveItems){
+//				SpdReceive spdReceive = receiveList.findReceiveById(spdReceiveItem.getReceiveId());
+//				if(spdReceive == null){
+//					SysDataCheckTaskItem sysDataCheckTaskItem = new SysDataCheckTaskItem();
+//					sysDataCheckTaskItem.setClassName(spdReceiveItem.getClass().getName());
+//					sysDataCheckTaskItem.setDataId(spdReceiveItem.getReceiveItemId());
+//					sysDataCheckTaskItem.setLevel(ScheduleTasks.ERROR);
+//					sysDataCheckTaskItem.setDescription("收货明细单对应的主单信息不存在！");
+//					dataCheckErrorDetails.add(sysDataCheckTaskItem);
+//				}
+//				
+//				SpdDepotCard spdDepotCard = cardList.findById(spdReceiveItem.getCardId());
+//				if(spdDepotCard == null){
+//					SysDataCheckTaskItem sysDataCheckTaskItem = new SysDataCheckTaskItem();
+//					sysDataCheckTaskItem.setClassName(spdReceiveItem.getClass().getName());
+//					sysDataCheckTaskItem.setDataId(spdReceiveItem.getReceiveItemId());
+//					sysDataCheckTaskItem.setLevel(ScheduleTasks.ERROR);
+//					sysDataCheckTaskItem.setDescription("收货明细单对应的帐页信息不存在！");
+//					dataCheckErrorDetails.add(sysDataCheckTaskItem);
+//				}
+//				
+//				YdsGoods ydsGood = goodsList.findById(spdReceiveItem.getGoodsId());
+//				if(ydsGood == null){
+//					SysDataCheckTaskItem sysDataCheckTaskItem = new SysDataCheckTaskItem();
+//					sysDataCheckTaskItem.setClassName(spdReceiveItem.getClass().getName());
+//					sysDataCheckTaskItem.setDataId(spdReceiveItem.getReceiveItemId());
+//					sysDataCheckTaskItem.setLevel(ScheduleTasks.ERROR);
+//					sysDataCheckTaskItem.setDescription("收货明细单对应的标准产品信息不存在！");
+//					dataCheckErrorDetails.add(sysDataCheckTaskItem);
+//				}
+//				
+//				SpdSellerSendItem spdSellerSendItem = delivertySheetItems.findById(spdReceiveItem.getSellerSendItemId());
+//				if(spdSellerSendItem == null){
+//					SysDataCheckTaskItem sysDataCheckTaskItem = new SysDataCheckTaskItem();
+//					sysDataCheckTaskItem.setClassName(spdReceiveItem.getClass().getName());
+//					sysDataCheckTaskItem.setDataId(spdReceiveItem.getReceiveItemId());
+//					sysDataCheckTaskItem.setLevel(ScheduleTasks.ERROR);
+//					sysDataCheckTaskItem.setDescription("收货明细单对应的送货单明细信息不存在！");
+//					dataCheckErrorDetails.add(sysDataCheckTaskItem);
+//				}
+//			}
+//		}
+//		return spdReceiveItems.size();
+//	}
+//}

@@ -1,0 +1,22 @@
+package cn.ak4j.yard.spd.reconciliation.report.base;
+
+import java.util.Map;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.domain.IDescribable;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+
+/**
+* @Description: 财务报表查询基类
+* @author zhengyf
+* @date 2017年10月14日 下午3:10:07
+* @version V1.0.0
+*/
+public abstract class SpdReconciliationReportQuerier<R extends SpdReconciliationReport<?>> implements IDescribable{
+
+	/**
+	 * @param reconciliationId 财务对账业务id
+	 */
+	public abstract R query(SpdFinacialReconciliationBiz reconciliation, Map<String, Object> queryParams, OrderParam orderParam);
+	
+}

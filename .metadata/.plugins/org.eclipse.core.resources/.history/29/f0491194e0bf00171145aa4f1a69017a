@@ -1,0 +1,17 @@
+package cn.ak4j.yard.web.request;
+
+import javax.servlet.http.HttpServletRequest;
+
+/**
+* @Description: 获取资源统计请求
+* @author zhengyf
+* @date 2016年11月28日 下午7:09:23
+* @version V1.0.0
+*/
+public class YardGetCountRequest extends YardRequest{
+
+	public YardGetCountRequest(HttpServletRequest request){
+		super(request);
+	}
+	
+}

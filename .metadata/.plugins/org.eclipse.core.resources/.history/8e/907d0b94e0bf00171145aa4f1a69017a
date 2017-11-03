@@ -1,0 +1,51 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.yds.params.YdsGoodsInfoParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@SuppressWarnings({"unchecked", "rawtypes", "serial"})
+public class YdsGoodsInfos extends Entities<YdsGoodsInfo> {
+
+	public YdsGoodsInfos(){}
+
+	public YdsGoodsInfos(List entities){
+		super(entities);
+	}
+
+	public YdsGoodsInfos findByIds(List<String> ids) {
+		YdsGoodsInfoParams params = new YdsGoodsInfoParams();
+		params.setGoodsId(new ListParam<String>(ids));
+		return new YdsGoodsInfos(find(params));
+	}
+
+	public YdsGoodsInfos findByPage(YdsGoodsRepository goodsRepository, YdsGoodsInfoParams params, OrderParam order, int pageNo,
+			int pageSize) {
+		if(params != null){
+			YdsGoodsParams goodsParams = new YdsGoodsParams();
+			goodsParams.setFormatName(params.getFormatName());
+			goodsParams.setPurch(params.getPurchUnitLvName());
+			goodsParams.setStore(params.getStoreUnitLvName());
+			goodsParams.setSale(params.getSaleUnitLvName());
+			goodsParams.setBigSum(params.getBigSum());
+			goodsParams.setMidSum(params.getMidSum());
+			goodsParams.setMinSum(params.getMinSum());
+			if(!goodsParams.isEmpty()){
+				YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams));
+				if(goodss.size() == 0){
+					return new YdsGoodsInfos();
+				}			
+				params.setGoodsId(new ListParam<String>(goodss.getIds()));
+			}
+		}
+		
+		Entities entities = findByPage(params, order, pageNo, pageSize);
+		return new YdsGoodsInfos(entities);
+	}
+	
+}

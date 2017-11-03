@@ -1,0 +1,105 @@
+package cn.ak4j.yard.spd.factory;
+
+import java.util.Calendar;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import lombok.extern.slf4j.Slf4j;
+
+@Component
+@Slf4j
+public class SpdDepotCardFactory {
+	
+	@Autowired private YardCodeService codeService;
+	
+	public SpdDepotCards buildAutoCard(PcsDepot depot, YdsGoodss notExsitCardGoodss, IUser user) {
+		SpdDepotCards result = new SpdDepotCards();
+		notExsitCardGoodss.forEach(goods->{
+			result.add(createCard(depot, goods, user));
+		});
+		return result;
+	}
+
+	public SpdDepotCard createCard(PcsDepot depot, YdsGoods goods, IUser user) {
+		SpdDepotCard depotCard = new SpdDepotCard();
+		
+		PcsDepotAreas normalAreas = depot.getAreas().findByAreaType(PcsAreaType.normal);
+		PcsDepotAreas isolationAreas = depot.getAreas().findByAreaType(PcsAreaType.isolation);
+		PcsDepotAreas unqualifiedAreas = depot.getAreas().findByAreaType(PcsAreaType.unqualified);
+		
+		if(CollectionUtils.isEmpty(normalAreas)){
+			throw new NotFoundException(YardExceptionType.not_found_area, depot.getDepotName(), PcsAreaType.normal.getName());
+		}
+		if(CollectionUtils.isEmpty(isolationAreas)){
+			throw new NotFoundException(YardExceptionType.not_found_area, depot.getDepotName(), PcsAreaType.isolation.getName());
+		}
+		if(CollectionUtils.isEmpty(unqualifiedAreas)){
+			throw new NotFoundException(YardExceptionType.not_found_area, depot.getDepotName(), PcsAreaType.unqualified.getName());
+		}
+		
+		PcsDepotArea normalArea = CollectionUtils.findWhere("areaName", "合格货区", normalAreas);
+		PcsDepotArea isolationArea = CollectionUtils.findWhere("areaName", "隔离货区", isolationAreas);
+		PcsDepotArea unqualifiedArea = CollectionUtils.findWhere("areaName", "不合格货区", unqualifiedAreas);
+		
+		PcsDepotShelf normalShelf = CollectionUtils.findWhere("shelfName", PcsDepotShelf.virtual_shelf_name, normalArea == null?normalAreas.get(0).getShelfs():normalArea.getShelfs());
+		PcsDepotShelf isolationShelf = CollectionUtils.findWhere("shelfName", PcsDepotShelf.virtual_shelf_name, isolationArea == null?isolationAreas.get(0).getShelfs():isolationArea.getShelfs());
+		PcsDepotShelf unqualifiedShelf = CollectionUtils.findWhere("shelfName", PcsDepotShelf.virtual_shelf_name, unqualifiedArea == null?unqualifiedAreas.get(0).getShelfs():unqualifiedArea.getShelfs());
+		
+		if(normalShelf == null){
+			NotFoundException exception = new NotFoundException(YardExceptionType.not_found_shelf, depot.getDepotName(), normalArea.getAreaName(), PcsDepotShelf.virtual_shelf_name);
+			log.warn("{}:{}", exception.getMessage(), exception.getDescription());
+			throw exception;
+		}
+		
+		if(isolationShelf == null){
+			NotFoundException exception = new NotFoundException(YardExceptionType.not_found_shelf, depot.getDepotName(), isolationArea.getAreaName(), PcsDepotShelf.virtual_shelf_name);
+			log.warn("{}:{}", exception.getMessage(), exception.getDescription());
+			throw exception;
+		}
+		
+		if(unqualifiedShelf == null){
+			NotFoundException exception = new NotFoundException(YardExceptionType.not_found_shelf, depot.getDepotName(), unqualifiedArea.getAreaName(), PcsDepotShelf.virtual_shelf_name);
+			log.warn("{}:{}", exception.getMessage(), exception.getDescription());
+			throw exception;
+		}
+		
+		Calendar receiveLastDateCal = Calendar.getInstance();
+		Calendar receiveNextDateCal = Calendar.getInstance();
+		receiveLastDateCal.set(Calendar.DAY_OF_MONTH, 1);
+		
+		receiveNextDateCal.add(Calendar.MONTH, 1);
+		receiveNextDateCal.set(Calendar.DAY_OF_MONTH, 1);
+		
+		depotCard.setCardCode(codeService.publishCode(CodeSort.zhangye).getCode());
+		depotCard.setShelfId(normalShelf.getDepotShelfId());
+		depotCard.setIsolationShelfId(isolationShelf.getDepotShelfId());
+		depotCard.setUnqualifiedShelfId(unqualifiedShelf.getDepotShelfId());
+		depotCard.setGoodsId(goods.getGoodsId());
+		depotCard.setStoreUnitLv(goods.getStoreUnitLv().toString());
+		depotCard.setStoreUnitName(SpdUnitUtils.computeGoodsUnitName(goods, goods.getStoreUnitLv()));
+		depotCard.setDepotId(depot.getDepotId());
+		depotCard.setEnabled(true);
+		depotCard.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		return depotCard;
+	}
+
+}

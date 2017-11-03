@@ -1,0 +1,2 @@
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('151','日清对账单号',0,null);
+insert into sys_code_sequence (sort_code,sort_code_name,sequence,last_update_time) values ('152','财务对账单号',0,null);

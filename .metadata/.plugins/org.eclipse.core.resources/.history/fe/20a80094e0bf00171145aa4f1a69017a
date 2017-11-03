@@ -1,0 +1,125 @@
+package cn.ak4j.yard.yds.service;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.validation.Valid;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Service
+public class YdsGoodsLotService extends IYardService<YdsGoodsLot> {
+    @Autowired private YdsGoodsLotRepository glRepository;
+    @Autowired private YdsGoodsRepository goodsRepository;
+    @Autowired private SpdShelfStockRepository shelfStockRepository;
+    @Autowired private SpdDepotCardRepository dcRepository;
+    
+    
+    @Transactional
+    @Caching(evict={@CacheEvict(value="longTimeCache", key="\"allLots\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+    public synchronized YdsGoodsLot add(@Valid YdsGoodsLot goodsLot, IUser user){
+    	if(!goodsLot.isValid()){
+    		throw new InvalidDataException(goodsLot.getValidateMsg());
+    	}
+    	YdsGoodsLot goodsLotPO = glRepository.findAll().findByGoodsLotNoAndGoodsId(goodsLot.getLotNo(), goodsLot.getGoodsId());
+    	//檢查批次是否存在，不添加重复的数据
+    	if (StringUtils.isNotEmpty(goodsLot.getLotNo()) && goodsLotPO != null) {
+    		YdsGoods goods = goodsRepository.findAll().findById(goodsLot.getGoodsId());
+    		if(goods != null){
+    			throw new InvalidDataException(YardExceptionType.invalid_exist_lot_no, goodsLot.getLotNo(), goods.getFormatName());
+    		}
+		}
+    	if(!(goodsLot.getLotValidity().getTime() > goodsLot.getProduceDate().getTime())){
+    		throw new InvalidDataException(String.format("批号为[%s]的批次有效期小于生产日期!",goodsLot.getLotNo()));
+    	}
+    	
+    	goodsLot = glRepository.save(goodsLot);
+    	return goodsLot;
+    }
+    
+	@Transactional
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allLots\""),
+	@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public void batchAddGoodsLot(YdsGoodsLots goodsLot) {
+		for(YdsGoodsLot goodsLotPO : goodsLot){
+			goodsLotPO = glRepository.save(goodsLotPO);
+		}
+	}
+    
+    @Transactional
+    @Caching(evict={@CacheEvict(value="longTimeCache", key="\"allLots\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+    public synchronized void delete(String goodsLotId,IUser user){
+    	YdsGoodsLot ydsGoodsLot = glRepository.findAll().findById(goodsLotId);
+    	if(!ydsGoodsLot.canDelete()){
+    		throw new OperateForbiddenException(YardExceptionType.forbide_delete, "lotNo:" + ydsGoodsLot.getLotNo());
+    	}
+    	glRepository.delete(ydsGoodsLot);
+    }
+    
+    @Transactional
+    @Caching(evict={@CacheEvict(value="longTimeCache", key="\"allLots\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+    public synchronized YdsGoodsLot modify (YdsGoodsLot goodsLot, IUser user){
+    	if(!goodsLot.isValid()){
+    		throw new InvalidDataException(goodsLot.getValidateMsg());
+    	}
+    	//檢查批次是否存在，不添加重复的数据
+    	YdsGoodsLot sameLot = glRepository.findAll().findWithSameLotNo(goodsLot.getLotNo(), goodsLot.getGoodsLotId(),goodsLot.getGoodsId());
+    	if (StringUtils.isNotEmpty(goodsLot.getLotNo()) &&  sameLot != null) {
+    		YdsGoods goods = goodsRepository.findAll().findById(goodsLot.getGoodsId());
+			throw new InvalidDataException(String.format("当前批号[%s]已存在,请确认后填写！", goodsLot.getLotNo(), goods.getFormatName()));
+		}
+    	
+    	if(!(goodsLot.getLotValidity().getTime() > goodsLot.getProduceDate().getTime())){
+    		throw new InvalidDataException("生产日期要小于批号日期!");
+    	}
+    	YdsGoodsLot ydsGoodsLotPO = glRepository.findAll().findById(goodsLot.getGoodsLotId());
+    	ydsGoodsLotPO.update(goodsLot, user.getOrgId(), user.getUserId());
+    	glRepository.save(ydsGoodsLotPO);
+    	
+    	return  ydsGoodsLotPO;
+    }
+    
+	@Override
+	public YdsGoodsLot updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException("标准产品批次不支持该行为");
+	}
+    
+	
+	@SuppressWarnings("unchecked")
+	public YdsGoodsLots findUnuseableLots(YdsGoodsLotParams params, OrderParam order, int pageNo, int pageSize, String depotId){
+		List<String> lotIds = shelfStockRepository.findLotIdsByDepot(depotId);
+		List<String> goodsIds = dcRepository.findAll().findByDepot(depotId).getUsableCards().pluck("goodsId");
+		
+		params.setGoodsLotId(new ListParam<String>(lotIds, QueryParam.operation_not_in));
+		params.setGoodsId(new ListParam<String>(goodsIds));
+		params.setEnabled(new ListParam<Boolean>(true));
+		return glRepository.findAllWithGoods().findByPage(params, order, pageNo, pageSize, goodsRepository);
+	}
+
+
+}

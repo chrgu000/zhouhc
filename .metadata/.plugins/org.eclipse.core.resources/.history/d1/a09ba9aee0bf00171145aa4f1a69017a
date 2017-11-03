@@ -1,0 +1,91 @@
+package cn.ak4j.yard.extend.zhjw;
+
+import static org.junit.Assert.assertNotNull;
+
+import javax.annotation.PostConstruct;
+
+import org.junit.Ignore;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.support.BeanDefinitionBuilder;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.context.ApplicationContext;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YdsGoodsType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import cn.ak4j.yard.yds.service.IYdsEdsGoodsEventProcessor;
+
+@Ignore
+public class ZhjwEdsGoodsEventProcessTest extends BaseTest{
+
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private ApplicationContext context;
+	
+	private IYdsEdsGoodsEventProcessor edsGoodsEventProcess;
+	
+	@PostConstruct
+	public void init(){
+		DefaultListableBeanFactory defaultListableBeanFactory = (DefaultListableBeanFactory) context.getAutowireCapableBeanFactory();
+		
+		BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder.genericBeanDefinition(ZhjwEdsGoodsEventProcessor.class);
+
+		//动态注册bean.
+		defaultListableBeanFactory.registerBeanDefinition("zhjwEdsGoodsEventProcessor", beanDefinitionBuilder.getBeanDefinition());
+
+		//获取动态注册的bean.
+		edsGoodsEventProcess = context.getBean(ZhjwEdsGoodsEventProcessor.class);
+	}
+	
+	@Test public void testProcess(){
+		String userId = "user_id_007";
+		AmqpMsgType msgType = AmqpMsgType.ADD_EDS_GOODS;
+//		String edsGoodsId = "eds_goods_id_043";
+//		YdsEdsGoods edsGoods = egRepository.findAll().findById(edsGoodsId);
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		YdsEdsGoods edsGoods = createEdsGoods(user);
+		edsGoods = egRepository.save(edsGoods);
+		edsGoodsEventProcess.process(edsGoods, userId, msgType);
+		
+		YdsEdsGoods edsGoodsPO = egRepository.findOne(edsGoods.getEdsGoodsId());
+		assertNotNull(edsGoodsPO.getYardGoodsId());
+		
+		YdsGoods goods = goodsRepository.findAll().findById(edsGoodsPO.getYardGoodsId());
+		assertNotNull(goods);
+		
+	}
+	
+	
+	private YdsEdsGoods createEdsGoods(PcsUser user) {
+		YdsEdsGoods edsGoods = new YdsEdsGoods();
+		edsGoods.setEdsGoodsType(YdsGoodsType.drug.getCode());
+		edsGoods.setEdsGoodsName("test");
+		edsGoods.setEdsWareName("test");
+		edsGoods.setEdsGoodsCode("zsy_1707031");
+		edsGoods.setEdsGoodsSpec("20mg/2ML*10支");
+		edsGoods.setEdsGoodsModel("注射剂");
+		edsGoods.setEdsGoodsDesc("test");
+		edsGoods.setEdsPackingSpec("20mg/2ML*10支");
+		edsGoods.setDeliveryUnitName("盒");
+		edsGoods.setEdsAthDoc("test");
+		edsGoods.setEdsFactName("test");
+		edsGoods.setEdsYdsUnitRatio(23);
+		edsGoods.setEdsPrice(32.4f);
+		edsGoods.setOwnerOrgId("org_id_001");
+		edsGoods.setMaintenanceInfo(new MaintenanceInfo(user));
+		edsGoods.setEnabled(true);
+		
+		return edsGoods;
+	}
+	
+}

@@ -1,0 +1,133 @@
+package cn.ak4j.yard.spd.bizplan.factory;
+
+import java.util.List;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfig;
+import cn.ak4j.yard.spd.domain.SpdDepotGoodsConfigs;
+import cn.ak4j.yard.spd.params.SpdDepotGoodsConfigParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotGoodsConfigRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class SpdPrepareInformFactory {
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdDepotGoodsConfigRepository dgcRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	
+	public SpdPrepareInformBiz builPrepareInform(SpdReceiveBiz receive, PcsUser user){
+		SpdPrepareInformBiz prepareInform = new SpdPrepareInformBiz();
+		
+		SpdPrepareInformRule rule = brRepository.findAllWithRelations().getAllPrepareInformRules().findByFromOrgIdAndToDepotId(receive.getFromOrgId(), receive.getToDepotId());
+		prepareInform.applyRule(rule, user);
+		
+		SpdBizItems prepareInformItems = mergeByGoods(receive.getItems());
+		
+		prepareInform.setItems(prepareInformItems);
+		prepareInform.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		return prepareInform;
+	}
+
+	private SpdBizItems mergeByGoods(SpdBizItems originItems) {
+		SpdBizItems goodsLvItems = new SpdBizItems();
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", originItems);
+		goodsIds.forEach(goodsId->{
+			SpdBizItems theItems = new SpdBizItems(CollectionUtils.find("goodsId", goodsId, originItems));
+			SpdBizItem goodsLvItem = new SpdBizItem();
+			BeanUtils.copyProperties(theItems.get(0), goodsLvItem, "bizItemId", "bizId");
+			goodsLvItem.setLotId(null);
+			goodsLvItem.setPlanQty(0);
+			goodsLvItem.setConfirmQty(0);
+			theItems.forEach(theItem->{
+				goodsLvItem.setPlanQty(goodsLvItem.getPlanQty() + theItem.getPlanQty());
+				goodsLvItem.setConfirmQty(goodsLvItem.getConfirmQty() + theItem.getConfirmQty());
+			});
+			goodsLvItems.add(goodsLvItem);
+		});
+		return goodsLvItems;
+	}
+	
+	
+	public SpdBizItems buildItmesFromLackGoodss(String depotId){
+		//获取当前备货仓库的所有的产品库存
+		SpdShelfStocks shelfStocks = ssRepository.findByShelfType(depotId, PcsAreaType.normal.getCode());
+		shelfStocks.fillGoodsLots(glRepository);
+		SpdShelfStocks goodsShelfStocks = shelfStocks.mergeByGoods();
+		
+		//获取当前备货仓库的仓库产品配置
+		//TODO 仓库产品配置缓存之后，调整该代码
+		SpdDepotGoodsConfigParams configParams = new SpdDepotGoodsConfigParams();
+		configParams.setDepotId(new ListParam<String>(depotId));
+		SpdDepotGoodsConfigs goodsConfigs = dgcRepository.find(configParams);
+		
+		//获取仓库账页信息
+		SpdDepotCards cards = dcRepository.findAll().findByDepot(depotId).getUsableCards();
+		
+		//获取所有产品
+		YdsGoodss goodss = goodsRepository.findAll();
+
+		SpdBizItems items = new SpdBizItems();
+		
+		//注意:库存存储的是小单位， 备货上下限是存储单位的
+		for(SpdDepotGoodsConfig config : goodsConfigs){
+			YdsGoods goods = goodss.findById(config.getGoodsId());
+			SpdDepotCard card = cards.findEnableCardByGoodsId(config.getGoodsId());
+			if(card == null){
+				log.info(String.format("产品编码:[%s]在仓库:[%s]中未找到启用账页信息，缺货备货时过滤", goods.getGoodsCode(), depotId));
+				continue;
+			}
+			
+			float prepareAndStoreRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), goods.getPrepareUnitLv());
+			
+			SpdShelfStock stock = CollectionUtils.findWhere("goodsId", config.getGoodsId(), goodsShelfStocks);
+			SpdBizItem item = new SpdBizItem();
+			item.setGoodsId(goods.getGoodsId());
+			item.setUnitLv(goods.getPrepareUnitLv());
+			item.setUnitPrice(goods.getPreparePrice());
+			if(stock == null){
+				int canPrepareStoreQty = config.getUpperLimit() - config.getUncompletedPrepareQty();
+				item.setPlanQty((int)(canPrepareStoreQty*prepareAndStoreRatio));
+			}else{
+				Integer storeUnitStockQty = stock.getUseableQtyByStoreUnit();
+				if((storeUnitStockQty+config.getUncompletedPrepareQty()) > config.getLowerLimit()){
+//					log.info("存储单位和备货单位转换比:{},存储单位数量：备货下限:{},现有库存:{}, 无需备货",prepareAndStoreRatio, config.getLowerLimit(), storeUnitStockQty);
+					continue;
+				}
+				item.setPlanQty((int)((config.getUpperLimit()-storeUnitStockQty-config.getUncompletedPrepareQty())*prepareAndStoreRatio));
+			}
+			items.add(item);
+		}
+		return items;
+	}
+}

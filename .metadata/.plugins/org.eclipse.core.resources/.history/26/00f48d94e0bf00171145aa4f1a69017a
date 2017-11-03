@@ -1,0 +1,101 @@
+package cn.ak4j.yard.spd.repository;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+@Repository
+@Slf4j
+public class SpdDepotCardRepository extends BaseRepository<SpdDepotCard, SpdDepotCards, SpdDepotCardParams, String> {
+
+	private final String notSupportMsg = "不支持该方法，所有细粒度查询均通过集合类来完成查询";
+	
+	@Autowired @Getter 
+	private EntityManager entityManager;
+	
+	@Autowired @Qualifier("depotCardQueryThreadPool")
+	private ExecutorService threadPool;
+
+	@Cacheable(value="longTimeCache", key="\"allSpdDepotCards\"")
+	public SpdDepotCards findAll() {
+		int totalCount = super.count(null);
+		int threadCount = Conf.getDepotCardQueryThreadPoolSize();
+		int pageSize = totalCount%threadCount==0?(totalCount/threadCount):((totalCount/threadCount)+1);
+		SpdDepotCards result = new SpdDepotCards(totalCount);
+		List<SpdDepotCardQuery> tasks = new ArrayList<SpdDepotCardQuery>();
+		for(int i = 0; i < threadCount; i++){
+			tasks.add(new SpdDepotCardQuery(this, pageSize, i));
+		}
+		try {
+			List<Future<SpdDepotCards>> threadResults = threadPool.invokeAll(tasks);
+			for(Future<SpdDepotCards> future : threadResults){
+				result.addAll(future.get());
+			}
+		} catch (Exception e) {
+			log.error("查询全部账页失败", e);
+		}
+		return result;
+	}
+	
+	@Deprecated
+	public SpdDepotCards find(SpdDepotCardParams params, OrderParam order, int pageNo, int pageSize) {
+		throw new UnsupportedOperationException(notSupportMsg);
+	}
+	
+	@Deprecated
+	public SpdDepotCards find(SpdDepotCardParams params) {
+		throw new UnsupportedOperationException(notSupportMsg);
+	}
+
+	@Deprecated
+	public SpdDepotCard findOne(String depotCardId) {
+		throw new UnsupportedOperationException(notSupportMsg);
+	}
+	
+	@Deprecated
+	public int count(SpdDepotCardParams params) {
+		throw new UnsupportedOperationException(notSupportMsg);
+	}
+
+	@Deprecated
+	public SpdDepotCards findByIds(List<String> ids){
+		throw new UnsupportedOperationException(notSupportMsg);
+	}
+	
+
+}
+
+class SpdDepotCardQuery implements Callable<SpdDepotCards>{
+	
+	private SpdDepotCardRepository repository;
+	private int pageSize;
+	private int pageNo;
+	
+	public SpdDepotCardQuery(SpdDepotCardRepository repository, int pageSize, int pageNo){
+		this.repository = repository;
+		this.pageSize = pageSize;
+		this.pageNo = pageNo;
+	}
+	
+	public SpdDepotCards call() throws Exception {
+		return repository.getList(pageSize, pageNo);
+	}
+}

@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.3.1.final using JasperReports Library version 6.3.1  -->
+<!-- 2017-05-13T17:34:05 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="spdPurchItem" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="02a8bec7-63a9-4233-b0ca-e9f2dfb239e5">
+	<property name="ireport.zoom" value="1.331000000000003"/>
+	<property name="ireport.x" value="0"/>
+	<property name="ireport.y" value="0"/>
+	<parameter name="type" class="java.lang.String"/>
+	<parameter name="code" class="java.lang.String"/>
+	<parameter name="depotNm" class="java.lang.String"/>
+	<parameter name="deptNm" class="java.lang.String"/>
+	<parameter name="orgNm" class="java.lang.String"/>
+	<parameter name="linkM" class="java.lang.String"/>
+	<parameter name="linkT" class="java.lang.String"/>
+	<parameter name="orgOA" class="java.lang.String"/>
+	<parameter name="sup" class="java.lang.String"/>
+	<parameter name="cDate" class="java.lang.String"/>
+	<field name="unitName" class="java.lang.String"/>
+	<field name="packingSpec" class="java.lang.String"/>
+	<field name="goodsFormatName" class="java.lang.String"/>
+	<field name="packLvName" class="java.lang.String"/>
+	<field name="checkQty" class="java.lang.Integer"/>
+	<field name="planQty" class="java.lang.Integer"/>
+	<field name="execQty" class="java.lang.Integer"/>
+	<variable name="planQtySum" class="java.lang.Long" incrementType="Report">
+		<variableExpression><![CDATA[new java.lang.Long($V{planQtySum}.longValue()+$F{planQty}.longValue())]]></variableExpression>
+		<initialValueExpression><![CDATA[new java.lang.Long(0)]]></initialValueExpression>
+	</variable>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<pageHeader>
+		<band height="187" splitType="Stretch">
+			<staticText>
+				<reportElement x="203" y="1" width="163" height="37" uuid="b26fb109-15c4-47ee-ac67-b41e51985172"/>
+				<textElement textAlignment="Center" verticalAlignment="Bottom">
+					<font fontName="微软雅黑" size="24" isBold="true" isItalic="false" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+					<paragraph lineSpacing="Single"/>
+				</textElement>
+				<text><![CDATA[采 购 订 单]]></text>
+			</staticText>
+			<componentElement>
+				<reportElement mode="Transparent" x="70" y="51" width="203" height="33" uuid="b913f1bf-4d2e-469d-adfa-80b45d1b3f27"/>
+				<jr:Code128 xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" textPosition="bottom">
+					<jr:codeExpression><![CDATA[$P{code}]]></jr:codeExpression>
+				</jr:Code128>
+			</componentElement>
+			<staticText>
+				<reportElement x="0" y="63" width="86" height="21" uuid="42846b19-65ca-49ab-a153-381f139f111d"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[采购编码：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="280" y="88" width="86" height="21" uuid="90bc0593-53a7-4ba4-9fc8-08e752df3418"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[采购日期：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="87" width="75" height="21" uuid="0585d228-e266-43b4-b7a5-975b1ef21eaa"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[收货方：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="280" y="112" width="86" height="21" uuid="74d00c12-9986-4bb5-996a-11b0a69888c7"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[供应商：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="111" width="75" height="21" uuid="ee3f4adb-5419-4186-b93c-eb04e34d2abe"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[地址：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="280" y="136" width="86" height="21" uuid="e49be2be-22c1-4124-ac76-c2ef1f3e3de2"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[地址：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="136" width="75" height="21" uuid="128ff892-d0ac-4576-b649-ca73626a7a1b"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[联系人：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="280" y="161" width="86" height="21" uuid="771d8623-ffcc-40fd-95a8-62e7752f2d95"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[采购类型：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="0" y="161" width="75" height="21" uuid="c84002a9-123f-4b09-8c73-b5c1214cb522"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[电话：]]></text>
+			</staticText>
+			<textField isBlankWhenNull="true">
+				<reportElement x="349" y="161" width="202" height="21" uuid="f6399df9-e651-4bd9-ae5b-1bf57ee5fb66"/>
+				<textElement>
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{type}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="65" y="111" width="208" height="21" uuid="b8ab4a88-cc83-470f-917a-778de5545b22"/>
+				<textElement verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{deptNm}+"("+$P{depotNm}+")"]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="65" y="86" width="208" height="21" uuid="48833f6e-5386-4c12-b409-baee81768c4f"/>
+				<textElement verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{orgNm}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="65" y="136" width="208" height="21" uuid="47b08623-7b2b-49fd-8077-6de71b36e371"/>
+				<textElement verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{linkM}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="65" y="161" width="208" height="21" uuid="86507738-97ec-4692-a560-976dab303b7c"/>
+				<textElement verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{linkT}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="349" y="136" width="202" height="21" uuid="e60480cc-4e8f-46b5-8dc1-f95916987d39"/>
+				<textElement verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{orgOA}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="349" y="112" width="202" height="21" uuid="33399f01-79fc-4892-baee-6009ba698fe8"/>
+				<textElement verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{sup}]]></textFieldExpression>
+			</textField>
+			<textField pattern="yyyy-MM-dd" isBlankWhenNull="true">
+				<reportElement x="349" y="88" width="81" height="21" uuid="3f674e3a-95b2-42d5-ab77-5e68357da854"/>
+				<box>
+					<bottomPen lineWidth="0.0"/>
+				</box>
+				<textElement verticalAlignment="Bottom">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{cDate}]]></textFieldExpression>
+			</textField>
+			<line>
+				<reportElement x="349" y="108" width="201" height="1" uuid="13b24a05-5243-4bc4-bef8-f57d6654f11a"/>
+			</line>
+			<line>
+				<reportElement x="349" y="133" width="201" height="1" uuid="9544d95b-8007-46ea-9dcd-fec4331bda27"/>
+			</line>
+			<line>
+				<reportElement x="349" y="156" width="201" height="1" uuid="b2a2d921-13bd-4a9c-a19a-c32081e1807c"/>
+			</line>
+			<line>
+				<reportElement x="349" y="181" width="201" height="1" uuid="28288686-4679-4714-84e3-5f277531b183"/>
+			</line>
+			<line>
+				<reportElement x="65" y="106" width="208" height="1" uuid="e4fca1b8-24ea-47ee-ad45-38da86be0f7f"/>
+			</line>
+			<line>
+				<reportElement x="65" y="131" width="208" height="1" uuid="a7433e80-949b-4833-9431-507a08f1290e"/>
+			</line>
+			<line>
+				<reportElement x="65" y="156" width="208" height="1" uuid="e70e5a73-b2b0-4c5f-ae5d-620feb9538a4"/>
+			</line>
+			<line>
+				<reportElement x="65" y="181" width="208" height="1" uuid="860be03b-b7ff-455b-bd89-5790653ed8ef"/>
+			</line>
+		</band>
+	</pageHeader>
+	<columnHeader>
+		<band height="24" splitType="Stretch">
+			<staticText>
+				<reportElement x="324" y="1" width="81" height="20" uuid="941bc0a9-17b1-45ea-a02f-390f2471d8d7"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[包装规格]]></text>
+			</staticText>
+			<line>
+				<reportElement x="0" y="21" width="555" height="1" uuid="b1ff6828-a8f8-4058-8d57-d6a8d526438c"/>
+			</line>
+			<staticText>
+				<reportElement x="0" y="1" width="324" height="20" uuid="40c2f644-f479-4abe-a618-fceb7d2993a5"/>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[产品名称]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="443" y="1" width="44" height="20" uuid="99090763-f7b1-489c-8e7a-7bb765c51a00"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[级别]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="490" y="1" width="61" height="20" uuid="a5435dd9-aa87-4a16-8580-d0a6d3d8189b"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[订单数量]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="406" y="1" width="36" height="20" uuid="ee6e461d-2444-48bb-8f7e-9ffe4e611492"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[单位]]></text>
+			</staticText>
+		</band>
+	</columnHeader>
+	<detail>
+		<band height="25" splitType="Stretch">
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="1" y="1" width="323" height="20" isPrintInFirstWholeBand="true" isPrintWhenDetailOverflows="true" uuid="bf0af00c-3b54-478b-be22-d546a3267668"/>
+				<textElement verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{goodsFormatName}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="324" y="1" width="79" height="20" uuid="a9637912-e9d5-4aba-9211-37c313111cac"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{packingSpec}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="406" y="1" width="33" height="20" uuid="81807e4f-c1e8-4f1c-a8ff-f7275974330d"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{unitName}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="490" y="1" width="58" height="20" uuid="086ca415-2786-4fb3-bbdb-85bfa1bbc523"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{checkQty}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="443" y="1" width="43" height="20" uuid="04502e43-77c5-4edc-a48c-6a09b1573713"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{packLvName}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<pageFooter>
+		<band height="122" splitType="Stretch">
+			<staticText>
+				<reportElement x="349" y="8" width="100" height="21" uuid="42d1da43-c987-48e8-8018-3e3890cef667"/>
+				<textElement>
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[备注信息：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="349" y="33" width="100" height="21" uuid="d7a228f4-0b3d-4a68-9cf8-31ab2cc2d1ad"/>
+				<textElement>
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[负责人签名：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="349" y="62" width="100" height="21" uuid="a9229997-d409-4470-8fc2-e4b21be5a013"/>
+				<textElement>
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[公司盖章：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="349" y="92" width="202" height="20" uuid="181d8e23-ea7b-4714-9907-4a4164ca52d3"/>
+				<textElement>
+					<font size="13" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<text><![CDATA[确认时间：          年     月    日]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="214" y="98" width="80" height="20" uuid="2d676406-bc61-4720-bd9a-06040d1b220e"/>
+				<textElement textAlignment="Right"/>
+				<textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField evaluationTime="Report">
+				<reportElement x="294" y="98" width="40" height="20" uuid="3e0e4844-e3fb-413d-8296-556885a30fa8"/>
+				<textFieldExpression><![CDATA[" /" + $V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageFooter>
+	<summary>
+		<band height="4" splitType="Stretch"/>
+	</summary>
+</jasperReport>

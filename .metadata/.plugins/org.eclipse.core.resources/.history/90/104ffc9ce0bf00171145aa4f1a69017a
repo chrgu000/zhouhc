@@ -1,0 +1,1 @@
+Insert into SYS_GLOBAL_INFO (KEY,NAME,VALUE,DESCRIPTION,CREATE_TIME,LAST_UPDATE_TIME,EDITABLE) values ('inventory_batch_goods_size','盘点产品品种数量','10','该属性用来表示全盘时按照明细的产品品种数量进行拆分为多个盘点单',to_date('2017-09-16 12:41:29','YYYY-MM-DD HH24:MI:SS'),to_date('2017-09-16 12:41:29','YYYY-MM-DD HH24:MI:SS'),'1');

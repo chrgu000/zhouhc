@@ -1,0 +1,17 @@
+package cn.ak4j.yard.spd.wrapper.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewSpdTurnoverBoxTO {
+	
+	private String id;
+	private String wrapperNo;
+	private boolean enabled;
+	private MaintenanceInfo maintenanceInfo;
+
+}

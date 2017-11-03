@@ -1,0 +1,21 @@
+package cn.ak4j.yard.pcs.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class PcsDepotRouteParams extends QueryParams{
+
+	private ListParam<String> routeId;
+	private ListParam<String> routeType;
+	private ListParam<String> routeName;
+	private ListParam<String> fromDepotId;
+	private ListParam<String> toDepotId;
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	
+}

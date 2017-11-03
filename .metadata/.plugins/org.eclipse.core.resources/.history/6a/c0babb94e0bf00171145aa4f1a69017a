@@ -1,0 +1,28 @@
+package cn.ak4j.yard.spd.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdSellerSendParams extends QueryParams{
+	
+	private ListParam<String> sellerSendId;
+	private ListParam<String> sendCode;
+	private ListParam<String> sendInputCode;
+	private ListParam<String> sellerOrgId;
+	private ListParam<String> depotId;
+	private ListParam<Integer> checkStateCode;
+	private ListParam<String> sendType; 
+	private FloatRangeParam checkAmount;//确认金额
+	private DateRangeParam maintenanceInfo_createDate;//创建时间
+	
+	private ListParam<String> depotName;
+	private ListParam<String> depotAddress;
+}
+

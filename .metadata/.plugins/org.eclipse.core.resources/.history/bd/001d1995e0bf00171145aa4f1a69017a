@@ -1,0 +1,14 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+
+@SuppressWarnings({"serial"})
+public class SpdBizLogs extends Entities<SpdBizLog>{
+
+	public SpdBizLog findByStatusCode(String code) {
+		return CollectionUtils.findWhere("bizStatusCode", code, this);
+	}
+
+	
+}

@@ -1,0 +1,163 @@
+package cn.ak4j.yard.spd.task.web;
+
+import java.util.Arrays;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTasks;
+import cn.ak4j.yard.spd.task.params.SpdLogisticsTaskParams;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.task.service.SpdLogisticsTaskService;
+
+@RestController
+public class SpdLogisticsTaskResource {
+
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private PcsDepotRepository depotRepsitory;
+	@Autowired private SpdLogisticsTaskService ltService;
+	
+	@RequestMapping(value = "/yard/spd/spdLogisticsTasks", method = RequestMethod.GET)
+	public SpdLogisticsTasks find(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		SpdLogisticsTaskParams params = SpdLogisticsTaskParams.buildParamsFromJson(paramsStr, SpdLogisticsTaskParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdLogisticsTaskParams();
+		}
+		
+		return ltRepository.find(params, order, currentPage-1, pageSize);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdLogisticsTasks/count", method = RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr,
+						HttpServletRequest request){
+		SpdLogisticsTaskParams params = SpdLogisticsTaskParams.buildParamsFromJson(paramsStr, SpdLogisticsTaskParams.class);
+		return ltRepository.count(params);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdLogisticsTasks/deliveryTasks", method = RequestMethod.GET)
+	public SpdLogisticsTasks findDeliveryTask(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		SpdLogisticsTaskParams params = SpdLogisticsTaskParams.buildParamsFromJson(paramsStr, SpdLogisticsTaskParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdLogisticsTaskParams();
+		}
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		
+		PcsDepots fromDepots = depotRepsitory.findAll().findByDept(user.getDeptId());
+		if(fromDepots.size()<=0){
+			return new SpdLogisticsTasks();
+		}
+		params.setFromDepotId(new ListParam<String>(fromDepots.getIds()));
+		
+		SpdLogisticsTasks spdLogisticsTasks = ltRepository.find(params, order, currentPage-1, pageSize);
+		return spdLogisticsTasks;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdLogisticsTasks/receiveTasks", method = RequestMethod.GET)
+	public SpdLogisticsTasks findReceiveTask(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		SpdLogisticsTaskParams params = SpdLogisticsTaskParams.buildParamsFromJson(paramsStr, SpdLogisticsTaskParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SpdLogisticsTaskParams();
+		}
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		PcsDepots toDepots = depotRepsitory.findAll().findByDept(user.getDeptId());
+		if(toDepots.size()<=0){
+			return new SpdLogisticsTasks();
+		}
+		params.setToDepotId(new ListParam<String>(toDepots.getIds()));
+		
+		SpdLogisticsTasks spdLogisticsTasks = ltRepository.find(params, order, currentPage-1, pageSize);
+		return spdLogisticsTasks;
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdLogisticsTasks/deliveryTasks/count", method = RequestMethod.GET)
+	public int countDeliveryTask(@RequestParam(value = "params", required = false) String paramsStr,
+			HttpServletRequest request){
+		SpdLogisticsTaskParams params = SpdLogisticsTaskParams.buildParamsFromJson(paramsStr, SpdLogisticsTaskParams.class);
+		if(params == null){
+			params = new SpdLogisticsTaskParams();
+		}
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		PcsDepots fromDepots = depotRepsitory.findAll().findByDept(user.getDeptId());
+		if(fromDepots.size()<=0){
+			return 0;
+		}
+		params.setFromDepotId(new ListParam<String>(fromDepots.getIds()));
+		return ltRepository.count(params);
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdLogisticsTasks/receiveTasks/count", method = RequestMethod.GET)
+	public int countReceiveTask(@RequestParam(value = "params", required = false) String paramsStr,
+			HttpServletRequest request){
+		SpdLogisticsTaskParams params = SpdLogisticsTaskParams.buildParamsFromJson(paramsStr, SpdLogisticsTaskParams.class);
+		if(params == null){
+			params = new SpdLogisticsTaskParams();
+		}
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		PcsDepots toDepots = depotRepsitory.findAll().findByDept(user.getDeptId());
+		if(toDepots.size()<=0){
+			return 0;
+		}
+		params.setToDepotId(new ListParam<String>(toDepots.getIds()));
+		return ltRepository.count(params);
+	}
+	
+	/**
+	 * 查询当前调度所关联的物流作业
+	 *
+	 */
+	@RequestMapping(value = "/yard/spd/dispatchers/{dispatcherId}/relationLogisticsTasks", method = RequestMethod.GET)
+	public SpdLogisticsTasks findDispatcherRelationReplenishs(@PathVariable(value = "dispatcherId")String dispatcherId){
+		return ltService.findDispatcherRelationLogisticsTasks(dispatcherId);
+	}
+	
+	@RequestMapping(value = "/yard/spd/dispatchers/{dispatcherId}/relationLogisticsTasks/count", method = RequestMethod.GET)
+	public int countDispatcherRelationReplenishs(@PathVariable(value = "dispatcherId")String dispatcherId){
+		return ltService.findDispatcherRelationLogisticsTasks(dispatcherId).size();
+	}
+	
+	/**
+	 * 查询当前调度可调度的物流作业
+	 */
+	@RequestMapping(value = "/yard/spd/dispatchers/{dispatcherId}/dispatchableLogisticsTasks", method = RequestMethod.GET)
+	public SpdLogisticsTasks findDispatchableReplenishs(@PathVariable(value = "dispatcherId")String dispatcherId){
+		return ltService.findDispatcherableLogisticsTasks(dispatcherId);
+	}
+	
+	@RequestMapping(value = "/yard/spd/dispatchers/{dispatcherId}/dispatchableLogisticsTasks/count", method = RequestMethod.GET)
+	public int countDispatchableReplenishs(@PathVariable(value = "dispatcherId")String dispatcherId){
+		return ltService.findDispatcherableLogisticsTasks(dispatcherId).size();
+	}
+	
+	@RequestMapping(value = "/yard/spd/spdLogisticsTasks/ids,{ids}",method = RequestMethod.GET)
+	public SpdLogisticsTasks getIds(@PathVariable("ids")String ids){
+		List<String> idsList = Arrays.asList(ids.split(","));
+		return ltRepository.findByIds(idsList);
+	}
+}

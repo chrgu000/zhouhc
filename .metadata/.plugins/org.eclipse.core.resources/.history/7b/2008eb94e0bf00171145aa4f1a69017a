@@ -1,0 +1,119 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdMoveAreaFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 移仓业务规则
+* @author zhengyf
+* @date 2017年6月20日 下午5:46:17
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_move_area_rule")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdMoveAreaRule extends SpdAbstractBizRule<SpdMoveAreaFeedbackRule>{
+	
+	/**
+	 * 事由
+	 */
+	@NotNull(message="移仓事由不能为空")
+	@Setter @Getter private String usage;
+	
+	@Getter @Setter @Embedded @NotNull(message="directionRule不能为空") @Valid
+	private SpdMoveAreaDirectionRule directionRule;
+
+	@SuppressWarnings("rawtypes") @Override
+	public void update(SpdAbstractBizRule theRule) {
+		SpdMoveAreaRule rule = (SpdMoveAreaRule)theRule;
+		setName(rule.getName());
+		setCustomName(rule.getCustomName());
+		setPrior(rule.getPrior());
+		setUsage(rule.getUsage());
+		setEnabled(rule.getEnabled());
+		setCanBeOriginRule(rule.getCanBeOriginRule());
+		setManualApply(rule.getManualApply());
+	}
+	
+	@Override
+	public String getDescription() {
+		//TODO 待设计描述
+		return getFeedbackRule().getDescription();
+	}
+	
+	@Override public SpdBizType getBizType() {
+		return SpdBizType.move_area_biz;
+	}
+	
+	@Override public void checkRule(SpdBizRules<?> allRules, SpdPropertyChangeRules allPropertyChangeRules) {
+		boolean isSameAreaType = getDirectionRule().getFromAreaType().equals(getDirectionRule().getToAreaType());
+		if(isSameAreaType){
+			throw new InvalidDataException(YardExceptionType.invalid_areaType_cannot_same, SpdBizType.move_area_biz.getName(), "原货区", "目标货区");
+		}
+	}
+
+	@SuppressWarnings("rawtypes") @Override
+	public boolean equalsRule(SpdAbstractBizRule theRule) {
+		if(theRule.getBizType() != getBizType()){
+			return false;
+		}
+		
+		SpdMoveAreaRule rule = (SpdMoveAreaRule)theRule;
+		if(getFeedbackRuleId().equals(rule.getFeedbackRuleId())
+			&& getDirectionRule().equals(rule.getDirectionRule())
+			&& getUsage().equals(rule.getUsage())){
+			return true;
+		}
+		
+		return false;
+	}
+
+	@Override
+	public String getDisplayName() {
+		String fromDepotName = directionRule.getDepot().getDepotName();
+		String fromAreaType = directionRule.getFromAreaType();
+		String toAreaType = directionRule.getToAreaType();
+		return String.format("%s [%s%s货区>%s货区]", getName(), fromDepotName, fromAreaType, toAreaType);
+	}
+
+	@Override
+	public boolean canApplyByUser(PcsUser user) {
+		if(!getEnabled()){
+			return false;
+		}
+		
+		boolean isFromDepotUser = getDirectionRule().getDepot().getManageDeptId().equals(user.getDeptId());
+		
+		if(isFromDepotUser){
+			return true;
+		}
+		
+		return false;
+	}
+	
+	public boolean equals(Object obj){
+		SpdMoveAreaRule rule = (SpdMoveAreaRule)obj;
+		return equalsRule(rule)
+				&& getName().equals(rule.getName())
+				&& getPrior().equals(rule.getPrior())
+				&& getEnabled().equals(rule.getEnabled())
+				&& getCanBeOriginRule().equals(rule.getCanBeOriginRule()
+				&& getManualApply().equals(rule.getManualApply()));
+	}
+
+}

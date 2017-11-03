@@ -1,0 +1,100 @@
+package cn.ak4j.yard.pcs.web;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import cn.ak4j.yard.pcs.domain.PcsAuthorityAssets;
+import cn.ak4j.yard.pcs.domain.PcsFunction;
+import cn.ak4j.yard.pcs.domain.PcsFunctions;
+import cn.ak4j.yard.pcs.domain.PcsMenus;
+import cn.ak4j.yard.pcs.domain.PcsMixedOperations;
+import cn.ak4j.yard.pcs.domain.PcsOperation;
+import cn.ak4j.yard.pcs.domain.PcsOperations;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsWebApi;
+import cn.ak4j.yard.pcs.params.PcsMixedOperationParams;
+import cn.ak4j.yard.pcs.service.SysAuthorityService;
+
+@RestController
+public class AuthorityAssetsResource {
+
+	@Autowired private SysAuthorityService authorityService;
+	@Autowired private PcsAuthorityAssets authorityAssets;
+	
+	@RequestMapping(value="/yard/pcs/menus", method=RequestMethod.GET)
+	public PcsMenus list() throws Exception{
+		return authorityAssets.getAllMenus();
+	}
+	
+	@RequestMapping(value="/yard/pcs/operations", method=RequestMethod.GET)
+	public PcsOperations operations(){
+		PcsOperations result = authorityAssets.getAllOperations();
+		Collections.sort(result, new Comparator<PcsOperation>() {
+			public int compare(PcsOperation o1, PcsOperation o2) {
+				return o2.getOpId().compareTo(o1.getOpId());
+			}
+		});
+		return result;
+	}
+	
+	@RequestMapping(value="/yard/pcs/opertions/whichDependendsOnApi")
+	public PcsOperations findOperationsByApi(@RequestParam("apiUri")String apiUri, @RequestParam("apiMethod")String apiMethod){
+		PcsOperations operations = authorityService.findOperationsByWebApi(new PcsWebApi(apiUri, apiMethod));
+		return operations;
+	}
+	
+	@RequestMapping(value="/yard/pcs/functions", method=RequestMethod.GET)
+	public PcsFunctions functions(){
+		PcsFunctions result = authorityAssets.getAllFunctions();
+		Collections.sort(result, new Comparator<PcsFunction>() {
+			public int compare(PcsFunction o1, PcsFunction o2) {
+				return o2.getFunctionId().compareTo(o1.getFunctionId());
+			}
+		});
+		return result;
+	}
+	
+	@RequestMapping(value = "/yard/pcs/menus/mine", method = RequestMethod.GET)
+	public PcsMenus getMenusByUserId(HttpServletRequest request) {
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		return authorityService.getMenusByUser(user);
+	};
+	
+	@RequestMapping(value="/yard/pcs/operations[elementClass]/mine", method=RequestMethod.GET)
+	public List<String> getOperationElementClasses(HttpServletRequest request){
+		PcsUser user = (PcsUser) request.getAttribute("user");
+		PcsOperations operations = authorityService.getOperationsByUser(user);
+		return operations.getAllElementClasses();
+	}
+	
+	@RequestMapping(value="/yard/pcs/sysMixedOperations", method=RequestMethod.GET)
+	public PcsMixedOperations getMixedOperations(@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		OrderParam order = OrderParam.buildFromJson(orders);
+		PcsMixedOperationParams params = QueryParams.buildParamsFromJson(paramsStr, PcsMixedOperationParams.class);
+		return (PcsMixedOperations)authorityAssets.getAllMixedOperations().findByPage(params, order, -1, -1);
+	}
+
+	@RequestMapping(value="/yard/pcs/sysMixedOperations/ids,{ids}", method=RequestMethod.GET)
+	public PcsMixedOperations getMixedOperations(@PathVariable("ids") String ids){
+		String[] idArray = ids.split(",");
+		List<String> idList = Arrays.asList(idArray);
+		PcsMixedOperationParams params = new PcsMixedOperationParams();
+		params.setOpId(new ListParam<String>(idList));
+		return (PcsMixedOperations)authorityAssets.getAllMixedOperations().find(params);
+	}
+}

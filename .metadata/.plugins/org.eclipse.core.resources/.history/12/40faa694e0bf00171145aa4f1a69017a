@@ -1,0 +1,45 @@
+package cn.ak4j.yard.spd.reconciliation.report.base;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.annotation.PostConstruct;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.spd.reconciliation.report.hspt_credit_rep_aggr_by_goods.SpdHospitalCreditReplenishAggregateByGoodsQuerier;
+import cn.ak4j.yard.spd.reconciliation.report.hspt_credit_rep_detail.SpdHospitalCreditReplenishDetailQuerier;
+import cn.ak4j.yard.spd.reconciliation.report.rep_aggr_by_goods.SpdReplenishAggregateByGoodsQuerier;
+import cn.ak4j.yard.spd.reconciliation.report.rep_detail.SpdReplenishDetailQuerier;
+
+/**
+* @Description: 报表查询器工厂类
+* @author zhengyf
+* @date 2017年10月14日 下午3:53:38
+* @version V1.0.0
+*/
+
+@Component
+public class SpdReconciliationReportQuerierFactory {
+
+	@Autowired private SpdHospitalCreditReplenishAggregateByGoodsQuerier hcrrabgQuerier;
+	@Autowired private SpdHospitalCreditReplenishDetailQuerier hcrdQuerier;
+	@Autowired private SpdReplenishDetailQuerier rdQuerier;
+	@Autowired private SpdReplenishAggregateByGoodsQuerier rabgQuerier;
+	
+	private Map<SpdReconciliationReportType, SpdReconciliationReportQuerier<?>> queriers = new HashMap<SpdReconciliationReportType, SpdReconciliationReportQuerier<?>>();
+	
+	@PostConstruct
+	public void init(){
+		this.queriers.put(SpdReconciliationReportType.hospital_credit_replenish_aggregate_by_goods, hcrrabgQuerier);
+		this.queriers.put(SpdReconciliationReportType.hospital_credit_replenish_detail, hcrdQuerier);
+		this.queriers.put(SpdReconciliationReportType.replenish_detail, rdQuerier);
+		this.queriers.put(SpdReconciliationReportType.replenish_aggregate_by_goods, rabgQuerier);
+	}
+	
+	public SpdReconciliationReportQuerier<?> getQuerier(SpdReconciliationReportType reportType){
+		return queriers.get(reportType);
+	}
+	
+}

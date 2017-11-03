@@ -1,0 +1,234 @@
+package cn.ak4j.yard.domain;
+
+import java.util.Date;
+
+import javax.persistence.Transient;
+
+import org.apache.commons.beanutils.BeanUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.EntityUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+
+
+@SuppressWarnings("serial")
+public abstract class YardMaintenceEntity extends YardEntity{
+	
+	private Logger logger = LoggerFactory.getLogger(YardMaintenceEntity.class);
+	
+	public void review(Date lastDate, Object...params){
+		updateCheckState(CheckState.reviewed.getCode(), lastDate, params);
+	}
+	
+	public void commit(Date lastDate, Object...params){
+		updateCheckState(CheckState.commited.getCode(), lastDate, params);
+	}
+	
+	public void updateCheckState(Integer checkStateCode, Date lastDate, Object... params){
+		IUser user = (params != null && params.length == 1)?(IUser)params[0]:null;
+		String orgId = user == null?this.getMaintenanceInfo().getLastOrgId():user.getOrgId();
+		String userId = user == null?this.getMaintenanceInfo().getLastUserId():user.getUserId();
+		updateCheckState(checkStateCode, lastDate, orgId, userId);
+	}
+	
+	
+	public void updateCheckState(Integer checkStateCode, Date lastDate, String userOrgId, String userId){
+		if(checkStateCode == null){
+			throw new OperateForbiddenException(YardExceptionType.forbide_update_check_state_commited);
+		}
+		
+		if(checkTimeStamp(lastDate) != 0){
+			throw new InvalidDataException(YardExceptionType.invalid_inconsistent_timestamp, getLastUpdateTime().getTime(), lastDate.getTime());
+		}
+		CheckState newState = CheckState.stateOf(checkStateCode);
+		
+		boolean update = false;
+		
+		if(getStateFlow().equals(StateFlowTemplates.statesFlow_n)){
+			if(getCheckState() == CheckState.new_created){
+				if(newState == CheckState.new_created){
+					update = true;
+				}
+			}
+		}
+		
+		if(getStateFlow().equals(StateFlowTemplates.statesFlow_n_c)){
+			if(getCheckState() == CheckState.new_created){
+				if(newState == CheckState.commited){
+					update = true;
+				}
+			}else if (getCheckState() == CheckState.commited){
+				if(newState == CheckState.new_created){
+					update = true;
+				}
+			}
+		}
+
+		if(getStateFlow().equals(StateFlowTemplates.statesFlow_n_r)){
+			if(getCheckState() == CheckState.new_created){
+				if(newState == CheckState.reviewed){
+					update = true;
+				}
+			}else if(getCheckState() == CheckState.reviewed){
+				if(newState == CheckState.new_created){
+					update = true;
+				}
+			}
+		}
+		
+		if(getStateFlow().equals(StateFlowTemplates.statesFlow_n_f)){
+			if(getCheckState() == CheckState.new_created){
+				if(newState == CheckState.completed){
+					update = true;
+				}
+			}else if (getCheckState() == CheckState.completed){
+				if(newState == CheckState.new_created){
+					update = true;
+				}
+			}
+		}
+		
+		
+		if(getStateFlow().equals(StateFlowTemplates.statesFlow_n_c_r)){
+			if(getCheckState() == CheckState.new_created){
+				if(newState == CheckState.commited){
+					update = true;
+				}
+			}else if(getCheckState() == CheckState.commited){
+				if(newState == CheckState.reviewed || newState == CheckState.new_created){
+					update = true;
+				}
+			}
+		} 
+		if(getStateFlow().equals(StateFlowTemplates.statesFlow_n_r_f)){
+			if(getCheckState() == CheckState.new_created){
+				if(newState == CheckState.reviewed){
+					update = true;
+				}
+			}else if(getCheckState() == CheckState.reviewed){
+				if(newState == CheckState.completed || newState == CheckState.new_created){
+					update = true;
+				}
+			}
+		}
+		
+		if(getStateFlow().equals(StateFlowTemplates.statesFlow_n_c_r_f)){
+			if(getCheckState() == CheckState.new_created){
+				if(newState == CheckState.commited){
+					update = true;
+				}
+			}else if(getCheckState() == CheckState.commited){
+				if(newState == CheckState.new_created || newState == CheckState.reviewed){
+					update = true;
+				}
+			}else if(getCheckState() == CheckState.reviewed){
+				if(newState == CheckState.commited || newState == CheckState.completed){
+					update = true;
+				}
+			}
+		}
+				
+		if(update){
+			setCheckStateCode(checkStateCode);
+			getMaintenanceInfo().updateByUser(userOrgId, userId);
+		}else{
+			OperateForbiddenException exception = new OperateForbiddenException(YardExceptionType.forbide_update_check_state, getCheckState().getName(), newState.getName());
+			logger.warn("对象[{}]状态更新异常:{}, stateFlow:{}", this.getClass().getSimpleName(), exception.getErrorInfo().getDescription(), this.getStateFlow());
+			throw exception;
+		}
+	}
+	
+	public void update(YardMaintenceEntity newEntity, String userOrgId, String userId){
+		checkUpdate(newEntity);
+		try{
+			int checkStateCode = this.getCheckStateCode();
+			BeanUtils.copyProperties(this, newEntity);
+			this.setCheckStateCode(checkStateCode);
+			this.getMaintenanceInfo().updateByUser(userOrgId, userId);
+		}catch(Exception e){
+			logger.error(ExceptionUtils.getStackTrace(e));
+		}
+	}
+	
+	public boolean checkUpdate(YardMaintenceEntity targetEntity){
+		if(!canUpdate()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_update, EntityUtils.getId(this));
+		}
+		
+		if(checkTimeStamp(targetEntity.getMaintenanceInfo().getLastDate()) != 0){
+			logger.error("current object:{}, target object:{}", getMaintenanceInfo().getLastDate(), targetEntity.getMaintenanceInfo().getLastDate());
+			throw new InvalidDataException(YardExceptionType.invalid_inconsistent_timestamp, getMaintenanceInfo().getLastDate().getTime(), targetEntity.getMaintenanceInfo().getLastDate().getTime());
+		}
+		return true;
+	}
+	
+	public boolean canDelete(){
+		if(getCheckStateCode() != null){
+			CheckState checkState = CheckState.stateOf(getCheckStateCode());
+			if(checkState != CheckState.new_created){
+				return false;
+			}
+		}
+
+		
+		return true;
+	}
+	
+	public boolean canUpdate(){
+		CheckState checkState = CheckState.stateOf(getCheckStateCode());
+		if(checkState != CheckState.new_created){
+			return false;
+		}
+		
+		return true;
+	}
+	
+	public abstract Integer getCheckStateCode();
+
+	public abstract void setCheckStateCode(Integer checkStateCode);
+	
+	public abstract MaintenanceInfo getMaintenanceInfo();
+	
+	public abstract void setMaintenanceInfo(MaintenanceInfo maintenanceInfo);
+
+	public String getStateFlow(){
+		return StateFlowTemplates.statesFlow_n_c;
+	}
+	
+	public CheckState getCheckState(){
+		if(getCheckStateCode() == null){
+			return null;
+		}
+		return CheckState.stateOf(getCheckStateCode());
+	}
+	
+	@Transient @JsonIgnore
+	public Date getCreateTime(){
+		if(getMaintenanceInfo() == null){
+			return null;
+		}
+		return getMaintenanceInfo().getCreateDate();
+	}
+	
+	@Transient @JsonIgnore
+	public Date getLastUpdateTime(){
+		if(getMaintenanceInfo() == null){
+			return null;
+		}
+		return getMaintenanceInfo().getLastDate();
+	}
+	
+	public void setLastUpdateTime(Date date){
+		//无需实现
+	}
+	
+	public void setCreateTime(Date date){
+		
+	}
+}

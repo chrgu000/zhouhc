@@ -1,0 +1,36 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 物流作业明细
+* @author zhengyf
+* @date 2017年4月5日 下午3:01:14
+* @version V1.0.0
+*/
+
+@NoArgsConstructor
+@Entity
+@Table(name="SPD_LOGISTICS_TASK_ITEM")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SpdLogisticsTaskItem extends SpdTaskItem{
+
+	@Getter @Setter
+	private Integer receiveQty = -1;
+	
+	public void receiveAsConfirm() {
+		setReceiveQty(getConfirmQty());
+	}
+	
+	public boolean isEntireReceive(){
+		return getConfirmQty().equals(getReceiveQty());
+	}
+}

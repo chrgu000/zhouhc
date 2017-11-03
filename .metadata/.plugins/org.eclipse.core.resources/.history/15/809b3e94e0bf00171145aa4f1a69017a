@@ -1,0 +1,88 @@
+package cn.ak4j.yard.sys.datacheck.domain;
+
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+
+@Entity
+@Table(name="SYS_DATA_CHECK_TASK")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SysDataCheckTask implements IEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name = "uuidGenerator", strategy = "uuid")
+	private String id;
+	private String operatorId;
+	private Date startTime;
+	private Date endTime;
+	private String status;
+	
+	public SysDataCheckTask() {
+		
+	}
+		
+	
+	/**
+	 * 
+	 * @param operatorId 操作员Id
+	 * @param startTime  开始时间
+	 * @param endTime    结束时间
+	 */
+	public SysDataCheckTask(String operatorId, Date startTime, Date endTime) {
+		if(operatorId == null){
+			this.operatorId = "-1";
+		}else{
+			setOperatorId(operatorId);
+		}
+		if(startTime == null){
+			this.startTime = new Date((long)0);
+		}else{
+			this.startTime = startTime;
+		}
+		this.endTime = endTime;
+		this.status = "执行中";
+	}
+	
+	public String getId() {
+		return id;
+	}
+	public void setId(String id) {
+		this.id = id;
+	}
+	public String getOperatorId() {
+		return operatorId;
+	}
+	public void setOperatorId(String operatorId) {
+		this.operatorId = operatorId;
+	}
+	public Date getStartTime() {
+		return startTime;
+	}
+	public void setStartTime(Date startTime) {
+		this.startTime = startTime;
+	}
+	public Date getEndTime() {
+		return endTime;
+	}
+	public void setEndTime(Date endTime) {
+		this.endTime = endTime;
+	}
+	public String getStatus() {
+		return status;
+	}
+	public void setStatus(String status) {
+		this.status = status;
+	}	
+}

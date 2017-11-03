@@ -1,0 +1,34 @@
+package cn.ak4j.yard.extend.scheduletask;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.domain.AbstractScheduleTask;
+import cn.ak4j.yard.spd.service.SpdDepotGoodsConfigService;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class ResetUncompletedPrepareQtyTask extends AbstractScheduleTask{
+
+	@Autowired private SpdDepotGoodsConfigService dgcService;
+	
+	@Getter @Setter private String name;
+	
+	public ResetUncompletedPrepareQtyTask(String name) {
+		this.name = name;
+	}
+
+	@Override
+	public void executeTask() throws Exception {
+		log.info("定时执行仓库产品配置自动清零任务！");
+		dgcService.cleanUncompletedPrepareQty();
+	}
+
+	@Override
+	public String getDescription() {
+		String description = "定时执行仓库产品配置自动清零任务！清零自动备货周期时间大于上次备货时间的仓库产品配置。";
+		return description;
+	}
+
+}

@@ -1,0 +1,1 @@
+alter table spd_shelf_stock add(shelf_id varchar2(32));

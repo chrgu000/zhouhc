@@ -1,0 +1,34 @@
+package cn.ak4j.yard.enums;
+
+import lombok.Getter;
+import lombok.Setter;
+
+public enum AmqpRouteKey {
+
+	BATCH_TASK_QUEUE_ROUTE("create_batch_task","","批量任务routeKey"),
+	SPD_BIZ_QUEUE_ROUTE("spd_biz","","一般的业务和基础数据routeKey"),
+	SYNC_TASK_QUEUE_ROUTE("sync_task","","同步任务routeKey");
+	
+	
+	@Getter @Setter private String code;
+	@Getter @Setter private String name;
+	@Getter @Setter private String description;
+	
+	private AmqpRouteKey (String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	/**
+	 * 根据消息类型获取routekey
+	 */
+	public static AmqpRouteKey getRoukey(AmqpMsgType msgType){
+		if(msgType.getCode().contains("批量任务")){
+			return BATCH_TASK_QUEUE_ROUTE;
+		}else if(msgType.getCode().contains("sync_")){
+			return SYNC_TASK_QUEUE_ROUTE;
+		}
+		return SPD_BIZ_QUEUE_ROUTE;
+	}
+}

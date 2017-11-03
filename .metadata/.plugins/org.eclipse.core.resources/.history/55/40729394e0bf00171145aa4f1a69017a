@@ -1,0 +1,397 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import java.util.Arrays;
+import java.util.Date;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.ISupplierProxy;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdRecItemsGenerateStatuses;
+import cn.ak4j.yard.spd.reconciliation.factory.SpdFinacialReconciliationFactory;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReport;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportQuerier;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportQuerierFactory;
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportType;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdDailyCleanBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationItemRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+public class SpdFinacialReconciliationBizService extends IYardService<SpdFinacialReconciliationBiz>{
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdFinacialReconciliationBizRepository frbRepository;
+	@Autowired private SpdDailyCleanBizRepository dcbRepository;
+	@Autowired private SpdDailyCleanBizService dcbService;
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private SpdFinacialReconciliationFactory frFactory;
+	@Autowired private SpdFinacialReconciliationItemRepository friRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private ApplicationContext context;
+	
+	@Autowired private SpdRecItemsGenerateStatuses itemsGenerateStatuses;
+	@Autowired private SpdReconciliationReportQuerierFactory reportQuerierFactory;
+	
+	@Transactional public SpdFinacialReconciliationBiz createInitReconciliation(String bizRuleId, SpdFinacialReconciliationItems items, IUser user){
+		SpdFinacialReconciliationRule rule = (SpdFinacialReconciliationRule)brRepository.findOne(bizRuleId);
+		
+		//检查是否已有初始期末
+		SpdFinacialReconciliationBiz initReconciliation = frbRepository.findByBizRuleAndBeginingReconciliationIds(bizRuleId, SpdFinacialReconciliationBiz.init_rec_id);
+		if(initReconciliation != null){
+			throw new InvalidDataException(YardExceptionType.invalid_init_reconciliation_exist, rule.getId(), rule.getDisplayName(), initReconciliation.getBizCode());
+		}
+		
+		//创建财务对账业务
+		SpdFinacialReconciliationBiz reconciliation = frFactory.buildInitReconciliation(rule, (PcsUser)user);
+		reconciliation.setBizCode(codeService.publishCode(CodeSort.caiwudan).getCode());
+		reconciliation.setItems(items);
+		if(!reconciliation.isValid()){
+			throw new InvalidDataException(reconciliation.getValidateMsg());
+		}
+		
+		frbRepository.saveWithItems(reconciliation);
+		
+		return reconciliation;
+	}
+	
+	@Transactional public SpdFinacialReconciliationBiz add(SpdFinacialReconciliationBiz reconciliation, IUser user){
+		SpdFinacialReconciliationRule rule = (SpdFinacialReconciliationRule)brRepository.findOne(reconciliation.getBizRuleId());
+		
+		//创建财务对账业务
+		reconciliation.setReconciliationDate(new Date());
+		reconciliation.setMaintenanceInfo(new MaintenanceInfo(user));
+		reconciliation.applyRule(rule, (PcsUser)user);
+		reconciliation.setBizCode(codeService.publishCode(CodeSort.caiwudan).getCode());
+		if(!reconciliation.isValid()){
+			throw new InvalidDataException(reconciliation.getValidateMsg());
+		}
+		frbRepository.save(reconciliation);
+
+		//更新期初对账业务的结转对账
+		SpdFinacialReconciliationBiz begining = frbRepository.findOne(reconciliation.getBeginingReconciliationId());
+		if(begining != null){
+			begining.setNextReconciliationId(reconciliation.getBizId());
+			//log.debug("期初的结转财务对账: {} {}", begining.getBizCode(), begining.getNextReconciliationId());
+			frbRepository.save(begining);
+		}
+		
+		//引入日清对账业务
+		SpdDailyCleanBizs dailyCleans = dcbRepository.findByTargetDatesAndDepotAndUnreconciliation(reconciliation.getCleanDates(), Arrays.asList(rule.getTargetDepotIds().split(",")));
+		log.info("创建财务对账业务，共引入{}个日清对账: {}, {}", dailyCleans.size(), reconciliation.getCleanDates(), rule.getTargetDepotIds());
+		//log.debug("reconciliation id:{}, {}", reconciliation.getBizId(), dailyCleans.pluck("bizId"));
+
+		//事务提交后添加生成明细的执行状态、发送业务事件消息
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				itemsGenerateStatuses.newReconciliation(reconciliation.getBizId());
+				rabbitProxy.sendBizMsg(reconciliation.getBizId(), null, user.getUserId(), AmqpMsgType.CREATE_FINACIAL_RECONCILIATION_BIZ);
+				//dailyCleans.forEach(dailyClean->log.debug("dailyClean's reconciliationId:{}", dailyClean.getFinacialReconciliationId()));
+            }
+		});
+		
+		dailyCleans.forEach(dailyClean->dailyClean.setFinacialReconciliationId(reconciliation.getBizId()));
+		dcbRepository.saveAll(dailyCleans);
+		
+		return reconciliation;
+	}
+	
+	/**
+	 * 非新增状态不能修改对账明细
+	 * 当前正在生成对账明细时不能编辑
+	 */
+	@Transactional public SpdFinacialReconciliationBiz modify(SpdFinacialReconciliationBiz reconciliation, IUser user){
+		String bizId = reconciliation.getBizId();
+		SpdFinacialReconciliationBiz reconciliationPO = frbRepository.findOne(bizId);
+		SpdFinacialReconciliationRule rule = (SpdFinacialReconciliationRule)brRepository.findOne(reconciliation.getBizRuleId());
+		
+		if(itemsGenerateStatuses.isGenerating(bizId)){
+			throw new OperateForbiddenException(YardExceptionType.forbid_concurrence_generating, reconciliation.getBizCode());
+		}
+		if(reconciliation.getCheckState() != CheckState.new_created){
+			throw new OperateForbiddenException(YardExceptionType.forbide_update, reconciliation.getBizCode());
+		}
+		
+		reconciliationPO.setDescription(reconciliation.getDescription());
+		//更新引入的日清业务
+		if(!reconciliationPO.getCleanDays().equals(reconciliation.getCleanDays())){
+			reconciliationPO.setCleanDays(reconciliation.getCleanDays());
+			
+			//清除之前的日清关联
+			SpdDailyCleanBizs dailyCleans = dcbRepository.findByFinacialConciliationId(bizId);
+			dailyCleans.forEach(dailyClean->dailyClean.setFinacialReconciliationId(null));
+			dcbRepository.saveAll(dailyCleans);
+			
+			//更新新的日清关联
+			dailyCleans = dcbRepository.findByTargetDatesAndDepot(reconciliation.getCleanDates(), Arrays.asList(rule.getTargetDepotIds().split(",")));
+			dailyCleans.forEach(dailyClean->dailyClean.setFinacialReconciliationId(bizId));
+			dcbRepository.saveAll(dailyCleans);
+			
+			//明细生成置为false, 更新明细生成状态为初始
+			reconciliationPO.setItemGenerated(false);
+			itemsGenerateStatuses.newReconciliation(bizId);
+			
+			//删除对账明细
+			SpdFinacialReconciliationItems reconciliationItems = friRepository.findByReconciliationId(bizId);
+			friRepository.delete(reconciliationItems);
+			
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+				public void afterCommit(){
+					rabbitProxy.sendBizMsg(reconciliation.getBizId(), null, user.getUserId(), AmqpMsgType.GENERATE_FINACIAL_RECONCILIATION_ITEMS);
+					//dailyCleans.forEach(dailyClean->log.debug("dailyClean's reconciliationId:{}", dailyClean.getFinacialReconciliationId()));
+	            }
+			});
+		}
+		
+		reconciliationPO.updateLastUpdateTime();
+		frbRepository.save(reconciliationPO);
+		return reconciliationPO;
+	}
+	
+	@Transactional
+	public synchronized void generateItems(String bizId){
+		SpdFinacialReconciliationBiz reconciliation = frbRepository.findOne(bizId);
+		generateItems(reconciliation);
+	}
+	
+	/**
+	 * 非新增状态不能生成对账明细
+	 * 当前正在生成时不能执行生成对账明细
+	 */
+	@SuppressWarnings("unchecked") @Transactional 
+	public synchronized void generateItems(SpdFinacialReconciliationBiz reconciliation){
+//		log.debug("reconciliation status: {}", reconciliation.getCheckState());
+		if(reconciliation.getCheckState() != CheckState.new_created){
+			throw new OperateForbiddenException(YardExceptionType.forbid_only_new_created_state_can_generate_items, reconciliation.getBizCode(), reconciliation.getCheckState().getName());
+		}
+		if(itemsGenerateStatuses.isGenerating(reconciliation.getBizId())){
+			throw new OperateForbiddenException(YardExceptionType.forbid_concurrence_generating, reconciliation.getBizCode());
+		}
+		
+		itemsGenerateStatuses.start(reconciliation.getBizId());
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				itemsGenerateStatuses.success(reconciliation.getBizId());
+            }
+		});
+		
+		try{
+			//根据当前对账业务的所有日清对账的明细构造财务对账明细
+			SpdDailyCleanBizs dailyCleans = dcbService.findWithRelationByFinacialReconciliation(reconciliation.getBizId());
+			if(CollectionUtils.isEmpty(dailyCleans)){
+				throw new NotFoundException(String.format("财务对账业务[%s,%s] 未找到日清对账", reconciliation.getBizId(), reconciliation.getBizCode()));
+			}
+			log.info("财务对账业务[{}] 日清对账业务共[{}]条", reconciliation.getBizCode(), dailyCleans.size());
+			
+			SpdPropertyChangeRecordItems recordItems = dailyCleans.getAllPropertyChangeItems();
+			recordItems.fillGoods(goodsRepository);
+			log.info("财务对账业务[{}] 相关物权变更明细共[{}]条", reconciliation.getBizCode(), recordItems.size());
+			
+			SpdFinacialReconciliationItems reconciliationItems = frFactory.buildReconciliationItems(recordItems);
+			log.info("财务对账业务[{}] 经汇总对账明细共[{}]条", reconciliation.getBizCode(), reconciliationItems.size());
+			
+			//查找往期有期末的明细
+			if(StringUtils.isNotEmpty(reconciliation.getBeginingReconciliationId())){
+				SpdFinacialReconciliationBizs pastReconciliations = frbRepository.findCompletedByRuleIdAndWithoutNextConciliation(reconciliation.getBeginingReconciliationId());
+				log.info("财务对账业务[{}] 需要做结转的往期[{}]条", reconciliation.getBizCode(), pastReconciliations.size());
+				
+				SpdFinacialReconciliationItems endingReconciliationItems = friRepository.findByReconciliationIdsAndEndingQty(pastReconciliations.getIds());
+				endingReconciliationItems.fillGoods(goodsRepository);
+				log.info("财务对账业务[{}] 结转明细[{}]条", reconciliation.getBizCode(), endingReconciliationItems.size());
+				
+				//对往期的对账业务做结转
+				endingReconciliationItems.forEach(endingReconciliationItem->reconciliationItems.carryOver(endingReconciliationItem));
+				pastReconciliations.forEach(pastReconciliation->{
+					pastReconciliation.setNextReconciliationId(reconciliation.getBizId());
+					pastReconciliation.updateLastUpdateTime();
+				});
+				frbRepository.saveAll(pastReconciliations);
+				
+				log.info("财务对账业务[{}] 经过结转后经汇总对账明细共[{}]条", reconciliation.getBizCode(), reconciliationItems.size());
+			}
+			
+			//保存对账明细
+			reconciliationItems.forEach(item->item.setReconciliationId(reconciliation.getBizId()));
+			friRepository.saveAll(reconciliationItems);
+			
+			//更新对账业务对象
+			reconciliation.setItemGenerated(true);
+			reconciliation.updateLastUpdateTime();
+			frbRepository.save(reconciliation);
+		}catch(Exception e){
+			itemsGenerateStatuses.fail(reconciliation.getBizId());
+			throw e;
+		}
+	}
+
+	@Override @Transactional
+	public void delete(String bizId, IUser user) {
+		SpdFinacialReconciliationBiz reconciliationPO = frbRepository.findOne(bizId);
+		
+		boolean canDelete = reconciliationPO.canDelete();
+		//如果当前操作人员所属部门所管理的仓库和该单据的创建仓库不一致时禁止删除操作
+		if(!canDelete || itemsGenerateStatuses.isGenerating(bizId)){
+			throw new OperateFailException(YardExceptionType.forbide_delete, reconciliationPO.getBizCode());
+		}
+		
+		//清除之前的日清关联
+		SpdDailyCleanBizs dailyCleans = dcbRepository.findByFinacialConciliationId(bizId);
+		dailyCleans.forEach(dailyClean->dailyClean.setFinacialReconciliationId(null));
+		dcbRepository.saveAll(dailyCleans);
+		
+		//清除期初对账业务的nextReconciliationId
+		SpdFinacialReconciliationBiz beginingReconciliation = frbRepository.findOne(reconciliationPO.getBeginingReconciliationId());
+		beginingReconciliation.setNextReconciliationId(null);
+		frbRepository.save(beginingReconciliation);
+		
+		//删除对账业务级明细
+		frbRepository.delete(reconciliationPO);
+		SpdFinacialReconciliationItems reconciliationItems = friRepository.findByReconciliationId(bizId);
+		friRepository.delete(reconciliationItems);
+		
+		//删除业务日志
+	}
+	
+	/**
+	 * 允许修改结算数量、调节数量
+	 */
+	@Transactional
+	public SpdFinacialReconciliationItem modifyItem(SpdFinacialReconciliationItem item, IUser user){
+		SpdFinacialReconciliationItem itemPO = friRepository.findOne(item.getId());
+		
+		itemPO.update(item);
+		friRepository.save(itemPO);
+		
+		return itemPO;
+	}
+
+	@Override @Transactional
+	public SpdFinacialReconciliationBiz updateCheckState(String bizId, int checkStateCode, Date lastUpdateDate,
+			IUser user) {
+		SpdFinacialReconciliationBiz reconciliation = frbRepository.findOne(bizId);
+		reconciliation.setItems(friRepository.findByReconciliationId(bizId));
+		return updateCheckState(reconciliation, checkStateCode, lastUpdateDate, user);
+	}
+	
+	@Transactional
+	public SpdFinacialReconciliationBiz updateCheckState(SpdFinacialReconciliationBiz reconciliation, int checkStateCode, Date lastUpdateDate,
+			IUser user) {
+		if(checkStateCode == CheckState.commited.getCode()){
+			if(itemsGenerateStatuses.isGenerating(reconciliation.getBizId())){
+				throw new OperateFailException(YardExceptionType.forbide_update_check_state, "正在生成明细", CheckState.commited.getName());
+			}
+			if(!reconciliation.getItems().isAllSettlementQtyFilled()){
+				throw new OperateForbiddenException(YardExceptionType.forbid_commit_settlement_qty_unfilled);
+			}
+		}else if(checkStateCode == CheckState.reviewed.getCode()){
+			reconciliation.updateEndingBalance();
+		}else if(checkStateCode == CheckState.completed.getCode()){
+			//nothing todo
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				AmqpMsgType msgType = null;
+				CheckState checkState = CheckState.stateOf(checkStateCode);
+				switch (checkState) {
+				case commited:
+					msgType = AmqpMsgType.COMMIT_FINACIAL_RECONCILIATION_BIZ;
+					break;
+				case reviewed:
+					msgType = AmqpMsgType.REVIEW_FINACIAL_RECONCILIATION_BIZ;
+					break;
+				case completed:
+					msgType = AmqpMsgType.COMPLETE_FINACIAL_RECONCILIATION_BIZ;
+					break;
+				default:
+					break;
+				}
+				rabbitProxy.sendBizMsg(reconciliation.getBizId(), null, user.getUserId(), msgType);
+            }
+		});
+		
+		reconciliation.updateCheckState(checkStateCode, lastUpdateDate, user);
+		frbRepository.save(reconciliation);
+		return reconciliation;
+	}
+
+	public SpdFinacialReconciliationBiz findBeginingReconciliation(String ruleId) {
+		SpdFinacialReconciliationBizs reconciliations = frbRepository.findCompletedByRuleIdAndWithoutNextConciliation(ruleId);
+		return CollectionUtils.isNotEmpty(reconciliations)?reconciliations.get(0):null;
+	}
+
+	public void fillAllRelation(SpdFinacialReconciliationBiz reconciliationBiz){
+		SpdFinacialReconciliationRule rule = (SpdFinacialReconciliationRule)brRepository.findAllWithRelations().findById(reconciliationBiz.getBizRuleId());
+		reconciliationBiz.setBizRule(rule);
+
+		SpdFinacialReconciliationItems reconciliationItems = friRepository.findByReconciliationId(reconciliationBiz.getBizId());
+		reconciliationItems.fillGoods(goodsRepository);
+		reconciliationBiz.setItems(reconciliationItems);
+		SpdDailyCleanBizs dailyCleans = dcbService.findWithRelationByFinacialReconciliation(reconciliationBiz.getBizId());
+		reconciliationBiz.setDailyCleans(dailyCleans);
+	}
+	
+	public SpdFinacialReconciliationBiz syncFinancialReconciliation(String bizId, IUser user) throws Exception {
+		SpdFinacialReconciliationBiz reconciliation = frbRepository.findOne(bizId);
+		fillAllRelation(reconciliation);
+		
+		return syncFinancialReconciliation(reconciliation, user);
+	}
+	
+	public SpdFinacialReconciliationBiz syncFinancialReconciliation(SpdFinacialReconciliationBiz reconciliation, IUser user) throws Exception {
+		if(reconciliation.getCheckState() != CheckState.reviewed || reconciliation.getBeginingReconciliationId().equals(SpdFinacialReconciliationBiz.init_rec_id)){
+			throw new OperateForbiddenException("只有已审核状态的财务对账才能进行同步");
+		}
+		SpdFinacialReconciliationRule reconciliationRule = reconciliation.getBizRule();
+
+		String intigrationComponent = reconciliationRule.hasIntigrationComponent() ? reconciliationRule.getIntigrationComponent() : "defaultSupplierProxy";
+		ISupplierProxy supplierProxy = (ISupplierProxy)context.getBean(intigrationComponent);
+		supplierProxy.syncFinacialReconciliationBiz(reconciliation);
+		
+		rabbitProxy.sendBizMsg(reconciliation.getBizId(), null, user.getUserId(), AmqpMsgType.SYNC_FINACIAL_RECONCILIATION_TO_SUPPLIER);
+		
+		return reconciliation;
+	}
+	
+	public SpdReconciliationReport<?> queryReport(String reconciliationId, SpdReconciliationReportType reportType, Map<String, Object> queryParams, OrderParam orderParam){
+		SpdReconciliationReportQuerier<?> reportQuerier = reportQuerierFactory.getQuerier(reportType);
+		SpdFinacialReconciliationBiz reconciliation = frbRepository.findOne(reconciliationId);
+		fillAllRelation(reconciliation);
+		return reportQuerier.query(reconciliation, queryParams, orderParam);
+	}
+	
+}

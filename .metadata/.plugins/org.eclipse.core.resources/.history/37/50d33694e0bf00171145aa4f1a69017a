@@ -1,0 +1,49 @@
+package cn.ak4j.yard.sys.datacheck.web;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskItem;
+import cn.ak4j.yard.sys.datacheck.params.SysDataCheckTaskItemParams;
+import cn.ak4j.yard.sys.datacheck.repository.SysDataCheckTaskItemRepository;
+
+@RestController
+public class SysDataCheckTaskItemResource {
+
+	@Autowired SysDataCheckTaskItemRepository sysDataCheckTaskItemRepository;
+	
+	@RequestMapping(value = "/yard/sysDataCheckTaskItems/{reportId}", method = RequestMethod.GET)
+	public List<SysDataCheckTaskItem> findDataCheckDetailsByPage(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			@PathVariable("reportId") String reportId) {
+		SysDataCheckTaskItemParams params = SysDataCheckTaskItemParams.buildParamsFromJson(paramsStr, SysDataCheckTaskItemParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(params == null){
+			params = new SysDataCheckTaskItemParams();
+		}
+		params.setReportId(new ListParam<String>(reportId));
+		return sysDataCheckTaskItemRepository.find(params, order, currentPage-1, pageSize);
+	}
+
+	@RequestMapping(value = "/yard/sysDataCheckTaskItems/{reportId}/count", method = RequestMethod.GET)
+	public long findDataCheckDetailsByPageCount(@RequestParam(value = "params", required = false) String paramsStr,
+			@PathVariable("reportId") String reportId) {
+		SysDataCheckTaskItemParams params = SysDataCheckTaskItemParams.buildParamsFromJson(paramsStr, SysDataCheckTaskItemParams.class);
+		if(params == null){
+			params = new SysDataCheckTaskItemParams();
+		}
+		params.setReportId(new ListParam<String>(reportId));
+		return sysDataCheckTaskItemRepository.count(params);
+	}
+}

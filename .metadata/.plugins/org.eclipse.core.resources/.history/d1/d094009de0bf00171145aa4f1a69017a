@@ -1,0 +1,10 @@
+call INIT_RULE_CODE_PROCEDURE('spd_replenish_rule','200');
+call INIT_RULE_CODE_PROCEDURE('spd_consume_rule','201');
+call INIT_RULE_CODE_PROCEDURE('spd_prepare_inform_rule','202');
+call INIT_RULE_CODE_PROCEDURE('spd_receive_rule','203');
+call INIT_RULE_CODE_PROCEDURE('spd_return_goods_rule','204');
+call INIT_RULE_CODE_PROCEDURE('spd_adjust_stock_rule','205');
+call INIT_RULE_CODE_PROCEDURE('spd_move_area_rule','206');
+call INIT_RULE_CODE_PROCEDURE('spd_property_change_rule','207');
+call INIT_RULE_CODE_PROCEDURE('spd_daily_clean_rule','208');
+call INIT_RULE_CODE_PROCEDURE('spd_fin_rec_rule','209');

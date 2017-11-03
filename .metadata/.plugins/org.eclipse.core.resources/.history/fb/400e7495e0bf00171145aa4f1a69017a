@@ -1,0 +1,51 @@
+package cn.ak4j.yard.extend;
+
+import java.util.HashMap;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReturnGoodsBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class DefaultSupplierProxy implements ISupplierProxy{
+	
+	protected CustomComponentDoc doc = new CustomComponentDoc("默认供应商代理", "没有实际操作", "defaultSupplierProxy", getClass().getName(), new HashMap<String, String>(), new HashMap<String, String>());
+
+	@Override
+	public SpdDeliveryOrders syncDeliveryOrders() throws Exception {
+		return new SpdDeliveryOrders();
+	}
+
+	@Override
+	public SpdPrepareInformBiz syncPrepareInform(SpdPrepareInformBiz prepareInform, YdsEdsGoodsRepository egRepository)
+			throws OperateFailException {
+		log.info("默认供应商代理，不做任何处理");
+		return new SpdPrepareInformBiz();
+	}
+	
+	@Override
+	public void receiveCallback(SpdReceiveBiz receive) throws Exception {
+		log.info("默认供应商代理，不做任何处理");
+	}
+	
+	
+	public CustomComponentDoc getDoc(){
+		return doc;
+	}
+
+	public SpdFinacialReconciliationBiz syncFinacialReconciliationBiz(SpdFinacialReconciliationBiz reconciliationBiz) throws Exception{
+		return new SpdFinacialReconciliationBiz();
+	}
+
+	@Override
+	public SpdReturnGoodsBiz syncReturnGoods(SpdReturnGoodsBiz returnGoods) throws Exception {
+		log.info("默认供应商代理，不做任何处理");
+		return new SpdReturnGoodsBiz();
+	}
+
+}

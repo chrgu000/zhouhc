@@ -1,0 +1,1 @@
+update spd_receive_biz set recorded='0';

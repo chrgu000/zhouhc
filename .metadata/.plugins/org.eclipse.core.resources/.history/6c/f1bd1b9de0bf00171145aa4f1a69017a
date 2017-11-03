@@ -1,0 +1,30 @@
+update spd_biz_item set confirm_qty=6 where 
+biz_item_id='ff8080815f43cdba015f46eac73301d6';
+
+update spd_off_shelf_task_item set plan_qty=6,confirm_qty=6 
+where task_item_id='ff8080815f43cdba015f46eac82501e7';
+
+update spd_depot_stock set min_stock_qty=0 where 
+goods_lot_id='ff8080815f2e68f6015f2eacf0dc007f' and 
+depot_id='ff8080815e371d0c015e3762abe80e06';
+
+update spd_shelf_stock set min_unit_qty=0 where 
+goods_lot_id='ff8080815f2e68f6015f2eacf0dc007f' and 
+depot_id='ff8080815e371d0c015e3762abe80e06';
+
+insert into spd_shelf_lock_stock(id, shelf_stock_id,biz_id,
+qty_by_min_unit,create_time,last_update_time,locked) values
+('ff8080815f43cdba015f46df4fd10185','ff8080815f330412015f33993f0802ef',
+'ff8080815f43cdba015f46eac73301d5',
+180, to_date('2017-10-23 09:48:32','YYYY-MM-DD HH24:MI:SS'), 
+to_date('2017-10-23 09:48:32','YYYY-MM-DD HH24:MI:SS'), 0);
+
+update spd_logistics_task_item set plan_qty=6,confirm_qty=6,receive_qty=6 
+where task_item_id='ff8080815f43cdba015f46eac88501ef';
+
+
+
+update spd_property_change set daily_clean_id=''
+ where daily_clean_id='ff8080815f48ac3c015f4c38530201ad';
+
+delete spd_daily_clean_biz where biz_id='ff8080815f48ac3c015f4c38530201ad'; 

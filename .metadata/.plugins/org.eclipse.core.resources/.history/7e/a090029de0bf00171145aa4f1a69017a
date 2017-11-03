@@ -1,0 +1,2 @@
+alter table spd_fin_rec_rule add(supplier_dept_id varchar2(32));
+alter table spd_fin_rec_biz add(supplier_dept_id varchar2(32));

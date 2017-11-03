@@ -1,0 +1,149 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdReturnGoodsFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 退货业务规则
+* @author zhengyf
+* @date 2017年7月31日 上午10:23:24
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_return_goods_rule")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdReturnGoodsRule extends SpdAbstractBizRule<SpdReturnGoodsFeedbackRule>{
+
+	@Getter @Setter
+	private String originRuleId;
+	
+	/**
+	 * 是否手动退货给供应商
+	 */
+	@Getter @Setter @NotNull(message="是否手动退货不能为空") 
+	private Boolean manualReturnGoods;
+	
+	/**
+	 * 退货组件
+	 */
+	@Getter @Setter
+	private String returnGoodsComponent;
+	
+	@Getter @Setter
+	private Boolean autoAssignReceive;
+	
+	@Getter @Setter @Embedded @NotNull(message="流向规则不能为空") @Valid
+	private SpdReturnGoodsDirectionRule directionRule;
+	
+	@Transient private String displayName;
+	
+	@SuppressWarnings("rawtypes") @Transient @Getter @Setter
+	private SpdAbstractBizRule originRule;
+	
+	@SuppressWarnings("rawtypes") @Override
+	public void update(SpdAbstractBizRule theRule) {
+		SpdReturnGoodsRule rule = (SpdReturnGoodsRule)theRule;
+		setName(rule.getName());
+		setCustomName(rule.getCustomName());
+		setPrior(rule.getPrior());
+		setEnabled(rule.getEnabled());
+		setCanBeOriginRule(rule.getCanBeOriginRule());
+		setManualReturnGoods(rule.getManualReturnGoods());
+		setReturnGoodsComponent(rule.getReturnGoodsComponent());
+		setManualApply(rule.getManualApply());
+	}
+	
+	@Override public void checkRule(SpdBizRules<?> allRules, SpdPropertyChangeRules allPropertyChangeRules) {
+	}
+	
+	@Override
+	public String getDescription() {
+		StringBuffer buf = new StringBuffer();
+		buf.append(manualReturnGoods?"手动":"调用"+returnGoodsComponent+"组件")
+			.append("退货")
+			.append(", 流向规则: "+directionRule.getDescription());
+		return buf.toString();
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.return_goods_biz;
+	}
+
+	@SuppressWarnings("rawtypes") @Override
+	public boolean equalsRule(SpdAbstractBizRule theRule) {
+		if(theRule.getBizType() != getBizType()){
+			return false;
+		}
+		SpdReturnGoodsRule returnGoodsRule = (SpdReturnGoodsRule)theRule;
+		boolean sameReturnGoodsComponent = (StringUtils.isEmpty(getReturnGoodsComponent()) 
+												&& StringUtils.isEmpty(returnGoodsRule.getReturnGoodsComponent()))
+											|| (StringUtils.isNotEmpty(getReturnGoodsComponent()) 
+												&& getReturnGoodsComponent().equals(returnGoodsRule.getReturnGoodsComponent()));
+		boolean sameOriginRuleId = (StringUtils.isEmpty(getOriginRuleId()) 
+											&& StringUtils.isEmpty(returnGoodsRule.getOriginRuleId()))
+									 || (StringUtils.isNotEmpty(getOriginRuleId()) 
+											 && getOriginRuleId().equals(returnGoodsRule.getOriginRuleId()));
+		boolean sameManualReturnGoods = getManualReturnGoods().equals(returnGoodsRule.getManualReturnGoods());
+		boolean sameDirectionRule = getDirectionRule().equals(returnGoodsRule.getDirectionRule());
+		boolean sameFeedbackRule = getFeedbackRuleId().equals(returnGoodsRule.getFeedbackRuleId());
+		boolean sameAutoAssignReceive = getAutoAssignReceive().equals(returnGoodsRule.getAutoAssignReceive());
+		
+		if(sameManualReturnGoods
+			&& sameReturnGoodsComponent
+			&& sameDirectionRule
+			&& sameFeedbackRule
+			&& sameOriginRuleId
+			&& sameAutoAssignReceive){
+			return true;
+		}
+		return false;
+	}
+
+	@Override public String getDisplayName() {
+		if(directionRule == null || directionRule.getFromDepot() == null){
+			return "";
+		}
+		String fromDepotName = directionRule.getFromDepot().getDepotName();
+		String toDeptName = directionRule.getToDept().getOrg().getOrgName()+directionRule.getToDept().getDeptName();
+		return String.format("%s [%s>%s]", getName(), fromDepotName, toDeptName);
+	}
+
+	@Override public boolean canApplyByUser(PcsUser user) {
+		if(!getEnabled()){
+			return false;
+		}
+
+		boolean isFromDepotUser = getDirectionRule().getFromDepot().getManageDeptId().equals(user.getDeptId());
+		return isFromDepotUser;
+	}
+	
+	public boolean equals(Object obj){
+		SpdReturnGoodsRule rule = (SpdReturnGoodsRule)obj;
+		return equalsRule(rule)
+				&& getEnabled().equals(rule.getEnabled())
+				&& getName().equals(rule.getName())
+				&& getPrior().equals(rule.getPrior())
+				&& getCanBeOriginRule().equals(rule.getCanBeOriginRule()
+				&& getManualApply().equals(rule.getManualApply())
+		        && getAutoAssignReceive().equals(rule.getAutoAssignReceive()));
+	}
+	
+}

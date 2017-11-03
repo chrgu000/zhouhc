@@ -1,0 +1,36 @@
+package cn.ak4j.yard.spd.reconciliation.params;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdPropertyChangeRuleParams extends QueryParams{
+
+	private ListParam<String> id;
+	private ListParam<String> name;
+	private ListParam<String> ruleCode;
+	private ListParam<String> customName;
+	private ListParam<String> bizRuleId;
+	private ListParam<String> triggerStepCode;
+	private ListParam<String> bizTypeCode;
+	private ListParam<String> creditOrgId;
+	private ListParam<String> debitOrgId;
+	private ListParam<String> debitDeptId;
+	private ListParam<String> debitDepotId;
+	private ListParam<String> creditDepotId;
+	private ListParam<String> creditDeptId;
+	private ListParam<Boolean> enabled;
+	
+	private ListParam<String> bizRuleName;
+	private ListParam<String> creditOrgName;
+	private ListParam<String> creditDeptName;
+	private ListParam<String> debitOrgName;
+	private ListParam<String> debitDeptName;
+	private ListParam<String> debitDepotName;
+	private ListParam<String> creditDepotName;
+	
+}

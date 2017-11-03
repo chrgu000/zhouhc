@@ -1,0 +1,146 @@
+package cn.ak4j.yard.spd.task.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.SpdSceneType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdOffShelfTaskItemRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+
+public class SpdOffShelfTaskItemResourceTest extends BaseTest{
+	
+	@Autowired private SpdOffShelfTaskItemRepository ostiRepository;
+	@Autowired private SpdDepotTaskRepository depotTaskRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdTurnoverBoxRepository tbRepository;
+
+	@Test public void testList() throws Exception{
+		String taskId = "task_id_005";
+		String urlTemplate = "/spd/spdOffShelfTaskItems/taskId,{taskId}?accessToken={accessToken}&pageSize=-1";
+		String accessToken = getAccessToken(xykUserCode);
+		
+		SpdOffShelfTaskItems items = mockMvcHelper.mockGet(SpdOffShelfTaskItems.class, urlTemplate, taskId, accessToken);
+		assertEquals(28, items.size());
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Test public void testListOrderByDepotShelf() throws Exception{
+		String taskId = "task_id_019";
+		String urlTemplate = "/spd/spdOffShelfTaskItems/taskId,{taskId}?accessToken={accessToken}&pageSize=-1";
+		String accessToken = getAccessToken(xykUserCode);
+		
+		SpdOffShelfTaskItems items = mockMvcHelper.mockGet(SpdOffShelfTaskItems.class, urlTemplate, taskId, accessToken);
+		assertEquals(11, items.size());
+
+		String depotId = depotTaskRepository.findOne(taskId).getTaskDepotId();
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		
+		items.fillShelfs(depot.getAreas().findShelfsByShelfId(items.pluck("shelfId")));
+		for(int i = 0; i < items.size(); i++){
+			SpdDepotTaskItem item = items.get(i);
+			if(i >= 1){
+				PcsDepotShelf beforeShelf = items.get(i).getShelf();
+				assertTrue(item.getShelf().getShelfCode().compareTo(beforeShelf.getShelfCode()) <= 0);
+			}
+		}
+	}
+	
+	@Test public void testCount() throws Exception{
+		String taskId = "task_id_005";
+		String urlTemplate = "/spd/spdOffShelfTaskItems/taskId,{taskId}/count?accessToken={accessToken}";
+		String accessToken = getAccessToken(xykUserCode);
+		
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, taskId, accessToken);
+		assertEquals(28, count);
+	}
+	
+	@Test public void testGetOffShelfTaskPdf() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdOffShelfTaskItems/taskId,{taskId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, "task_id_019", accessToken))
+//				.andDo(print())
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("拣配作业单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+		
+	}
+	
+	@Test
+	public void testGetWholeItemsLablePdf() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdOffShelfTaskItems/wholeItemsLable/taskId,{taskId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, "task_id_019", accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("整件标签", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+		
+	}
+	
+	@Test public void testUpdateOffShelfTaskItem() throws Exception{
+		String taskItemId = "task_item_id_030";
+		SpdOffShelfTaskItem offSehelfItem = ostiRepository.findOne(taskItemId);
+		offSehelfItem.setConfirmQty(12);
+		
+		offSehelfItem = mockMvcHelper.modify(SpdOffShelfTaskItem.class, xykUserCode, taskItemId, offSehelfItem);
+		assertEquals(12, offSehelfItem.getConfirmQty().intValue());
+	}
+	
+	/**
+	 * 两个细分场景
+	 * 1) 将一个明细设置到一个已经被当前任务所使用的周转箱里
+	 * 2) 将一个明细设置到一个没有被当前任务所使用的周转箱里
+	 */
+	@Test public void testUpdateOffShelfItemWrapper() throws Exception{
+		String taskItemId = "task_item_id_060";
+		String wrapperNo = "600002";
+		
+		SpdTurnoverBox turnoverBox = tbRepository.findAll().findByWrapperNo(wrapperNo);
+		SpdOffShelfTaskItem taskItem = ostiRepository.findOne(taskItemId);
+		taskItem.setParentWrapperId(turnoverBox.getId());
+		
+		taskItem = mockMvcHelper.modify(SpdOffShelfTaskItem.class, xykUserCode, taskItemId, taskItem);
+		assertEquals(turnoverBox.getId(), taskItem.getParentWrapperId());
+		
+		//对于没有添加的周转箱进行自动添加周转箱
+		taskItemId = "task_item_id_063";
+		wrapperNo = "600003";
+		
+		turnoverBox = tbRepository.findAll().findByWrapperNo(wrapperNo);
+		taskItem = ostiRepository.findOne(taskItemId);
+		taskItem.setParentWrapperId(turnoverBox.getId());
+		assertEquals(SpdSceneType.idle, turnoverBox.getSceneType());
+		
+		taskItem = mockMvcHelper.modify(SpdOffShelfTaskItem.class, xykUserCode, taskItemId, taskItem);
+		assertEquals(turnoverBox.getId(), taskItem.getParentWrapperId());
+		
+		turnoverBox = tbRepository.findAll().findByWrapperNo(wrapperNo);
+		assertEquals(SpdSceneType.off_shelf_task, turnoverBox.getSceneType());
+		assertEquals(taskItem.getTaskId(), turnoverBox.getOwnerId());
+		
+		taskItem.setParentWrapperId(Constant.none);
+		taskItem = mockMvcHelper.modify(SpdOffShelfTaskItem.class, xykUserCode, taskItemId, taskItem);
+		assertEquals(Constant.none, taskItem.getParentWrapperId());
+	}
+
+}

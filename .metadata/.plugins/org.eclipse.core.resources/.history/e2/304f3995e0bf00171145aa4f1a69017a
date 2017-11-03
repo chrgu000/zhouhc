@@ -1,0 +1,20 @@
+package cn.ak4j.yard.pcs.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper=false)
+@SuppressWarnings("serial")
+public class PcsRoleApiParams extends QueryParams{
+
+	private ListParam<String> id;
+	private ListParam<String> roleId;
+	private ListParam<String> uri;
+	private ListParam<String> requestMethod;
+	private DateRangeParam createTime;
+	private DateRangeParam lastUpdateTime;
+}

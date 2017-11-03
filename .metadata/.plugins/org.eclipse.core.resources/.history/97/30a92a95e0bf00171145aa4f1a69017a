@@ -1,0 +1,35 @@
+package cn.ak4j.yard.pcs.to;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewPcsOrgTO {
+
+	private boolean agent;
+	private boolean bank;
+	private boolean buyer;
+	private boolean enabled;
+	private boolean gov;
+	private boolean main;
+	private String orgAbbr;
+	private String orgBusNo;
+	private String orgCAddress;
+	private String orgCode;
+	private Date orgExpDate;
+	private Date orgCreateDate;
+	private String orgLegal;
+	private String orgName;
+	private String orgOAddress;
+	private String orgRegNo;
+	private String orgScope;
+	private String orgTaxNo;
+	private String orgTypeName;
+	private boolean saler;
+	private boolean storage;
+	private boolean trans;
+}

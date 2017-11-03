@@ -1,0 +1,212 @@
+package cn.ak4j.yard.spd.supply.domain;
+
+import static org.junit.Assert.assertEquals;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.junit.Test;
+
+import cn.ak4j.yard.enums.YdsGoodsType;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class SpdDeliveryOrderTest {
+
+	private Date validDate;
+	private Date produceDate;
+	private String sendCode;
+	private String depotId;
+	
+	@Test public void testValid() throws ParseException{
+
+		initData();
+		
+		SpdDeliveryOrder order1 = getOrderWithoutCode();
+		assertEquals(false, order1.isValid());
+		log.debug("order valid msg:{}", order1.getValidateMsg());
+		
+		SpdDeliveryOrder order2 = getOrderWithoutItemCode();
+		assertEquals(true, order2.isValid());
+		
+		SpdDeliveryOrder order3 = getOrderItemWithoutEdsGoodsCode();
+		assertEquals(false, order3.isValid());
+		log.debug("order valid msg:{}", order3.getValidateMsg());
+		
+		SpdDeliveryOrder order4 = getOrderItemWithoutLotNo();
+		assertEquals(true, order4.isValid());
+		log.debug("order valid msg:{}", order4.getValidateMsg());
+		
+		SpdDeliveryOrder order5 = getOrderItemWithoutProduceDate();
+		assertEquals(true, order5.isValid());
+		log.debug("order valid msg:{}", order5.getValidateMsg());
+		
+		SpdDeliveryOrder order6 = getOrderItemWithFutureProduceDate();
+		assertEquals(false, order6.isValid());
+		log.debug("order valid msg:{}", order6.getValidateMsg());
+		
+		SpdDeliveryOrder order7 = getOrderItemWithNegativeQty();
+		assertEquals(false, order7.isValid());
+		log.debug("order valid msg:{}", order7.getValidateMsg());
+		
+		SpdDeliveryOrder order8 = getOrderItemWithoutQty();
+		assertEquals(false, order8.isValid());
+		log.debug("order valid msg:{}", order8.getValidateMsg());
+		
+		SpdDeliveryOrder order9 = getOrderItemWithNegativeUnitPrice();
+		assertEquals(false, order9.isValid());
+		log.debug("order valid msg:{}", order9.getValidateMsg());
+		
+		SpdDeliveryOrder order10 = getOrderItemWithoutUnitPrice();
+		assertEquals(false, order10.isValid());
+		log.debug("order valid msg:{}", order10.getValidateMsg());
+		
+		SpdDeliveryOrder order11 = getOrderItemWithoutDepotId();
+		assertEquals(false, order11.isValid());
+		log.debug("order valid msg:{}", order11.getValidateMsg());
+	
+	}
+	private void initData() throws ParseException{
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+		validDate = format.parse("2017-9-30");
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.DAY_OF_YEAR, -30);
+		produceDate = cal.getTime();
+		sendCode = RandomStringUtils.random(8, false, true);
+		depotId = "200007";
+	}
+	
+	//送货单号为空
+	private SpdDeliveryOrder getOrderWithoutCode(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setDepotId(depotId);
+		SpdDeliveryOrderItem item= new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//送货单明细编码为空
+	private SpdDeliveryOrder getOrderWithoutItemCode(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setDepotId(depotId);
+		order.setPrepareInformBizCode("1121708031");
+		order.setOrderNo(RandomStringUtils.random(8, false, true));
+		SpdDeliveryOrderItem item= new SpdDeliveryOrderItem(null, "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//企业产品编码为空
+	private SpdDeliveryOrder getOrderItemWithoutEdsGoodsCode(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setDepotId(depotId);
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", null, 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f,  "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//企业产品批号为空
+	private SpdDeliveryOrder getOrderItemWithoutLotNo(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setDepotId(depotId);
+		order.setPrepareInformBizCode("1121708031");
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				null, validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//生产时间为空
+	private SpdDeliveryOrder getOrderItemWithoutProduceDate(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setDepotId(depotId);
+		order.setPrepareInformBizCode("1121708031");
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, null, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//生产时间为未来的时间
+	private SpdDeliveryOrder getOrderItemWithFutureProduceDate(){
+		Calendar cal = Calendar.getInstance();
+		cal.add(Calendar.DAY_OF_YEAR, 30);
+		
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setDepotId(depotId);
+		order.setPrepareInformBizCode("1121708031");
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, cal.getTime(), 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//数量为负数
+	private SpdDeliveryOrder getOrderItemWithNegativeQty(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setDepotId(depotId);
+		order.setPrepareInformBizCode("1121708031");
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, -30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//数量为空
+	private SpdDeliveryOrder getOrderItemWithoutQty(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setDepotId(depotId);
+		order.setPrepareInformBizCode("1121708031");
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, null, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//价格为负数
+	private SpdDeliveryOrder getOrderItemWithNegativeUnitPrice(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setDepotId(depotId);
+		order.setPrepareInformBizCode("1121708031");
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", -12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//价格为空
+	private SpdDeliveryOrder getOrderItemWithoutUnitPrice(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setDepotId(depotId);
+		order.setPrepareInformBizCode("1121708031");
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", null, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+	
+	//仓库id为空
+	private SpdDeliveryOrder getOrderItemWithoutDepotId(){
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		order.setOrderNo(sendCode);
+		order.setPrepareInformBizCode("1121708031");
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem("NO1", "zsy_1701001", 
+				"ln_585622", validDate, produceDate, 30, "盒", 12.5f, "fax90324", 375f, YdsGoodsType.equipment.getCode());
+		order.getItems().add(item);
+		return order;
+	}
+}

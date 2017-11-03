@@ -1,0 +1,146 @@
+package cn.ak4j.yard.spd.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+
+@Entity
+@Table(name = "spd_seller_send_tax")
+@JsonIgnoreProperties(ignoreUnknown = true)
+@SuppressWarnings({"serial"})
+public class SpdSellerSendTax  extends YardMaintenceEntity{
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	private String taxId;
+	@NotEmpty(message = "发票号码不能为空")
+	private String taxNo;//发票号码
+	private Integer taxQty;//发票数量
+	@Column(name="IS_RED")
+	private boolean red;//是否红票
+	@Column(name="SELLER_ORG_ID")
+	private String sellerOrgId;//卖方机构
+	private float taxPriceSum;// 发票金额（含税）
+	private float noFeePriceSum;//发票金额（不含税）
+	@NotNull(message = "开票日期必须选择")
+	private Date taxDate;//开票日期
+	
+	
+	private Integer checkStateCode = CheckState.new_created.getCode();
+	
+	@Transient
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_r;
+	
+	@Embedded
+	private MaintenanceInfo maintenanceInfo;
+
+
+	public String getTaxId() {
+		return taxId;
+	}
+
+	public void setTaxId(String taxId) {
+		this.taxId = taxId;
+	}
+
+	public String getTaxNo() {
+		return taxNo;
+	}
+
+	public void setTaxNo(String taxNo) {
+		this.taxNo = taxNo;
+	}
+
+	public Integer getTaxQty() {
+		return taxQty;
+	}
+
+	public void setTaxQty(Integer taxQty) {
+		this.taxQty = taxQty;
+	}
+
+	public String getSellerOrgId() {
+		return sellerOrgId;
+	}
+
+	public void setSellerOrgId(String sellerOrgId) {
+		this.sellerOrgId = sellerOrgId;
+	}
+
+
+	
+
+	public float getTaxPriceSum() {
+		return taxPriceSum;
+	}
+
+	public void setTaxPriceSum(float taxPriceSum) {
+		this.taxPriceSum = taxPriceSum;
+	}
+
+	public float getNoFeePriceSum() {
+		return noFeePriceSum;
+	}
+
+	public void setNoFeePriceSum(float noFeePriceSum) {
+		this.noFeePriceSum = noFeePriceSum;
+	}
+
+	public boolean isRed() {
+		return red;
+	}
+
+	public void setRed(boolean red) {
+		this.red = red;
+	}
+
+
+
+	public Date getTaxDate() {
+		return taxDate;
+	}
+
+	public void setTaxDate(Date taxDate) {
+		this.taxDate = taxDate;
+	}
+
+	public Integer getCheckStateCode() {
+		return checkStateCode;
+	}
+	
+	public String getStateFlow() {
+		return stateFlow;
+	}
+
+	public void setCheckStateCode(Integer checkStateCode) {
+		this.checkStateCode = checkStateCode;
+	}
+
+	public MaintenanceInfo getMaintenanceInfo() {
+		return maintenanceInfo;
+	}
+
+	public void setMaintenanceInfo(MaintenanceInfo maintenanceInfo) {
+		this.maintenanceInfo = maintenanceInfo;
+	}
+	
+}

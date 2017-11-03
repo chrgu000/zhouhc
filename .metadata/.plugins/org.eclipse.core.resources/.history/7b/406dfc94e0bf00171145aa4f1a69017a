@@ -1,0 +1,414 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.SpdDepotTaskType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizLogRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTasks;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.wrapper.domain.SpdWrappers;
+import cn.ak4j.yard.spd.wrapper.repository.SpdTurnoverBoxRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Service
+@SuppressWarnings({"unchecked"})
+public class SpdReplenishBizService extends IYardService<SpdReplenishBiz>{
+
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdBizLogRepository blRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdTurnoverBoxRepository tbRepository;
+	
+	@Autowired private NotifyMsgBuilder notifyMsgBuilder;
+	@Autowired private MGProxy mgProxy;
+	
+	@Override @Transactional 
+	public SpdReplenishBiz add(@Valid SpdReplenishBiz replenish, IUser user) {
+		SpdReplenishRule rule = brRepository.findAllWithRelations().getAllReplenishRules().findById(replenish.getBizRuleId());
+		if(rule == null){
+			throw new NotFoundException(YardExceptionType.not_found_replenish_rule, replenish.getBizRuleId());
+		}
+		
+		PcsUser createUser = replenish.determinCreateUser(rule, (PcsUser)user, userRepository.findAll());
+		replenish.setMaintenanceInfo(new MaintenanceInfo(createUser));
+		
+		//应用申领业务规则
+		replenish.applyRule(rule, createUser);
+		
+		if(!replenish.isValid()){
+			throw new InvalidDataException(replenish.getValidateMsg());
+		}
+		
+		//加载关联资源
+		replenish.getFromDepot().fillCards(dcRepository);
+		replenish.getToDepot().fillCards(dcRepository);
+		replenish.getItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		
+		//TODO: 检查收货方货位容量是否足够
+		
+		//设置业务编码
+		replenish.setBizCode(codeService.publishCode(CodeSort.shenlingdanhao).getCode());
+		
+		//验证明细的产品是否有可关联批次
+		if(CollectionUtils.isNotEmpty(replenish.getItems())){
+			SpdBizItems hasNotLotBizItems = replenish.getItems().whichHasHasNotRelationLot(glRepository);
+			if(CollectionUtils.isNotEmpty(hasNotLotBizItems)){
+				MailMsg mail = notifyMsgBuilder.buildReplenishHasNotLotMail(replenish, hasNotLotBizItems);
+				mgProxy.sendMail(mail);
+			}
+		}
+		
+		//检验账页
+		replenish.verifyDepotCard(rabbitProxy, replenish.getToDepot(), (PcsUser)user);
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				//发送业务事件
+				rabbitProxy.sendBizMsg(replenish.getBizId(), null, replenish.getMaintenanceInfo().getCreateUserId(), AmqpMsgType.CREATE_REPLENISH_BIZ);
+            }
+		});
+		
+		//保存申领业务
+		rbRepository.saveWithItems(replenish);
+		
+		return replenish;
+	}
+	
+
+	@Override @Transactional
+	public void delete(String bizId, IUser user) {
+		SpdReplenishBiz replenishBizPO = rbRepository.getWithItems(bizId);
+		
+		boolean canDelete = replenishBizPO.canDelete();
+		//如果当前操作人员所属部门所管理的仓库和该单据的创建仓库不一致时禁止删除操作
+		boolean ownOperationPermission = replenishBizPO.verifyOperationPermission(userRepository, depotRepository, user.getUserId());
+		if(!canDelete || !ownOperationPermission){
+			throw new OperateFailException(YardExceptionType.forbide_delete, replenishBizPO.getBizCode());
+		}
+		
+		rbRepository.delete(replenishBizPO);
+		
+		if(replenishBizPO.hasItems()){
+			biRepository.delete(replenishBizPO.getItems());	
+		}
+	}
+
+	@Override @Transactional 
+	public SpdReplenishBiz modify(SpdReplenishBiz replenish, IUser user) {
+		SpdReplenishBiz replenishBizPO = rbRepository.findOne(replenish.getBizId());
+		replenishBizPO.update(replenish, user.getOrgId(), user.getUserId());
+		replenishBizPO = rbRepository.save(replenishBizPO);
+		return replenishBizPO;
+	}
+
+	@Transactional
+	public SpdReplenishBiz updateCheckState(String bizId, int checkStateCode, Date lastUpdateDate, IUser user) {
+		SpdReplenishBiz replenish = rbRepository.findOne(bizId);
+		fillAllRelations(replenish);
+		if(checkStateCode == CheckState.commited.getCode()){
+			return commitReplenish(replenish, lastUpdateDate, user);
+		}else if(checkStateCode == CheckState.reviewed.getCode()){
+			return reviewReplenish(replenish, lastUpdateDate, user);
+		}else if(checkStateCode == CheckState.completed.getCode()){
+			return completeReplenish(replenish, user);
+		}
+		return null;
+	}
+
+	@Transactional
+	public SpdReplenishBiz completeReplenish(SpdReplenishBiz replenish, IUser user) {
+		replenish.updateCheckState(CheckState.completed.getCode(), replenish.getMaintenanceInfo().getLastDate(), user.getOrgId(), user.getUserId());
+		rbRepository.save(replenish);
+		return replenish;
+	}
+
+	/**
+	 * 申领业务审核：
+	 * 1) 校验明细是否已确认数量
+	 * 2) 根据库存检查明细的确认数量
+	 * 3) 更新锁库存即增加预备库存
+	 * 4) 更新审核状态
+	 * 5) 发送业务消息
+	 */
+	@Transactional 
+	public SpdReplenishBiz reviewReplenish(SpdReplenishBiz replenish, Date lastUpdateDate, IUser user) {
+		//当前用户是否可以确认当前业务
+		PcsUser executeUser = userRepository.findAll().findById(user.getUserId());
+		if(!replenish.getBizRule().canConfirmByUser(executeUser)){
+			throw new OperateFailException(YardExceptionType.forbid_can_not_confirm_biz, executeUser.getDeptId(), replenish.getBizRule().getDisplayName()); 
+		}
+		
+		//明细没有全部确认抛出异常
+		if(!replenish.getItems().isAllConfirmed()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("申领业务[%s]", replenish.getBizCode()));
+		}
+		
+		//验证明细中是否存在产品无批次
+		replenish.getItems().checkIfAllGoodsHasLot(glRepository);
+		
+		List<SpdGoodsQty> prepareQtyByStoreUnit = replenish.getItems().getConfirmGoodsQtysByStoreUnit();
+		List<SpdGoodsQty> realQtyByStoreUnit = dsService.findRealShelfStoreUnitStocks(replenish.getFromDepotId(), replenish.getFromAreaType(), prepareQtyByStoreUnit);
+		
+		//根据实际可用产品数量校验申领明细的确认数量，防止在确认数量输入之后库存有变更
+		replenish.getItems().verifyConfirmQtyWithRealQty(realQtyByStoreUnit);
+
+		//发送审核完成消息
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(replenish.getBizId(), null, user.getUserId(), AmqpMsgType.REVIEW_REPLENISH_BIZ);
+            }
+		});
+		
+		//根据实际可用产品数量增加货位预备库存/锁库存
+		replenish.getFromDepot().fillCards(dcRepository);
+		SpdShelfStockChanges stockChanges = new SpdShelfStockChanges(replenish.getFromDepot(), replenish.getFromAreaType(), realQtyByStoreUnit);
+		dsService.scheduleDecrementShelfStocks(stockChanges ,replenish.getBizId());
+		
+		//更新审核状态
+		replenish.updateCheckState(CheckState.reviewed.getCode(), lastUpdateDate, user.getOrgId(), user.getUserId());
+		rbRepository.save(replenish);
+		return replenish;
+	}
+
+	@Transactional 
+	public SpdReplenishBiz commitReplenish(SpdReplenishBiz replenish, Date lastDate, IUser user) {
+		PcsUser executeUser = userRepository.findAll().findById(user.getUserId());
+		if(!replenish.getBizRule().canApplyByUser(executeUser)){
+			throw new OperateFailException(YardExceptionType.forbid_can_not_apply_biz, executeUser.getDeptId(), replenish.getBizRule().getDisplayName()); 
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(replenish.getBizId(), null, user.getUserId(), AmqpMsgType.COMMIT_REPLENISH_BIZ);
+            }
+		});
+		
+		if(replenish.hasItems()){
+			//如果明细的计划数量未全部确认抛出异常
+			if(!replenish.getItems().isAllPlaned()){
+				throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("申领业务[%s]", replenish.getBizCode()));
+			}
+
+			//检验账页
+			replenish.verifyDepotCard(rabbitProxy, replenish.getToDepot(), (PcsUser)user);
+			
+			replenish.updateCheckState(CheckState.commited.getCode(), lastDate, user.getOrgId(), user.getUserId());
+			rbRepository.save(replenish);
+			return replenish;
+		}
+		
+		throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("申领业务[%s]", replenish.getBizCode()));
+	}
+	
+	/**
+	 * 查询隶属部门的申领业务,完整的描述：查询当前用户的隶属部门的仓库的申领业务
+	 */
+	public SpdReplenishBizs findReplenishByOwnerDept(PcsUser user, SpdReplenishBizParams params, OrderParam order, int pageNo, int pageSize){
+		PcsDepots ownerDepots = new PcsDepots(CollectionUtils.find("manageDeptId", user.getDeptId(), depotRepository.getAll()));
+		if(CollectionUtils.isEmpty(ownerDepots)){
+			return new SpdReplenishBizs();
+		}
+		params.setToDepotId(new ListParam<String>(ownerDepots.getIds()));
+		return rbRepository.find(params, order, pageNo, pageSize);
+	}
+	
+	/**
+	 * 查询等待特定用户处理的申领业务
+	 */
+	public SpdReplenishBizs findWaitingProcessReplenish(PcsUser user, SpdReplenishBizParams params){
+		//查找未确认的申领业务
+		List<Integer> checkStateCodes = new ArrayList<Integer>();
+		checkStateCodes.add(CheckState.new_created.getCode());
+		checkStateCodes.add(CheckState.commited.getCode());
+		params.setCheckStateCode(new ListParam<Integer>(checkStateCodes));
+		SpdReplenishBizs replenishs = rbRepository.find(params, new OrderParam(), -1, -1);
+		replenishs.fillBizRules(brRepository.findAllWithRelations().getAllReplenishRules());
+		
+		return replenishs.getWhichINeedProcess(user);
+	}
+	
+	public SpdReplenishBizs findByDepotCorrelation(SpdReplenishBizParams params, PcsUser user){
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(CollectionUtils.isEmpty(depots)){
+			return new SpdReplenishBizs();
+		}
+	
+		SpdReplenishRules rules = brRepository.findAllWithRelations().getAllReplenishRules();
+		if(CollectionUtils.isEmpty(rules)){
+			return new SpdReplenishBizs();
+		}
+		
+		SpdReplenishRules correlationRules = new SpdReplenishRules();
+		depots.forEach(depot->{
+			SpdReplenishRules depotCorrelationRules = rules.findByDepotId(depot.getDepotId());
+			correlationRules.addAll(depotCorrelationRules);
+		});
+		params.setBizRuleId(new ListParam<String>(correlationRules.getIds()));
+		return rbRepository.find(params, new OrderParam(), -1, -1);
+	}
+	
+	/**
+	 * 查询可被特定的调度任务进行调度的申领业务，包含两类：
+	 * 1）当前调度任务所关联的申领业务
+	 * 2）不被任何调度任务所关联的申领业务:也即申领已审核但还没有下架调度的申领业务
+	 */
+	public SpdReplenishBizs findDispatcherableReplenishs(String dispatcherId){
+		SpdDispatcher dispatcher = dispatcherRepository.findOne(dispatcherId);
+		//查询已审核申领的申领业务
+		SpdReplenishBizs reviewdReplenishs = rbRepository.findByBizStatusCodeAndFromDepotId(SpdReplenishBizSteps.review_replenish.getStatusCode(), dispatcher.getDispatcherDepotId());
+		
+		//查询当前调度任务所关联的申领业务
+		SpdReplenishBizs dispatcherRelationReceives = findDispatcherRelationReplenishs(dispatcherId);
+		
+		SpdReplenishBizs result = new SpdReplenishBizs();
+		result.addAll(reviewdReplenishs);
+		result.addAll(dispatcherRelationReceives);
+		
+		return result;
+	}
+	
+	/**
+	 * 根据当前的调度的信息获取关联的申领业务
+	 */
+	public SpdReplenishBizs findDispatcherRelationReplenishs(String dispatcherId){
+		//查询当前调度明细关联的申领业务
+		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+		
+		SpdReplenishBizs replenishs = rbRepository.findByIds(dispatcher.getRefs().pluck("refObjectId"));
+		
+		return replenishs;
+	}
+
+	public SpdReplenishBiz getFullReplenish(String bizId) {
+		SpdReplenishBiz replenish = rbRepository.findOne(bizId);
+		fillAllRelations(replenish);
+		return replenish;
+	}
+	
+	public SpdReplenishBiz updateBizRuleId(String bizId, String bizRuleType, PcsUser user) {
+		SpdReplenishBiz replenish = rbRepository.findOne(bizId);
+		SpdReplenishRules allRules = brRepository.findAllWithRelations().getAllReplenishRules();
+		SpdReplenishRule rule = allRules.findById(replenish.getBizRuleId());
+		
+		if(bizRuleType.equals("totalAutoFeedbackRule")){
+			SpdReplenishRule totalAutoFeedbackRule = allRules.findSameRuleButTotalAutoFeedbackRule(rule);
+			if(totalAutoFeedbackRule == null){
+				throw new NotFoundException(YardExceptionType.not_found_total_auto_feedback_rule, rule.getId(), rule.getDisplayName());
+			}
+			replenish.updateBizRule(totalAutoFeedbackRule);
+			rbRepository.save(replenish);
+		}
+		
+		return replenish;
+	}
+
+	public void fillAllRelations(SpdReplenishBiz replenish) {
+		replenish.setItems(biRepository.findWithGoodsByBizId(replenish.getBizId()));
+		replenish.getItems().fillSpecialGoodsLot(glRepository);
+		
+		SpdReplenishRule rule = (SpdReplenishRule)(brRepository.findAllWithRelations().findById(replenish.getBizRuleId()));
+		replenish.setBizRule(rule);
+		
+		replenish.getFromDepot().fillCards(dcRepository);
+		replenish.getToDepot().fillCards(dcRepository);
+		
+		PcsDepot creatorDepot = depotRepository.findAllWithRelations().findById(replenish.getCreatorDepotId());
+		replenish.setCreatorDepot(creatorDepot);
+		
+		SpdDepotTasks depotTasks = dtRepository.findWithItemsByBizId(replenish.getBizId());
+		SpdDepotTasks offShelfTasks = new SpdDepotTasks(CollectionUtils.find("taskType", SpdDepotTaskType.off_shelf_task.getCode(), String.class, depotTasks));
+		replenish.setOffShelfTasks(offShelfTasks);
+		
+		SpdDepotTasks onShelfTasks = new SpdDepotTasks(CollectionUtils.find("taskType", SpdDepotTaskType.on_shelf_task.getCode(), String.class, depotTasks));
+		replenish.setOnShelfTasks(onShelfTasks);
+		
+		SpdLogisticsTasks deliveryTasks = ltRepository.findWithItemsByBizId(replenish.getBizId());
+		deliveryTasks.forEach(task->{
+			SpdWrappers wrappers = tbRepository.findAll().findByOwnerId(task.getTaskId());
+			wrappers.fillItems(deliveryTasks.getAllItems());
+			task.setWrappers(wrappers);
+		});
+		
+		if(CollectionUtils.isNotEmpty(deliveryTasks)){
+			deliveryTasks.forEach(deliveryTask->{
+				deliveryTask.getItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+				deliveryTask.getItems().fillUnuseableGoodsLot(glRepository);
+				deliveryTask.setFromDepot(replenish.getFromDepot());
+				deliveryTask.setToDepot(replenish.getToDepot());
+				deliveryTask.setBiz(replenish);
+			});
+		}
+		
+		replenish.setDeliveryTasks(deliveryTasks);
+		
+		replenish.setLogs(blRepository.findByBizId(replenish.getBizId()));
+	}
+	
+	
+}

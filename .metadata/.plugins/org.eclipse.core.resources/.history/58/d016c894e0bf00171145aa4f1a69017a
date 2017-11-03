@@ -1,0 +1,142 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsDirectionRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdReturnGoodsRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.bizrule.service.SpdBizRuleService;
+import cn.ak4j.yard.spd.bizrule.to.SpdReturnGoodsRuleTO;
+
+@RestController
+public class SpdReturnGoodsRuleResource {
+
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdBizRuleService brService;
+	private SpdReturnGoodsRuleAssember assember = new SpdReturnGoodsRuleAssember();
+	
+	@RequestMapping(value="/yard/spd/spdReturnGoodsRules", method=RequestMethod.GET)
+	public List<SpdReturnGoodsRuleTO> list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdReturnGoodsRuleParams params = SpdReturnGoodsRuleParams.buildParamsFromJson(paramsStr, SpdReturnGoodsRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdReturnGoodsRules rules = brRepository.findAllWithRelations().getAllReturnGoodsRules();
+		rules = new SpdReturnGoodsRules(rules.findByPage(params, order, currentPage-1, pageSize));
+		
+		return assember.buildList(rules);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReturnGoodsRules/count", method=RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdReturnGoodsRuleParams params = SpdReturnGoodsRuleParams.buildParamsFromJson(paramsStr, SpdReturnGoodsRuleParams.class);
+		SpdReturnGoodsRules rules = brRepository.findAllWithRelations().getAllReturnGoodsRules();
+		rules = new SpdReturnGoodsRules(rules.find(params));
+		return assember.buildList(rules).size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReturnGoodsRules/ids,{ids}", method=RequestMethod.GET)
+	public List<SpdReturnGoodsRuleTO> getByIds(@PathVariable("ids") String ids){
+		SpdReturnGoodsRules rules = brRepository.findAllWithRelations().getAllReturnGoodsRules();
+		return assember.buildList(rules.findByIds(Arrays.asList(ids.split(","))));
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReturnGoodsRules", method = RequestMethod.POST)
+	public SpdReturnGoodsRuleTO add(@RequestBody SpdReturnGoodsRuleTO returnGoodsRuleTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdReturnGoodsRule returnGoodsRule = (SpdReturnGoodsRule)brService.add(assember.build(returnGoodsRuleTO), user);
+		returnGoodsRule = (SpdReturnGoodsRule) brRepository.findAllWithRelations().findById(returnGoodsRule.getId());
+		
+		return assember.build(returnGoodsRule);
+	}
+
+	@RequestMapping(value="/yard/spd/spdReturnGoodsRules/{id}", method = RequestMethod.PUT)
+	public SpdReturnGoodsRuleTO update(@RequestBody SpdReturnGoodsRuleTO returnGoodsRuleTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		brService.modify(assember.build(returnGoodsRuleTO), user);
+		SpdReturnGoodsRule returnGoodsRule = (SpdReturnGoodsRule)brRepository.findAllWithRelations().findById(returnGoodsRuleTO.getId());
+		
+		return assember.build(returnGoodsRule);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReturnGoodsRules/{id}", method = RequestMethod.GET)
+	public SpdReturnGoodsRuleTO get(@PathVariable("id")String id){
+		SpdReturnGoodsRule returnGoodsRule = (SpdReturnGoodsRule)brRepository.findAllWithRelations().findById(id);
+		return assember.build(returnGoodsRule);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdReturnGoodsRules/whichICanApply", method = RequestMethod.GET)
+	public List<SpdReturnGoodsRuleTO> whichICanReceiving(
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders, 
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdReturnGoodsRuleParams params = SpdReturnGoodsRuleParams.buildParamsFromJson(paramsStr, SpdReturnGoodsRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdReturnGoodsRules whichCanApplyRules = new SpdReturnGoodsRules(brRepository.findAllWithRelations().getAllReturnGoodsRules().whichCanApplyByUser(user));
+		SpdReturnGoodsRules rules = new SpdReturnGoodsRules(whichCanApplyRules.findByPage(params, order, -1, -1));
+		
+		return assember.buildList(rules);
+	}
+	
+}
+
+class SpdReturnGoodsRuleAssember{
+	
+	public List<SpdReturnGoodsRuleTO> buildList(List<SpdReturnGoodsRule> rules){
+		List<SpdReturnGoodsRuleTO> result = new ArrayList<SpdReturnGoodsRuleTO>();
+		rules.forEach(rule->{
+			SpdReturnGoodsRuleTO to = build(rule);
+			result.add(to);
+		});
+		
+		return result;
+	}
+	
+	public SpdReturnGoodsRuleTO build(SpdReturnGoodsRule rule){
+		SpdReturnGoodsRuleTO to = new SpdReturnGoodsRuleTO();
+		
+		BeanUtils.copyProperties(rule.getDirectionRule(), to);
+		BeanUtils.copyProperties(rule, to);
+		
+		//关联仓库资源
+		to.setFromDepot(to.getFromDepot());
+		to.setPrimaryName(rule.getPrimaryName());
+		return to;
+	}
+
+	public SpdReturnGoodsRule build(SpdReturnGoodsRuleTO returnGoodsRuleTO) {
+		SpdReturnGoodsRule returnGoodsRule = new SpdReturnGoodsRule();
+		
+		SpdReturnGoodsDirectionRule directionRule = new SpdReturnGoodsDirectionRule();
+		BeanUtils.copyProperties(returnGoodsRuleTO, directionRule);
+		
+		returnGoodsRule.setDirectionRule(directionRule);
+		
+		BeanUtils.copyProperties(returnGoodsRuleTO, returnGoodsRule);
+		returnGoodsRule.setCreateTime(new Date());
+		returnGoodsRule.setLastUpdateTime(new Date());
+		
+		return returnGoodsRule;
+	}
+	
+}

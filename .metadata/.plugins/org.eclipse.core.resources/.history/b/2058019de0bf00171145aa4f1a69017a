@@ -1,0 +1,1 @@
+ALTER TABLE spd_fin_rec_rule ADD(intigration_component VARCHAR2(50));

@@ -1,0 +1,23 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+public class SpdMoveAreaFeedbackRuleTest {
+
+	@Test public void testGetDescription(){
+		SpdMoveAreaFeedbackRule rule = new SpdMoveAreaFeedbackRule();
+		rule.setAutoCommitMoveArea(false);
+		rule.setAutoReviewMoveArea(false);
+		rule.setAutoCreateOffShelfDispatcher(true);
+		rule.setAutoReviewOffShelfDispatcher(true);
+		rule.setAutoReviewOffShelfTask(false);
+		rule.setAutoCreateOnShelfDispatcher(true);
+		rule.setAutoReviewOnShelfDispatcher(true);
+		rule.setAutoReviewOnShelfTask(false);
+
+		assertEquals("手动提交移仓;手动审核移仓;自动创建下架调度;自动审核下架调度;手动审核下架作业;自动创建上架调度;自动审核上架调度;手动审核上架作业", rule.getDescription());
+	}
+	
+}

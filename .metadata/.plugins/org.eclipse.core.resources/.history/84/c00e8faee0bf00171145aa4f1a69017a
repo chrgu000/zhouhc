@@ -1,0 +1,150 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReturnGoodsRules;
+import cn.ak4j.yard.spd.bizrule.to.SpdReturnGoodsRuleTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdReturnGoodsRuleResourceTest extends BaseTest{
+
+	@Autowired private YardCodeService codeService;
+	
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReturnGoodsRules?accessToken={accessToken}";
+		List<SpdReturnGoodsRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReturnGoodsRuleTO>>() {}, url, accessToken);
+		assertEquals(6, rules.size());
+		
+		rules.forEach(rule->{
+			assertNotNull(rule.getFromDepot());
+			assertNotNull(rule.getToDept());
+			assertNotNull(rule.getToDept().getOrg());
+		});
+	}
+
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReturnGoodsRules/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(6, count);
+	}
+
+	@Test public void testGetByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReturnGoodsRules/ids,{ids}?accessToken={accessToken}";
+		List<String> ids = new ArrayList<String>();
+		ids.add("ret_rule_id_01");
+		ids.add("ret_rule_id_03");
+		List<SpdReturnGoodsRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReturnGoodsRuleTO>>() {}, url, StringUtils.join(ids, ","), accessToken);
+		assertEquals(2, rules.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("id", id, rules));
+		}
+	}
+	
+	@Test public void testAdd() throws Exception{
+		SpdReturnGoodsRuleTO ruleTO = createReturnGoodsRule();
+		String originRuleId = "rep_rule_id_09";
+		ruleTO.setOriginRuleId(originRuleId);
+		
+		SpdReturnGoodsRuleTO newRuleTO = mockMvcHelper.add(SpdReturnGoodsRuleTO.class, testUserCode, "spd", "spdReturnGoodsRules", ruleTO);
+		
+		assertTrue(newRuleTO.getId() != null);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.tuihuoguize);
+		assertEquals(CodeSort.tuihuoguize.getCode()+getCurrentDateCode()+sequenceCode, newRuleTO.getRuleCode());
+		assertEquals(ruleTO.getFromAreaType(), newRuleTO.getFromAreaType());
+		assertEquals(ruleTO.getFromDepotId(), newRuleTO.getFromDepotId());
+		assertEquals(ruleTO.getToOrgId(), newRuleTO.getToOrgId());
+		assertEquals(ruleTO.getToDeptId(), newRuleTO.getToDeptId());
+		assertEquals(ruleTO.getEnabled(), newRuleTO.getEnabled());
+		assertEquals(ruleTO.getFeedbackRuleId(), newRuleTO.getFeedbackRuleId());
+		assertEquals(ruleTO.getName(), newRuleTO.getName());
+		assertEquals(ruleTO.getCustomName(), newRuleTO.getCustomName());
+		assertEquals(ruleTO.getPrior(), newRuleTO.getPrior());
+		assertEquals(ruleTO.getManualReturnGoods(), newRuleTO.getManualReturnGoods());
+		assertEquals(ruleTO.getReturnGoodsComponent(), newRuleTO.getReturnGoodsComponent());
+		assertEquals(originRuleId, newRuleTO.getOriginRuleId());
+		
+		ruleTO.setName("X退货");
+		mockMvcHelper.add(SpdReturnGoodsRuleTO.class, testUserCode, "spd", "spdReturnGoodsRules", ruleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		ruleTO.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.add(SpdReturnGoodsRuleTO.class, testUserCode, "spd", "spdReturnGoodsRules", ruleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+	}
+
+	@Test public void testModify() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReturnGoodsRules/{id}?accessToken={accessToken}";
+		String id = "ret_rule_id_02";
+		SpdReturnGoodsRuleTO ruleTO = mockMvcHelper.mockGet(SpdReturnGoodsRuleTO.class, url, id, accessToken);
+		
+		String newName = "科室手动退货2";
+		ruleTO.setName(newName);
+		ruleTO.setCustomName("自定义科室手动退货");
+		ruleTO = mockMvcHelper.modify(SpdReturnGoodsRuleTO.class, testUserCode, "spd", "spdReturnGoodsRules", id, ruleTO, status().isOk(), null);
+		assertTrue(ruleTO.getName().equals(newName));
+		assertEquals("自定义科室手动退货", ruleTO.getCustomName());
+
+		ruleTO.setFromDepotId("depot_id_001");
+		ruleTO.setName("库房手动退货");
+		ruleTO.setFromAreaType(PcsAreaType.normal.getCode());
+		ruleTO.setPrior(99);
+		ruleTO.setOriginRuleId("");
+		ruleTO.setAutoAssignReceive(true);
+		mockMvcHelper.modify(SpdReturnGoodsRuleTO.class, testUserCode, "spd", "spdReturnGoodsRules", id, ruleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		ruleTO.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.modify(SpdReturnGoodsRuleTO.class, testUserCode, "spd", "spdReturnGoodsRules", id, ruleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+	}
+	
+	@Test public void whichICanApply() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReturnGoodsRules/whichICanApply?accessToken={accessToken}";
+		
+		SpdReturnGoodsRules rules = mockMvcHelper.mockGet(SpdReturnGoodsRules.class, url, accessToken);
+		assertEquals(4, rules.size());
+		
+		accessToken = getAccessToken(mzmanagerUserCode);
+		rules = mockMvcHelper.mockGet(SpdReturnGoodsRules.class, url, accessToken);
+		assertEquals(2, rules.size());
+	}
+	
+	private SpdReturnGoodsRuleTO createReturnGoodsRule(){
+		SpdReturnGoodsRuleTO ruleTO = new SpdReturnGoodsRuleTO();
+		
+		ruleTO.setFromAreaType(PcsAreaType.isolation.getCode());
+		ruleTO.setFromDepotId("depot_id_004");
+		ruleTO.setToOrgId("org_id_001");
+		ruleTO.setToDeptId("dept_id_005");
+		ruleTO.setEnabled(true);
+		ruleTO.setCanBeOriginRule(false);
+		ruleTO.setFeedbackRuleId("ret_fb_id_16");
+		ruleTO.setName("半自动退货");
+		ruleTO.setCustomName("自定义半自动退货");
+		ruleTO.setPrior(12);
+		ruleTO.setManualReturnGoods(false);
+		ruleTO.setAutoAssignReceive(false);
+		ruleTO.setReturnGoodsComponent("cn.ak4j.yard.extend.zhjw.SpdZHJSReturnGoodsComponent");
+		
+		return ruleTO;
+	}
+	
+}

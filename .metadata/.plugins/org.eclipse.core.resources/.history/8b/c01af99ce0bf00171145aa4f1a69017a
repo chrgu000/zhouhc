@@ -1,0 +1,1 @@
+alter table spd_logistics_task_item add(receive_qty integer);

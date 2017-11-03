@@ -1,0 +1,34 @@
+package cn.ak4j.yard.spd.stock.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdShelfStockParams extends QueryParams{
+
+	private ListParam<String> shelfStockId;
+	private ListParam<String> depotId;
+	private ListParam<String> goodsId;
+	private ListParam<String> lotId;
+	private ListParam<String> shelfType;
+	private IntegerRangeParam qtyByStoreUnit;
+	private IntegerRangeParam lockQtyByMinUnit;
+	private IntegerRangeParam qtyByMinUnit;
+	
+	private ListParam<String> formatName;
+	private ListParam<String> packingSpec;
+	private ListParam<String> storeUnitName;
+	private ListParam<String> lotNo;
+	private DateRangeParam lotValidity;
+	private DateRangeParam produceDate;
+	private ListParam<String> depotName;
+	
+	private ListParam<String> areaId;
+	private ListParam<String> shelfName;
+}

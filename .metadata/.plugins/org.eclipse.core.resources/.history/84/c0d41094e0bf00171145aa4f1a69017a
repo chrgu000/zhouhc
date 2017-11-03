@@ -1,0 +1,27 @@
+package cn.ak4j.yard.web.request;
+
+import java.util.Arrays;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 根据ids请求资源列表
+* @author zhengyf
+* @date 2016年11月29日 上午8:44:19
+* @version V1.0.0
+*/
+public class YardGetByIdsRequest extends YardRequest{
+
+	@Getter @Setter private List<String> ids;
+	
+	public YardGetByIdsRequest(HttpServletRequest request){
+		super(request);
+		String[] idsArr = getUriArr()[4].replace("ids,", "").split(","); 
+		this.ids = Arrays.asList(idsArr);
+	}
+	
+}

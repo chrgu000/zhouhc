@@ -1,0 +1,243 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizItemParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdBizItemRepository extends BaseRepository<SpdBizItem, SpdBizItems, SpdBizItemParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired @Lazy private SpdReceiveBizRepository rbRepository;
+	@Autowired @Lazy private SpdReplenishBizRepository replenishRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	
+	public SpdBizItem save(SpdBizItem item){
+		item.updateAsPlaned();
+		return super.save(item);
+	}
+
+	public SpdBizItems find(SpdBizItemParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = new OrderParam();
+			}
+			
+			return new SpdBizItems(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdBizItems();
+	}
+	
+	public SpdBizItems findReplenishItems(SpdBizItemParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			if(setReplenishRelationParams(params)){
+				if(order == null){
+					order = new OrderParam();
+				}
+			}
+			
+			return new SpdBizItems(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdBizItems();
+	}
+
+	public int count(SpdBizItemParams params){
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	public int countReplenishItems(SpdBizItemParams params){
+		if(setRelationParams(params)){
+			if(setReplenishRelationParams(params)){
+				return super.count(params);
+			}
+		}
+		return 0;
+	}
+	
+	public boolean setRelationParams(SpdBizItemParams params){
+		if(params != null){
+			YdsGoodsParams goodsParams = new YdsGoodsParams();
+			goodsParams.setFormatName(params.getFormatName());
+			goodsParams.setPackingSpec(params.getPackingSpec());
+			goodsParams.setGoodsId(params.getGoodsId());
+			if(!goodsParams.isEmpty()){
+				YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams, depotRepository, dcRepository));
+				if(goodss.size() == 0){
+					return false;
+				}
+				params.setGoodsId(new ListParam<String>(goodss.getIds()));
+			}
+			
+			YdsGoodsLotParams lotParams = new YdsGoodsLotParams();
+			lotParams.setLotNo(params.getLotNo());
+			lotParams.setLotValidity(params.getLotValidity());
+			lotParams.setGoodsLotId(params.getLotId());
+			lotParams.setSterilizeLotNo(params.getSterilizeLotNo());
+			lotParams.setSterilizeTime(params.getSterilizeTime());
+			lotParams.setProduceDate(params.getProduceDate());
+			if(!lotParams.isEmpty()){
+				YdsGoodsLots lots = new YdsGoodsLots(glRepository.findAll().find(lotParams));
+				if(lots.size() == 0){
+					return false;
+				}
+				params.setLotId(new ListParam<String>(lots.getIds()));
+			}
+			
+			
+		}
+		return true;	
+	}
+	
+	private boolean setReplenishRelationParams(SpdBizItemParams params) {
+		SpdReplenishBizParams replenishParams = new SpdReplenishBizParams();
+		replenishParams.setBizCode(params.getBizCode());
+		if(params.getDepotName() != null){
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			PcsDepots depots = null;
+			if(!depotParams.isEmpty()){
+				depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+				if(CollectionUtils.isNotEmpty(depots)){
+					replenishParams.setFromDepotId(new ListParam<String>(depots.getIds()));
+				}else{
+					return false;
+				}
+			}
+		}
+
+		replenishParams.setFromDeptName(params.getDeptName());
+		replenishParams.setMaintenanceInfo_lastDate(params.getRefundLastDate());
+		replenishParams.setMaintenanceInfo_describe(params.getDescribe());
+		replenishParams.setCreateUserName(params.getCreateUserName());
+		if(!replenishParams.isEmpty()){
+			replenishParams.setBizId(params.getBizId());
+			SpdReplenishBizs replenishs = replenishRepository.find(replenishParams);
+			if(CollectionUtils.isEmpty(replenishs)){
+				return false;
+			}
+			params.setBizId(new ListParam<String>(replenishs.getIds()));
+		}
+		return true;
+	}
+	
+	public SpdBizItems findWithGoodsByBizId(String bizId){
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(bizId));
+		SpdBizItems items = find(params, new OrderParam("createTime", "desc"), -1, -1);
+		items.fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		return items;
+	}
+
+	public SpdBizItems findWithGoodsByBizIds(List<String> bizIds) {
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(bizIds));
+		SpdBizItems items = find(params, new OrderParam(), -1, -1);
+		items.fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		return items;
+	}
+
+	public SpdBizItems findByBizCode(SpdBizItemParams params, OrderParam order, String receiveCode) {
+		SpdBizItems list = new SpdBizItems();
+		SpdReceiveBizParams bizParams = new SpdReceiveBizParams();
+		bizParams.setBizCode(new ListParam<String>(receiveCode));
+		SpdReceiveBizs receiveBizs =  rbRepository.find(bizParams);
+		if(CollectionUtils.isEmpty(receiveBizs)){
+			new SpdBizItems();
+		}
+		SpdReceiveBiz receiveBiz = receiveBizs.get(0);
+		
+		if (receiveBiz != null) {
+			params.setBizId(new ListParam<String>(receiveBiz.getBizId()));
+			list = find(params, order, -1, -1);
+		}
+		list.fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		return list;
+	}
+	
+	public void deleteByBizId(String bizId){
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(bizId));
+		SpdBizItems items = find(params, new OrderParam("createTime", "desc"), -1, -1);
+		delete(items);
+	}
+
+	public boolean verifyDataReplication(SpdBizItem bizItem) {
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(bizItem.getBizId()));
+		params.setGoodsId(new ListParam<String>(bizItem.getGoodsId()));
+		if(StringUtils.isNotEmpty(bizItem.getLotId())){
+			params.setLotId(new ListParam<String>(bizItem.getLotId()));
+		}
+		return CollectionUtils.isEmpty(find(params));
+	}
+	
+	public SpdBizItems findByGoodsIdAndLotId(String goodsId, String lotId){
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setGoodsId(new ListParam<String>(goodsId));
+		if(StringUtils.isNotEmpty(lotId)){
+			params.setLotId(new ListParam<String>(lotId));
+		}
+		return find(params);
+	}
+	
+	public SpdBizItems findByBizId(String bizId){
+		List<String> bizIds = new ArrayList<String>();
+		bizIds.add(bizId);
+		return findByBizIds(bizIds);
+	}
+
+	public SpdBizItems findByBizIds(List<String> ids) {
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setBizId(new ListParam<String>(ids));
+		return find(params);
+	}
+
+	public SpdBizItems findByOriginId(String originId) {
+		SpdBizItemParams params = new SpdBizItemParams();
+		params.setOriginId(new ListParam<String>(originId));
+		return find(params);
+	}
+
+}

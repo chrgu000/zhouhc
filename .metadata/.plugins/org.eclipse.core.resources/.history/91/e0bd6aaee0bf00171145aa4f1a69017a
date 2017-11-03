@@ -1,0 +1,114 @@
+package cn.ak4j.yard.yds.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.yds.domain.YdsWorkBook;
+import cn.ak4j.yard.yds.domain.YdsWorkBooks;
+import cn.ak4j.yard.yds.params.YdsWorkBookParams;
+
+public class YdsWorkBookResourceTest extends BaseTest{
+	
+	@Test public void testGet() throws Exception{
+		String id = "pack_unit_001";
+		
+		YdsWorkBook workBook = mockMvcHelper.findOne(YdsWorkBook.class, testUserCode, id);
+		assertEquals(id, workBook.getWorkbookId());
+	}
+	
+	@Test public void testList() throws Exception{
+		YdsWorkBooks workBooks = mockMvcHelper.findList(YdsWorkBooks.class, testUserCode, null);
+		assertEquals(195, workBooks.size());
+		
+		String sortCode = "replenish_rule";
+		String sortName = "仓库申领规则";
+		String keyName = "自动请领";
+		YdsWorkBookParams params = new YdsWorkBookParams();
+		params.setSortCode(new ListParam<String>(sortCode));
+		params.setSortName(new ListParam<String>(sortName));
+		params.setKeyName(new ListParam<String>(keyName));
+		
+		workBooks = mockMvcHelper.findList(YdsWorkBooks.class, testUserCode, params);
+		assertEquals(1, workBooks.size());
+		
+	}
+	
+	@Test public void testCount() throws Exception{
+		int count = mockMvcHelper.count(YdsWorkBooks.class, testUserCode, null);
+		assertEquals(195, count);
+		
+		String sortCode = "replenish_rule";
+		String sortName = "仓库申领规则";
+		String keyName = "自动请领";
+		YdsWorkBookParams params = new YdsWorkBookParams();
+		params.setSortCode(new ListParam<String>(sortCode));
+		params.setSortName(new ListParam<String>(sortName));
+		params.setKeyName(new ListParam<String>(keyName));
+		
+		count = mockMvcHelper.count(YdsWorkBooks.class, testUserCode, params);
+		assertEquals(1, count);
+	}
+	
+	@Test public void testGetByIds() throws Exception{
+		List<String> ids = new ArrayList<String>();
+		ids.add("pack_unit_001");
+		ids.add("pack_unit_002");
+		ids.add("pack_unit_003");
+		ids.add("pack_unit_004");
+		ids.add("pack_unit_005");
+		
+		YdsWorkBooks workBooks = mockMvcHelper.getByIds(YdsWorkBooks.class, testUserCode, ids);
+		assertEquals(5, workBooks.size());
+		workBooks.forEach(workBook->{
+			assertTrue(ids.contains(workBook.getWorkbookId()));
+		});
+	}
+	
+	@Test public void testAdd() throws Exception{
+		//正常数据
+		YdsWorkBook workBook = createWorkBook();
+		YdsWorkBook newWorkBook = mockMvcHelper.add(YdsWorkBook.class, testUserCode, workBook);
+		assertNotNull(newWorkBook.getWorkbookId());
+		assertEquals(CheckState.new_created.getCode(), newWorkBook.getCheckState().getCode());
+		
+	}
+	
+	@Test public void testUpdate() throws Exception{
+		String normalId = "eqp_sort_name_011";
+		YdsWorkBook normalWorkBook = mockMvcHelper.findOne(YdsWorkBook.class, testUserCode, normalId);
+		
+		//正常修改
+		normalWorkBook.setKeyName("testKeyName");
+		YdsWorkBook newWorkBook = mockMvcHelper.modify(YdsWorkBook.class, testUserCode, normalId, normalWorkBook);
+		assertEquals("testKeyName", newWorkBook.getKeyName());
+		
+		String forbiddenId = "eqp_sort_name_012";
+		YdsWorkBook forbiddenWorkBook = mockMvcHelper.findOne(YdsWorkBook.class, testUserCode, forbiddenId);
+		forbiddenWorkBook.setKeyName("testKeyName");
+		mockMvcHelper.modify(YdsWorkBook.class, testUserCode, normalId, forbiddenWorkBook, status().is4xxClientError(), YardExceptionType.forbid_edit_uneditable_workbook);
+	}
+
+	private YdsWorkBook createWorkBook() {
+		YdsWorkBook workBook = new YdsWorkBook();
+		workBook.setSortCode("test");
+		workBook.setSortName("test");
+		workBook.setKeyName("test");
+		workBook.setKeyValue("test");
+		workBook.setKeyInx(1);
+		workBook.setEnabled(true);
+		
+		return workBook;
+	}
+	
+}

@@ -1,0 +1,18 @@
+CREATE TABLE "SPD_PREPARE_INFORM_RULE" 
+   ("ID" VARCHAR2(32 BYTE),
+    "NAME" VARCHAR(100 BYTE),
+    "RULE_PRIOR" INTEGER,
+    "FEEDBACK_RULE_ID" VARCHAR2(32),
+	"CREATE_TIME" DATE,  
+    "LAST_UPDATE_TIME" DATE,
+    "ENABLED" CHAR(1 BYTE),
+    "manual_inform_supplier" CHAR(1 BYTE),
+    "inform_component" VARCHAR2(500 BYTE),
+    "FROM_ORG_ID" VARCHAR2(100 BYTE),
+    "TO_DEPOT_ID" VARCHAR2(100 BYTE),
+    "FROM_DEPT_ID" VARCHAR2(100 BYTE),
+	 PRIMARY KEY ("ID")
+   );
+COMMENT ON TABLE "SPD_RECEIVE_RULE"  IS '备货通知业务规则表';
+
+alter table spd_feedback_rule add(auto_complete_prepare_inform CHAR(1 BYTE));

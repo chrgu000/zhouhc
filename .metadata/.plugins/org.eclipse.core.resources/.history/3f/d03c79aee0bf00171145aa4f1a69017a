@@ -1,0 +1,95 @@
+package cn.ak4j.yard.spd.utils;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.yds.domain.YdsGoods;
+
+public class SpdUnitUtilsTest{
+	
+	@Test public void testComputeUnitExchangeRatio(){
+		YdsGoods goods = new YdsGoods();
+		goods.setPrepareUnitLv(4);
+		goods.setStoreUnitLv(3);
+		goods.setConsumeUnitLv(2);
+		goods.setSettleUnitLv(1);
+		
+		goods.setBigSum(10);
+		goods.setMidSum(4);
+		goods.setMinSum(2);
+		
+		float unitRatio = 0;
+		
+		//断言备货到存储
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getPrepareUnitLv(), goods.getStoreUnitLv());
+		assertEquals(10, (int)unitRatio);
+		
+		//断言存储到备货
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), goods.getPrepareUnitLv());
+		assertEquals(0.1, unitRatio, 0.0001);
+		
+		//断言备货到消耗
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getPrepareUnitLv(), goods.getConsumeUnitLv());
+		assertEquals(40, unitRatio, 0.0001);
+		
+		//断言消耗到备货
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getConsumeUnitLv(), goods.getPrepareUnitLv());
+		assertEquals(1.0/40, unitRatio, 0.0001);
+		
+		//断言备货到结算
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getPrepareUnitLv(), goods.getSettleUnitLv());
+		assertEquals(80, unitRatio, 0.0001);
+		
+		//断言结算到备货
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getSettleUnitLv(), goods.getPrepareUnitLv());
+		assertEquals(1.0/80, unitRatio, 0.0001);
+		
+		//断言存储到结算
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), goods.getSettleUnitLv());
+		assertEquals(8, unitRatio, 0.0001);
+		
+		//断言结算到存储
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getSettleUnitLv(), goods.getStoreUnitLv());
+		assertEquals(1.0/8, unitRatio, 0.0001);
+		
+		goods = new YdsGoods();
+		goods.setPrepareUnitLv(4);
+		goods.setStoreUnitLv(1);
+		goods.setConsumeUnitLv(1);
+		goods.setSettleUnitLv(1);
+		
+		goods.setBigSum(10);
+		goods.setMidSum(1);
+		goods.setMinSum(1);
+		
+		//断言存储到备货
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), goods.getPrepareUnitLv());
+		assertEquals(1.0/10, unitRatio, 0.0001);
+		
+		//断言备货到消耗
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getPrepareUnitLv(), goods.getConsumeUnitLv());
+		assertEquals(10, unitRatio, 0.0001);
+		
+		//断言消耗到备货
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getConsumeUnitLv(), goods.getPrepareUnitLv());
+		assertEquals(1.0/10, unitRatio, 0.0001);
+		
+		//断言备货到结算
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getPrepareUnitLv(), goods.getSettleUnitLv());
+		assertEquals(10.0, unitRatio, 0.0001);
+		
+		//断言结算到备货
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getSettleUnitLv(), goods.getPrepareUnitLv());
+		assertEquals(1.0/10, unitRatio, 0.0001);
+		
+		//断言存储到结算
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), goods.getSettleUnitLv());
+		assertEquals(1, unitRatio, 0.0001);
+		
+		//断言结算到存储
+		unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getSettleUnitLv(), goods.getStoreUnitLv());
+		assertEquals(1, unitRatio, 0.0001);
+	}
+	
+}

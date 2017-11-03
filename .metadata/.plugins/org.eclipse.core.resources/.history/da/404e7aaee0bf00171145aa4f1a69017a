@@ -1,0 +1,93 @@
+package cn.ak4j.yard.spd.task.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTaskItems;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+
+public class SpdLogisticsTaskItemResourceTest extends BaseTest{
+
+	@Autowired private SpdLogisticsTaskItemRepository ltiRepository;
+	
+	private String accessToken;
+	
+	@Before
+	public void init() throws Exception{
+		accessToken = getAccessToken(xykUserCode);
+	}
+	
+	@Test public void testFindByTaskId() throws Exception{
+		String taskId = "logi_task_id_002";
+		String urlTemplate ="/spd/spdLogisticsTaskItems/taskId,{taskId}?accessToken={accessToken}&pageSize=-1";
+		
+		SpdLogisticsTaskItems taskItems = mockMvcHelper.mockGet(SpdLogisticsTaskItems.class, urlTemplate, taskId, accessToken);
+		assertEquals(62, taskItems.size());
+		taskItems.forEach(taskItem->{
+			assertEquals(taskId, taskItem.getTaskId());
+		});
+	}
+	
+	@Test public void testModifyAsPlan() throws Exception{
+		String taskItemId = "logi_task_item_id_003";
+		testAndCheckResultMofifyCheckState(taskItemId, 6);
+	}
+	
+	@Test public void testModifyWithZero() throws Exception{
+		String taskItemId = "logi_task_item_id_004";
+		testAndCheckResultMofifyCheckState(taskItemId, 0);
+	}
+	
+	@Test public void testModifyWithNegative() throws Exception{
+		String taskItemId = "logi_task_item_id_005";
+		testAndCheckResultMofifyCheckState(taskItemId, -10);
+	}
+	
+	private void testAndCheckResultMofifyCheckState(String taskItemId, int receiveQty) throws Exception{
+		SpdLogisticsTaskItem logisticsTaskItem = ltiRepository.findOne(taskItemId);
+		logisticsTaskItem.setReceiveQty(receiveQty);
+		
+		if(receiveQty < 0){
+			mockMvcHelper.modify(SpdLogisticsTaskItem.class, xykUserCode, taskItemId, logisticsTaskItem, status().is4xxClientError(), YardExceptionType.forbide_update_receive_negative);
+		}else{
+			logisticsTaskItem = mockMvcHelper.modify(SpdLogisticsTaskItem.class, xykUserCode, taskItemId, logisticsTaskItem);
+
+			SpdLogisticsTaskItem findLogisticsTaskItem = ltiRepository.findOne(taskItemId);
+			assertEquals(receiveQty, logisticsTaskItem.getReceiveQty().intValue());
+			assertEquals(receiveQty, findLogisticsTaskItem.getReceiveQty().intValue());
+		}
+	}
+	
+	@Test public void testModifyWithNotAsPlanned() throws Exception{
+		String taskItemId = "logi_task_item_id_005";
+		SpdLogisticsTaskItem logisticsTaskItem = ltiRepository.findOne(taskItemId);
+		logisticsTaskItem.setConfirmQty((int)Math.floor(logisticsTaskItem.getPlanQty()/2));
+		
+		mockMvcHelper.modify(SpdLogisticsTaskItem.class, xykUserCode, taskItemId, logisticsTaskItem, status().is4xxClientError(), YardExceptionType.forbide_update);
+	}
+	
+	@Test public void testGetLogisticsTaskPdf() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdLogisticsTaskItems/taskId,{taskId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, "logi_task_id_001", accessToken))
+//				.andDo(print())
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("送货作业单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+	}
+	
+}

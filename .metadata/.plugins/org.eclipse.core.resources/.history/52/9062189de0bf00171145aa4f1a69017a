@@ -1,0 +1,1 @@
+delete from yds_goods where goods_type != 'drug';

@@ -1,0 +1,28 @@
+package cn.ak4j.yard.sys.domain;
+
+import org.junit.Test;
+
+import cn.ak4j.Global;
+
+import static org.junit.Assert.*;
+
+public class YardCodeSequenceTest {
+	
+	@Test
+	public void testPublishYardCode(){
+		String dateCode = Global.yyMMddDF.format(Global.defaultCalendar.getTime());
+		YardCodeSequence sequence = new YardCodeSequence(CodeSort.xiajiadan);
+		
+		YardTimeSequenceCode code = sequence.publishYardCode();
+		assertEquals(CodeSort.xiajiadan.getCode(), code.getSortCode());
+		assertEquals(CodeSort.xiajiadan.getName(), code.getSortCodeName());
+		assertEquals(dateCode, code.getDateCode());
+		assertEquals(new Integer(1), code.getSequenceCode());
+		assertEquals(CodeSort.xiajiadan.getCode()+dateCode+1, code.getCode());
+		
+		code = sequence.publishYardCode();
+		assertEquals(new Integer(2), code.getSequenceCode());
+		assertEquals(CodeSort.xiajiadan.getCode()+dateCode+2, code.getCode());
+	}
+	
+}

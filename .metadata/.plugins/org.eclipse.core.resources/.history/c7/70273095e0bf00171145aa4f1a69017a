@@ -1,0 +1,197 @@
+package cn.ak4j.yard.pcs.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotAreas;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.factory.PcsDepotFactory;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.domain.YardArbitraryCode;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+@Service
+public class PcsDepotService extends IYardService<PcsDepot>{
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsDepotAreaService daService;
+	@Autowired private PcsDepotShelfService dsService;
+	@Autowired private PcsDepotFactory depotFactory;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private YardCodeService ycService;
+	@Autowired private PcsDeptRepository deptRepository;
+
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException("仓库不支持该行为");
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allDepots\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPropertyChangeRulesWithRelation\"")})
+	@Transactional
+	public PcsDepot add(@Valid PcsDepot depot, IUser user) {
+		YardArbitraryCode sysCode = ycService.publishCode(CodeSort.cangku, depot.getDepotCode());
+		depot.setDepotCode(sysCode.getCode());
+		
+		depot.verify(depotRepository);
+		depot = depotRepository.save(depot);
+		PcsDepts allDepts = deptRepository.findAllWithRelations();
+		depot.fillManageDept(allDepts);
+		return depot;
+	}
+	
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allDepots\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPropertyChangeRulesWithRelation\"")})
+	public PcsDepot modify(@Valid PcsDepot depot, IUser user) {
+		PcsDepot depotPO = depotRepository.findAllWithRelations().findById(depot.getDepotId());
+		if (depotPO != null && !depotPO.canUpdate()) {
+			throw new OperateForbiddenException(YardExceptionType.forbide_update, depotPO.getDepotName());
+		}
+		YardArbitraryCode sysCode = ycService.publishCode(CodeSort.cangku, depot.getDepotCode());
+		depot.setDepotCode(sysCode.getCode());
+		
+		if(!depot.isValid()){
+			throw new InvalidDataException(depot.getValidateMsg());
+		}
+		
+		depot.verify(depotRepository);
+		
+		depotPO.update(depot, user.getOrgId(), user.getUserId());
+		if (depot.isEnabled() != depotPO.isEnabled()) {
+			depotPO.setEnabled(depot.isEnabled());
+		}
+		depotRepository.save(depotPO);
+		return depotPO;
+	}
+
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+					@CacheEvict(value="longTimeCache", key="\"allDepots\""),
+					@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+					@CacheEvict(value="longTimeCache", key="\"allPropertyChangeRulesWithRelation\"")})
+	public PcsDepot updateCheckState(String depotId, int checkStateCode, Date lastDate, IUser user) {
+		// 判断当前仓库是否有货区，没有则状态禁止修改，同时货区中的隶属部门没有找到这个仓库隶属部门的也不能修改
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		if (depot.getAreas().size() <= 0 && checkStateCode == CheckState.commited.getCode()) {
+			throw new NotFoundException("当前仓库未找到货区");
+		}
+
+		depot.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		depot = depotRepository.save(depot);
+		return depot;
+	}
+	
+	/**
+	 * 初始化仓库：
+	 * 1）检查是否有正常货区、不合格货区、隔离货区，如果没有则相应的自动创建
+	 * 2）检查正常货区、不合格货区、隔离货区是否有名为‘虚拟货位’的货位，如没有则自动创建
+	 */
+	@Caching(evict={@CacheEvict(value = "longTimeCache", key = "\"allDepotsWithRelations\""), 
+			@CacheEvict(value="longTimeCache", key="\"allDepots\""),
+			@CacheEvict(value="longTimeCache", key="\"allPcsDepotAreas\""),
+			@CacheEvict(value="longTimeCache", key="\"allPcsDepotShelfs\""),
+			@CacheEvict(value="longTimeCache", key="\"allBizRulesWithRelation\""),
+			@CacheEvict(value="longTimeCache", key="\"allPropertyChangeRulesWithRelation\"")})
+	public PcsDepot initDepotAreaAndShelf(String depotId, IUser user){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		depot.fillCards(dcRepository);
+		StringBuffer buf = new StringBuffer(depot.getMaintenanceInfo().getDescribe()+"");
+		//没有正常货区自动创建一个正常货区以及一个虚拟货位
+		if(CollectionUtils.isEmpty(depot.getAreas().findByAreaType(PcsAreaType.normal))){
+			//构造合格货区并保存，构造虚拟货位并保存
+			daService.add(depotFactory.buildAutoDepotArea(depot.getDepotId(), PcsAreaType.normal.getCode(), user), user);
+			buf.append("仓库初始化检测到没有合格货区，自动创建合格货区;");
+			buf.append("仓库初始化检测到合格货区没有货位，自动创建合格货区的虚拟货位;");
+			
+		}
+		//检查正常货区中是否有虚拟货位，如果没有则自动创建
+		else{
+			//检查是否有名为'虚拟货位'的货位，如没有则构造虚拟货位并保存
+			PcsDepotAreas depotAreas = depot.getAreas().findByAreaType(PcsAreaType.normal);
+			
+			depotAreas.forEach(depotArea->{
+				if(CollectionUtils.isEmpty(depotArea.getShelfs()) || 
+				   CollectionUtils.findWhere("shelfName", PcsDepotShelf.virtual_shelf_name, depotArea.getShelfs()) == null){
+					dsService.add(depotFactory.buildAutoDepotShelf(depotArea, user), user);
+					buf.append("仓库初始化检测到合格货区没有货位，自动创建合格货区的虚拟货位;");
+				}
+			});
+			
+		}
+		
+		//没有不合格货区自动创建一个不合格货区以及一个虚拟货位
+		if(CollectionUtils.isEmpty(depot.getAreas().findByAreaType(PcsAreaType.unqualified))){
+			//构造不合格货区并保存，构造虚拟货位并保存
+			daService.add(depotFactory.buildAutoDepotArea(depot.getDepotId(), PcsAreaType.unqualified.getCode(), user), user);
+			buf.append("仓库初始化检测到没有不合格货区，自动创建不合格货区;");
+			buf.append("仓库初始化检测到不合格货区没有货位，自动创建合不格货区的虚拟货位;");
+			
+		}
+		//检查不合格货区中是否有虚拟货位，如果没有则自动创建
+		else{
+			//检查是否有名为'虚拟货位'的货位，如没有则构造虚拟货位并保存
+			PcsDepotAreas depotAreas = depot.getAreas().findByAreaType(PcsAreaType.unqualified);
+			
+			depotAreas.forEach(depotArea->{
+				if(CollectionUtils.isEmpty(depotArea.getShelfs()) ||
+				   CollectionUtils.findWhere("shelfName", PcsDepotShelf.virtual_shelf_name, depotArea.getShelfs()) == null){
+					dsService.add(depotFactory.buildAutoDepotShelf(depotArea, user), user);
+					
+					buf.append("仓库初始化检测到不合格货区没有货位，自动创建不合格货区的虚拟货位;");
+				}
+			});
+			
+		}
+		
+		//没有隔离货区自动创建一个隔离货区以及一个虚拟货位
+		if(CollectionUtils.isEmpty(depot.getAreas().findByAreaType(PcsAreaType.isolation))){
+			//构造隔离货区并保存，构造虚拟货位并保存
+			daService.add(depotFactory.buildAutoDepotArea(depot.getDepotId(), PcsAreaType.isolation.getCode(), user), user);
+			buf.append("仓库初始化检测到没有隔离货区，自动创建隔离货区;");
+			buf.append("仓库初始化检测到隔离货区没有货位，自动创建隔离货区的虚拟货位;");
+		}
+		//检查隔离货区中是否有虚拟货位，如果没有则自动创建
+		else{
+			//检查是否有名为'虚拟货位'的货位，如没有则构造虚拟货位并保存
+			PcsDepotAreas depotAreas = depot.getAreas().findByAreaType(PcsAreaType.isolation);
+			
+			depotAreas.forEach(depotArea->{
+				if(CollectionUtils.isEmpty(depotArea.getShelfs())|| 
+				   CollectionUtils.findWhere("shelfName", PcsDepotShelf.virtual_shelf_name, depotArea.getShelfs()) == null){
+					dsService.add(depotFactory.buildAutoDepotShelf(depotArea, user), user);
+					buf.append("仓库初始化检测到隔离货区没有货位，自动创建隔离货区的虚拟货位;");
+				}
+			});
+			
+		}
+		
+		depot.getMaintenanceInfo().setDescribe(buf.toString());
+		depot.updateLastUpdateTime();
+		depotRepository.save(depot);
+		return depot;
+	}
+
+}

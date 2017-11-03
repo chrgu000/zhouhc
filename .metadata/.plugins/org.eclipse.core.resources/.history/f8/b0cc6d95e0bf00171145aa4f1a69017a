@@ -1,0 +1,74 @@
+package cn.ak4j.yard.extend.gep.domain;
+
+import java.util.List;
+
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlType;
+
+@XmlRootElement(name="Bill")
+@XmlType(propOrder = { "srcBill", "reqSendDate", "orgId", "abteilung", "getAbteilung", "items"})
+public class InmAllotNotice {
+
+	private String orgId;
+	private String srcBill;
+	private String reqSendDate;
+	private String abteilung;
+	private String getAbteilung;
+	
+	private List<SpdGepBillItem> items;
+	
+	public String getOrgId() {
+		return orgId;
+	}
+	
+	@XmlElement(name="FOrgID")
+	public void setOrgId(String orgId) {
+		this.orgId = orgId;
+	}
+	
+	public String getAbteilung() {
+		return abteilung;
+	}
+
+	@XmlElement(name="FAbteilung")
+	public void setAbteilung(String abteilung) {
+		this.abteilung = abteilung;
+	}
+
+	public String getGetAbteilung() {
+		return getAbteilung;
+	}
+
+	@XmlElement(name="FGetAbteilung")
+	public void setGetAbteilung(String getAbteilung) {
+		this.getAbteilung = getAbteilung;
+	}
+
+	public String getSrcBill() {
+		return srcBill;
+	}
+
+	@XmlElement(name="FSrcBill")
+	public void setSrcBill(String srcBill) {
+		this.srcBill = srcBill;
+	}
+
+	public String getReqSendDate() {
+		return reqSendDate;
+	}
+
+	@XmlElement(name="FReqSendDate")
+	public void setReqSendDate(String reqSendDate) {
+		this.reqSendDate = reqSendDate;
+	}
+
+	public List<SpdGepBillItem> getItems() {
+		return items;
+	}
+
+	@XmlElement(name="FItem")
+	public void setItems(List<SpdGepBillItem> items) {
+		this.items = items;
+	}
+}

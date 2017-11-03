@@ -1,0 +1,56 @@
+package cn.ak4j.yard.yds.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import lombok.Getter;
+
+@Repository
+public class YdsEdsGoodsRepository extends BaseRepository<YdsEdsGoods, YdsEdsGoodss, YdsEdsGoodsParams, String>{
+	
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Cacheable(value = "longTimeCache", key = "\"allEdsGoodss\"")
+	public YdsEdsGoodss findAll(){
+		return getAll();
+	}
+	
+//	@Deprecated
+//	public YdsEdsGoods findOne(String goodsId){
+//		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+//	}
+	
+	@Deprecated
+	public int count(YdsEdsGoodsParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsEdsGoodss find(YdsEdsGoodsParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsEdsGoodss findByIds(List<String> ids){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsEdsGoodss find(YdsEdsGoodsParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+}
+
+

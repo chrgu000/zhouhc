@@ -1,0 +1,65 @@
+package cn.ak4j.yard.spd.wrapper.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.spd.params.SpdTurnoverBoxParams;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBox;
+import cn.ak4j.yard.spd.wrapper.domain.SpdTurnoverBoxs;
+import lombok.Getter;
+
+@Repository
+public class SpdTurnoverBoxRepository extends BaseRepository<SpdTurnoverBox, SpdTurnoverBoxs, SpdTurnoverBoxParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Cacheable(value="longTimeCache", key="\"allTurnoverBoxs\"")
+	public SpdTurnoverBoxs findAll(){
+		return getAll();
+	}
+	
+	@Deprecated
+	public SpdTurnoverBox findOne(String id){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public int count(SpdTurnoverBoxParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public SpdTurnoverBoxs find(SpdTurnoverBoxParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public SpdTurnoverBoxs findByIds(List<String> ids){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public SpdTurnoverBoxs find(SpdTurnoverBoxParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+//	public SpdTurnoverBox findByWrapperNo(String turnoverBoxCode){
+//		SpdTurnoverBoxParams params = new SpdTurnoverBoxParams();
+//		params.setTurnoverBoxCode(new ListParam<String>(turnoverBoxCode));
+//		SpdTurnoverBoxs boxes = new SpdTurnoverBoxs(findAll().find(params));
+//		return CollectionUtils.isEmpty(boxes)?null:boxes.get(0);
+//	}
+//
+//	public SpdTurnoverBoxs findByBoxCodes(List<String> boxCodes) {
+//		return findAll().getByBoxCodes(boxCodes);
+//	}
+	
+}

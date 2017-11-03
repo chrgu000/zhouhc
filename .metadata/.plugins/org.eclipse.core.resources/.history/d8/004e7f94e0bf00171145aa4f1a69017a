@@ -1,0 +1,54 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 货架库存变更
+* @author zhengyf
+* @date 2017年3月31日 上午10:33:10
+* @version V1.0.0
+*/
+
+@NoArgsConstructor
+public class SpdShelfStockChange extends SpdStockChange{
+
+	@Getter @Setter
+	private String shelfId;
+	
+	@Getter @Setter
+	private String shelfType;
+	
+	@Getter @Setter
+	private int planQtyByStoreUnit;
+	
+	public SpdShelfStockChange(YdsGoodsLot goodsLot, PcsDepot depot, String shelfType){
+		setGoodsLot(goodsLot);
+		setDepot(depot);
+		setShelfType(shelfType);
+	}
+	
+	public SpdShelfStockChange(YdsGoodsLot goodsLot, PcsDepot depot, String shelfType, String shelfId, int storeUnitQty){
+		this(goodsLot, depot, shelfType);
+		setQtyByStoreUnit(storeUnitQty);
+		setShelfId(shelfId);
+	}
+	
+	public int getPlanQtyByMinUnit(){
+		YdsGoods goods = getGoodsLot().getGoods();
+ 		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), YdsUnitLv.base.getLv());
+		int planQtyByMinUnit = (int)(getPlanQtyByStoreUnit()*unitRatio);
+		return planQtyByMinUnit;
+	}
+
+	public boolean isInvalid() {
+		return getGoodsLot() == null;
+	}
+	
+}

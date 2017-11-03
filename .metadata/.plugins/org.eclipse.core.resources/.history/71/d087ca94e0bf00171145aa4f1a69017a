@@ -1,0 +1,145 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizrule.domain.SpdMoveAreaDirectionRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdMoveAreaRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdMoveAreaRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdMoveAreaRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.bizrule.service.SpdBizRuleService;
+import cn.ak4j.yard.spd.bizrule.to.SpdMoveAreaRuleTO;
+
+@RestController
+public class SpdMoveAreaRuleResource {
+	
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdBizRuleService brService;
+	SpdMoveAreaRuleAssember assember = new SpdMoveAreaRuleAssember();
+
+	@RequestMapping(value="/yard/spd/spdMoveAreaRules", method=RequestMethod.GET)
+	public List<SpdMoveAreaRuleTO> list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdMoveAreaRuleParams params = SpdMoveAreaRuleParams.buildParamsFromJson(paramsStr, SpdMoveAreaRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdMoveAreaRules rules = brRepository.findAllWithRelations().getAllMoveAreaRules();
+		rules = new SpdMoveAreaRules(rules.findByPage(params, order, currentPage-1, pageSize));
+		return assember.buildList(rules);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdMoveAreaRules/count", method=RequestMethod.GET)
+	public int count(@RequestParam(value = "params", required = false) String paramsStr){
+		SpdMoveAreaRuleParams params = SpdMoveAreaRuleParams.buildParamsFromJson(paramsStr, SpdMoveAreaRuleParams.class);
+		SpdMoveAreaRules rules = brRepository.findAllWithRelations().getAllMoveAreaRules();
+		rules = new SpdMoveAreaRules(rules.find(params));
+		return assember.buildList(rules).size();
+	}
+	
+	@RequestMapping(value="/yard/spd/spdMoveAreaRules/ids,{ids}", method=RequestMethod.GET)
+	public List<SpdMoveAreaRuleTO> getByIds(@PathVariable("ids") String ids){
+		SpdMoveAreaRules rules = brRepository.findAllWithRelations().getAllMoveAreaRules();
+		return assember.buildList(rules.findByIds(Arrays.asList(ids.split(","))));
+	}
+	
+	@RequestMapping(value="/yard/spd/spdMoveAreaRules", method = RequestMethod.POST)
+	public SpdMoveAreaRuleTO add(@RequestBody SpdMoveAreaRuleTO ruleTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdMoveAreaRule rule = assember.build(ruleTO);
+		rule = (SpdMoveAreaRule) brService.add(rule, user);
+		
+		SpdMoveAreaRules rules = brRepository.findAllWithRelations().getAllMoveAreaRules();
+		ruleTO = assember.build(CollectionUtils.findWhere("id", rule.getId(), rules));
+		
+		return ruleTO;
+	}
+
+	@RequestMapping(value="/yard/spd/spdMoveAreaRules/{id}", method = RequestMethod.PUT)
+	public SpdMoveAreaRuleTO update(@RequestBody SpdMoveAreaRuleTO ruleTO, HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdMoveAreaRule prepareInformRule = (SpdMoveAreaRule) brService.modify(assember.build(ruleTO), user);
+		
+		SpdMoveAreaRules rules = brRepository.findAllWithRelations().getAllMoveAreaRules();
+		ruleTO = assember.build(CollectionUtils.findWhere("id", prepareInformRule.getId(), rules));
+		
+		return ruleTO;
+	}
+
+	@RequestMapping(value="/yard/spd/spdMoveAreaRules/{id}", method = RequestMethod.GET)
+	public SpdMoveAreaRuleTO get(@PathVariable("id")String id){
+		SpdMoveAreaRules rules = brRepository.findAllWithRelations().getAllMoveAreaRules();
+		SpdMoveAreaRuleTO ruleTO = assember.build(CollectionUtils.findWhere("id", id, rules));
+		return ruleTO;
+	}
+	
+	@RequestMapping(value="/yard/spd/spdMoveAreaRules/whichICanApply", method = RequestMethod.GET)
+	public List<SpdMoveAreaRuleTO> whichICanApply(
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders,
+			HttpServletRequest request){
+		PcsUser user = (PcsUser)request.getAttribute("user");
+		SpdMoveAreaRuleParams params = SpdMoveAreaRuleParams.buildParamsFromJson(paramsStr, SpdMoveAreaRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		SpdMoveAreaRules whichCanApplyRules = new SpdMoveAreaRules(brRepository.findAllWithRelations().getAllMoveAreaRules().whichCanApplyByUser(user));
+		SpdMoveAreaRules rules = new SpdMoveAreaRules(whichCanApplyRules.findByPage(params, order, -1, -1));
+		return assember.buildList(rules);
+	}
+	
+}
+
+class SpdMoveAreaRuleAssember{
+	
+	public List<SpdMoveAreaRuleTO> buildList(List<SpdMoveAreaRule> rules){
+		List<SpdMoveAreaRuleTO> result = new ArrayList<SpdMoveAreaRuleTO>();
+		
+		rules.forEach(rule->{
+			SpdMoveAreaRuleTO to = build(rule);
+			result.add(to);
+		});
+		
+		return result;
+	}
+	
+	public SpdMoveAreaRuleTO build(SpdMoveAreaRule rule){
+		SpdMoveAreaRuleTO to = new SpdMoveAreaRuleTO();
+		
+		BeanUtils.copyProperties(rule.getDirectionRule(), to);
+		BeanUtils.copyProperties(rule, to);		
+		to.setPrimaryName(rule.getPrimaryName());
+		return to;
+	}
+
+	public SpdMoveAreaRule build(SpdMoveAreaRuleTO ruleTO) {
+		SpdMoveAreaRule rule = new SpdMoveAreaRule();
+		
+		SpdMoveAreaDirectionRule directionRule = new SpdMoveAreaDirectionRule();
+		BeanUtils.copyProperties(ruleTO, directionRule);
+		
+		rule.setDirectionRule(directionRule);
+		
+		BeanUtils.copyProperties(ruleTO, rule);
+		rule.setCreateTime(new Date());
+		rule.setLastUpdateTime(new Date());
+		
+		return rule;
+	}
+	
+}

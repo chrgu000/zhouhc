@@ -1,0 +1,664 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.DateRange;
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.params.SpdReplenishBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReplenishBizRepository;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.bizrule.domain.SpdReplenishRules;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.stock.service.SpdDepotStockService;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRefs;
+import cn.ak4j.yard.spd.task.domain.SpdLogisticsTasks;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRefRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdLogisticsTaskRepository;
+import cn.ak4j.yard.spd.task.service.SpdDepotTaskService;
+import cn.ak4j.yard.spd.task.service.SpdLogisticsTaskService;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class SpdReplenishBizResourceTest extends BaseTest{
+	
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdReplenishBizRepository rbRepository;
+	@Autowired private SpdReplenishBizService rbService;
+	@Autowired private SpdDepotStockService dsService;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdDispatcherRefRepository drRepository;
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private SpdDepotTaskItemRepository tiRepository;
+	@Autowired private SpdDepotTaskService dtService;
+	@Autowired private SpdLogisticsTaskRepository ltRepository;
+	@Autowired private SpdLogisticsTaskService ltService;
+	@Autowired private SpdLogisticsTaskItemRepository ltiRepository;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testFindReplenishs() throws Exception{
+		String accessToken = getAccessToken("test");
+		String url = "/spd/spdReplenishs?accessToken={accessToken}&params={params}";
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		params.setFromDepotId(new ListParam<String>("depot_id_001"));
+		SpdReplenishBizs replenishs = mockMvcHelper.mockGet(SpdReplenishBizs.class, url, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		
+		replenishs.forEach(replenish->{
+			assertEquals("depot_id_001",replenish.getFromDepotId());
+		});
+	}
+
+	@Test public void testFindReplenishBizsByFromDepot() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/mine?accessToken={accessToken}&params={params}&pageSize=-1";
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		// 条件 已提交的发货仓库是当前用户所管理的
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode(), QueryParam.operation_not_in));
+		SpdReplenishBizs allReplenishBizs = mockMvcHelper.mockGet(SpdReplenishBizs.class, url, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		assertEquals(8, allReplenishBizs.size());
+	    
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		PcsDepots depots = new PcsDepots(CollectionUtils.find("manageDeptId", user.getDeptId(), depotRepository.getAll()));
+		allReplenishBizs.forEach(replenish->{
+			assertNotNull(CollectionUtils.findWhere("depotId", replenish.getFromDepotId(), depots));
+		});
+		
+		allReplenishBizs.forEach(replenish->{
+			assertTrue(replenish.getCheckState() == CheckState.commited || replenish.getCheckState() == CheckState.new_created);
+		});
+	}
+	
+	@Test public void testFindUnProcessedDepotReplenishByCreateDate() throws Exception{
+		String url = "/spd/spdReplenishs?accessToken={accessToken}&params={params}&pageSize=-1";
+		String accessToken = getAccessToken(xykUserCode);
+		
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		Date start = Global.sdfYMD.parse("2017-04-01");
+		Date end = Global.sdfYMD.parse("2017-04-28");
+		params.setMaintenanceInfo_createDate(new DateRangeParam(new DateRange(start, end)));
+		
+		String urlTemplate = getUrlTemplate(url);
+		
+		String json = mockMvc.perform(get(urlTemplate, accessToken, Global.defaultObjectMapper.writeValueAsString(params)))
+							.andExpect(status().isOk())
+							.andReturn().getResponse().getContentAsString();
+		SpdReplenishBizs allReplenishBizs = Global.defaultObjectMapper.readValue(json, SpdReplenishBizs.class);
+		assertEquals(8, allReplenishBizs.size());
+		allReplenishBizs.forEach(replenish->{
+			assertTrue(start.before(replenish.getMaintenanceInfo().getCreateDate()));
+			assertTrue(end.after(replenish.getMaintenanceInfo().getCreateDate()));
+		});
+	}
+
+	@Test public void testFindCountByFromDepot() throws Exception{
+		String url = "/spd/spdReplenishs/mine/count?accessToken={accessToken}&params={params}";
+		String accessToken = getAccessToken(xykUserCode);
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		// 条件 已提交的发货仓库是当前用户所管理的
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode(), QueryParam.operation_not_in));
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		assertEquals(8, count);
+	}
+	
+	@Test public void testFindReplenishBizsByToDepot() throws Exception{
+		PcsUser user = userRepository.findAll().findById(mzmanagerUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode(), QueryParam.operation_not_in));
+		params.setToDepotId(new ListParam<String>(depots.getIds()));
+		params.setCreatorDepotId(new ListParam<String>(depots.getIds()));
+		
+		String url = "/spd/spdReplenishs?accessToken={accessToken}&params={params}&pageSize=-1";
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		SpdReplenishBizs allReplenishBizs = mockMvcHelper.mockGet(SpdReplenishBizs.class, url, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		assertEquals(6, allReplenishBizs.size());
+		
+		
+		allReplenishBizs.forEach(replenish->{
+			assertNotNull(CollectionUtils.findWhere("depotId", replenish.getToDepotId(), depots));
+		});
+		
+		allReplenishBizs.forEach(replenish->{
+			assertTrue(replenish.getCheckState() != CheckState.completed);
+		});
+	}
+	
+	@Test public void testFindReplenishCountByToDepot() throws Exception{
+		PcsUser user = userRepository.findAll().findById(mzmanagerUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode(), QueryParam.operation_not_in));
+		params.setToDepotId(new ListParam<String>(depots.getIds()));
+		params.setCreatorDepotId(new ListParam<String>(depots.getIds()));
+		
+		String url = "/spd/spdReplenishs/count?accessToken={accessToken}&params={params}";
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		assertEquals(6, count);
+	}
+	
+	@Test public void testAddReplenish() throws Exception{
+		SpdReplenishBiz replenishBiz = buildReplenishBiz(xykUserId);
+		testReplenishBizCreated(replenishBiz, xykUserCode);
+	}
+	
+	@Test public void testAddReplenishLackDepotCard() throws Exception{
+		String goodsId = "goods_id_048";
+		SpdReplenishBiz replenish = buildReplenish(eisUserId);
+		SpdBizItem item = new SpdBizItem(goodsId, null, YdsUnitLv.min.getLv(), 10, -1, 10.5f);
+		replenish.getItems().add(item);
+		mockMvcHelper.add(SpdReplenishBiz.class, eisUserCode, "spd", "spdReplenishs", replenish, status().is5xxServerError(), YardExceptionType.forbid_without_depot_card);
+	}
+	
+	@Test public void testAddReplenishByEisRequest() throws Exception{
+		SpdReplenishBiz replenish = buildReplenishBiz(eisUserId);
+		replenish = testReplenishBizCreated(replenish, eisUserCode);
+		assertEquals("user_id_002", replenish.getMaintenanceInfo().getCreateUserId());
+	}
+	
+	@Test public void testAddReplenishByEisRequestAndSpecifiyUser() throws Exception{
+		SpdReplenishBiz replenish = buildReplenishBiz(eisUserId);
+		String applyUserId = "user_id_010";
+		replenish.getMaintenanceInfo().setCreateUserId(applyUserId);
+		replenish = testReplenishBizCreated(replenish, eisUserCode);
+		assertEquals(applyUserId, replenish.getMaintenanceInfo().getCreateUserId());
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Test public void testAddReplenishWithItemByEis() throws Exception{
+		String accessToken = getAccessToken(eisUserCode);
+		String url = "/spd/spdReplenishs?accessToken={accessToken}";
+		SpdReplenishBiz replenish = buildReplenishWithItem(eisUserId,"rep_rule_id_10");
+		SpdReplenishBiz newReplenish = mockMvcHelper.mockPost(SpdReplenishBiz.class, replenish, url, accessToken);
+		wait(9);
+		SpdReplenishBiz theReplenish = rbRepository.findOne(newReplenish.getBizId());
+		assertEquals(mzmanagerUserId, theReplenish.getMaintenanceInfo().getCreateUserId());
+//		assertEquals(mzmanagerUserId, theReplenish.getMaintenanceInfo().getLastUserId());
+		
+		rbService.fillAllRelations(theReplenish);
+		
+		SpdDispatcherRefs dispatcherRefs = drRepository.findByRefObjectId(theReplenish.getBizId());
+		SpdDispatcher dispatcher = dispatcherRepository.findOne(dispatcherRefs.get(0).getDispatcherId());
+		assertEquals(xykUserId, dispatcher.getMaintenanceInfo().getCreateUserId());
+		assertEquals(xykUserId, dispatcher.getMaintenanceInfo().getLastUserId());
+		
+		SpdDepotTasks offShelfTasks = theReplenish.getOffShelfTasks();
+		offShelfTasks.forEach(task->{
+			assertEquals(xykUserId, task.getMaintenanceInfo().getCreateUserId());
+			assertEquals(xykUserId, task.getMaintenanceInfo().getLastUserId());
+		});
+		
+		SpdLogisticsTasks deliveryTasks = theReplenish.getDeliveryTasks();
+		
+		deliveryTasks.forEach(deliveryTask->{
+			assertEquals(xykUserId, deliveryTask.getMaintenanceInfo().getCreateUserId());
+			assertEquals(mzmanagerUserId, deliveryTask.getMaintenanceInfo().getLastUserId());
+		});
+		
+		SpdDispatcherRefs theDispatcherRefs = drRepository.findByRefObjectIds(deliveryTasks.getIds());
+		SpdDispatcher theDispatcher = dispatcherRepository.findOne(theDispatcherRefs.get(0).getDispatcherId());
+		
+		assertEquals(mzmanagerUserId, theDispatcher.getMaintenanceInfo().getCreateUserId());
+		assertEquals(mzmanagerUserId, theDispatcher.getMaintenanceInfo().getLastUserId());
+		
+		SpdDepotTasks onShelfTasks = dtRepository.findWithItemsByDispatcherId(theDispatcher.getDispatcherId());
+		
+		onShelfTasks.forEach(task->{
+			assertEquals(mzmanagerUserId, task.getMaintenanceInfo().getCreateUserId());
+			assertEquals(mzmanagerUserId, task.getMaintenanceInfo().getLastUserId());
+		});
+	}
+	
+	private SpdReplenishBiz testReplenishBizCreated(SpdReplenishBiz replenish, String userCode) throws Exception{
+		SpdReplenishBiz newReplenish = mockMvcHelper.add(SpdReplenishBiz.class, userCode, "spd", "spdReplenishs", replenish);
+		assertNotNull(newReplenish);
+		wait(5);
+		SpdReplenishBiz createdReplenish = rbRepository.findOne(newReplenish.getBizId());
+		assertEquals(newReplenish.getFromOrgId(), createdReplenish.getFromOrgId());
+		assertEquals(newReplenish.getFromDepotId(), createdReplenish.getFromDepotId());
+		assertEquals(newReplenish.getToOrgId(), createdReplenish.getToOrgId());
+		assertEquals(newReplenish.getToDepotId(), createdReplenish.getToDepotId());
+		assertEquals(newReplenish.getCreatorDepotId(), createdReplenish.getCreatorDepotId());
+		assertEquals(SpdReplenishBizSteps.create_replenish.getStatusCode(), createdReplenish.getBizStatusCode());
+		assertEquals(CheckState.new_created, createdReplenish.getCheckState());
+		
+		return createdReplenish;
+	}
+	
+	@Test public void testModifyReplenish() throws Exception{
+		//TODO 测试数据没有该种情况的数据，暂时先调用添加的接口添加再修改
+		SpdReplenishBiz replenishBiz = buildReplenish(xyfUserId);
+		String createAccessToken = getAccessToken(xyfUserCode);
+		String createUrl = "/spd/spdReplenishs?accessToken={accessToken}";
+		SpdReplenishBiz createdReplenish = mockMvcHelper.mockPost(SpdReplenishBiz.class, replenishBiz, createUrl, createAccessToken);
+		SpdReplenishBiz originReplenish = rbRepository.findOne(createdReplenish.getBizId());
+		
+		wait(3);
+		
+		//进行修改
+		String fromDepotId = "depot_id_003";
+		originReplenish.setFromDepotId(fromDepotId);
+		String bizRuleId = "rep_rule_id_25";
+		originReplenish.setBizRuleId(bizRuleId);
+		String url = "/spd/spdReplenishs/{bizId}?accessToken={accessToken}";
+		String accessToken = getAccessToken(xykUserCode);
+		SpdReplenishBiz newReplenishBiz = mockMvcHelper.mockPut(SpdReplenishBiz.class, originReplenish, url, originReplenish.getBizId(), accessToken);
+		
+		assertEquals(fromDepotId, newReplenishBiz.getFromDepotId());
+		assertEquals(bizRuleId, newReplenishBiz.getBizRuleId());
+	}
+	
+	private SpdReplenishBiz buildReplenishBiz(String userId){
+		String creatorDepotId = "depot_id_001";
+		SpdReplenishBiz replenishBiz = new SpdReplenishBiz();
+		replenishBiz.setBizRuleId("rep_rule_id_19");
+		replenishBiz.setCreatorDepotId(creatorDepotId);
+		PcsUser user = userRepository.findAll().findById(userId);
+		replenishBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		return replenishBiz;
+	}
+	
+	private SpdReplenishBiz buildReplenish(String userId){
+		String creatorDepotId = "depot_id_002";
+		SpdReplenishBiz replenishBiz = new SpdReplenishBiz();
+		replenishBiz.setCreatorDepotId(creatorDepotId);
+		replenishBiz.setBizRuleId("rep_rule_id_22");
+		PcsUser user = userRepository.findAll().findById(userId);
+		replenishBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		return replenishBiz;
+	}
+	
+	private SpdReplenishBiz buildReplenishWithItem(String userId, String ruleId){
+		String creatorDepotId = "depot_id_003";
+		SpdReplenishBiz replenishBiz = new SpdReplenishBiz();
+		replenishBiz.setBizRuleId(ruleId);
+		replenishBiz.setCreatorDepotId(creatorDepotId);
+		PcsUser user = userRepository.findAll().findById(userId);
+		replenishBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item1 = new SpdBizItem("goods_id_001", null, 2, 20, 20, 5.0f);
+		SpdBizItem item2 = new SpdBizItem("goods_id_003", null, 2, 0, 0, 5.0f);
+		SpdBizItem item3 = new SpdBizItem("goods_id_007", null, 2, 20, 20, 5.0f);
+		items.add(item1);
+		items.add(item2);
+		items.add(item3);
+		
+		replenishBiz.setItems(items);
+		
+		return replenishBiz;
+	}
+	
+	/**
+	 *测试当前用户所属部门所管理的仓库是否拥有操作指定的bizId的这条数据的删除权限
+	 *如果没有抛出异常：操作失败:禁止删除当前资源
+	 */
+	@Test public void testDeleteOwnerReplenish () throws Exception{
+		String bizId = "rep_biz_id_001";
+		String accessToken = getAccessToken("test");
+		String url = "/spd/spdReplenishs/{bizId}?accessToken={accessToken}";
+		mockMvcHelper.mockDelete(url, bizId, accessToken, status().is5xxServerError(), null);
+	}
+	
+	@Test public void testDeleteReplenish() throws Exception{
+		String url = "/spd/spdReplenishs/{bizId}?accessToken={accessToken}";
+		String bizId = "rep_biz_id_001";
+		String userCode = xykUserCode;
+		String accessToken = getAccessToken(userCode);
+		mockMvcHelper.mockDelete(url, bizId, accessToken);
+		SpdReplenishBiz replenishBiz = rbRepository.findOne(bizId);
+		assertNull(replenishBiz);
+	}
+	
+	@Test public void testUpdateCheckStateByCommited() throws Exception{
+		String url= "/spd/spdReplenishs/{bizId}/checkState/commited?accessToken={accessToken}";
+		String bizId = "rep_biz_id_001";
+		
+		SpdReplenishBiz originReplenishBiz = rbRepository.findOne(bizId);
+		CheckStateTO checkStateTo = new CheckStateTO(CheckState.commited.getCode(), originReplenishBiz.getLastUpdateTime());
+		updateCheckStateCodeAndAssert(bizId, url, checkStateTo);
+	}
+	
+	@Test public void testUpdateCheckStateByReviewed() throws Exception{
+		String url = "/spd/spdReplenishs/{bizId}/checkState/reviewed?accessToken={accessToken}";
+		String bizId = "rep_biz_id_002";
+		
+		SpdReplenishBiz originReplenishBiz = rbRepository.getWithItems(bizId);
+		CheckStateTO checkStateTo = new CheckStateTO(CheckState.reviewed.getCode(), originReplenishBiz.getLastUpdateTime());
+		
+		//填充确认数量，按实际库存填充
+		List<SpdGoodsQty> planGoodsQtys = originReplenishBiz.getItems().getPlanGoodsQtysByStoreUnit();
+		List<SpdGoodsQty> realQtysByStoreUnit = dsService.findRealShelfStoreUnitStocks(originReplenishBiz.getFromDepotId(), originReplenishBiz.getFromAreaType(), planGoodsQtys);
+		originReplenishBiz.getItems().confirm(realQtysByStoreUnit);
+		biRepository.saveAll(originReplenishBiz.getItems());
+		
+		updateCheckStateCodeAndAssert(bizId, url, checkStateTo);
+	}
+	
+	@Test public void testFindOneReplenishBiz() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String bizId = "rep_biz_id_001";
+		String url = "/spd/spdReplenishs/{bizId}?accessToken={accessToken}";
+		SpdReplenishBiz replenishBiz = mockMvcHelper.mockGet(SpdReplenishBiz.class, url, bizId, accessToken);
+		assertNotNull(replenishBiz);
+		assertEquals(bizId, replenishBiz.getBizId());
+	}
+	
+	@Test public void testFindByDepotCorrelation() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/depotCorrelation?accessToken={accessToken}&params={params}";
+		
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		List<String> replenishTypeCodes = new ArrayList<String>();
+		replenishTypeCodes.add("depot_replenish");
+		replenishTypeCodes.add("dept_apply");
+		
+		List<Integer> checkStateCodes = new ArrayList<Integer>();
+		checkStateCodes.add(CheckState.reviewed.getCode());
+		checkStateCodes.add(CheckState.completed.getCode());
+		params.setCheckStateCode(new ListParam<Integer>(checkStateCodes));
+		SpdReplenishBizs replenishs = mockMvcHelper.mockGet(SpdReplenishBizs.class, url, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		assertEquals(8, replenishs.size());
+	}
+	
+	@Test public void testFindByDepotCorrelationCount() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/depotCorrelation/count?accessToken={accessToken}&params={params}";
+		
+		SpdReplenishBizParams params = new SpdReplenishBizParams();
+		
+		List<Integer> checkStateCodes = new ArrayList<Integer>();
+		checkStateCodes.add(CheckState.reviewed.getCode());
+		checkStateCodes.add(CheckState.completed.getCode());
+		
+		params.setCheckStateCode(new ListParam<Integer>(checkStateCodes));
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		
+		
+		assertEquals(8, count);
+	}
+
+	private void updateCheckStateCodeAndAssert(String bizId, String url, CheckStateTO checkStateTo) throws Exception {
+		String accessToken = getAccessToken(xykUserCode);
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		CheckStateTO newCheckStateTo = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, bizId, accessToken);
+		assertEquals(checkStateTo.getCheckStateCode(), newCheckStateTo.getCheckStateCode());
+		
+		SpdReplenishBiz newReplenishBiz = rbRepository.findOne(bizId);
+		assertEquals(newReplenishBiz.getMaintenanceInfo().getLastUserId(), user.getUserId());
+		assertEquals(checkStateTo.getCheckStateCode().intValue(), newReplenishBiz.getCheckState().getCode());
+	}
+	
+	
+	@Test public void testUpdateAttributeQuickMode() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/modifyQuickMode?accessToken={accessToken}";
+		String bizId = "rep_biz_id_001";
+		SpdReplenishBiz originReplenish = rbRepository.findOne(bizId);
+		
+		mockMvcHelper.mockPut(SpdReplenishBiz.class, originReplenish, url, accessToken);
+		wait(1);
+		SpdReplenishBiz newReplenish = rbRepository.findOne(bizId);
+		assertNotNull(newReplenish);
+	}
+
+	@Test public void testUpdateBizRuleId() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/{bizId}/bizRuleId?bizRuleType={bizRuleType}&accessToken={accessToken}";
+		String bizId = "rep_biz_id_014";
+		Map<String, Object> result = mockMvcHelper.mockPut(new TypeReference<Map<String, Object>>() {}, null, url, bizId, "totalAutoFeedbackRule", accessToken);
+		wait(1);
+		assertEquals("rep_rule_id_14", result.get("bizRuleId").toString());
+	}
+	
+	@Test public void testFindWaitingProcessReplenish() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/mine?accessToken={accessToken}";
+		SpdReplenishBizs replenishs = mockMvcHelper.mockGet(SpdReplenishBizs.class, url, accessToken);
+		SpdReplenishRules replenishRules = brRepository.findAllWithRelations().getAllReplenishRules().getAllApplyRules();
+		
+		replenishRules.forEach(rule->{
+			SpdReplenishBiz replenish = CollectionUtils.findWhere("bizRuleId", rule.getId(), replenishs);
+			if(replenish!=null){
+				assertEquals(CheckState.commited, replenish.getCheckState());
+			}
+		});
+	}
+	
+	@Test public void testFindWaitingProcessReplenishByApply() throws Exception{
+		String accessToken = getAccessToken(xyfUserCode);
+		String url = "/spd/spdReplenishs/mine?accessToken={accessToken}";
+		SpdReplenishBizs replenishs = mockMvcHelper.mockGet(SpdReplenishBizs.class, url, accessToken);
+		
+		SpdReplenishRules replenishRules = brRepository.findAllWithRelations().getAllReplenishRules().getAllApplyRules();
+		
+		List<Integer> checkStateCodes = new ArrayList<Integer>();
+		checkStateCodes.add(CheckState.new_created.getCode());
+		checkStateCodes.add(CheckState.commited.getCode());
+		
+		replenishRules.forEach(rule->{
+			SpdReplenishBiz replenish = CollectionUtils.findWhere("bizRuleId", rule.getId(), replenishs);
+			if(replenish!=null){
+				assertTrue(checkStateCodes.contains(replenish.getCheckStateCode()));
+			}
+		});
+	}
+	
+	//测试库房和库房之间的半自动请领
+	@Test public void testStoreroomSemiAutomaticApply() throws Exception{
+		String accessToken = getAccessToken(nxykUserCode);
+		String url = "/spd/spdReplenishs/{bizId}/checkState/commited?accessToken={accessToken}";
+		String bizId = "rep_biz_id_015";
+		PcsUser user = userRepository.findAll().findById(nxykUserId);
+		
+		SpdReplenishBiz originReplenishBiz = rbRepository.findOne(bizId);
+		CheckStateTO checkStateTo = new CheckStateTO(CheckState.commited.getCode(), originReplenishBiz.getLastUpdateTime());
+		CheckStateTO newCheckStateTo = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, bizId, accessToken);
+		assertEquals(checkStateTo.getCheckStateCode(), newCheckStateTo.getCheckStateCode());
+		wait(5);
+		
+		SpdReplenishBiz replenish = rbRepository.findOne(bizId);
+		rbService.fillAllRelations(replenish);
+		
+		assertEquals(SpdReplenishBizSteps.create_off_shelf_task.getStatusCode(), replenish.getCurrentBizStep().getStatusCode());
+	
+		SpdDepotTasks offShelfTasks = replenish.getOffShelfTasks();
+		offShelfTasks.forEach(task->{
+			task.getItems().forEach(item->{
+				item.confirmAsPlaned();
+			});
+			tiRepository.saveAll(task.getItems());
+			dtService.updateCheckState(task.getTaskId(), CheckState.reviewed.getCode(), task.getLastUpdateTime(), user);
+		});
+		
+		wait(4);
+		SpdReplenishBiz replenishTask = rbRepository.findOne(bizId);
+		assertEquals(SpdReplenishBizSteps.create_delivery_task.getStatusCode(), replenishTask.getCurrentBizStep().getStatusCode());
+		
+		SpdLogisticsTasks logisticsTasks = ltRepository.findWithItemsByBizId(bizId);
+		logisticsTasks.forEach(task->{
+			task.getItems().forEach(item->{
+				item.confirmAsPlaned();
+			});
+			ltiRepository.saveAll(task.getItems());
+			ltService.updateCheckState(task.getTaskId(), CheckState.commited.getCode(), task.getLastUpdateTime(), user);
+		});
+		
+		wait(4);
+		SpdReplenishBiz replenishLogisticsTask = rbRepository.findOne(bizId);
+		assertEquals(SpdReplenishBizSteps.commit_delivery_task.getStatusCode(), replenishLogisticsTask.getCurrentBizStep().getStatusCode());
+		
+		SpdLogisticsTasks logisticsTasksByReview = ltRepository.findWithItemsByBizId(bizId);
+		logisticsTasksByReview.forEach(task->{
+			task.getItems().forEach(item->{
+				item.receiveAsConfirm();
+			});
+			ltiRepository.saveAll(task.getItems());
+			ltService.updateCheckState(task.getTaskId(), CheckState.reviewed.getCode(), task.getLastUpdateTime(), user);
+		});
+		
+		wait(4);
+		SpdReplenishBiz replenishLogisticsTaskByReview = rbRepository.findOne(bizId);
+		assertEquals(SpdReplenishBizSteps.complete_on_shelf_task.getStatusCode(), replenishLogisticsTaskByReview.getCurrentBizStep().getStatusCode());
+		
+	}
+	
+	@Test public void testAutoSetBizConfirmQty() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/{bizId}/checkState/commited?accessToken={accessToken}";
+		String bizId = "rep_biz_id_001";
+		SpdReplenishBiz replenish = rbRepository.getWithItems(bizId);
+		
+		replenish.getItems().forEach(item->{
+			assertTrue(item.getConfirmQty()==-1);
+		});
+		
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.commited.getCode(), replenish.getLastUpdateTime());
+		
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTO, url, bizId, accessToken);
+		wait(2);
+		
+		SpdReplenishBiz newReplenish = rbRepository.getWithItems(bizId);
+		
+		
+		newReplenish.getItems().forEach(newItem->{
+			assertEquals(newItem.getPlanQty(), newItem.getConfirmQty());
+		});
+		
+	}
+	
+	/**
+	 * 测试未科室请领未全部收货，作业完成自动生成申领退货业务
+	 * @throws Exception 
+	 */
+	@Test public void testNotEntireReceive() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/{bizId}/checkState/reviewed?accessToken={accessToken}";
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		String bizId = "rep_biz_id_016";
+		
+		SpdReplenishBiz replenish = rbRepository.findOne(bizId);
+		
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.reviewed.getCode(), replenish.getLastUpdateTime());
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTO, url, bizId, accessToken);
+		wait(2);
+		
+		SpdReplenishBiz reviewedReplenish = rbRepository.findOne(bizId);
+		rbService.fillAllRelations(reviewedReplenish);
+		
+		SpdLogisticsTasks logisticsTasks = reviewedReplenish.getDeliveryTasks();
+		
+		logisticsTasks.forEach(task->{
+			task.getItems().forEach(theItem->{
+				if(theItem.getConfirmQty()>0){
+					theItem.setReceiveQty((int)Math.floor(theItem.getConfirmQty()/2));
+					log.debug("goodsId:{},confirmQty:{}, receiveQty:{}, qty:{}", theItem.getGoodsId(),theItem.getConfirmQty(), theItem.getReceiveQty(), theItem.getConfirmQty() - theItem.getReceiveQty());
+				}
+			});
+			ltiRepository.saveAll(task.getItems());
+			ltService.updateCheckState(task.getTaskId(), CheckState.reviewed.getCode(), task.getLastUpdateTime(), user);
+		});
+		
+		wait(2);
+		
+		
+		logisticsTasks.forEach(task->{
+			SpdBizItems bizItems = biRepository.findByOriginId(task.getTaskId());
+			task.getItems().getAllNotEntireReceiveItems().forEach(taskItem->{
+				bizItems.forEach(bizItem->{
+					boolean isSameGoods = taskItem.getGoodsId().equals(bizItem.getGoodsId());
+					boolean isSameLots = taskItem.getLotId().equals(bizItem.getLotId());
+					boolean isOrigin = taskItem.getTaskId().equals(bizItem.getOriginId()) && taskItem.getTaskItemId().equals(bizItem.getOriginItemId());
+					if(isSameGoods && isSameLots && isOrigin){
+						assertEquals(bizItem.getPlanQty().intValue(), taskItem.getConfirmQty() - taskItem.getReceiveQty());
+						assertEquals(bizItem.getConfirmQty(), bizItem.getPlanQty());
+					}
+				});
+			});
+		});
+	}
+	
+	
+    @Test public void testNotEntireReceiveException() throws Exception{
+    	String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishs/{bizId}/checkState/reviewed?accessToken={accessToken}";
+		PcsUser user = userRepository.findAll().findById(mzmanagerUserId);
+		String bizId = "rep_biz_id_017";
+		
+		SpdReplenishBiz replenish = rbRepository.findOne(bizId);
+		
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.reviewed.getCode(), replenish.getLastUpdateTime());
+		
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTO, url, bizId, accessToken);
+		wait(5);
+		
+		SpdReplenishBiz reviewedReplenish = rbRepository.findOne(bizId);
+		rbService.fillAllRelations(reviewedReplenish);
+		
+		SpdLogisticsTasks logisticsTasks = reviewedReplenish.getDeliveryTasks();
+		
+		//声明异常
+		thrown.expect(InvalidDataException.class);
+		
+		logisticsTasks.forEach(task->{
+			task.getItems().forEach(theItem->{
+				if(theItem.getConfirmQty()>0){
+					theItem.setReceiveQty((int)Math.floor(theItem.getConfirmQty()/2));
+				}
+			});
+			ltiRepository.saveAll(task.getItems());
+			ltService.updateCheckState(task.getTaskId(), CheckState.reviewed.getCode(), task.getLastUpdateTime(), user);
+		});
+    }
+}

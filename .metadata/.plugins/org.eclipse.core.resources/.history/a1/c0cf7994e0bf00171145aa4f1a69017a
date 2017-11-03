@@ -1,0 +1,262 @@
+package cn.ak4j.yard.spd.stock.service;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.domain.SpdGoodsQty;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStockChanges;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfLockStocks;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStock;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStockChanges;
+import cn.ak4j.yard.spd.stock.domain.SpdShelfStocks;
+import cn.ak4j.yard.spd.stock.params.SpdShelfStockParams;
+import cn.ak4j.yard.spd.stock.repository.SpdDepotStockRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfLockStockRepository;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.spd.utils.YdsGoodsLotSorter;
+import cn.ak4j.yard.vo.UnitExchangeRatio;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
+@SuppressWarnings({"unchecked"})
+public class SpdDepotStockService {
+
+	@Autowired private SpdDepotStockRepository dsRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	@Autowired private SpdShelfLockStockRepository slsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	
+	/**
+	 * 计划货位库存扣减的执行结果是增加货位的锁库存
+	 */
+	@Transactional public synchronized void scheduleDecrementShelfStocks(SpdShelfStockChanges stockChanges, String bizId){
+		if(!stockChanges.isSameDepotAndShelfType()){
+			throw new OperateFailException("只对相同仓库以及相同货位类型的货位库存进行同时更新");
+		}
+		if(CollectionUtils.isEmpty(stockChanges) || CollectionUtils.isEmpty(stockChanges.getGoodsLots())){
+			log.warn("无库存变更，不增加锁库存");
+			return ;
+		}
+		
+		List<String> lotIds = stockChanges.getGoodsLots().getIds();
+		SpdShelfStocks stocks = ssRepository.findByShelfTypeAndGoodsLots(stockChanges.get(0).getDepot().getDepotId(), stockChanges.get(0).getShelfType(), lotIds);
+		stocks.fillGoodsLots(stockChanges.getGoodsLots());
+		SpdShelfLockStocks lockStocks = stocks.incrementLockQty(bizId, stockChanges);
+		ssRepository.saveAll(stocks);
+		slsRepository.saveAll(lockStocks);
+	}
+	
+	/**
+	 * 执行货位库存扣减，通常发生在请领审核后下架完成时，这种库存变更仅用于库存扣减
+	 */
+	@Transactional public synchronized void doDecrementShelfStocks(SpdShelfStockChanges stockChanges, String bizId){
+		if(!stockChanges.isSameDepotAndShelfType()){
+			throw new OperateFailException("只对相同仓库以及相同货位类型的货位库存进行同时更新");
+		}
+		
+		stockChanges.removeInvalid();
+		
+		if(CollectionUtils.isEmpty(stockChanges)){
+			log.warn("库存变更集为空，无需执行库存变更！");
+			return ;
+		}
+		
+		List<String> lotIds = stockChanges.getGoodsLots().getIds();
+		SpdShelfStocks stocks = ssRepository.findByShelfTypeAndGoodsLots(stockChanges.get(0).getDepot().getDepotId(), stockChanges.get(0).getShelfType(), lotIds);
+		stocks.decrementStockQty(stockChanges);
+		ssRepository.saveAll(stocks);
+		
+		SpdShelfLockStocks lockStocks = slsRepository.findByBizId(bizId);
+		lockStocks.releaseLock();
+		slsRepository.saveAll(lockStocks);
+	}
+	
+	/**
+	 * 执行货位库存增加
+	 */
+	@Transactional public synchronized void incrementShelfStocks(SpdShelfStockChanges stockChanges){
+		if(!stockChanges.isSameDepotAndShelfType()){
+			throw new OperateFailException("只对相同仓库以及相同货位类型的货位库存进行同时更新");
+		}
+		
+		stockChanges.removeInvalid();
+		
+		if(CollectionUtils.isEmpty(stockChanges)){
+			log.warn("库存变更集为空，无需执行库存变更！");
+			return ;
+		}
+		
+		List<String> lotIds = stockChanges.getGoodsLots().getIds();
+		SpdShelfStocks stocks = ssRepository.findByShelfTypeAndGoodsLots(stockChanges.get(0).getDepot().getDepotId(), stockChanges.get(0).getShelfType(), lotIds);
+		stocks.update(stockChanges);
+		ssRepository.saveAll(stocks);
+	}
+	
+	/**
+	 * 更新仓库库存
+	 */
+	@Transactional
+	public synchronized void updateDepotStocks(SpdDepotStockChanges stockChanges){
+		if(CollectionUtils.isEmpty(stockChanges)){
+			return ;
+		}
+		if(!stockChanges.isSameDepot()){
+			throw new OperateFailException("只能对相同仓库的库存变更进行同时更新");
+		}
+		
+		//查询库存记录
+		List<String> lotIds = stockChanges.getGoodsLots().getIds();
+		SpdDepotStocks stocks = dsRepository.findByDepotAndGoodsLots(stockChanges.get(0).getDepot().getDepotId(), lotIds);
+		
+		//更新库存记录
+		stocks.update(stockChanges);
+
+		//保存
+		dsRepository.saveAll(stocks);
+	}
+	
+
+	/**
+	 * 根据药品数量集合查找实际库存的药品数量集合，当实际库存数量足够返回的值和传入的值将一样，
+	 * 当实际库存数量小于传入的值则返回实际的值。
+	 * 计划产品数量依据是否关联批次分为：按产品查询实际可用数量和按批次查询实际可用数量。
+	 * 无论是哪种情况，如果一个产品的实际可用数量为0，也会返回一个相应的实际数量对象，
+	 * 按批次查询的情况下，如果某个批次无可用数量则不返回该批次的实际数量
+	 * @param depotId 仓库id
+	 * @param areaType 货区类型
+	 * @param planGoodsQtysByStoreUnit 存储单位的药品数量集合
+	 */
+	public List<SpdGoodsQty> findRealShelfStoreUnitStocks(String depotId, String areaType, List<SpdGoodsQty> planGoodsQtysByStoreUnit) {
+		List<SpdGoodsQty> result = new ArrayList<SpdGoodsQty>();
+		
+		YdsGoodsLots specialGoodsLots = new YdsGoodsLots(CollectionUtils.pluck("specialGoodsLot", planGoodsQtysByStoreUnit, YdsGoodsLot.class));
+		
+		//特定批次的库存查询
+		if(CollectionUtils.isNotEmpty(specialGoodsLots)){
+			List<String> lotIds = specialGoodsLots.getIds();
+			SpdShelfStocks stocks = ssRepository.findByShelfTypeAndGoodsLots(depotId, areaType, lotIds);
+			stocks.fillGoodsLots(specialGoodsLots);
+			for(SpdGoodsQty planQty : planGoodsQtysByStoreUnit){
+				SpdShelfStock stock = stocks.findByDepotAndGoodsLot(depotId, areaType, planQty.getSpecialGoodsLot().getGoodsLotId());
+				SpdGoodsQty realQty = new SpdGoodsQty(planQty.getGoods(), planQty.getSpecialGoodsLot(), YdsUnitLv.base.getLv());
+				if(stock == null){
+					realQty.setQty(0);
+				}else if((stock.getQtyByMinUnit() - stock.getLockQtyByMinUnit()) < planQty.getQtyByBaseUnit()){
+					realQty.setQty(stock.getQtyByMinUnit());
+				}else{
+					realQty.setQty(planQty.getQtyByBaseUnit());
+				}
+				result.add(realQty);
+			}
+		} 
+		
+		//非特定批次(即产品级别)的库存查询
+		else {
+			YdsGoodss goodss = new YdsGoodss(CollectionUtils.pluck("goods", planGoodsQtysByStoreUnit, YdsGoods.class));
+			SpdShelfStocks stocks = ssRepository.findByShelfTypeAndGoodss(depotId, areaType, goodss.getIds(), 0);
+			stocks.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+			
+			for(SpdGoodsQty planQty : planGoodsQtysByStoreUnit){
+				SpdShelfStocks sameGoodsStocks = new SpdShelfStocks(CollectionUtils.find("goodsId", planQty.getGoods().getGoodsId(), String.class, stocks));
+				int i = 0;
+				
+				YdsGoodsLots useableGoodsLots = planQty.getGoods().getUseableGoodsLots();
+				if(CollectionUtils.isEmpty(useableGoodsLots)){
+					SpdGoodsQty realQty = new SpdGoodsQty(planQty.getGoods(), null, YdsUnitLv.base.getLv());
+					realQty.setQty(0);
+					result.add(realQty);
+					continue;
+				}
+				//这里是所有仓库的可用批次，需要根据当前仓库实际的可用批次进行过滤
+				useableGoodsLots = useableGoodsLots.findByIds(sameGoodsStocks.pluck("lotId"));
+				
+				Collections.sort(useableGoodsLots, new YdsGoodsLotSorter());
+				while(planQty.getQtyByStoreUnit() > 0){
+					if(i >= useableGoodsLots.size()){
+						break;
+					}
+					String goodsLotId = useableGoodsLots.get(i).getGoodsLotId();
+					SpdShelfStock theShelfStock = CollectionUtils.findWhere("lotId", goodsLotId, sameGoodsStocks);
+					SpdGoodsQty realQty = new SpdGoodsQty(planQty.getGoods(), theShelfStock.getGoodsLot(), planQty.getUnitLv());
+					
+					//当前货位[批次]库存大于剩余计划数量则直接退出
+					if((theShelfStock.getQtyByMinUnit() - theShelfStock.getLockQtyByMinUnit()) >= planQty.getQtyByBaseUnit()){
+						realQty.setQty(planQty.getQty());
+						result.add(realQty);
+						break;
+					}
+					
+					//当前货位[批次]库存小于剩余计划数量时根据当前货位库存数量添加一个产品数量
+					else{
+						if(theShelfStock.getQtyByMinUnit() - theShelfStock.getLockQtyByMinUnit() > 0){
+							int qtyByBaseUnit = theShelfStock.getQtyByMinUnit() - theShelfStock.getLockQtyByMinUnit();
+							
+							//TODO 存在问题，不适合用存储级别单位来传递数量，应该用最小级别单位来传递
+							UnitExchangeRatio ratio = SpdUnitUtils.computeUnitExchange(planQty.getGoods(), YdsUnitLv.base, YdsUnitLv.unitOf(planQty.getGoods().getStoreUnitLv()));
+							int qtyByStoreUnit = (int)(ratio.getRatio() * qtyByBaseUnit);
+							realQty.setQty(qtyByStoreUnit);
+							
+							result.add(realQty);
+						}
+						planQty.setQty(planQty.getQty() - realQty.getQtyByStoreUnit());
+						i++;
+					}
+					
+					
+				}
+				
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 获取某个业务的锁库存，这个方法可用于指导仓库的出库作业
+	 * @param bizId
+	 * @return
+	 */
+	public SpdShelfLockStocks getLockStockByBizId(String bizId) {
+		SpdShelfLockStocks lockStocks = slsRepository.findByBizId(bizId);
+		List<String> shelfStockIds = lockStocks.pluck("shelfStockId");
+		SpdShelfStocks shelfStocks = ssRepository.findByIds(shelfStockIds);
+		shelfStocks.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+		lockStocks.fillShelfStocks(shelfStocks);
+		return lockStocks;
+	}
+	
+	@Deprecated
+	public SpdShelfStocks findGoodsShelfStocks(SpdShelfStockParams params, OrderParam order, int pageNo, int pageSize){
+		SpdShelfStocks goodsLotShelfStocks = ssRepository.find(params, order, -1, -1);
+		goodsLotShelfStocks.fillGoodsLots(glRepository);
+		return goodsLotShelfStocks.mergeByGoods();
+	}
+
+	@Transactional
+	public void cleanShelfStock(Date time) {
+		SpdShelfLockStocks completedShelfLockStocks = slsRepository.findCompletedByDate(new Date(0), time);
+		log.info("清除[{}]以前已完成的锁库存，共[{}]条", Global.sdfYMDHms.format(time), completedShelfLockStocks.size());
+		slsRepository.delete(completedShelfLockStocks);
+		
+	}
+	
+	
+}

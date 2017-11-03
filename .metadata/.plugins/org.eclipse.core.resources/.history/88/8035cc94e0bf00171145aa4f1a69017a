@@ -1,0 +1,81 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdBizRuleParams;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.bizrule.to.SpdBizRuleTO;
+
+@RestController
+public class SpdBizRuleResource {
+	
+	@Autowired private SpdBizRuleRepository brRepository;
+	private SpdBizRuleAssember assember = new SpdBizRuleAssember();
+
+	@RequestMapping(value="/yard/spd/spdBizRules", method=RequestMethod.GET)
+	public List<SpdBizRuleTO> list(@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders){
+		SpdBizRuleParams params = SpdBizRuleParams.buildParamsFromJson(paramsStr, SpdBizRuleParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		
+		SpdAbstractBizRules rules = brRepository.findAllWithRelations();
+		rules = new SpdAbstractBizRules(rules.findByPage(params, order, currentPage-1, pageSize));
+
+		List<SpdBizRuleTO> ruleTOs = assember.buildList(rules);
+		return ruleTOs;
+	}
+	
+	@SuppressWarnings("rawtypes")
+	@RequestMapping(value="/yard/spd/spdBizRules/{id}", method=RequestMethod.GET)
+	public SpdBizRuleTO get(@PathVariable("id")String id){
+		SpdAbstractBizRule rule = brRepository.findAllWithRelations().findById(id);
+		
+		return assember.build(rule);
+	}
+	
+	@RequestMapping(value="/yard/spd/spdBizRules/ids,{ids}", method=RequestMethod.GET)
+	public List<SpdBizRuleTO> getByIds(@PathVariable("ids")String ids){
+		SpdAbstractBizRules rules = brRepository.findAllWithRelations().findByIds(Arrays.asList(ids.split(",")));
+		
+		return assember.buildList(rules);
+	}
+	
+}
+
+class SpdBizRuleAssember{
+
+	public List<SpdBizRuleTO> buildList(SpdAbstractBizRules rules) {
+		List<SpdBizRuleTO> result = new ArrayList<SpdBizRuleTO>();
+		rules.forEach(rule->{
+			SpdBizRuleTO ruleTO = build(rule);
+			result.add(ruleTO);
+		});
+		return result;
+	}
+
+	@SuppressWarnings("rawtypes")
+	public SpdBizRuleTO build(SpdAbstractBizRule rule) {
+		SpdBizRuleTO ruleTO = new SpdBizRuleTO();
+		
+		BeanUtils.copyProperties(rule, ruleTO);
+		ruleTO.setBizTypeCode(rule.getBizType().getCode());
+		ruleTO.setPrimaryName(rule.getPrimaryName());
+		return ruleTO;
+	}
+	
+}

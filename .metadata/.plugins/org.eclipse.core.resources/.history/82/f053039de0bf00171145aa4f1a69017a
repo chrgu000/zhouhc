@@ -1,0 +1,2 @@
+alter table spd_depot_goods_config add(replenish_upper_limit number(10,0) default 0);
+alter table spd_depot_goods_config add(replenish_lower_limit number(10,0) default 0);

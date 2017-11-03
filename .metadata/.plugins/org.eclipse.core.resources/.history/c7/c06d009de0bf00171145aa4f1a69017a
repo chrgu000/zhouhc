@@ -1,0 +1,40 @@
+create or replace PROCEDURE INIT_RULE_CODE_PROCEDURE 
+(
+  TABLE_NAME IN VARCHAR2 
+, CATE_CODE IN VARCHAR2 
+) AS 
+
+TYPE cur_type IS REF CURSOR;
+t_name VARCHAR(100);
+f_count int;
+var_sql VARCHAR(1000);
+cur_1 cur_type;
+idx int;
+f_id VARCHAR(100);
+  
+BEGIN
+  idx :=1;
+  t_name := UPPER(TABLE_NAME);
+  select count(1) into f_count from user_tab_columns  where UPPER(column_name)='RULE_CODE' AND TABLE_NAME=''|| t_name || '';
+  Dbms_Output.put_line(f_count);
+  If (f_count > 0) then
+      var_sql := 'SELECT ID FROM ' || t_name || ' WHERE RULE_CODE IS NULL OR RULE_CODE = '''' ORDER BY ID';
+      Dbms_Output.put_line(var_sql);
+      
+      open cur_1 for var_sql;
+      loop
+          fetch cur_1 into f_id;
+          exit when cur_1%notfound;
+          var_sql := 'UPDATE "' ||  t_name || '" SET RULE_CODE='''||CATE_CODE||'170101'||idx||'''  WHERE ID=''' || f_id || '''';
+          idx := idx + 1;
+          Dbms_Output.put_line(var_sql);
+          execute immediate var_sql;
+      end loop;
+      close cur_1;
+  ELSE
+      Dbms_Output.put_line('表['||t_name||']没有RULE_CODE字段!');
+  End If;
+  
+END INIT_RULE_CODE_PROCEDURE;
+
+

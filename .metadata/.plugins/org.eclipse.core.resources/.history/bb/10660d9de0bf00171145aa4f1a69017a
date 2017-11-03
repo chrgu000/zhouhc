@@ -1,0 +1,3 @@
+--1）删除下架作业明细，上架作业明细以及物流作业明细中废弃的字段
+alter table spd_off_shelf_task_item drop(item_type, parent_item_id);
+alter table spd_logistics_task_item drop(task_item_type, parent_item_code);

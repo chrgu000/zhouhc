@@ -1,0 +1,5 @@
+update PCS_DEPOT_AREA set primary = '1' where area_code in('201HG01','201GL01','201BHG01');
+update PCS_DEPOT_AREA set primary = '0' where area_code not in('201HG01','201GL01','201BHG01');
+
+update PCS_DEPOT_SHELF  set primary = '1' where shelf_code = '202XN001';
+update PCS_DEPOT_SHELF  set primary = '0' where shelf_code != '202XN001';

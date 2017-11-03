@@ -1,0 +1,55 @@
+package cn.ak4j.yard.sys.datacheck.web;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.yard.sys.datacheck.domain.SysDataCheckTaskReport;
+import cn.ak4j.yard.sys.datacheck.params.SysDataCheckTaskReportParams;
+import cn.ak4j.yard.sys.datacheck.repository.SysDataCheckTaskReportRepository;
+
+@RestController
+public class SysDataCheckTaskReportResource {
+	
+    @Autowired SysDataCheckTaskReportRepository sysDataCheckTaskReportRepository;
+//    @Autowired ScheduleTasks scheduleTasks;
+	
+	@RequestMapping(value = "/yard/sysDataCheckTaskReports", method = RequestMethod.GET)
+	public List<SysDataCheckTaskReport> findDataCheckTaskReportsByPage(
+			@RequestParam(value = "currentPage", required = false, defaultValue = "1") int currentPage,
+			@RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+			@RequestParam(value = "params", required = false) String paramsStr,
+			@RequestParam(value = "orders", required = false) String orders) {
+		SysDataCheckTaskReportParams params = SysDataCheckTaskReportParams.buildParamsFromJson(paramsStr, SysDataCheckTaskReportParams.class);
+		OrderParam order = OrderParam.buildFromJson(orders);
+		if(order == null){
+			order = new OrderParam("SysDataCheckTask[taskId=id].endTime","desc");
+		}
+		return sysDataCheckTaskReportRepository.find(params, order, currentPage-1, pageSize);
+	}
+
+	@RequestMapping(value = "/yard/sysDataCheckTaskReports/count", method = RequestMethod.GET)
+	public long findDataCheckTaskReportsByPageCount(@RequestParam(value = "params", required = false) String paramsStr) {
+		SysDataCheckTaskReportParams params = SysDataCheckTaskReportParams.buildParamsFromJson(paramsStr, SysDataCheckTaskReportParams.class);
+		return sysDataCheckTaskReportRepository.count(params);
+	}
+	
+	@RequestMapping(value = "/yard/sysDataCheckTaskReport/{id}", method = RequestMethod.GET)
+	public SysDataCheckTaskReport getSysDataCheckTaskReport(@PathVariable("id") String id) {
+		SysDataCheckTaskReport sysDataCheckTaskReport = sysDataCheckTaskReportRepository.findOne(id);
+		return sysDataCheckTaskReport;
+	}
+	
+//	@RequestMapping(value = "/yard/sysDataCheckTaskManualStart",method = RequestMethod.GET)
+//	public String DataCheckTaskManualStart(HttpServletRequest request){
+//		PcsUser user = (PcsUser)request.getAttribute("user");
+//		scheduleTasks.manualCheckDatas(user.getUserId());
+//		return "SUCCESS";
+//	}
+}

@@ -1,0 +1,11 @@
+package cn.ak4j.yard.sys.service.taskprocessor;
+
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+
+public interface IBatchTaskProcessor {
+
+	public void process(YardBatchTask<?> batchTask, PcsUser user, MailMsg hisMail, MailMsg supplyMail) throws Exception;
+	
+}

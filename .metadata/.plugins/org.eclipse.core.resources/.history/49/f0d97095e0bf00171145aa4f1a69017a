@@ -1,0 +1,167 @@
+package cn.ak4j.yard.extend.gep;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
+
+import javax.annotation.PostConstruct;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.oxm.jaxb.Jaxb2Marshaller;
+import org.springframework.ws.client.core.WebServiceTemplate;
+import org.springframework.ws.soap.client.core.SoapActionCallback;
+
+import cn.ak4j.Global;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.CustomComponentDoc;
+import cn.ak4j.yard.extend.DefaultSupplierProxy;
+import cn.ak4j.yard.extend.gep.domain.AddInmAllotNoticeResult;
+import cn.ak4j.yard.extend.gep.domain.UpdateAlloBillsResult;
+import cn.ak4j.yard.extend.gep.wsdl.AddInmAllotNotice;
+import cn.ak4j.yard.extend.gep.wsdl.AddInmAllotNoticeResponse;
+import cn.ak4j.yard.extend.gep.wsdl.AddSmsInventoryOut;
+import cn.ak4j.yard.extend.gep.wsdl.AddSmsInventoryOutResponse;
+import cn.ak4j.yard.extend.gep.wsdl.UpdateAlloBills;
+import cn.ak4j.yard.extend.gep.wsdl.UpdateAlloBillsResponse;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class SpdGepProxy extends DefaultSupplierProxy{
+
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	
+	private static final String PROP_NAME_WS_URL = "wsUrl";
+	private static final String PROP_NAME_USER_NAME = "userName";
+	private static final String PROP_NAME_PASSWORD = "password";
+	private static final String PROP_NAME_CUSTOMER = "customer";
+	
+	private SpdGepPrepareInformAssember prepareInformAssember;
+	private SpdGepFinacialReconciliationAssember reconciliationAssember;
+	private WebServiceHelper webServiceHelper = new WebServiceHelper();
+	private WebServiceTemplate wsTemplate;
+	private Properties conf;
+	
+	@PostConstruct
+	public void init(){
+		//加载配置文件
+		conf = new Properties();
+		try{
+			conf.load(getClass().getResourceAsStream("/extend/zhjw.properties"));
+		}catch(Exception e){
+			throw new OperateFailException(YardExceptionType.file_load_fail, "zhjw.properties");
+		}
+		prepareInformAssember = new SpdGepPrepareInformAssember(conf);
+		reconciliationAssember = new SpdGepFinacialReconciliationAssember(conf);
+		initWebService();
+		initDoc();
+	}
+	
+	private void initDoc() {
+		String name = "GEP代理组件";
+		String beanName = "gepSupplierProxy";
+		String className = getClass().getName();
+
+		StringBuffer summary = new StringBuffer();
+		summary.append(Global.spliteCharacter)
+			  .append("1）同步备货通知到GEP").append(Global.spliteCharacter)
+			  .append("2）GEP调用SPD的更新预计送达时间接口来回传预计送达时间").append(Global.spliteCharacter)
+			  .append("3）GEP调用SPD的批量任务接口传递送货单").append(Global.spliteCharacter)
+			  .append("4）SPD异步完成收货后调用SPD的收货单号回传接口完成SPD的收货单回传").append(Global.spliteCharacter)
+			  .append("5）SPD通过EIS模块完成对GEP的企业产品同步").append(Global.spliteCharacter);
+		
+		Map<String, String> properties = new HashMap<String, String>();
+		properties.put(PROP_NAME_WS_URL, conf.getProperty(PROP_NAME_WS_URL).toString());
+		properties.put(PROP_NAME_USER_NAME, conf.getProperty(PROP_NAME_USER_NAME).toString());
+		properties.put(PROP_NAME_PASSWORD, conf.getProperty(PROP_NAME_PASSWORD).toString());
+		properties.put(PROP_NAME_CUSTOMER, conf.getProperty(PROP_NAME_CUSTOMER).toString());
+		
+		Map<String, String> methodDesc = new HashMap<String, String>();
+		methodDesc.put(CustomComponentDoc.doc_receive_callback, "将SPD的收货单号连同GEP的送货单号回传给GEP系统");
+		methodDesc.put(CustomComponentDoc.doc_sync_prepare_inform, "对于GEP来说就是他们的调拨通知单，同步备货单的逻辑中有对码逻辑，目前该对码逻辑由GEP完成，即我们只需要传我们的仓库ID和部门ID");
+		methodDesc.put(CustomComponentDoc.doc_sync_finacial_reconciliation, "对于GEP来说就是他们的销售出库单");
+		
+		doc = new CustomComponentDoc(name, summary.toString(), beanName, className, properties, methodDesc);
+//		doc.put(doc_proxy_summary, global.toString());
+//		doc.put(doc_receive_callback, "将SPD的收货单号连同GEP的送货单号回传给GEP系统");
+//		doc.put(doc_sync_prepare_inform, "对于GEP来说就是他们的调拨通知单，同步备货单的逻辑中有对码逻辑，目前该对码逻辑由GEP完成，即我们只需要传我们的仓库ID");
+	}
+
+	public void initWebService(){
+		Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
+		marshaller.setContextPath("cn.ak4j.yard.extend.gep.wsdl");
+		webServiceHelper.setMarshaller(marshaller);
+		webServiceHelper.setUnmarshaller(marshaller);
+		wsTemplate = webServiceHelper.getWebServiceTemplate();
+		
+	}
+	
+	public void receiveCallback(SpdReceiveBiz receive){
+		UpdateAlloBillsResult result = null;
+		try{
+			UpdateAlloBills updateAlloBills = new UpdateAlloBills();
+			updateAlloBills.setUser(conf.getProperty(PROP_NAME_USER_NAME).toString());
+			updateAlloBills.setPwd(conf.getProperty(PROP_NAME_PASSWORD).toString());
+			updateAlloBills.setGepCode(receive.getSendCode());
+			updateAlloBills.setSpdCode(receive.getBizCode());
+			
+			log.info("updateAlloBills:{}", updateAlloBills);
+			
+			SoapActionCallback actionCallback = new SoapActionCallback("http://tempuri.org/UpdateAlloBills");
+			UpdateAlloBillsResponse response = (UpdateAlloBillsResponse) wsTemplate.marshalSendAndReceive(conf.get(PROP_NAME_WS_URL).toString(), updateAlloBills, actionCallback);
+			log.info(response.getUpdateAlloBillsResult());
+			
+			String responseStr = response.getUpdateAlloBillsResult();
+			responseStr = responseStr.replaceAll("'", "\"");
+			result = Global.defaultObjectMapper.readValue(responseStr, UpdateAlloBillsResult.class);
+		}catch(Exception e){
+			log.error("ws response error ", e);
+			throw new OperateFailException(YardExceptionType.gep_sync_update_receive_code_fail, e, receive.getBizCode());
+		}
+		
+		if(result == null || !result.getResult().equals("0")){
+			log.error("ws response error:{}", result.getMessage());
+			throw new OperateFailException(YardExceptionType.gep_sync_update_receive_code_fail, result.getMessage());
+		}
+
+	}
+
+	public SpdPrepareInformBiz syncPrepareInform(SpdPrepareInformBiz prepareInform, YdsEdsGoodsRepository egRepository) throws OperateFailException {
+		AddInmAllotNoticeResult result = null;
+		try{
+			AddInmAllotNotice pmsOrder  = prepareInformAssember.build(prepareInform, egRepository);
+			
+			SoapActionCallback actionCallback = new SoapActionCallback("http://tempuri.org/AddInmAllotNotice");
+			AddInmAllotNoticeResponse response = (AddInmAllotNoticeResponse) wsTemplate.marshalSendAndReceive(conf.get(PROP_NAME_WS_URL).toString(), pmsOrder, actionCallback);
+	
+			log.info("response:{}", response.getAddInmAllotNoticeResult());
+			String responseStr = response.getAddInmAllotNoticeResult();
+			responseStr = responseStr.replaceAll("'", "\"");
+			result = Global.defaultObjectMapper.readValue(responseStr, AddInmAllotNoticeResult.class);
+			prepareInform.setExResourceId(result.getAllotNoticeCode());
+		}catch(Exception e){
+			log.error("ws response error ", e);
+			throw new OperateFailException(YardExceptionType.sync_prepare_inform_fail, e, prepareInform.getBizId(), prepareInform.getBizCode());
+		}
+
+		if(result == null || !result.getResult().equals("0")){
+			log.error("ws response error:{}", result.getMessage());
+			throw new OperateFailException(YardExceptionType.sync_prepare_inform_fail, prepareInform.getBizCode(), result.getMessage());
+		}
+		return prepareInform;
+	}
+	
+	public SpdFinacialReconciliationBiz syncFinacialReconciliationBiz(SpdFinacialReconciliationBiz reconciliationBiz) throws Exception{
+		AddSmsInventoryOut smsInventoryOut = reconciliationAssember.build(reconciliationBiz, egRepository);
+		SoapActionCallback actionCallback = new SoapActionCallback("http://tempuri.org/AddSmsInventoryOut");
+		AddSmsInventoryOutResponse response = (AddSmsInventoryOutResponse) wsTemplate.marshalSendAndReceive(conf.get(PROP_NAME_WS_URL).toString(), smsInventoryOut, actionCallback);
+		log.info("response:{}", response.getAddSmsInventoryOutResult());
+		
+		return reconciliationBiz;
+	}
+
+}

@@ -1,0 +1,166 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: 货位库存，实际业务场景中有时称之为保管账，也即货位上实际可用库存，
+* 货位库存包含两个维度：产品批次和货位类型，即一个产品批次可以存在于例如合格区货位和不合格区两个货位中。
+* 库存对象包含：药品信息、库存数量信息、货位信息
+* @author zhengyf
+* @date 2017年3月31日 上午10:12:58
+* @version V1.0.0
+*/
+
+@NoArgsConstructor
+@Entity
+@Table(name="SPD_SHELF_STOCK")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+@Slf4j
+public class SpdShelfStock extends YardEntity{
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String shelfStockId;
+	
+	@Getter @Setter
+	private String shelfId;
+	
+	@Getter @Setter
+	private String goodsId;
+	
+	@Getter @Setter @Column(name="goods_lot_id")
+	private String lotId;
+	
+	@Getter @Setter
+	private String depotId;
+	
+	@Getter @Setter
+	private String shelfType;
+	
+	@Column(name="min_unit_qty") @Getter @Setter
+	private Integer qtyByMinUnit;
+	
+	@Column(name="min_unit_lock_qty") @Setter
+	private Integer lockQtyByMinUnit;
+	
+	@Getter @Setter
+	private Date createTime = new Date();
+	
+	@Getter @Setter
+	private Date lastUpdateTime;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private YdsGoodsLot goodsLot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private YdsGoods goods;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot depot;
+	
+	@Transient @Getter @Setter
+	private PcsDepotShelf depotShelf;
+	
+	@Transient @Setter
+	private Integer lockQtyByStoreUnit;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdShelfLockStocks lockStocks;
+	
+	public SpdShelfStock(String goodsId, String depotId, String shelfType, Integer qtyByMinUnit,
+			Integer lockQtyByMinUnit) {
+		super();
+		this.goodsId = goodsId;
+		this.depotId = depotId;
+		this.shelfType = shelfType;
+		this.qtyByMinUnit = qtyByMinUnit;
+		this.lockQtyByMinUnit = lockQtyByMinUnit;
+	}
+	
+	public SpdShelfStock(SpdShelfStockChange change) {
+		setGoodsId(change.getGoodsLot().getGoodsId());
+		setLotId(change.getGoodsLot().getGoodsLotId());
+		setDepotId(change.getDepot().getDepotId());
+		setShelfId(change.getShelfId());
+		setShelfType(change.getShelfType());
+		setQtyByMinUnit(change.getQtyByBaseUnit());
+		setCreateTime(new Date());
+		setLastUpdateTime(new Date());
+	}
+	
+	/**
+	 * @param minUnitIncrement 最小单位的库存增量
+	 */
+	public void updateQty(int minUnitIncrement) {
+		int newMinUnitQty = getQtyByMinUnit() + minUnitIncrement;
+		if(newMinUnitQty < 0){
+			throw new OperateFailException(YardExceptionType.forbide_update_stock_to_negative, getQtyByMinUnit(), minUnitIncrement, depotId, goodsId, lotId);
+		}
+		setQtyByMinUnit(newMinUnitQty);
+		updateLastUpdateTime();
+	}
+	
+	public Integer getLockQtyByMinUnit(){
+		return this.lockQtyByMinUnit==null?0:this.lockQtyByMinUnit;
+	}
+	
+//	@JsonIgnore 
+	public Integer getLockQtyByStoreUnit(){
+		if(lockQtyByStoreUnit==null){
+			log.debug("goodsLot:{}, goodsLotId:{}, goodsId:{}", getGoodsLot(), getLotId(), getGoodsId());
+			YdsGoods goods = getGoodsLot().getGoods();
+	 		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), goods.getStoreUnitLv());
+			int lockQtyByStoreUnit = (int)(getLockQtyByMinUnit()*unitRatio);
+			return lockQtyByStoreUnit;
+		}
+		return this.lockQtyByStoreUnit;
+	}
+	
+	@Transient
+	public int getUseableQtyByStoreUnit(){
+		int useableQtyByBaseUnit = getQtyByMinUnit() - getLockQtyByMinUnit();
+		YdsGoods goods = getGoodsLot().getGoods();
+ 		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), goods.getStoreUnitLv());
+		int lockQtyByStoreUnit = (int)(useableQtyByBaseUnit*unitRatio);
+		return lockQtyByStoreUnit;
+	}
+	
+	@Transient
+	public int getQtyByStoreUnit(){
+		YdsGoods goods = getGoodsLot().getGoods();
+ 		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, YdsUnitLv.base.getLv(), goods.getStoreUnitLv());
+		int qtyByStoreUnit = (int)(getQtyByMinUnit()*unitRatio);
+		return qtyByStoreUnit;
+	}
+	
+}

@@ -1,0 +1,12 @@
+package cn.ak4j.yard.enums;
+
+
+public interface ITypeEnum {
+
+	public String getCode();
+	
+	public String getName();
+	
+	public String getDescription();
+	
+}

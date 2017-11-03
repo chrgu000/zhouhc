@@ -1,0 +1,1 @@
+alter table spd_fin_rec_biz add(clean_days varchar2(3000));

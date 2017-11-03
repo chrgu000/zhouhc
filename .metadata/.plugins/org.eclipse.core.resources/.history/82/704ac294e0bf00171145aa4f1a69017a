@@ -1,0 +1,60 @@
+package cn.ak4j.yard.spd.domain;
+
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 产品数量
+* @author zhengyf
+* @date 2017年4月2日 下午6:28:36
+* @version V1.0.0
+*/
+@NoArgsConstructor
+public class SpdGoodsQty {
+
+	@Getter @Setter
+	private YdsGoods goods;
+	
+	@Getter @Setter
+	private YdsGoodsLot specialGoodsLot;
+	
+	@Getter @Setter
+	private int qty;
+	
+	@Getter @Setter
+	private Integer unitLv;
+	
+	public SpdGoodsQty(YdsGoods goods, YdsGoodsLot goodsLot, Integer unitLv){
+		this.goods = goods;
+		this.specialGoodsLot = goodsLot;
+		if(this.specialGoodsLot != null){
+			this.specialGoodsLot.setGoods(goods);
+		}
+		this.unitLv = unitLv;
+	}
+	
+	public SpdGoodsQty(YdsGoods goods, YdsGoodsLot goodsLot, int qty, Integer unitLv){
+		this(goods, goodsLot, unitLv);
+		this.qty = qty;
+	}
+	
+	public int getQtyByStoreUnit() {
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), goods.getStoreUnitLv());
+		return (int)(getQty()*unitRatio);
+	}
+	
+	public int getQtyByBaseUnit(){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), YdsUnitLv.base.getLv());
+		return (int)(getQty()*unitRatio);
+	}
+	
+	public int getQty(int unitLv){
+		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, getUnitLv(), unitLv);
+		return (int)(getQty()*unitRatio);
+	}
+}

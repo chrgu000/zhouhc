@@ -1,0 +1,75 @@
+package cn.ak4j.yard.sys.domain;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.BaseTest;
+
+public class YardCodeParserTest extends BaseTest{
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test
+	public void testParseArbitraryCode(){
+		String code = "200cangku";
+		YardArbitraryCode sysCode = YardCodeParser.parseArbitraryCode(code);
+		assertEquals(CodeSort.cangku.getCode(), sysCode.getSortCode());
+		assertEquals("cangku",sysCode.getMeterialCode());
+	}
+	
+	@Test
+	public void testParseArbitraryCodeIsEmpty(){
+		thrown.expect(InvalidDataException.class);
+		String code = null;
+		YardCodeParser.parseArbitraryCode(code);
+	}
+	
+	@Test
+	public void testParseArbitraryCodeOverstep(){
+		thrown.expect(InvalidDataException.class);
+		String code = "200cangku2254875";
+		YardCodeParser.parseArbitraryCode(code);
+	}
+	
+	@Test
+	public void testParseArbitraryCodeInsufficient(){
+		thrown.expect(InvalidDataException.class);
+		String code = "200";
+		YardCodeParser.parseArbitraryCode(code);
+	}
+	
+	@Test
+	public void testYardTimeSequenceCode(){
+		String code = "2001703171";
+		YardTimeSequenceCode sysCode = YardCodeParser.parseTimeSequenceCode(code);
+		assertEquals(CodeSort.cangku.getCode(), sysCode.getSortCode());
+		assertEquals("170317", sysCode.getDateCode());
+		assertEquals(new Integer(1), sysCode.getSequenceCode());
+	}
+	
+	@Test
+	public void testYardTimeSequenceCodeIsEmpty(){
+		thrown.expect(InvalidDataException.class);
+		String code = null;
+		YardCodeParser.parseTimeSequenceCode(code);
+	}
+	
+	@Test
+	public void testYardTimeSequenceCodeOverstep(){
+		thrown.expect(InvalidDataException.class);
+		String code = "2001703171000032";
+		YardCodeParser.parseTimeSequenceCode(code);
+	}
+	
+	@Test
+	public void testYardTimeSequenceCodeInsufficient(){
+		thrown.expect(InvalidDataException.class);
+		String code = "200";
+		YardCodeParser.parseTimeSequenceCode(code);
+	}
+
+}

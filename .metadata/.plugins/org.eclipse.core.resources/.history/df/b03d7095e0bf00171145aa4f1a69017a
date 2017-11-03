@@ -1,0 +1,8 @@
+package cn.ak4j.yard.extend.gep;
+
+import org.springframework.ws.client.core.support.WebServiceGatewaySupport;
+
+public class WebServiceHelper extends WebServiceGatewaySupport{
+
+	
+}

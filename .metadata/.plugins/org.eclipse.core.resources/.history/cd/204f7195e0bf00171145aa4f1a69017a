@@ -1,0 +1,149 @@
+package cn.ak4j.yard.extend.gep;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
+import javax.xml.bind.JAXBException;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.extend.gep.domain.SmsInventoryOut;
+import cn.ak4j.yard.extend.gep.domain.SmsInventoryOuts;
+import cn.ak4j.yard.extend.gep.domain.SpdGepBillItem;
+import cn.ak4j.yard.extend.gep.wsdl.AddSmsInventoryOut;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdDailyCleanBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecords;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+
+public class SpdGepFinacialReconciliationAssember {
+
+//	private SpdDailyCleanBizService dcbService;
+//	private YdsGoodsRepository goodsRepository;
+	
+	private static final String PROP_NAME_USER_NAME = "userName";
+	private static final String PROP_NAME_PASSWORD = "password";
+	private static final String PROP_NAME_ORG_ID = "orgId";
+	private static final String PROP_NAME_CUSTOMER = "customer";
+	
+	private Properties conf;
+	
+	public SpdGepFinacialReconciliationAssember(Properties conf){
+		this.conf = conf;
+	}
+	
+	public AddSmsInventoryOut build(SpdFinacialReconciliationBiz reconciliationBiz, YdsEdsGoodsRepository egRepository) throws JAXBException, IOException{
+		AddSmsInventoryOut smsInventoryOut = new AddSmsInventoryOut();
+		smsInventoryOut.setUser(conf.getProperty(PROP_NAME_USER_NAME).toString());
+		smsInventoryOut.setPwd(conf.getProperty(PROP_NAME_PASSWORD).toString());
+		
+		SmsInventoryOuts inventoryOuts = new SmsInventoryOuts();
+		SmsInventoryOut inventoryOut = new SmsInventoryOut();
+		
+		inventoryOut.setOrgId(conf.getProperty(PROP_NAME_ORG_ID).toString());
+		inventoryOut.setCustomer(conf.getProperty(PROP_NAME_CUSTOMER).toString());
+		inventoryOut.setSrcBill(reconciliationBiz.getBizCode());
+		
+		SpdDailyCleanBizs dailyCleans = reconciliationBiz.getDailyCleans();
+		SpdPropertyChangeRecords records = dailyCleans.getAllPropertyChanges();
+//		SpdPropertyChangeRecordItems recordItems = dailyCleans.getAllPropertyChangeItems();
+		
+		if(CollectionUtils.pluck("creditOrgId", records).size() > 1){
+			throw new InvalidDataException(String.format("财务对账[%s]的贷出机构数量过多,请确认！", reconciliationBiz.getBizCode()));
+		}
+		
+		if(CollectionUtils.pluck("debitDeptId", records).size() > 1){
+			throw new InvalidDataException(String.format("财务对账[%s]的接入部门数量过多,请确认！", reconciliationBiz.getBizCode()));
+		}
+		
+		String orgId = records.get(0).getCreditOrgId();
+		
+		SpdFinacialReconciliationItems reconciliationItems = reconciliationBiz.getItems();
+		
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", reconciliationItems);
+		YdsEdsGoodss edsGoodsList = egRepository.findAll().findSupplierUseabledWithGoodsIds(goodsIds, orgId);
+		
+//		recordItems.forEach(recordItem->{
+//			SpdPropertyChangeRecord record = CollectionUtils.findWhere("id", recordItem.getRecordId(), records);
+//			List<SpdGepBillItem> billItems = buildItems(record, recordItem, edsGoodsList);
+//			items.addAll(billItems);
+//		});
+
+		
+		List<SpdGepBillItem> items = buildItems(records.get(0).getDebitDeptId(), reconciliationItems, edsGoodsList);
+		
+		inventoryOut.setItems(items);
+		inventoryOuts.add(inventoryOut);
+		String xml = XmlBeanConverter.getXmlFromBean(inventoryOuts, SmsInventoryOuts.class);
+		smsInventoryOut.setOrderXml(xml);
+		return smsInventoryOut;
+
+	}
+	
+	private List<SpdGepBillItem> buildItems(String debitDeptId, SpdFinacialReconciliationItems reconciliationItems, YdsEdsGoodss edsGoodsList){
+		
+		List<SpdGepBillItem> billItems = new ArrayList<SpdGepBillItem>();
+		reconciliationItems.forEach(reconciliationItem->{
+			SpdGepBillItem billItem = new SpdGepBillItem();
+			
+			YdsEdsGoodss edsGoodss = new YdsEdsGoodss(CollectionUtils.find("yardGoodsId", reconciliationItem.getGoods().getGoodsId(), edsGoodsList));
+			if(CollectionUtils.isEmpty(edsGoodss)){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_without_butting_code, reconciliationItem.getGoods().getFormatName());
+			}else if(edsGoodss.size() > 1){
+				throw new InvalidDataException(YardExceptionType.invalid_goods_relation_many_usable_eds_goods,reconciliationItem.getGoods().getFormatName());
+			}
+			
+			YdsEdsGoods edsGoods = edsGoodss.get(0);
+			YdsGoods goods = reconciliationItem.getGoods();
+			
+			float baseToPrepareUnitLvRatio = SpdUnitUtils.computeUnitExchange(goods, goods.getPrepareUnitLv(), YdsUnitLv.base.getLv()).getRatio();
+			int tempQty = (int) (reconciliationItem.getSettlementQty()/baseToPrepareUnitLvRatio);
+			
+			float num = tempQty/edsGoods.getEdsYdsUnitRatio();
+			if(num != (int)num){
+				throw new InvalidDataException(YardExceptionType.invalid_integration_supplier_qty_error, goods.getGoodsCode(), tempQty, edsGoods.getEdsGoodsCode(), edsGoods.getEdsYdsUnitRatio());
+			}
+			
+			billItem.setCode(edsGoods.getEdsGoodsCode());
+			billItem.setProd(edsGoods.getEdsGoodsName());
+			billItem.setNum((int)num);
+			billItem.setPrice(reconciliationItem.getUnitPrice());
+			billItem.setAbteilung(debitDeptId);
+			billItems.add(billItem);
+		});
+		return billItems;
+		
+	}
+
+//	private List<SpdGepBillItem> buildItems(SpdPropertyChangeRecord record, SpdPropertyChangeRecordItem recordItem, YdsEdsGoodss edsGoodsList) {
+//		List<SpdGepBillItem> billItems = new ArrayList<SpdGepBillItem>();
+//		recordItem.getItems().forEach(relationItem->{
+//			SpdGepBillItem billItem = new SpdGepBillItem();
+//			
+//			YdsEdsGoodss edsGoodss = new YdsEdsGoodss(CollectionUtils.find("yardGoodsId", recordItem.getGoods().getGoodsId(), edsGoodsList));
+//			if(CollectionUtils.isEmpty(edsGoodss)){
+//				throw new InvalidDataException(YardExceptionType.invalid_goods_without_butting_code, recordItem.getGoods().getFormatName());
+//			}else if(edsGoodss.size() > 1){
+//				throw new InvalidDataException(YardExceptionType.invalid_goods_relation_many_usable_eds_goods,recordItem.getGoods().getFormatName());
+//			} 
+//			
+//			YdsEdsGoods edsGoods = edsGoodss.get(0);
+//			billItem.setCode(edsGoods.getEdsGoodsCode());
+//			billItem.setProd(edsGoods.getEdsGoodsName());
+//			billItem.setNum(relationItem.getDealQty());
+//			billItem.setPrice(relationItem.getUnitPrice());
+//			billItem.setAbteilung(record.getDebitDeptId());
+//			billItems.add(billItem);
+//		});
+//		return billItems;
+//	}
+}

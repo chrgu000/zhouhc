@@ -1,0 +1,58 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+public class SpdPropertyChangeRecordItems extends Entities<SpdPropertyChangeRecordItem>{
+
+	public SpdPropertyChangeRecordItems(List<SpdPropertyChangeRecordItem> entities){
+		super(entities);
+	}
+
+	public void fillItems(SpdPropertyChangeRelationItems relationItems) {
+		this.forEach(recordItem->{
+			SpdPropertyChangeRelationItems theRelationItems = new SpdPropertyChangeRelationItems(CollectionUtils.find("propertyChangeItemId", recordItem.getId(), relationItems));
+			recordItem.setItems(theRelationItems);
+		});
+	}
+
+	@SuppressWarnings("unchecked")
+	public void fillGoods(YdsGoodsRepository goodsRepository) {
+		YdsGoodss goodss = goodsRepository.findAll().findByIds(this.pluck("goodsId"));
+		this.forEach(item->{
+			YdsGoods goods = goodss.findById(item.getGoodsId());
+			item.setGoods(goods);
+		});
+	}
+	
+	@SuppressWarnings("unchecked")
+	public void fillGoodsAndGoodsLot(YdsGoodsLotRepository glRepository){
+		YdsGoodsLots goodsLots = glRepository.findAllWithGoods().findByIds(this.pluck("lotId"));
+		this.forEach(item->{
+			YdsGoodsLot goodsLot = goodsLots.findById(item.getLotId());
+			item.setGoods(goodsLot.getGoods());
+			item.setGoodsLot(goodsLot);
+		});
+	}
+	
+	public SpdPropertyChangeRelationItems getRelationItems(){
+		SpdPropertyChangeRelationItems result = new SpdPropertyChangeRelationItems();
+		this.forEach(relationItem->{
+			result.addAll(relationItem.getItems());
+		});
+		
+		return result;
+	}
+
+}

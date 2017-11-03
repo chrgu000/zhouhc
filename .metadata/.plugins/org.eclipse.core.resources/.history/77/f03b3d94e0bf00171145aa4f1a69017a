@@ -1,0 +1,20 @@
+package cn.ak4j.yard.sys.datacheck.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SysDataCheckTaskParams extends QueryParams{
+
+	private ListParam<String> id;
+	private ListParam<String> operatorId;
+	private DateRangeParam startTime;
+	private DateRangeParam endTime;
+	private ListParam<String> status;
+	private ListParam<String> operatorName;
+}

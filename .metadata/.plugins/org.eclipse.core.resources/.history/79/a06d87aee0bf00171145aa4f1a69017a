@@ -1,0 +1,223 @@
+package cn.ak4j.yard.spd.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.SpdInventoryType;
+import cn.ak4j.yard.enums.SpdInventoryWay;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.enums.SpdAdjustStockType;
+import cn.ak4j.yard.spd.bizplan.repository.SpdAdjustStockBizRepository;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventoryItem;
+import cn.ak4j.yard.spd.domain.SpdInventoryItems;
+import cn.ak4j.yard.spd.repository.SpdInventoryItemRepository;
+import cn.ak4j.yard.spd.repository.SpdInventoryRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@SuppressWarnings({"unchecked"})
+public class SpdInventoryServiceTest extends BaseTest{
+
+	@Autowired private SpdInventoryService inventoryService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdInventoryRepository inventoryRepository;
+	@Autowired private SpdInventoryItemRepository iiRepository;
+	@Autowired private SpdAdjustStockBizRepository asbRepository;
+	@Autowired private YardCodeService codeService;
+	
+	@Test public void testAdd(){
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdInventory inventory = getSpdInventory(user);
+		
+		SpdInventory newInventory = inventoryService.add(inventory, user);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.pandiandan);
+
+		assertEquals(CodeSort.pandiandan.getCode()+getCurrentDateCode()+sequenceCode, newInventory.getInventoryCode());
+		assertEquals(inventory.getInventoryType(), newInventory.getInventoryType());
+		assertEquals(inventory.getFixed(), newInventory.getFixed());
+		assertEquals(inventory.getDepotId(), newInventory.getDepotId());
+		assertEquals(inventory.getAreaId(), newInventory.getAreaId());
+		assertEquals(inventory.getOrgId(), newInventory.getOrgId());
+		assertEquals(inventory.getCheckStateCode(), newInventory.getCheckStateCode());
+		assertEquals(CheckState.new_created.getCode(), newInventory.getCheckStateCode().intValue());
+
+	}
+	
+	
+	
+	@Test public void testReview(){
+		String inventoryId = "inventory_id_002";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdInventory inventory = inventoryRepository.findByIdWithRelations(inventoryId);
+		
+		SpdInventoryItems items = inventory.getItems();
+		for(int i = 0; i < items.size(); i++){
+			SpdInventoryItem item = items.get(i);
+			item.setCheckQty(i%2==0?item.getPlanQty()+(i+1):item.getPlanQty()-(i+1));
+			log.debug("item checkQty :{}", item.getCheckQty());
+		}
+		
+		iiRepository.saveAll(items);
+		
+		
+		SpdInventoryItems decrementInventoryItems = new SpdInventoryItems();
+		SpdInventoryItems incrementInventoryItems = new SpdInventoryItems();
+		items.forEach(item->{
+			if(item.getPlanQty() > item.getCheckQty()){
+				decrementInventoryItems.add(item);
+			}else if(item.getPlanQty() < item.getCheckQty()){
+				incrementInventoryItems.add(item);
+			}
+		});
+		
+		//取出原有的库存调节单
+		SpdAdjustStockBizs originAdjustStocks = asbRepository.getAll();
+		
+		SpdInventory reviewedInventory = inventoryService
+				.review(inventoryId, CheckState.reviewed.getCode(), inventory.getMaintenanceInfo().getLastDate(), user);
+		
+		assertEquals(CheckState.reviewed.getCode(), reviewedInventory.getCheckStateCode().intValue());
+		
+		wait(2);
+		
+		//取出盘点审核后的库存调节单
+		SpdAdjustStockBizs allAdjustStocks = asbRepository.getAll();
+		
+		List<String> bizIds = originAdjustStocks.getIds();
+		//取出新建的库存调节单id
+		List<String> newAdjustStockIds = new ArrayList<String>();
+		allAdjustStocks.forEach(adjustStock->{
+			if(!bizIds.contains(adjustStock.getBizId())){
+				newAdjustStockIds.add(adjustStock.getBizId());
+			}
+		});
+		
+		//查出库存调节并关联库存调节明细
+		SpdAdjustStockBizs newAdjustStocks = new SpdAdjustStockBizs();
+		newAdjustStockIds.forEach(bizId->{
+			newAdjustStocks.add(asbRepository.getWithItems(bizId));
+		});
+		
+		assertEquals(1, newAdjustStocks.size());
+		SpdAdjustStockBiz decrementAdjustStock = CollectionUtils.findWhere("adjustTypeCode", SpdAdjustStockType.decrement.getCode(), newAdjustStocks);
+		SpdAdjustStockBiz incrementAdjustStock = CollectionUtils.findWhere("adjustTypeCode", SpdAdjustStockType.increment.getCode(), newAdjustStocks);
+		assertNull(decrementAdjustStock);
+		assertNotNull(incrementAdjustStock);
+		
+		incrementInventoryItems.forEach(inventoryItem->{
+			SpdBizItem adjustStockItem = CollectionUtils.findWhere("lotId", inventoryItem.getStockGoodsLotId(), incrementAdjustStock.getItems());
+			assertNotNull(adjustStockItem);
+			log.debug("qty:{} adjust qty:{}",(int)((inventoryItem.getCheckQty()+inventoryItem.getUnqualifiedQty()) - inventoryItem.getPlanQty()), adjustStockItem.getPlanQty().intValue());
+			assertEquals((int)((inventoryItem.getCheckQty()+inventoryItem.getUnqualifiedQty()) - inventoryItem.getPlanQty()), adjustStockItem.getPlanQty().intValue());
+		});
+	}
+	
+	
+	@Test public void testReviewWithOffGrade(){
+		String inventoryId = "inventory_id_002";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		SpdInventory inventory = inventoryRepository.findByIdWithRelations(inventoryId);
+		
+		SpdInventoryItems items = inventory.getItems();
+		for(int i = 0; i < items.size(); i++){
+			SpdInventoryItem item = items.get(i);
+			item.setCheckQty(i%2==0?item.getPlanQty()+(i+2):item.getPlanQty()-(i+2));
+			item.setUnqualifiedQty(i+1);
+		}
+		
+		iiRepository.saveAll(items);
+		
+		
+		//取出原有的库存调节单
+		SpdAdjustStockBizs originAdjustStocks = asbRepository.getAll();
+		
+		//取出生成不合格区报溢的盘点明细
+		SpdInventoryItems offGradeInventoryItems = new SpdInventoryItems();
+		items.forEach(item->{
+			if(item.getUnqualifiedQty() > 0){
+				offGradeInventoryItems.add(item);
+			}
+		});
+		
+		
+		SpdInventory reviewedInventory = inventoryService
+				.review(inventoryId, CheckState.reviewed.getCode(), inventory.getMaintenanceInfo().getLastDate(), user);
+		
+		assertEquals(CheckState.reviewed.getCode(), reviewedInventory.getCheckStateCode().intValue());
+		
+		wait(2);
+		
+		//取出盘点审核后的库存调节单
+		SpdAdjustStockBizs allAdjustStocks = asbRepository.getAll();
+		
+		
+		List<String> bizIds = originAdjustStocks.getIds();
+		//取出新建的不合格区库存调节单id
+		List<String> newAdjustStockIds = new ArrayList<String>();
+		allAdjustStocks.forEach(adjustStock->{
+			if(!bizIds.contains(adjustStock.getBizId())){
+				if(adjustStock.getAreaType().equals(PcsAreaType.unqualified.getCode())){
+					newAdjustStockIds.add(adjustStock.getBizId());
+				}
+			}
+		});
+		
+		//查出库存调节并关联库存调节明细
+		SpdAdjustStockBizs newAdjustStocks = new SpdAdjustStockBizs();
+		newAdjustStockIds.forEach(bizId->{
+			newAdjustStocks.add(asbRepository.getWithItems(bizId));
+		});
+		
+		assertEquals(1, newAdjustStocks.size());
+		
+		offGradeInventoryItems.forEach(inventoryItem->{
+			SpdBizItem adjustStockItem = CollectionUtils.findWhere("lotId", inventoryItem.getStockGoodsLotId(), newAdjustStocks.get(0).getItems());
+			assertNotNull(adjustStockItem);
+			assertEquals((int)inventoryItem.getUnqualifiedQty(), adjustStockItem.getPlanQty().intValue());
+		});
+	}
+	
+	@Test public void testAutoCreateInventoryItems(){
+		String inventoryId = "inventory_id_003";
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		inventoryService.autoCreateInventoryItems(inventoryId, user);
+		
+		SpdInventory inventory = inventoryRepository.findByIdWithRelations(inventoryId);
+		
+		assertTrue(inventory.getItems().size()>0);
+	}
+	
+	private SpdInventory getSpdInventory(PcsUser user){
+		SpdInventory inventory = new SpdInventory();
+		inventory.setAreaId("area_id_003");
+		inventory.setFixed(SpdInventoryType.spare_parts.getCode());
+		inventory.setDeptId("dept_id_001");
+		inventory.setDepotId("depot_id_001");
+		inventory.setInventoryUser(xykUserId);
+		inventory.setInventoryType(SpdInventoryWay.static_disc.getCode());
+		inventory.setOrgId("626");
+		inventory.setMaintenanceInfo(new MaintenanceInfo(user));
+		return inventory;
+	}
+	
+}

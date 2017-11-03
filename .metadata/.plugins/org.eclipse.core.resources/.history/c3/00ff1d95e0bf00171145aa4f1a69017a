@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+
+/**
+* @Description: 描述业务包含目的仓库作业能力
+* @author zhengyf
+* @date 2017年4月4日 下午12:27:56
+* @version V1.0.0
+*/
+public interface IToDepotTask {
+
+	public PcsDepot getToDepot();
+	
+	public String getToAreaType();
+	
+	public SpdDepotTasks getOnShelfTasks();
+	
+}

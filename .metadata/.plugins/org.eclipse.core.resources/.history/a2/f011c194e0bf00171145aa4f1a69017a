@@ -1,0 +1,20 @@
+package cn.ak4j.yard.spd.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+
+@SuppressWarnings({"serial", "rawtypes", "unchecked"})
+public class SpdDepotGoodsConfigs extends Entities<SpdDepotGoodsConfig>{
+	public SpdDepotGoodsConfigs(){}
+	
+	public SpdDepotGoodsConfigs(List entities){
+		super(entities);
+	}
+
+	
+	public SpdDepotGoodsConfig findByGoodsId(String goodsId) {
+		return CollectionUtils.findWhere("goodsId", goodsId, this);
+	}
+}

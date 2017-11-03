@@ -1,0 +1,62 @@
+package cn.ak4j.yard.sys.service.taskprocessor;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.service.SpdReceiveBizService;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.spd.supply.service.SpdDeliveryOrderService;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.service.YdsEdsGoodsLotService;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Component
+public class CreateDeliveryOrderTaskProcessor implements IBatchTaskProcessor{
+
+	@Autowired private MGProxy mgProxy;
+	@Autowired private NotifyMsgBuilder msgbuilder;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private SpdReceiveBizService rbService;
+	@Autowired private SpdDeliveryOrderService doService;
+	@Autowired private YdsEdsGoodsLotService eglService;
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" }) 
+	public void process(YardBatchTask batchTask, PcsUser user, MailMsg hisMail, MailMsg supplyMail) throws Exception{
+		String mailTitle = msgbuilder.getMailTitlePref() + "创建送货单任务";
+		try{
+			String json = batchTask.getJson();
+			YardBatchTaskTO<SpdDeliveryOrders> deliveryOrdersTaskTO = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTaskTO<SpdDeliveryOrders>>(){});
+			batchTask.setData(deliveryOrdersTaskTO.getData());
+			SpdDeliveryOrders deliveryOrders = (SpdDeliveryOrders)batchTask.getData();
+			
+			//检查企业批次是否存在，不存在则添加企业产品批次
+			YdsEdsGoodss edsGoodss = egRepository.findAll().findByOrgId(user.getOrgId());
+			YdsEdsGoodsLots edsGoodsLots = deliveryOrders.parseAllEdsGoodsLots(user, edsGoodss);
+			eglService.checkAndCreateNotExistEdsGoodsLots(edsGoodsLots, user);
+	
+			rbService.add(deliveryOrders, user);
+			doService.fillAllRelation(deliveryOrders);
+			//暂时不发送供应商通知邮件
+			//supplyMail = msgbuilder.buildSupDeliveryOrderMail(deliveryOrders, user);
+			hisMail = msgbuilder.buildHisDeliveryOrderMail(deliveryOrders, user);
+		}catch(Exception e){
+			log.error("批量任务执行失败", e);
+			mgProxy.sendMail(mailTitle+"执行失败", ExceptionUtils.getStackTrace(e), NotifyMsgBuilder.toHisEmails);
+			//mgProxy.sendMail(mailTitle+"执行失败", ExceptionUtils.getStackTrace(e), NotifyMsgBuilder.toSupEmails);
+		}
+	}
+	
+}

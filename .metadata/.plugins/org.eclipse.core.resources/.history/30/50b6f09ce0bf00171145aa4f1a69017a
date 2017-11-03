@@ -1,0 +1,1 @@
+update SYS_GLOBAL_INFO set key = 'off_shelf_block_item_lables_report', value = '{"pdfFileName":"整件标签","jasperFilePath":"/reports/spd/task/off_shelf_block_item_lables_01"}' where key = 'off_shelf_block_Item_lables_report'

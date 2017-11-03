@@ -1,0 +1,49 @@
+package cn.ak4j.yard.spd.bizplan.configuration;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdAdjustStockBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdConsumeBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdDailyCleanBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdFinancialReconciliationBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdMoveAreaBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdPrepareInformBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReceiveBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReplenishBizSteps;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdReturnGoodsBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+
+/**
+* @Description: 配置所有的业务步骤
+* @author zhengyf
+* @date 2017年4月2日 下午4:23:26
+* @version V1.0.0
+*/
+
+//@Configuration
+public class SpdBizStepConfiguration {
+
+//	@Bean("allBizSteps")
+	public Map<SpdBizType, SpdBizSteps> allBizSteps(){
+		Map<SpdBizType, SpdBizSteps> allBizSteps = new HashMap<SpdBizType, SpdBizSteps>();
+		
+		allBizSteps.put(SpdBizType.receive_biz, new SpdReceiveBizSteps());
+		allBizSteps.put(SpdBizType.adjust_stock_biz, new SpdAdjustStockBizSteps());
+		allBizSteps.put(SpdBizType.move_area_biz, new SpdMoveAreaBizSteps());
+		allBizSteps.put(SpdBizType.replenish_biz, new SpdReplenishBizSteps());
+		allBizSteps.put(SpdBizType.prepare_inform_biz, new SpdPrepareInformBizSteps());
+		allBizSteps.put(SpdBizType.consume_biz, new SpdConsumeBizSteps());
+		allBizSteps.put(SpdBizType.return_goods_biz, new SpdReturnGoodsBizSteps());
+		
+		allBizSteps.put(SpdBizType.daily_clean_biz, new SpdDailyCleanBizSteps());
+		allBizSteps.put(SpdBizType.finacial_reconciliation_biz, new SpdFinancialReconciliationBizSteps());
+		
+		Constant.all_biz_steps = allBizSteps;
+		
+		return allBizSteps;
+	}
+	
+}

@@ -1,0 +1,27 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLog;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLogs;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizLogParams;
+import lombok.Getter;
+
+@Repository
+public class SpdBizLogRepository extends BaseRepository<SpdBizLog, SpdBizLogs, SpdBizLogParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+
+	public SpdBizLogs findByBizId(String bizId) {
+		SpdBizLogParams params = new SpdBizLogParams();
+		params.setBizId(new ListParam<String>(bizId));
+		return find(params, new OrderParam("createTime", "asc"), -1, -1);
+	}
+	
+}

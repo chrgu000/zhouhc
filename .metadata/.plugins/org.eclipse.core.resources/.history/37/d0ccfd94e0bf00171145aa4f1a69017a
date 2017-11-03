@@ -1,0 +1,383 @@
+package cn.ak4j.yard.spd.bizplan.service;
+
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.NotFoundException;
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.NotifyMsgBuilder;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.extend.ISupplierProxy;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdPrepareInformBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.factory.SpdPrepareInformFactory;
+import cn.ak4j.yard.spd.bizplan.params.SpdPrepareInformBizParams;
+import cn.ak4j.yard.spd.bizplan.params.SpdReceiveItemParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdPrepareInformBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveItemRepository;
+import cn.ak4j.yard.spd.bizplan.vo.SpdPrepareReceiveQty;
+import cn.ak4j.yard.spd.bizrule.domain.SpdPrepareInformRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.service.SpdDepotGoodsConfigService;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Service
+public class SpdPrepareInformBizService extends IYardService<SpdPrepareInformBiz> {
+	
+	@Autowired private SpdPrepareInformBizRepository pibRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private MGProxy mgProxy;
+	@Autowired private NotifyMsgBuilder msgBuilder;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdReceiveItemRepository riRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdPrepareInformFactory piFactory;
+	@Autowired private SpdDepotGoodsConfigService dgcService;
+	@Autowired private ApplicationContext context;
+	
+	/**
+	 * 根据一个收货业务来创建备货，这主要是用于后补备货
+	 */
+	@Transactional
+	public SpdPrepareInformBiz add(SpdReceiveBiz receive, IUser user){
+		SpdPrepareInformBiz prepareInform = piFactory.builPrepareInform(receive, (PcsUser)user);
+		return add(prepareInform, user);
+	}
+	
+	@Transactional @Override
+	public SpdPrepareInformBiz add(SpdPrepareInformBiz prepareInform, IUser user) {
+		
+		SpdPrepareInformRule rule = (SpdPrepareInformRule)brRepository.findAllWithRelations().findById(prepareInform.getBizRuleId());
+		if(rule == null){
+			throw new NotFoundException(YardExceptionType.not_found_prepare_inform_rule, String.format("id:%s", prepareInform.getBizRuleId()));
+		}
+		prepareInform.applyRule(rule, (PcsUser)user);
+		
+		if(!prepareInform.isValid()){
+			throw new InvalidDataException(prepareInform.getValidateMsg());
+		}
+		
+		//判断是否有未审核的采购计划，如果有不能继续新增
+//		SpdPrepareInformBizs purchases = paRepository.findUnreviewedByDepotId(prepareInform.getToDepotId());
+//		if(CollectionUtils.isNotEmpty(purchases)){
+//			throw new InvalidDataException("存在未审核的采购计划单，请先完成现有的采购计划单！");
+//		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(prepareInform.getBizId(), null, prepareInform.getMaintenanceInfo().getCreateUserId(), AmqpMsgType.CREATE_PREPARE_INFORM_BIZ);
+            }
+		});
+		
+		//获取入库仓库的产品货位库存
+//		SpdShelfStocks shelfStocks = ssRepository.findByDepot(prepareInform.getToDepotId());
+//		shelfStocks.fillGoodsLotsAndGoodsWithUseableLots(glRepository, ssRepository);
+//		shelfStocks = shelfStocks.sumByGoods();
+//		
+//		prepareInform.addItems(paFactory.buildPurchaseItems(prepareInform.getToDepotId(), shelfStocks));
+		prepareInform.setBizCode(codeService.publishCode(CodeSort.beihuodan).getCode());
+		pibRepository.saveWithItems(prepareInform);
+		
+		return prepareInform;
+	}
+
+	@Override
+	public void delete(String bizId, IUser user) {
+		SpdPrepareInformBiz purchasePO = pibRepository.getWithItems(bizId);
+		if(!purchasePO.canDelete()){
+			throw new OperateFailException(YardExceptionType.forbide_delete,bizId);
+		}
+		
+		pibRepository.delete(purchasePO);
+		
+		if(purchasePO.hasItems()){
+			biRepository.delete(purchasePO.getItems());
+		}
+//		throw new UnsupportedOperationException("不支持删除备货通知业务");
+	}
+
+	@Transactional @Override
+	public SpdPrepareInformBiz modify(SpdPrepareInformBiz purchase, IUser user) {
+		SpdPrepareInformBiz purchasePO = pibRepository.findOne(purchase.getBizId());
+		purchasePO.update(purchase, user.getOrgId(), user.getUserId());
+		purchasePO = pibRepository.save(purchasePO);
+		return purchasePO;
+	}
+
+	@Transactional @Override
+	public SpdPrepareInformBiz updateCheckState(String bizId, int checkStateCode, Date lastUpdateTime, IUser user) {
+		SpdPrepareInformBiz prepareInform = pibRepository.getWithItems(bizId);
+		fillAllRelations(prepareInform);
+
+		if(!prepareInform.hasItems()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_data, String.format("备货通知[%s]", prepareInform.getBizCode()));
+		}
+		
+		if(checkStateCode == CheckState.commited.getCode()){
+			return commitPrepareInform(prepareInform, lastUpdateTime, (PcsUser)user);
+		}else if(checkStateCode == CheckState.reviewed.getCode()){
+			return reviewPrepareInform(prepareInform, lastUpdateTime, (PcsUser)user);
+		}
+		
+		throw new OperateForbiddenException(YardExceptionType.forbide_update_check_state, prepareInform.getCheckState().getName(), CheckState.stateOf(checkStateCode).getName());
+	}
+	
+	@Transactional public SpdPrepareInformBiz reviewPrepareInform(SpdPrepareInformBiz prepareInform, Date lastUpdateTime, PcsUser user){
+		if(!prepareInform.getConfirmDeptId().equals(user.getDeptId())){
+			throw new OperateForbiddenException(YardExceptionType.forbid_review_prepare_inform, user.getUserCode(), prepareInform.getConfirmDept().getDeptName());
+		}
+		
+		//明细没有全部确认抛出异常
+		if(!prepareInform.getItems().isAllConfirmed()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_confirm, String.format("备货通知[%s]", prepareInform.getBizCode()));
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(prepareInform.getBizId(), null, prepareInform.getMaintenanceInfo().getCreateUserId(), AmqpMsgType.REVIEW_PREPARE_INFORM_BIZ);
+            }
+		});
+		
+		prepareInform.updateCheckState(CheckState.reviewed.getCode(), lastUpdateTime, user.getOrgId(), user.getUserId());
+		pibRepository.save(prepareInform);
+		return prepareInform;
+	}
+	
+	@Transactional public SpdPrepareInformBiz commitPrepareInform(SpdPrepareInformBiz prepareInform, Date lastUpdateTime, PcsUser user){
+		//验证标准产品是否对码
+		checkGoodsButtingCode(prepareInform);
+		
+		//明细没有全部确认抛出异常
+		if(!prepareInform.getItems().isAllPlaned()){
+			throw new InvalidDataException(YardExceptionType.invalid_item_not_plan, String.format("备货通知[%s]", prepareInform.getBizCode()));
+		}
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(prepareInform.getBizId(), null, prepareInform.getMaintenanceInfo().getCreateUserId(), AmqpMsgType.COMMIT_PREPARE_INFORM_BIZ);
+            }
+		});
+		prepareInform.updateCheckState(CheckState.commited.getCode(), lastUpdateTime, user.getOrgId(), user.getUserId());
+		pibRepository.save(prepareInform);
+		return prepareInform;
+	}
+	
+	//检查明细是否未与企业产品对码或未提交、未启用
+	private void checkGoodsButtingCode(SpdPrepareInformBiz prepareInform) {
+		SpdPrepareInformRule rule = (SpdPrepareInformRule)brRepository.findAllWithRelations().findById(prepareInform.getBizRuleId());
+		
+		boolean flag = false;
+		StringBuilder info = new StringBuilder();
+		
+		for(SpdBizItem item : prepareInform.getItems()){
+			YdsEdsGoodss existEdsGoodss = egRepository.findAll().findByButtingCode(rule.getDirectionRule().getFromOrgId(), item.getGoodsId());
+			if(CollectionUtils.isEmpty(existEdsGoodss)){
+				info.append(goodsRepository.findAll().findById(item.getGoodsId()).getFormatName()+",");
+				flag = true;
+			}
+		}
+		
+		if(flag){
+			throw new InvalidDataException(YardExceptionType.invalid_goods_without_butting_code, info.toString().substring(0, info.toString().length()-1));
+		}
+		
+	}
+
+	@Transactional public SpdPrepareInformBiz completePrepareInform(SpdPrepareInformBiz prepareInform, Date lastUpdateTime, IUser user){
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(prepareInform.getBizId(), null, prepareInform.getMaintenanceInfo().getCreateUserId(), AmqpMsgType.COMPLETE_PREPARE_INFORM_BIZ);
+            }
+		});
+		
+		prepareInform.updateCheckState(CheckState.completed.getCode(), prepareInform.getLastUpdateTime(), user.getOrgId(), user.getUserId());
+		pibRepository.save(prepareInform);
+		dgcService.incrementUncompletedPrepareQty(prepareInform);
+		return prepareInform;
+	}
+	
+	/**
+	 * 通知供应商
+	 */
+	@Transactional public SpdPrepareInformBiz informSupplier(String bizId, IUser user){
+		SpdPrepareInformBiz prepareInform = pibRepository.getWithItems(bizId);
+		if(prepareInform.getInformTime() != null){
+			throw new OperateFailException(YardExceptionType.forbid_inform_supplier, prepareInform.getBizCode());
+		}
+		pibRepository.save(prepareInform);
+		return informSupplier(prepareInform, user);
+	}
+	
+	@Transactional public SpdPrepareInformBiz informSupplier(SpdPrepareInformBiz prepareInform, IUser user){
+		if(prepareInform.getCheckState() != CheckState.reviewed || prepareInform.getInformTime() != null){
+			throw new OperateFailException(YardExceptionType.forbid_inform_supplier, prepareInform.getBizCode()); 
+		}
+		
+		fillAllRelations(prepareInform);
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){
+				rabbitProxy.sendBizMsg(prepareInform.getBizId(), null, prepareInform.getMaintenanceInfo().getCreateUserId(), AmqpMsgType.INFORM_SUPPLIER_INFORM_BIZ);
+            }
+		});
+		
+		//如果定义了通知供应商组件(意味着是通过系统集成的方式通知供应商的)，则创建通知供应商的批量任务
+		if(prepareInform.getBizRule().hasInformComponent() && !prepareInform.getItems().isAllConfirmEmpty()){
+			try {
+				ISupplierProxy supplierProxy = (ISupplierProxy)context.getBean(prepareInform.getBizRule().getInformComponent());
+				SpdPrepareInformBiz syncPrepareInform = supplierProxy.syncPrepareInform(prepareInform, egRepository);
+				prepareInform.setExResourceId(syncPrepareInform.getExResourceId());
+			} catch (OperateFailException e) {
+				mgProxy.sendMail(msgBuilder.buildSyncPrepareInformFailEmail(prepareInform, e));
+				throw e;
+			} 
+		}
+		
+		prepareInform.setInformTime(new Date());
+		prepareInform.updateLastUpdateTime();
+		pibRepository.save(prepareInform);
+		return prepareInform;
+	}
+
+	public void fillAllRelations(SpdPrepareInformBiz prepareInform) {
+		SpdPrepareInformRule rule = (SpdPrepareInformRule)brRepository.findAllWithRelations().findById(prepareInform.getBizRuleId());
+		SpdBizItems bizItems = biRepository.findByBizId(prepareInform.getBizId());
+		prepareInform.setItems(bizItems);
+		prepareInform.setBizRule(rule);
+		
+		prepareInform.getItems().fillGoods(goodsRepository);
+	}
+
+	public SpdPrepareInformBizs findITakeChargeOfUncompletePrepares(PcsUser user, SpdPrepareInformBizParams params, OrderParam order,
+			int pageNo, int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		if(depots.size()<=0){
+			return new SpdPrepareInformBizs();
+		}
+		params.setToDepotId(new ListParam<String>(depots.getIds()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode(), QueryParam.operation_not_in));
+		
+		return pibRepository.find(params, order, pageNo, pageSize);
+	}
+
+
+	public SpdPrepareInformBiz updateEstimatedDeliveryTime(String bizCode, Date estimatedDeliveryTime, PcsUser user) {
+		SpdPrepareInformBiz prepareInform = pibRepository.findByBizCode(bizCode);
+		if(prepareInform == null){
+			throw new InvalidDataException(YardExceptionType.not_found_prepare_inform, bizCode);
+		}
+		prepareInform.setEstimatedDeliveryTime(estimatedDeliveryTime);
+		prepareInform = pibRepository.save(prepareInform);
+		return prepareInform;
+	}
+	
+	public SpdPrepareInformBizs findWhichICanReview(PcsUser user, SpdPrepareInformBizParams params, OrderParam order,
+			int pageNo, int pageSize) {
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode(), QueryParam.operation_not_in));
+		
+		SpdPrepareInformBizs prepareInforms = pibRepository.find(params, order, -1, -1);
+		SpdPrepareInformBizs newPrepareInforms = new SpdPrepareInformBizs();
+		
+		prepareInforms.forEach(prepareInform->{
+			PcsDepot iCanConfirmDepot = CollectionUtils.findWhere("depotId", prepareInform.getToDepotId(), depots);
+			if(iCanConfirmDepot != null){
+				newPrepareInforms.add(prepareInform);
+			}else{
+				if(prepareInform.getConfirmDeptId().equals(user.getDeptId()) && !(prepareInform.getCheckStateCode().equals(CheckState.new_created.getCode()))){
+					newPrepareInforms.add(prepareInform);
+				}
+			}
+		});
+		
+		return  new SpdPrepareInformBizs(newPrepareInforms.findByPage(null, null, pageNo, pageSize));
+	}
+
+	public List<SpdPrepareReceiveQty> findPrepareReceiveQty(String prepareInformId){
+		SpdReceiveItemParams riParams = new SpdReceiveItemParams();
+		riParams.setOriginId(new ListParam<String>(prepareInformId));
+		SpdReceiveItems receiveItems = riRepository.find(riParams);
+		return receiveItems.toPrepareReceiveQtys();
+	}
+
+	
+	@Transactional
+	public String autoCreatePrepareInformItemsAndSplit(String bizId, int batchGoodsSize, PcsUser user) {
+		autoCreatePrepareInformItems(bizId, user);
+		return splitPrepareInform(bizId, batchGoodsSize, user);
+	}
+
+
+	/**
+	 * 根据备货通知单创建备货产品明细
+	 */
+	@Transactional
+	public void autoCreatePrepareInformItems(String bizId, PcsUser user) {
+		SpdPrepareInformBiz prepareInform = pibRepository.findOne(bizId);
+		prepareInform.setItems(piFactory.buildItmesFromLackGoodss(prepareInform.getToDepotId()));
+		prepareInform.updateItemsBizIdAndTime();
+		biRepository.saveAll(prepareInform.getItems());
+	}
+	
+	/**
+	 * 拆分备货通知单
+	 * @param batchGoodsSize 指定拆分的产品数量
+	 */
+	@Transactional
+	public String splitPrepareInform(String bizId, int batchGoodsSize, PcsUser user) {
+		SpdPrepareInformBiz prepareInform = pibRepository.findOne(bizId);
+		
+		SpdPrepareInformBizs prepareInforms = prepareInform.splitPrepareInform(batchGoodsSize);
+		
+		if(CollectionUtils.isNotEmpty(prepareInforms)){
+			if(prepareInform.getRemark() == null ||prepareInform.getRemark().isEmpty()){
+				prepareInform.setRemark(prepareInform.getBizCode());
+				modify(prepareInform, user);
+			}
+			
+			prepareInforms.forEach(thePrepareInform->{
+				add(thePrepareInform, user);
+			});
+			
+			return prepareInform.getBizCode();
+		}
+		
+		return "";
+	}
+}

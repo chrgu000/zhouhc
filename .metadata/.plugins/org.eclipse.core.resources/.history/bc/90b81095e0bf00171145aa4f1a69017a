@@ -1,0 +1,37 @@
+package cn.ak4j.yard.spd.bizplan.domain.bizstep;
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@NoArgsConstructor
+public class SpdBizStep {
+	
+	@Getter @Setter private String statusCode;
+	@Getter @Setter private String statusName;
+	@Getter @Setter private String  action;
+	@Getter @Setter private String description;
+	@Getter @Setter private Integer index;
+	
+	public SpdBizStep(Integer index, String action, String description, String statusCode, String statusName){
+		this.index = index;
+		this.action = action;
+		this.description = description;
+		this.statusCode = statusCode;
+		this.statusName = statusName;
+	}
+	
+	public boolean equals(Object obj){
+		if(obj instanceof SpdBizStep){
+			return getStatusCode().equals(((SpdBizStep)obj).getStatusCode());
+		}
+		return false;
+	}
+
+	
+	public String toString() {
+		return "SpdBizStep [statusCode=" + statusCode + ", statusName=" + statusName+"]";
+	}
+	
+	
+}

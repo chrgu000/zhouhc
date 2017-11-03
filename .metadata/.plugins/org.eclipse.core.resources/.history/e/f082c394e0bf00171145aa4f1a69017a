@@ -1,0 +1,104 @@
+package cn.ak4j.yard.spd.domain;
+
+import javax.persistence.Column;
+import javax.persistence.Embedded;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name = "SPD_DEPOT_CARD")
+@JsonIgnoreProperties(ignoreUnknown = true)
+@SuppressWarnings({"serial"})
+public class SpdDepotCard extends YardMaintenceEntity {
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name = "uuidGenerator", strategy = "uuid")
+	@Column(name="card_id") @Getter @Setter
+	private String depotCardId;// 帐页ID
+	
+	@Getter @Setter
+	private String cardCode;//帐页编码
+	
+	@Getter @Setter
+	private String depotId;// 仓库ID
+	
+	@Getter @Setter
+	private String shelfId;// 货位ID
+	
+	@Column(name="LOSE_SHEFT_ID") @Getter @Setter
+	private String unqualifiedShelfId;// 不合格货位
+	
+	@Getter @Setter
+	private String isolationShelfId;//隔离货位
+	
+	@Getter @Setter
+	private String goodsId;// 产品ID
+	
+	@Getter @Setter
+	private String storeUnitLv;// 存储单位级别
+	
+	@Getter @Setter
+	private String storeUnitName;// 存储单位名称
+	
+	@Getter @Setter
+	private boolean enabled;// 启用标识
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();// 审核状态
+	
+	@Embedded @Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_c;// 新增_提交
+
+	@Transient @JsonIgnore @Getter @Setter
+	private YdsGoods goods;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepot depot;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepotShelf normalDepotShelf;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepotShelf isolationDepotShelf;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private PcsDepotShelf unqualifiedDepotShelf;
+	
+	public String getShelfId(PcsAreaType areaType){
+		switch (areaType) {
+			case normal:
+				return shelfId;
+			case isolation:
+				return isolationShelfId;
+			case unqualified:
+				return unqualifiedShelfId;
+			default:
+				break;
+		}
+		return null;
+	}
+}

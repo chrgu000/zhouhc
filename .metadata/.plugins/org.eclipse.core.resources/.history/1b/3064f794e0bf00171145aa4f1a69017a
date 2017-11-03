@@ -1,0 +1,106 @@
+package cn.ak4j.yard.spd.bizplan.service.assistant;
+
+import java.util.List;
+
+import org.apache.commons.lang.exception.ExceptionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.IToDepotTask;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLog;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizPlan;
+import cn.ak4j.yard.spd.bizplan.domain.SpdGoodsBizPlan;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizLogRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcherRefs;
+import cn.ak4j.yard.spd.task.domain.SpdDispatchers;
+import cn.ak4j.yard.spd.task.enums.SpdDispatcherType;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskItemRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRefRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.spd.task.service.SpdDepotTaskService;
+import cn.ak4j.yard.spd.task.service.SpdDispatcherService;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+* @Description: 业务助理类，业务助理类有三类职责：
+* 1) 负责针对每一个业务事件尝试更新业务事务(也即业务计划对象)的状态
+* 2) 负责记录作业日志
+* 3) 负责尝试对业务作业序列进行自动化执行
+* @author zhengyf
+* @date 2017年3月29日 下午7:54:43
+* @version V1.0.0
+*/
+@Slf4j
+@SuppressWarnings("rawtypes")
+public abstract class SpdBizAssistantService<T extends SpdBizPlan> {
+
+	@Autowired @Getter
+	protected SpdBizItemRepository biRepository;
+	
+	@Autowired @Getter
+	private SpdBizLogRepository blRepository;
+	
+	@Autowired private SpdDispatcherRefRepository drRepository;
+	
+	@Autowired protected PcsUserRepository userRepository;
+	@Autowired PcsOrgRepository orgRepository;
+	@Autowired SpdDispatcherService dispatcherService;
+	@Autowired SpdDispatcherRepository dispatcherRepository;
+	@Autowired SpdDepotTaskItemRepository tiRepository;
+	@Autowired SpdDepotTaskService dtService;
+	@Autowired MGProxy mgProxy;
+	@Autowired RabbitProxy rabbitProxy;
+	
+	public abstract void process(T biz, String taskId, String userId, String action);
+	
+	protected abstract T forwardBizStep(T biz, String taskId, String action);
+	
+	protected void saveBizLog(T biz, PcsUser user){
+		String log = String.format("[%s]将%s[%s]变成了%s", user.getUserName(), biz.getBizType().getName(), biz.getBizCode(), biz.getCurrentBizStep().getStatusName());
+		SpdBizLog bizLog = new SpdBizLog(biz.getBizId(), user.getUserId(), biz.getCurrentBizStep().getStatusCode(), log);
+		blRepository.save(bizLog);
+	}
+	
+	protected void reviewOnShelfDepotTask(SpdGoodsBizPlan biz, PcsUser user){
+		IToDepotTask bizWithOnShelfTask = ((IToDepotTask)biz);
+		bizWithOnShelfTask.getOnShelfTasks().forEach(task->task.getItems().confirmAsPlan());
+		tiRepository.saveAll(bizWithOnShelfTask.getOnShelfTasks().getAllItems());
+		dtService.batchReview(bizWithOnShelfTask.getOnShelfTasks(), user);
+	}
+	
+	protected void reviewDispatcher(SpdGoodsBizPlan biz, PcsUser user, SpdDispatcherType dispatcherType){
+		SpdDispatcherRefs refs = drRepository.findByRefObjectId(biz.getBizId());
+		List<String> dispatcherIds = CollectionUtils.pluck("dispatcherId", refs);
+		SpdDispatchers dispatchers = dispatcherRepository.findWithRelationsByIds(dispatcherIds);
+		SpdDispatcher dispatcher = CollectionUtils.findWhere("dispatcherType", dispatcherType.getCode(), dispatchers);
+		dispatcherService.review(dispatcher, user);
+	}
+	
+	protected void handleException(String action, SpdBizPlan biz, Exception e){
+		String title = String.format("%s助理处理失败:[%s]", biz.getBizType().getName(), biz.getBizId());
+		log.error(title, e);
+		if(Conf.isSendExceptionMail()){
+			StringBuffer buf = new StringBuffer(String.format("action:{}, current biz status:{}", action, biz.getCurrentBizStep().getStatusCode()));
+			buf.append("\n")
+			   .append(ExceptionUtils.getFullStackTrace(e));
+			if(Conf.getEnv().equals("prod")){
+				PcsOrg org = orgRepository.findAll().getMainOrg();
+				title = String.format("[%s]%s", org.getOrgAbbr(), title);
+			}else{
+				title = String.format("[%s]%s", "澳加测试", title);
+			}
+			mgProxy.sendMail(title, buf.toString(), "spd@1ycloud.net");
+		}
+	}
+	
+}

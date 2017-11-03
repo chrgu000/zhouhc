@@ -1,0 +1,16 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+
+/**
+* @Description: 业务计划接口
+* @author zhengyf
+* @date 2017年4月4日 下午12:38:42
+* @version V1.0.0
+*/
+public interface IBizPlan {
+
+
+	public SpdBizType getBizType();
+	
+}

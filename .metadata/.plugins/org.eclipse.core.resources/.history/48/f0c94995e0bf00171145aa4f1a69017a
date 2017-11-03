@@ -1,0 +1,16 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+
+@SuppressWarnings({"rawtypes", "serial", "unchecked"})
+public class PcsRoles extends Entities<PcsRole>{
+
+	public PcsRoles(){}
+
+	public PcsRoles(List entities){
+		super(entities);	
+	}
+	
+}

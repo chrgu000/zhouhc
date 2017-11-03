@@ -1,0 +1,26 @@
+package cn.ak4j.yard.spd.reconciliation.params;
+
+import cn.ak4j.entity.query.param.DateRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdFinacialReconciliationBizParams extends QueryParams{
+
+	private ListParam<String> bizCode;
+	private ListParam<String> deptId;
+	private ListParam<Boolean> itemGenerated;
+	private ListParam<String> bizRuleId;
+	private ListParam<String> beginingReconciliationId;
+	private ListParam<Boolean> checkStateCode;
+	private DateRangeParam reconciliationDate;
+	private ListParam<String> maintenanceInfo_createUserId;
+	private DateRangeParam maintenanceInfo_createDate;
+	
+	private ListParam<String> beginingRecCode;//期初编码
+	private ListParam<String> primaryName;
+}

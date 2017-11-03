@@ -1,0 +1,29 @@
+package cn.ak4j.yard.sys.web;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.AmqpMsgType;
+
+public class AmqpMsgSenderResourceTest extends BaseTest{
+
+	@Test public void testSendMessage() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/sys/msgSenders?msgType={msgType}&accessToken={accessToken}";
+		String msgType = AmqpMsgType.ADD_GOODS.getCode();
+		
+		Map<String, Object> data = new HashMap<String, Object>();
+		data.put("goodsId", "goods_id_001");
+		data.put("userId", testUserId);
+		
+		String json = mockMvcHelper.mockPost(String.class, data, url, msgType, accessToken);
+		
+		wait(3);
+		assertEquals("ok", json);
+	}
+}

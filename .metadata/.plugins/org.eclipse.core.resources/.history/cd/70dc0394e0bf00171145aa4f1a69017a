@@ -1,0 +1,54 @@
+package cn.ak4j.yard.yds.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.yds.domain.YdsWorkBook;
+import cn.ak4j.yard.yds.domain.YdsWorkBooks;
+import cn.ak4j.yard.yds.params.YdsWorkBookParams;
+import lombok.Getter;
+
+@Repository
+public class YdsWorkBookRepository extends BaseRepository<YdsWorkBook, YdsWorkBooks, YdsWorkBookParams, String> {
+
+	@Autowired @Getter private EntityManager entityManager;
+	
+	@Cacheable(value = "longTimeCache", key = "\"allWorkBooks\"")
+	public YdsWorkBooks findAll() {
+		return getAll();
+	}
+	
+	@Deprecated
+	public YdsWorkBook findOne(String goodsId){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public int count(YdsWorkBookParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsWorkBooks find(YdsWorkBookParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsWorkBooks findByIds(List<String> ids){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public YdsWorkBooks find(YdsWorkBookParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+
+}

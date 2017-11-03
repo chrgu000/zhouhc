@@ -1,0 +1,39 @@
+package cn.ak4j.yard.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import lombok.Getter;
+import lombok.Setter;
+
+
+/**
+ * @attributeName SpdInventoryType
+ * @name 盘点单类型
+ * @item1 1、静盘 Static_disc
+ * @item2 2、静盘(盲) Static_disc_blind
+ */
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SpdInventoryWay implements ITypeEnum{
+
+	static_disc("static_disc","静盘",""),
+	static_disc_blind("static_disc_blind","静盘(盲)","");
+	
+	@Getter @Setter	private String code;
+	@Getter @Setter	private String name;
+	@Getter @Setter	private String description;
+	
+	private SpdInventoryWay(String code, String name, String description){
+		this.code = code;
+		this.name = name;
+		this.description = description;
+	}
+	
+	public static SpdInventoryWay typeOf(String code){
+		for(SpdInventoryWay way : SpdInventoryWay.values()){
+			if(way.getCode().equals(code)){
+				return way;
+			}
+		}
+		return null;
+	}
+}

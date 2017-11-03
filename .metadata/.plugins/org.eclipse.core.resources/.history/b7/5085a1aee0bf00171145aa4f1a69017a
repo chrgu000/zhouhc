@@ -1,0 +1,177 @@
+package cn.ak4j.yard.pcs.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+import java.util.Arrays;
+
+import org.junit.Test;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.params.PcsDepotShelfParams;
+import cn.ak4j.yard.pcs.to.NewPcsDepotShelfTO;
+
+public class PcsDepotShelfResourceTest extends BaseTest{
+
+	@Test public void testFindAll() throws Exception{
+		PcsDepotShelfs depotShelfs = mockMvcHelper.findList(PcsDepotShelfs.class, testUserCode, null);
+		assertTrue(depotShelfs.size()>0);
+		assertEquals(53, depotShelfs.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		int count = mockMvcHelper.count(PcsDepotShelfs.class, testUserCode, null);
+		assertEquals(53, count);
+	}
+	
+	@Test public void testFind() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		testFindByAreaId(accessToken);
+		testGetByAreaIdCount(accessToken);
+		testFindByIds();
+	}
+	
+	@Test public void testWhichCanConfigDepotCard() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		testWhichCanConfigDepotCard(accessToken);
+		testWhichCanConfigDepotCardCount(accessToken);
+	}
+	
+   @Test public void testGetDepotShelfPdf() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/pcs/pcsDepotShelfs/depotShelfId,{depotShelfId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, "shelf_id_031", accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("货位标签", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+	}
+	
+	@Test public void testGetAllDepotShelfPdf() throws Exception{
+//		String accessToken = getAccessToken(xykUserCode);
+//		String urlTemplate = getUrlTemplate("/pcs/pcsDepotShelfs/pdf?accessToken={accessToken}");
+//		mockMvc.perform(get(urlTemplate, accessToken))
+//				.andExpect(status().isOk())
+//				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("货位标签", Global.defaultCharset.name()))))
+//				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+	}
+	
+	@Test public void findWhichCanConfigDepotCard() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String depotId = "depot_id_001";
+		String urlTemplate = "/pcs/pcsDepotShelfs/whichCanConfigDepotCard?params={params}&accessToken={accessToken}";
+	    PcsDepotShelfParams params = new PcsDepotShelfParams();
+	    params.setDepotId(new ListParam<String>(depotId));
+	    params.setAreaType(new ListParam<String>(PcsAreaType.normal.getCode()));
+	    
+	    PcsDepotShelfs depotShelfs = mockMvcHelper.mockGet(PcsDepotShelfs.class, urlTemplate, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+	    assertTrue(depotShelfs.size()>0);
+	}
+    
+	@Test public void testAdd() throws Exception{
+		NewPcsDepotShelfTO shelfTO = createShelf("test_001");
+		
+		PcsDepotShelf shelf = mockMvcHelper.add(PcsDepotShelf.class, testUserCode, shelfTO);
+		assertNotNull(shelf);
+	}
+	
+	@Test public void testAddError() throws Exception{
+		NewPcsDepotShelfTO shelfTO = createShelf("DSXYKZC001");
+		mockMvcHelper.add(PcsDepotShelf.class, testUserCode, shelfTO, status().is4xxClientError(), YardExceptionType.forbide_operate);
+	}
+	
+	@Test public void testModify() throws Exception{
+		String shelfId031 = "shelf_id_031";
+		PcsDepotShelfs allShelfs = mockMvcHelper.findList(PcsDepotShelfs.class, testUserCode, null);
+		PcsDepotShelf originShelf = CollectionUtils.findWhere("depotShelfId", shelfId031, allShelfs);
+		String newShelfNmae = originShelf.getShelfName()+"test";
+		originShelf.setShelfName(newShelfNmae);
+		String shelfJson = Global.defaultObjectMapper.writeValueAsString(originShelf);
+		shelfJson = shelfJson.replace("202DSXYKZC001", "DSXYKZC001");
+		
+		PcsDepotShelf newShelf = mockMvcHelper.modify(PcsDepotShelf.class, testUserCode, shelfId031, shelfJson);
+		assertEquals(newShelfNmae, newShelf.getShelfName());
+		
+		//测试不能修改默认货位
+		String shelfId045 = "shelf_id_045";
+		PcsDepotShelf primayShelf = mockMvcHelper.findOne(PcsDepotShelf.class, testUserCode, shelfId045);
+		primayShelf.setShelfName("test虚拟货位");
+		
+		mockMvcHelper.modify(PcsDepotShelf.class, testUserCode, shelfId045, primayShelf, status().is4xxClientError(), YardExceptionType.forbid_update_default_depot_shelf);
+	}
+	
+	@Test public void testModifyError() throws Exception{
+		String shelfId031 = "shelf_id_019";
+		PcsDepotShelfs allShelfs = mockMvcHelper.findList(PcsDepotShelfs.class, testUserCode, null);
+		PcsDepotShelf originShelf = CollectionUtils.findWhere("depotShelfId", shelfId031, allShelfs);
+		String shelfJson = Global.defaultObjectMapper.writeValueAsString(originShelf);
+		shelfJson = shelfJson.replace("202DSXYKZC003", "DSXYKZC005");
+		
+		mockMvcHelper.modify(PcsDepotShelf.class, testUserCode, "pcs", "pcsDepotShelfs", shelfId031, shelfJson, status().is4xxClientError(), YardExceptionType.forbide_operate);
+	}
+	
+	private  void testFindByAreaId(String accessToken) throws Exception{
+		String urlTemplate = "/pcs/pcsDepotShelfs/areaId,{areaId}?accessToken={accessToken}";
+		String areaId003 = "area_id_003";
+
+		PcsDepotShelfs depotShelfs = mockMvcHelper.mockGet(PcsDepotShelfs.class, urlTemplate, areaId003, accessToken);
+		assertEquals(7, depotShelfs.size());
+	}
+	
+	private void testGetByAreaIdCount(String accessToken) throws Exception{
+		String urlTemplate = "/pcs/pcsDepotShelfs/areaId,{areaId}/count?accessToken={accessToken}";
+        String areaId003 = "area_id_003";
+		
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, areaId003, accessToken);
+		assertEquals(7, count);
+	}
+	
+	private void testWhichCanConfigDepotCard(String accessToken) throws Exception{
+		String urlTemplate = "/pcs/pcsDepotShelfs/whichCanConfigDepotCard?accessToken={accessToken}";
+		PcsDepotShelfs shelfs = mockMvcHelper.mockGet(PcsDepotShelfs.class, urlTemplate, accessToken);
+		assertEquals(0, shelfs.size());
+	}
+	
+    private void testWhichCanConfigDepotCardCount(String accessToken) throws Exception{
+        String urlTemplate = "/pcs/pcsDepotShelfs/whichCanConfigDepotCard/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, accessToken);
+		assertEquals(0, count);
+	}
+	
+	private  void testFindByIds() throws Exception{
+		String[] ids = new String[]{"shelf_id_019","shelf_id_018"};
+		
+		PcsDepotShelfs depotShelfs = mockMvcHelper.getByIds(PcsDepotShelfs.class, testUserCode, Arrays.asList(ids));
+		assertEquals(2, depotShelfs.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("depotShelfId", id, depotShelfs));
+		}
+	}
+	
+	private NewPcsDepotShelfTO createShelf(String shelfCode){
+		NewPcsDepotShelfTO shelf = new NewPcsDepotShelfTO();
+		shelf.setDepotId("depot_id_001");
+		shelf.setAreaId("area_id_016");
+		shelf.setShelfCode(shelfCode);
+		shelf.setShelfName("西药库二号正常货区第三格");
+		shelf.setStoreType("常温");
+		shelf.setMixedBatch(false);
+		shelf.setMixedGoods(true);
+		shelf.setEnabled(true);
+		shelf.setPrimary(false);
+		return shelf;
+	}
+}

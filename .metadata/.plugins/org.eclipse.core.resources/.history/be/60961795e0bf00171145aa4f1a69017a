@@ -1,0 +1,102 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.validator.constraints.NotEmpty;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdAdjustStockType;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAdjustStockRule;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+/**
+* @Description: 库存调节业务
+* @author zhengyf
+* @date 2017年4月10日 下午2:21:07
+* @version V1.0.0
+*/
+@Data
+@NoArgsConstructor
+@EqualsAndHashCode(callSuper=true)
+@Entity
+@Table(name="spd_adjust_stock_biz")
+@SuppressWarnings({"serial"})
+public class SpdAdjustStockBiz extends SpdGoodsBizPlan<SpdAdjustStockRule>{
+
+	@Transient private final String stateFlow = StateFlowTemplates.statesFlow_n_c_r;
+	
+	@NotEmpty(message="仓库不能为空")
+	private String depotId;
+	
+	@NotEmpty(message="库存调节类型不能为空")
+	private String adjustTypeCode;
+	
+	@NotEmpty(message="货区类型不能为空")
+	private String areaType = PcsAreaType.normal.getCode();
+	
+	private String reason;
+	
+	@Transient @JsonIgnore
+	private PcsDepot depot;
+
+	@Transient @JsonIgnore
+	private SpdDepotTasks onShelfTasks;
+	
+	@Transient @JsonIgnore
+	private SpdDepotTasks offShelfTasks;
+	
+	@JsonIgnore @Transient @Deprecated
+	public PcsDepot getStockChangeDepot() {
+		return getDepot();
+	}
+	
+	public String getTargetAreaType(){
+		return areaType;
+	}
+
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.adjust_stock_biz;
+	}
+	
+	@Transient 
+	public SpdAdjustStockType getAdjustType(){
+		return SpdAdjustStockType.typeOf(adjustTypeCode);
+	}
+
+
+	@Override
+	public void applyRule(SpdAdjustStockRule rule, PcsUser user) {
+		if(!rule.canApplyByUser(user)){
+			throw new OperateFailException(YardExceptionType.forbid_can_not_apply_biz, rule.getDepotId(), rule.getDisplayName());
+		}
+		
+		setBizRule(rule);
+		setBizRuleId(rule.getId());
+		setDepotId(rule.getDepotId());
+		setCreatorDepotId(rule.getDepotId());
+		setAreaType(rule.getAreaType());
+		setAdjustTypeCode(rule.getTypeCode());
+	}
+	
+	public void setBizRule(SpdAdjustStockRule bizRule){
+		super.setBizRule(bizRule);
+		if(bizRule == null){
+			return ;
+		}
+		setDepot(bizRule.getDepot());
+	}
+}

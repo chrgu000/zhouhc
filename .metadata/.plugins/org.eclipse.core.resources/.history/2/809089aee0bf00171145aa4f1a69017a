@@ -1,0 +1,27 @@
+/**
+ */
+package cn.ak4j.yard.spd.reconciliation.web;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRelationItems;
+
+public class SpdPropertyChangeRelationItemResourceTest extends BaseTest{
+
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRelationItems?accessToken={accessToken}&pageSize=-1";
+		SpdPropertyChangeRelationItems items = mockMvcHelper.mockGet(SpdPropertyChangeRelationItems.class, url, accessToken);
+		assertEquals(17, items.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdPropertyChangeRelationItems/count?accessToken={accessToken}&pageSize=-1";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(17, count);
+	}
+}

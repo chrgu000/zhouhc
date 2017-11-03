@@ -1,0 +1,11 @@
+package cn.ak4j.yard.extend.gep.domain;
+
+import java.util.Date;
+
+import lombok.Data;
+
+@Data
+public class SpdGepPrepareInformBizTO {
+	private String bizId;
+	private Date estimatedDeliveryTime;
+}

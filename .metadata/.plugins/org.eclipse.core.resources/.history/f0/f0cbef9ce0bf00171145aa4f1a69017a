@@ -1,0 +1,1 @@
+alter table spd_replenish_rule drop column enable_excess_plan;

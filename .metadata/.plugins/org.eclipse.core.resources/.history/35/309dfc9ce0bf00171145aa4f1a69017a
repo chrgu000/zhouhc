@@ -1,0 +1,1 @@
+alter table spd_daily_clean_biz add(fin_rec_id varchar2(32));

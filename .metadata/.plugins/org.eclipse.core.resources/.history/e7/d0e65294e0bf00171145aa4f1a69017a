@@ -1,0 +1,21 @@
+package cn.ak4j.yard.spd.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class NewSpdDepotCardTO {
+
+	private String depotId;
+	private String cardCode;
+	private String goodsId;
+	private String shelfId;
+	private String loseSheftId;// 不合格货位
+	private String isolationShelfId;//隔离货位
+	private String storeUnitLv;
+	private String storeUnitName;
+	private boolean enabled;
+
+}

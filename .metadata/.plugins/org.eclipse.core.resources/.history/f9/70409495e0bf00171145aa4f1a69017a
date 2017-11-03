@@ -1,0 +1,96 @@
+package cn.ak4j.yard.amqp;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.AmqpRouteKey;
+
+@Component
+public class RabbitProxy {
+
+	private Logger logger = LoggerFactory.getLogger(RabbitProxy.class);
+	@Autowired @Qualifier("yardRabbitTemplate") private RabbitTemplate rabbitTemplate;
+	
+	public void sendMsg(Object data, AmqpMsgType msgType, String routeKey){
+		try{		
+			String json = Global.defaultObjectMapper.writeValueAsString(data);
+			
+			MessageProperties properties = new MessageProperties();
+			properties.setHeader(Constant.AMQP_MSG_TYPE, msgType.getCode());
+			properties.setHeader("send_time", Global.sdfYMDHms.format(new Date()));
+			Message msg = new Message(json.getBytes(Global.defaultCharset), properties);
+			//logger.info("{}: {}", msgType.getCode(), json);
+			rabbitTemplate.convertAndSend(Constant.AMQP_AK_TOPIC, routeKey, msg);
+		}catch(Exception e){
+			logger.error("error occur in send amqp message", e);
+			//定义一个应用级的运行时异常
+			throw new RuntimeException(ExceptionUtils.getStackTrace(e));
+		}
+	}
+	
+	public void sendCreateBatchTaskMsg(String taskId){
+		Map<String, Object> data = new HashMap<String, Object>();
+		data.put("taskId", taskId);	
+		sendMsg(data, AmqpMsgType.CREATE_BATCH_TASK, AmqpRouteKey.BATCH_TASK_QUEUE_ROUTE.getCode());
+	}
+	
+	public void sendBizMsg(String bizId, String taskId, String userId, AmqpMsgType msgType){
+		Map<String, Object> data = new HashMap<String, Object>();
+		data.put("bizId", bizId);	
+		data.put("taskId", taskId);
+		data.put("userId", userId);
+		sendMsg(data, msgType, AmqpRouteKey.SPD_BIZ_QUEUE_ROUTE.getCode());
+	}
+	
+	public void sendGoodsMsg(String goodsId, String userId, AmqpMsgType msgType){
+		Map<String, Object> data = new HashMap<String, Object>();
+		data.put("goodsId", goodsId);	
+		data.put("userId", userId);
+		sendMsg(data, msgType, AmqpRouteKey.SPD_BIZ_QUEUE_ROUTE.getCode());
+	}
+	
+	public void sendEdsGoodsMsg(String edsGoodsId, String userId, AmqpMsgType msgType){
+		Map<String, Object> data = new HashMap<String, Object>();
+		data.put("edsGoodsId", edsGoodsId);	
+		data.put("userId", userId);
+		sendMsg(data, msgType, AmqpRouteKey.SPD_BIZ_QUEUE_ROUTE.getCode());
+	}
+	
+	public void sendDepotCardMsg(String depotId, List<String> goodsIds, String userId){
+		Map<String, Object> data = new HashMap<String, Object>();
+		data.put("depotId", depotId);
+		data.put("goodsIds", goodsIds);	
+		data.put("userId", userId);
+		sendMsg(data, AmqpMsgType.LACK_DEPOT_CARD, AmqpRouteKey.SPD_BIZ_QUEUE_ROUTE.getCode());
+	}
+	
+	public void sendCreatePrepareInformMsg(String receiveJson, String userId){
+		Map<String, Object> data = new HashMap<String, Object>();
+		data.put("receiveJson", receiveJson);
+		data.put("userId", userId);
+		sendMsg(data, AmqpMsgType.RECEIVE_LACK_RELATION_PREPARE_INFORM, AmqpRouteKey.SPD_BIZ_QUEUE_ROUTE.getCode());
+	}
+	
+	public void sendCreateSyncTaskMsg(String syncResourceType){
+		String msgType = "sync_"+syncResourceType;
+		AmqpMsgType amqpMsgType = AmqpMsgType.typeOf(msgType);
+		sendMsg("", amqpMsgType, AmqpRouteKey.SYNC_TASK_QUEUE_ROUTE.getCode());
+	}
+
+
+}

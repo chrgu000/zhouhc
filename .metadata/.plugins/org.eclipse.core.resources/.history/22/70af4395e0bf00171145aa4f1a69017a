@@ -1,0 +1,100 @@
+package cn.ak4j.yard.pcs.domain;
+
+import cn.ak4j.entity.Entities;
+
+@SuppressWarnings({"serial"})
+public class PcsWebApis extends Entities<PcsWebApi>{
+
+	public static final PcsWebApis publicWebApis = new PcsWebApis();
+	public static final PcsWebApis basicWebApis = new PcsWebApis();
+	
+	static{
+		basicWebApis.add(new PcsWebApi("/yard/pcs/WebApis/mine", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsUsers/mine", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsUsers", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsUsers/{userId}","PUT"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/menus/mine", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/operations[elementClass]/mine", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/operations", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/functions", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/spd/spdBizRules", "GET"));
+		
+		basicWebApis.add(new PcsWebApi("/yard/yds/ydsGoodss/indexNames", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/sys/yardGlobalInfos/{key}", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/sys/yardGlobalInfos/keys,{keys}", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/sys/dataImporterTemplates/{dataType}", "GET"));
+		
+		basicWebApis.add(new PcsWebApi("/yard/spd/recreateAllChangeTasks", "POST"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/opertions/whichDependendsOnApi", "GET"));
+		
+		
+		//TODO 删除临时接口
+		/******** 临时添加接口 起始******/
+		
+		basicWebApis.add(new PcsWebApi("/yard/spd/spdReplenishs", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/spd/spdReplenishs/count", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/spd/spdBizItems", "GET"));
+
+		basicWebApis.add(new PcsWebApi("/yard/spd/spdGoodsLotShelfStocks", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/spd/depots/{depotId}/goodss", "GET"));
+		
+		basicWebApis.add(new PcsWebApi("/yard/spd/spdDepotGoodsConfigs/{depotId}/initDepotGoodsConfigTask","POST"));
+		
+		//TODO 由于调度功能暂时在web端去掉，所以权限没赋值，暂时调度相关的接口在这里添加，待启动该功能之后删除
+		basicWebApis.add(new PcsWebApi("/yard/spd/spdDispatchers", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/spd/spdDispatchers/count", "GET"));
+		
+		
+		//TODO 角色权限接口,角色权限功能开发后删除
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsRoleApis", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsRoleApis/count", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsRoleApis/{id}", "GET"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsRoleApis", "POST"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsRoleApis/{id}", "DELETE"));
+		basicWebApis.add(new PcsWebApi("/yard/pcs/pcsRoleApis/{id}", "PUT"));
+		
+
+		/******** 临时添加接口 结束******/
+	}
+	
+	static{
+		publicWebApis.add(new PcsWebApi("/error", "GET"));
+		publicWebApis.add(new PcsWebApi("/error", "PUT"));
+		publicWebApis.add(new PcsWebApi("/error", "POST"));
+		publicWebApis.add(new PcsWebApi("/error", "DELETE"));
+		
+		publicWebApis.add(new PcsWebApi("/yard/pcs/accessTokens", "POST"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/accessTokens/{accessToken}", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/accessTokens/pub","POST"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/accessTokens/{accessToken}/refreshLastTime", "PUT"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/sysMixedOperations", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/sysMixedOperations/ids,{ids}", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/menus", "GET"));
+		
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId:[^ids].*}", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsOrgs/ids,{ids}", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsUsers/ids,{ids}", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsDepots/ids,{ids}", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsDepots/{depotId}", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsDepts", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsDepts/{deptId}", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/pcs/pcsDepotAreas", "GET"));
+		
+		publicWebApis.add(new PcsWebApi("/yard/enums", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/stateFlows", "GET"));
+
+		publicWebApis.add(new PcsWebApi("/yard/spd/repenishBizSteps", "GET"));
+		publicWebApis.add(new PcsWebApi("/yard/spd/allBizSteps", "GET"));
+	}
+	
+	public boolean contained(String uri, String method){
+		for(PcsWebApi webApi : this){
+			if(webApi.match(uri, method)){
+				return true;
+			}
+		}	
+		return false;
+	}	
+	
+}

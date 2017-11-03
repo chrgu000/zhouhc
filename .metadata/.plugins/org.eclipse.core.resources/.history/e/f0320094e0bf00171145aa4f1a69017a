@@ -1,0 +1,179 @@
+package cn.ak4j.yard.yds.service;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.validation.Valid;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfo;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@Service
+public class YdsGoodsService extends IYardService<YdsGoods> {
+	
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsEdsGoodsRepository edsGoodsRepository;
+	@Autowired private YdsGoodsInfoService giService;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private RabbitProxy rabbitProxy;
+
+	private Logger logger = LoggerFactory.getLogger(YdsGoodsService.class);
+
+	@Transactional
+    @Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public synchronized YdsGoods add(@Valid YdsGoods goods, IUser user) {
+		try{
+			goods.checkData();
+		}catch(InvalidDataException e){
+			goods.setEnabled(false);
+			String disableMsg = String.format("数据不规范被设置为不启用:%s", goods.getValidateMsg());
+			logger.warn("goods code:{}, msg:{}",goods.getGoodsCode(), disableMsg);
+			goods.getMaintenanceInfo().setDescribe(disableMsg);
+		}
+		
+		goods.verifyCodeUnique(goodsRepository);
+		goods.setMaintenanceInfo(new MaintenanceInfo(user));
+
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){		
+				rabbitProxy.sendGoodsMsg(goods.getGoodsId(), user.getUserId(), AmqpMsgType.ADD_GOODS);
+            }
+		});
+		
+		// 设置规格名称
+		goods.calculateFormatName();
+		goodsRepository.save(goods);
+		
+		giService.add(new YdsGoodsInfo(goods), user);
+		return goods;
+	}
+
+	@Transactional
+    @Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+					@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public synchronized YdsGoods modify(@Valid YdsGoods goods, IUser user) {
+		goods.checkData();
+		goods.verifyCodeUnique(goodsRepository);
+
+		YdsGoods goodsPO = goodsRepository.findAll().findById(goods.getGoodsId());
+		if(goods.getUnitPrice() != goodsPO.getUnitPrice()){
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+				public void afterCommit(){		
+					rabbitProxy.sendGoodsMsg(goods.getGoodsId(), user.getUserId(), AmqpMsgType.UPDATE_GOODS_PRICE);
+	            }
+			});
+		}
+		
+		goodsPO.updateBaseInfo(goods, (PcsUser)user);
+		goods.setMaintenanceInfo(goodsPO.getMaintenanceInfo());
+		goodsPO.updatePackageSpecifications(goods, (PcsUser)user);
+		goodsPO.calculateFormatName();
+		goodsPO = goodsRepository.save(goodsPO);
+		return goodsPO;
+	}
+	
+	@Transactional
+    @Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+					@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public synchronized YdsGoods setPackageSpecifications(@Valid YdsGoods goods, IUser user) { 
+		YdsGoods goodsPO = goodsRepository.findAll().findById(goods.getGoodsId());
+		goodsPO.updatePackageSpecifications(goods, (PcsUser)user);
+		goodsRepository.save(goodsPO);
+		return goodsPO;
+	}
+
+	@Transactional
+    @Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public synchronized void delete(String goodsId, IUser user) {
+		YdsGoods ydsGoods = goodsRepository.findAll().findById(goodsId);
+		YdsEdsGoodss edsGoodss = edsGoodsRepository.findAll().findByGoodsId(ydsGoods.getGoodsId());
+		if (CollectionUtils.isEmpty(edsGoodss)) {
+			throw new InvalidDataException("当前标准产品有企业产品相关联");
+		}
+		if (!ydsGoods.canDelete()) {
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, ydsGoods.getGoodsName());
+		}
+		goodsRepository.delete(ydsGoods);
+	}
+	
+	@Transactional
+    @Caching(evict={@CacheEvict(value="longTimeCache", key="\"allGoodss\""),
+			@CacheEvict(value="longTimeCache", key="\"allLotsWithGoods\"")})
+	public synchronized YdsGoods updateCheckState(String goodId, int checkStateCode, Date lastDate, IUser user) {
+		YdsGoods goodsPO = goodsRepository.findAll().findById(goodId);
+		goodsPO.checkData();
+		if(!goodsPO.getEnabled() && checkStateCode == CheckState.commited.getCode()){
+			throw new InvalidDataException(YardExceptionType.invalid_disabled_commiting_goods, goodsPO.getGoodsId(), goodsPO.getGoodsCode());
+		}
+		if(!goodsPO.isPackageSpecificationComplete()){
+			throw new InvalidDataException(YardExceptionType.invalid_package_specification_incomplete, goodsPO.getGoodsId(), goodsPO.getGoodsCode());
+		}
+		goodsPO.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		
+		if(checkStateCode == CheckState.commited.getCode()){
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+				public void afterCommit(){		
+					rabbitProxy.sendGoodsMsg(goodsPO.getGoodsId(), user.getUserId(), AmqpMsgType.COMMIT_GOODS);
+	            }
+			});
+		}
+		
+		goodsRepository.save(goodsPO);
+		
+		return goodsPO;
+	}
+	
+	/**
+	 * 查找制定仓库没有账页的产品，账页必须是启用提交状态
+	 * 产品必须是可用状态
+	 */
+	@SuppressWarnings("unchecked")
+	public YdsGoodss findWithoutCardGoodss(String depotId){
+		PcsDepot depot = depotRepository.findAllWithRelations().findById(depotId);
+		depot.fillCards(dcRepository);
+		List<String> goodsIds = depot.getCards().getEnableCards().pluck("goodsId");
+		
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setGoodsType(new ListParam<String>(depot.getGoodsType()));
+		if(CollectionUtils.isNotEmpty(goodsIds)){
+			params.setGoodsId(new ListParam<String>(goodsIds, QueryParam.operation_not_in));
+		}
+		return new YdsGoodss(goodsRepository.findAll().find(params));
+	}
+}

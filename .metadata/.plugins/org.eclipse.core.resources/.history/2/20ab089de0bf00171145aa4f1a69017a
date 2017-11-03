@@ -1,0 +1,162 @@
+--修改货区类型
+--PCS_DEPOT_AREA
+update pcs_depot_area area set area.area_type = 'normal' where area.area_type = '1';
+update pcs_depot_area area set area.area_type = 'isolation' where area.area_type = '2';
+update pcs_depot_area area set area.area_type = 'unqualified' where area.area_type = '3';
+
+--SPD_ADJUST_STOCK_BIZ
+update spd_adjust_stock_biz asb set asb.area_type = 'normal' where asb.area_type = '1';
+update spd_adjust_stock_biz asb set asb.area_type = 'isolation' where asb.area_type = '2';
+update spd_adjust_stock_biz asb set asb.area_type = 'unqualified' where asb.area_type = '3';
+
+--SPD_DISPATCHER_REF
+update spd_dispatcher_ref df set df.area_type = 'normal' where df.area_type = '1';
+update spd_dispatcher_ref df set df.area_type = 'isolation' where df.area_type = '2';
+update spd_dispatcher_ref df set df.area_type = 'unqualified' where df.area_type = '3';
+
+--SPD_MOVE_AREA_BIZ
+update spd_move_area_biz mab set mab.from_area_type = 'normal' where mab.from_area_type = '1';
+update spd_move_area_biz mab set mab.from_area_type = 'isolation' where mab.from_area_type = '2';
+update spd_move_area_biz mab set mab.from_area_type = 'unqualified' where mab.from_area_type = '3';
+
+update spd_move_area_biz mab set mab.to_area_type = 'normal' where mab.to_area_type = '1';
+update spd_move_area_biz mab set mab.to_area_type = 'isolation' where mab.to_area_type = '2';
+update spd_move_area_biz mab set mab.to_area_type = 'unqualified' where mab.to_area_type = '3';
+
+--SPD_RECEIVE_BIZ
+update spd_receive_biz rb set rb.to_area_type = 'normal' where rb.to_area_type = '1';
+update spd_receive_biz rb set rb.to_area_type = 'isolation' where rb.to_area_type = '2';
+update spd_receive_biz rb set rb.to_area_type = 'unqualified' where rb.to_area_type = '3';
+
+--SPD_REPLENISH_BIZ
+update spd_replenish_biz rbiz set rbiz.from_area_type = 'normal' where rbiz.from_area_type = '1';
+update spd_replenish_biz rbiz set rbiz.from_area_type = 'isolation' where rbiz.from_area_type = '2';
+update spd_replenish_biz rbiz set rbiz.from_area_type = 'unqualified' where rbiz.from_area_type = '3';
+
+update spd_replenish_biz rbiz set rbiz.to_area_type = 'normal' where rbiz.to_area_type = '1';
+update spd_replenish_biz rbiz set rbiz.to_area_type = 'isolation' where rbiz.to_area_type = '2';
+update spd_replenish_biz rbiz set rbiz.to_area_type = 'unqualified' where rbiz.to_area_type = '3';
+
+--SPD_REPLENISH_RULE
+update spd_replenish_rule rr set rr.from_depot_area_type = 'normal' where rr.from_depot_area_type = '1';
+update spd_replenish_rule rr set rr.from_depot_area_type = 'isolation' where rr.from_depot_area_type = '2';
+update spd_replenish_rule rr set rr.from_depot_area_type = 'unqualified' where rr.from_depot_area_type = '3';
+
+update spd_replenish_rule rr set rr.to_depot_area_type = 'normal' where rr.to_depot_area_type = '1';
+update spd_replenish_rule rr set rr.to_depot_area_type = 'isolation' where rr.to_depot_area_type = '2';
+update spd_replenish_rule rr set rr.to_depot_area_type = 'unqualified' where rr.to_depot_area_type = '3';
+
+--SPD_SHELF_STOCK
+update spd_shelf_stock ss set ss.shelf_type = 'normal' where ss.shelf_type = '1';
+update spd_shelf_stock ss set ss.shelf_type = 'isolation' where ss.shelf_type = '2';
+update spd_shelf_stock ss set ss.shelf_type = 'unqualified' where ss.shelf_type = '3';
+
+
+
+--修改部门类型
+--PCS_DEPT
+--1.在表中加一个临时字段
+alter table pcs_dept add(interim varchar2(50));
+--2.将目标字段的值付给临时字段，并将目标字段置空
+update pcs_dept set interim = dept_type, dept_type = null;
+--3.修改目标类型
+alter table pcs_dept modify(dept_type varchar2(50));
+--4.将临时字段的值付给目标字段，并将临时字段置空
+update pcs_dept set dept_type = interim, interim = null;
+--5.删除临时字段
+alter table pcs_dept drop column interim;
+--6.更新目标字段的值
+update pcs_dept dept set dept.dept_type = 'depot_management' where dept.dept_type = '1';
+update pcs_dept dept set dept.dept_type = 'purchase_management' where dept.dept_type = '2';
+update pcs_dept dept set dept.dept_type = 'sale_management' where dept.dept_type = '3';
+update pcs_dept dept set dept.dept_type = 'finance_management' where dept.dept_type = '4';
+update pcs_dept dept set dept.dept_type = 'operate_management' where dept.dept_type = '5';
+update pcs_dept dept set dept.dept_type = 'technology_management' where dept.dept_type = '6';
+update pcs_dept dept set dept.dept_type = 'operate' where dept.dept_type = '9';
+
+
+--修改盘点方式
+--SPD_INVENTORY
+update spd_inventory it set it.inventory_type = 'static_disc' where it.inventory_type = '1';
+update spd_inventory it set it.inventory_type = 'static_disc_blind' where it.inventory_type = '2';
+
+
+--修改采购类型
+--SPD_PURCHASE
+update spd_purchase pc set pc.purchase_type = 'purchase' where pc.purchase_type = '1';
+update spd_purchase pc set pc.purchase_type = 'refund' where pc.purchase_type = '2';
+
+
+--修改作业类型
+--SPD_DEPOT_TASK
+alter table spd_depot_task modify(task_type varchar2(50));
+
+update spd_depot_task dt set dt.task_type ='on_shelf_task' where dt.task_type = '1';
+update spd_depot_task dt set dt.task_type ='off_shelf_task' where dt.task_type = '2';
+
+
+--修改产品类型
+--YDS_GOODS
+--1.在表中加一个临时字段
+alter table yds_goods add(interim varchar2(50));
+--2.将目标字段的值付给临时字段，
+update yds_goods set interim = goods_type;
+--3.修改目标类型
+alter table yds_goods modify(goods_type varchar2(50));
+--4.将临时字段的值付给目标字段，并将临时字段置空
+update yds_goods set goods_type = interim, interim = null;
+--5.删除临时字段
+alter table yds_goods drop column interim;
+--6.更新目标字段的值
+update yds_goods goods set goods.goods_type = 'drug' where goods.goods_type = '1';
+update yds_goods goods set goods.goods_type = 'equipment' where goods.goods_type = '2';
+update yds_goods goods set goods.goods_type = 'other' where goods.goods_type = '3';
+
+
+--修改字典编码
+--YDS_WORKBOOK
+update yds_workbook wb set wb.sort_code = 'pack_unit' where wb.sort_code = 'GOODS_PACK';
+update yds_workbook wb set wb.sort_code = 'store_type' where wb.sort_code = 'STORE_TYPE';
+update yds_workbook wb set wb.sort_code = 'goods_model' where wb.sort_code = 'GOODS_MODEL';
+update yds_workbook wb set wb.sort_code = 'measurement_unit' where wb.sort_code = 'GOODS_UNIT';
+update yds_workbook wb set wb.sort_code = 'tax_ratiot ' where wb.sort_code = 'TAX_RATIO';
+update yds_workbook wb set wb.sort_code = 'bill_type' where wb.sort_code = 'BILL_TYPE';
+
+
+--修改调度类型
+--SPD_DISPATCHER
+--1.在表中加一个临时字段
+alter table spd_dispatcher add(interim varchar2(50));
+--2.将目标字段的值付给临时字段，
+update spd_dispatcher set interim = dispatcher_type;
+--3.修改目标类型
+alter table spd_dispatcher modify(dispatcher_type varchar2(50));
+--4.将临时字段的值付给目标字段，并将临时字段置空
+update spd_dispatcher set dispatcher_type = interim, interim = null;
+--5.删除临时字段
+alter table spd_dispatcher drop column interim;
+--6.更新目标字段的值
+update spd_dispatcher dc set dc.dispatcher_type = 'on_shelf' where dc.dispatcher_type = '1';
+update spd_dispatcher dc set dc.dispatcher_type = 'off_shelf' where dc.dispatcher_type = '2';
+
+
+--修改帐页补货周期
+--SPD_DEPOT_CARD
+--1.在表中加一个临时字段
+alter table spd_depot_card add(interim varchar2(50));
+--2.将目标字段的值付给临时字段
+update spd_depot_card set interim = receive_cycle;
+--3.修改目标类型
+alter table spd_depot_card modify(receive_cycle varchar2(50));
+--4.将临时字段的值付给目标字段，并将临时字段置空
+update spd_depot_card set receive_cycle = interim, interim = null;
+--5.删除临时字段
+alter table spd_depot_card drop column interim;
+--6.更新目标字段的值
+update spd_depot_card dcard set dcard.receive_cycle = 'each_day' where dcard.receive_cycle = '1';
+update spd_depot_card dcard set dcard.receive_cycle = 'each_week' where dcard.receive_cycle = '2';
+update spd_depot_card dcard set dcard.receive_cycle = 'each_month' where dcard.receive_cycle = '3';
+
+
+
+

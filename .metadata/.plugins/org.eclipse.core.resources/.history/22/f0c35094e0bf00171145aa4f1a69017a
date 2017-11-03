@@ -1,0 +1,23 @@
+package cn.ak4j.yard.spd.to;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewSpdDepotStockTO {
+	
+	private String cardId;//帐页ID
+	private String goodsId;//产品ID
+	private String goodsLotId;//批号ID
+	private Integer stockQty;//可用数量
+	private Integer lockQty;//锁定数量
+	private Integer taskInQty;//待入库数量
+	private Integer taskOutQty;//待出库数量
+	private String depotId;//所在仓库
+	private String shelfId;//货位
+
+	
+	
+}

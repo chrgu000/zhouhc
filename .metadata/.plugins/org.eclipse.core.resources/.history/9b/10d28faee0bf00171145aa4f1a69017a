@@ -1,0 +1,180 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizrule.params.SpdReceiveRuleParams;
+import cn.ak4j.yard.spd.bizrule.to.SpdReceiveRuleTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdReceiveRuleResourceTest extends BaseTest{
+
+	@Autowired private YardCodeService codeService;
+	
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReceiveRules?accessToken={accessToken}";
+		List<SpdReceiveRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReceiveRuleTO>>() {}, url, accessToken);
+		assertEquals(11, rules.size());
+	}
+	
+	@Test public void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReceiveRules/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(11, count);
+	}
+	
+	@Test public void testFinByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReceiveRules/ids,{ids}?accessToken={accessToken}";
+		String[] ids = new String[]{"rec_rule_id_01", "rec_rule_id_02"};
+		List<SpdReceiveRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReceiveRuleTO>>() {}, url, StringUtils.join(ids, ","), accessToken);
+		assertEquals(2, rules.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("id", id, rules));
+		}
+	}
+
+	@Test public void testWhichICanApply() throws Exception{
+		testSimpleWhichICanApply();
+		testWhichICanApplyWitchParams();
+	}
+	
+	private void testSimpleWhichICanApply() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReceiveRules/whichICanApply?accessToken={accessToken}";
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		List<SpdReceiveRuleTO> ruleTOs = mockMvcHelper.mockGet(new TypeReference<List<SpdReceiveRuleTO>>() {}, url, accessToken);
+		assertEquals(11, ruleTOs.size());
+		ruleTOs.forEach(ruleTO->{
+			assertTrue(ruleTO.getReceiveDepot().getManageDeptId().equals(user.getDeptId())
+							|| ruleTO.getCollectDepot().getManageDeptId().equals(user.getDeptId()));
+		});
+	}
+	
+	private void testWhichICanApplyWitchParams() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReceiveRules/whichICanApply?params={params}&accessToken={accessToken}";
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		SpdReceiveRuleParams params = new SpdReceiveRuleParams();
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setMustPrepare(new ListParam<Boolean>(false));
+		List<SpdReceiveRuleTO> ruleTOs = mockMvcHelper.mockGet(new TypeReference<List<SpdReceiveRuleTO>>() {}, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(3, ruleTOs.size());
+		ruleTOs.forEach(ruleTO->{
+			assertTrue(ruleTO.getReceiveDepot().getManageDeptId().equals(user.getDeptId())
+							|| ruleTO.getCollectDepot().getManageDeptId().equals(user.getDeptId()));
+		});
+	}
+	
+	@Test public void testAdd() throws Exception{
+		SpdReceiveRuleTO ruleTO = createReceiveRule();
+		String originRuleId = "rep_rule_id_09";
+		ruleTO.setOriginRuleId(originRuleId);
+		String collectDepotId = "depot_id_001";
+		ruleTO.setCollectDepotId(collectDepotId);
+		ruleTO.setCollectAreaType(PcsAreaType.normal.getCode());
+		SpdReceiveRuleTO newRuleTO = mockMvcHelper.add(SpdReceiveRuleTO.class, testUserCode, "spd", "spdReceiveRules", ruleTO);
+		
+		assertTrue(newRuleTO.getId() != null);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.shouhuoguize);
+		assertEquals(CodeSort.shouhuoguize.getCode()+getCurrentDateCode()+sequenceCode, newRuleTO.getRuleCode());
+		assertNotNull(newRuleTO.getCustomName());
+		assertEquals(ruleTO.getName(), newRuleTO.getName());
+		assertEquals(ruleTO.getCustomName(), newRuleTO.getCustomName());
+		assertEquals(ruleTO.getPrior(), newRuleTO.getPrior());
+		assertEquals(ruleTO.getToDepotId(), newRuleTO.getToDepotId());
+		assertEquals(ruleTO.getToAreaType(), newRuleTO.getToAreaType());
+		assertEquals(ruleTO.getFromOrgId(), newRuleTO.getFromOrgId());
+		assertEquals(ruleTO.getFromDeptId(), newRuleTO.getFromDeptId());
+		assertEquals(ruleTO.getEnabled(), newRuleTO.getEnabled());
+		assertEquals(ruleTO.getFeedbackRuleId(), newRuleTO.getFeedbackRuleId());
+		assertEquals(originRuleId, newRuleTO.getOriginRuleId());
+		assertEquals(collectDepotId, newRuleTO.getCollectDepotId());
+		assertEquals(PcsAreaType.normal.getCode(), newRuleTO.getCollectAreaType());
+		
+		ruleTO.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.add(SpdReceiveRuleTO.class, testUserCode, "spd", "spdReceiveRules", ruleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+		
+		ruleTO.setFeedbackRuleId(newRuleTO.getFeedbackRuleId());
+		ruleTO.setCollectDepotId("depot_id_007");
+		mockMvcHelper.add(SpdReceiveRuleTO.class, testUserCode, "spd", "spdReceiveRules", ruleTO, status().is4xxClientError(), YardExceptionType.invalid_depot_goods_type_different);
+		
+		SpdReceiveRuleTO receiveRuleTO = new SpdReceiveRuleTO();
+		receiveRuleTO.setName("默认收货");
+		receiveRuleTO.setPrior(99);
+		receiveRuleTO.setFeedbackRuleId("rec_fb_id_19");
+		receiveRuleTO.setEnabled(true);
+		receiveRuleTO.setMustPrepare(true);
+		receiveRuleTO.setCanBeOriginRule(false);
+		receiveRuleTO.setOriginRuleId("prp_inf_rule_id_004");
+		receiveRuleTO.setFromOrgId("org_id_001");
+		receiveRuleTO.setFromDeptId("dept_id_005");
+		receiveRuleTO.setToDepotId("depot_id_001");
+		receiveRuleTO.setToAreaType(PcsAreaType.normal.getCode());
+		mockMvcHelper.add(SpdReceiveRuleTO.class, testUserCode, "spd", "spdReceiveRules", receiveRuleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+	}
+	
+	
+	@Test public void testModify() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReceiveRules/{id}?accessToken={accessToken}";
+		String bizRuleId = "rec_rule_id_05";
+		SpdReceiveRuleTO ruleTO = mockMvcHelper.mockGet(SpdReceiveRuleTO.class, url, bizRuleId, accessToken);
+		ruleTO.setEnabled(false);
+		ruleTO.setCustomName("西药库直收半自动02");
+		
+		SpdReceiveRuleTO newRuleTO = mockMvcHelper.modify(SpdReceiveRuleTO.class, testUserCode, "spd", "spdReceiveRules", bizRuleId, ruleTO, status().isOk(), null);
+		assertEquals(false, newRuleTO.getEnabled());
+		assertNotNull(newRuleTO.getCustomName());
+		assertEquals("西药库直收半自动02", newRuleTO.getCustomName());
+		
+		newRuleTO.setFeedbackRuleId("rec_fb_id_19");
+		mockMvcHelper.modify(SpdReceiveRuleTO.class, testUserCode, "spd", "spdReceiveRules", bizRuleId, newRuleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		newRuleTO.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.modify(SpdReceiveRuleTO.class, testUserCode, "spd", "spdReceiveRules", bizRuleId, newRuleTO, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+		
+		ruleTO.setFeedbackRuleId(ruleTO.getFeedbackRuleId());
+		ruleTO.setCollectDepotId("depot_id_007");
+		ruleTO.setCollectAreaType(PcsAreaType.normal.getCode());
+		mockMvcHelper.modify(SpdReceiveRuleTO.class, testUserCode, "spd", "spdReceiveRules", bizRuleId, ruleTO, status().is4xxClientError(), YardExceptionType.invalid_depot_goods_type_different);
+	}
+	
+	private SpdReceiveRuleTO createReceiveRule(){
+		SpdReceiveRuleTO receiveRuleTO = new SpdReceiveRuleTO();
+		receiveRuleTO.setName("默认收货");
+		receiveRuleTO.setCustomName("自定义默认收货");
+		receiveRuleTO.setPrior(99);
+		receiveRuleTO.setFeedbackRuleId("rec_fb_id_19");
+		receiveRuleTO.setEnabled(true);
+		receiveRuleTO.setMustPrepare(false);
+		receiveRuleTO.setFromOrgId("org_id_001");
+		receiveRuleTO.setFromDeptId("dept_id_005");
+		receiveRuleTO.setToDepotId("depot_id_002");
+		receiveRuleTO.setToAreaType(PcsAreaType.normal.getCode());
+		receiveRuleTO.setCanBeOriginRule(false);
+		return receiveRuleTO;
+	}
+	
+}

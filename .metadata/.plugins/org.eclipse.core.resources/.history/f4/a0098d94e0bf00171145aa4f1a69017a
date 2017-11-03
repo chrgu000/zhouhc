@@ -1,0 +1,168 @@
+package cn.ak4j.yard.spd.repository;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.pcs.domain.PcsDepotArea;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsDepotAreaParams;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotAreaRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventoryItems;
+import cn.ak4j.yard.spd.domain.SpdInventorys;
+import cn.ak4j.yard.spd.params.SpdInventoryItemParams;
+import cn.ak4j.yard.spd.params.SpdInventoryParams;
+import lombok.Getter;
+
+@Repository
+public class SpdInventoryRepository extends BaseRepository<SpdInventory, SpdInventorys, SpdInventoryParams, String>{
+	
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotAreaRepository daRepository;
+	@Autowired private SpdInventoryItemRepository iiRepository;
+	
+	@Transactional
+	public SpdInventory saveWithItems(SpdInventory inventory){
+		inventory = save(inventory);
+		inventory.updateItemsId();
+		iiRepository.saveAll(inventory.getItems());
+		return inventory;
+	}
+	
+	public SpdInventory findByIdWithRelations(String inventoryId){
+		SpdInventory inventory = findOne(inventoryId);
+		
+		PcsDepotArea depotArea = daRepository.findAllWithRelation().findById(inventory.getAreaId());
+		inventory.setDepotArea(depotArea);
+		
+		SpdInventoryItemParams itemParams = new SpdInventoryItemParams();
+		itemParams.setInventoryId(new ListParam<String>(inventoryId));
+		SpdInventoryItems items = iiRepository.findWithGoods(itemParams);
+		inventory.setItems(items);
+		return inventory;
+	}
+
+	public SpdInventorys find(SpdInventoryParams params, OrderParam order, int pageNo, int pageSize){
+		if(setRelationParams(params)){
+			if(order == null){
+				order = OrderParam.getDefaultOrder();
+			}
+			return new SpdInventorys(doQuery(params, order, pageNo, pageSize));
+		}
+		return new SpdInventorys();
+	}
+
+	public int count(SpdInventoryParams params) {
+		if(setRelationParams(params)){
+			return super.count(params);
+		}
+		return 0;
+	}
+	
+	private boolean setRelationParams(SpdInventoryParams params){
+		if(params !=null){
+		
+			PcsDeptParams deptParams = new PcsDeptParams();
+			deptParams.setDeptName(params.getDeptName());
+			if(!deptParams.isEmpty()){
+				PcsDepts pcsDepts = new PcsDepts(deptRepository.findAll().find(deptParams));
+				if(pcsDepts.size() == 0){
+					return false;
+				}
+				params.setDeptId(new ListParam<String>(pcsDepts.getIds()));
+			}
+			
+			PcsOrgParams orgParams = new PcsOrgParams();
+			orgParams.setOrgName(params.getOrgName());
+			if(!orgParams.isEmpty()){
+				PcsOrgs pcsOrgs = new PcsOrgs(orgRepository.findAll().find(orgParams));
+				if(pcsOrgs.size() == 0){
+					return false;
+				}
+				params.setOrgId(new ListParam<String>(pcsOrgs.getIds()));
+			}
+			
+			PcsDepotParams depotParams = new PcsDepotParams();
+			depotParams.setDepotName(params.getDepotName());
+			if(!depotParams.isEmpty()){
+				PcsDepots depots = depotRepository.findAll().find(depotParams, orgRepository, deptRepository);
+				if(depots.size() == 0){
+					return false;
+				}
+				params.setDepotId(new ListParam<String>(depots.getIds()));
+			}
+			
+			PcsUserParams userParams = new PcsUserParams();
+			userParams.setUserName(params.getUserName());
+			if(!userParams.isEmpty()){
+				PcsUsers users = userRepository.find(userParams);
+				if(users.size() == 0){
+					return false;
+				}
+				params.setInventoryUser(new ListParam<String>(users.getIds()));
+			}
+			
+			PcsDepotAreaParams areaParams = new PcsDepotAreaParams();
+			areaParams.setAreaName(params.getAreaName());
+			if(!areaParams.isEmpty()){
+				Entities<PcsDepotArea> areas = daRepository.findAllWithRelation().find(areaParams);
+				if(CollectionUtils.isEmpty(areas)){
+					return false;
+				}
+				params.setAreaId(new ListParam<String>(areas.getIds()));
+			}
+		}
+		
+		return true;
+	}
+	
+	public SpdInventorys findbyIdsArray(String ids) {
+		String[] idArray = ids.split(",");
+		List<String> idList = Arrays.asList(idArray);
+		SpdInventoryParams params = new SpdInventoryParams();
+		params.setInventoryId(new ListParam<String>(idList));
+		return this.find(params);
+	}
+
+	@Deprecated
+	public SpdInventorys findUnreviewedByAreaIdAndDepotId(String areaId, String depotId) {
+		SpdInventoryParams params = new SpdInventoryParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		params.setAreaId(new ListParam<String>(areaId));
+		List<Integer> checkStateCodes = new ArrayList<Integer>();
+		checkStateCodes.add(CheckState.reviewed.getCode());
+		checkStateCodes.add(CheckState.completed.getCode());
+		params.setCheckStateCode(new ListParam<Integer>(checkStateCodes, QueryParam.operation_not_in));
+		return find(params);
+	}
+	
+}

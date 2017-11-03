@@ -1,0 +1,80 @@
+package cn.ak4j.yard.spd.bizrule.domain.feedbackrule;
+
+import javax.persistence.Column;
+import javax.persistence.DiscriminatorValue;
+import javax.persistence.Entity;
+import javax.persistence.Transient;
+
+import org.apache.commons.lang3.StringUtils;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+/**
+* @Description: 移仓业务的反馈规则
+* @author zhengyf
+* @date 2017年6月14日 上午11:25:56
+* @version V1.0.0
+*/
+@Data
+@EqualsAndHashCode(callSuper=false)
+@Entity  
+@DiscriminatorValue("move_area") 
+public class SpdMoveAreaFeedbackRule extends SpdAbstractFeedbackRule {
+
+	private static final long serialVersionUID = 8157833151767453816L;
+
+	private Boolean autoCommitMoveArea;
+	
+	private Boolean autoReviewMoveArea;
+	
+	@Column(name="AUTO_CREATE_OFF_SHELF_DISP")
+	private Boolean autoCreateOffShelfDispatcher;
+	
+	@Column(name="AUTO_REVIEW_OFF_SHELF_DISP")
+	private Boolean autoReviewOffShelfDispatcher;
+	
+	private Boolean autoReviewOffShelfTask;
+	
+	@Column(name="AUTO_CREATE_ON_SHELF_DISP")
+	private Boolean autoCreateOnShelfDispatcher;
+	
+	@Column(name="AUTO_REVIEW_ON_SHELF_DISP")
+	private Boolean autoReviewOnShelfDispatcher;
+	
+	private Boolean autoReviewOnShelfTask;
+	
+	@Transient private String description;
+	
+	@Override public SpdBizType getBizType() {
+		return SpdBizType.move_area_biz;
+	}
+	
+	@Override @Transient
+	public String getDescription() {
+		if(StringUtils.isEmpty(description)){
+			StringBuffer buf = new StringBuffer();
+			buf.append(autoCommitMoveArea?auto_word:manual_word)
+			 	.append("提交移仓").append(Global.generalSeparator)
+			 	.append(autoReviewMoveArea?auto_word:manual_word)
+			 	.append("审核移仓").append(Global.generalSeparator)
+			 	.append(autoCreateOffShelfDispatcher?auto_word:manual_word)
+			 	.append("创建下架调度").append(Global.generalSeparator)
+			 	.append(autoReviewOffShelfDispatcher?auto_word:manual_word)
+			 	.append("审核下架调度").append(Global.generalSeparator)
+			 	.append(autoReviewOffShelfTask?auto_word:manual_word)
+			 	.append("审核下架作业").append(Global.generalSeparator)
+			 	.append(autoCreateOnShelfDispatcher?auto_word:manual_word)
+			 	.append("创建上架调度").append(Global.generalSeparator)
+			 	.append(autoReviewOnShelfDispatcher?auto_word:manual_word)
+			 	.append("审核上架调度").append(Global.generalSeparator)
+			 	.append(autoReviewOnShelfTask?auto_word:manual_word)
+			 	.append("审核上架作业");
+			return this.description = buf.toString();
+		}
+		return description;
+	}
+	
+}

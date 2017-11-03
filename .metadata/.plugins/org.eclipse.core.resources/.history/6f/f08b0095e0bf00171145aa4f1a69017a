@@ -1,0 +1,12 @@
+package cn.ak4j.yard.spd.bizplan.repository;
+
+import org.springframework.data.repository.CrudRepository;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.yard.spd.bizplan.domain.SpdGoodsBizPlan;
+
+@SuppressWarnings("rawtypes")
+@Repository
+public interface SpdBizPlanRepository extends CrudRepository<SpdGoodsBizPlan, String>{
+
+}

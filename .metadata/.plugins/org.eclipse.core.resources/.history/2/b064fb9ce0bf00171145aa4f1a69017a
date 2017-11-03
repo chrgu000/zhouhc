@@ -1,0 +1,2 @@
+alter table spd_adjust_stock_rule drop column usage;
+alter table spd_adjust_stock_rule add(init_adjust char(1));

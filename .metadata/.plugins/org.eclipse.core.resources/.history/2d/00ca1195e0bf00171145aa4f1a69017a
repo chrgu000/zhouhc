@@ -1,0 +1,21 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import cn.ak4j.entity.Entities;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial", "rawtypes"})
+public class SpdGoodsBizPlans extends Entities<SpdGoodsBizPlan>{
+	
+	@SuppressWarnings("unchecked")
+	public SpdGoodsBizPlans(Entities plans){
+		super(plans);
+	}
+
+	public SpdGoodsBizPlans(Iterable<SpdGoodsBizPlan> bizPlans) {
+		bizPlans.forEach(bizPlan->{
+			add(bizPlan);
+		});
+	}
+
+}

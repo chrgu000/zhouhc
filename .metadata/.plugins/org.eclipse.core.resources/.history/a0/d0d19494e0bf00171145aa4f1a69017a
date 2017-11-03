@@ -1,0 +1,75 @@
+package cn.ak4j.yard.spd.reconciliation.service;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdPropertyChangeRuleRepository;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+@Service
+public class SpdPropertyChangeRuleService extends IYardService<SpdPropertyChangeRule>{
+	
+	@Autowired private SpdPropertyChangeRuleRepository pcrRepository;
+	@Autowired private YardCodeService codeService;
+
+	@Override @Transactional
+	@CacheEvict(value = "longTimeCache", key = "\"allPropertyChangeRulesWithRelation\"")
+	public SpdPropertyChangeRule add(SpdPropertyChangeRule rule, IUser user) {
+		if(!rule.isValid()){
+			throw new InvalidDataException(rule.getValidateMsg());
+		}
+		SpdPropertyChangeRules allRules = pcrRepository.findAllWithRelations();
+		if(allRules.containsRule(rule)){
+			throw new InvalidDataException(YardExceptionType.invalid_exist_same_property_change_rule);
+		}
+		
+		rule.setRuleCode(codeService.publishCode(CodeSort.wuquanbiangengguize).getCode());
+		
+		rule.checkRule(allRules);
+		pcrRepository.save(rule);
+		return rule;
+	}
+
+	@Override
+	public void delete(String id, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+	@Override @Transactional
+	@CacheEvict(value = "longTimeCache", key = "\"allPropertyChangeRulesWithRelation\"")
+	public SpdPropertyChangeRule modify(SpdPropertyChangeRule rule, IUser user) {
+		if(!rule.isValid()){
+			throw new InvalidDataException(rule.getValidateMsg());
+		}
+		
+		SpdPropertyChangeRules allRules = pcrRepository.findAllWithRelations();
+		SpdPropertyChangeRule sameConditionRule = allRules.findWithSameRuleProps(rule);
+		if(sameConditionRule != null && !sameConditionRule.getId().equals(rule.getId())){
+			throw new InvalidDataException(YardExceptionType.invalid_rule_exsit);
+		}
+		SpdPropertyChangeRule rulePO = allRules.findById(rule.getId());
+		rule.checkRule(allRules);
+		rulePO.update(rule);
+		return pcrRepository.save(rulePO);
+	}
+
+	@Override
+	public SpdPropertyChangeRule updateCheckState(String id, int checkStateCode, Date lastUpdateDate, IUser user) {
+		throw new UnsupportedOperationException(Constant.service_method_not_support_msg);
+	}
+
+	
+	
+}

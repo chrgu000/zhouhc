@@ -1,0 +1,122 @@
+package cn.ak4j.yard.spd.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+
+import org.junit.Test;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.spd.to.NewSpdDepotCardTO;
+
+public class SpdDepotCardResourceTest extends BaseTest{
+
+	@Test public void testFindMine() throws Exception{
+		String accessToken = getAccessToken(xyfUserCode);
+		String urlTemplate = "/spd/spdDepotCards/mine?accessToken={accessToken}&params={params}&orders={orders}&currentPage=1&pageSize=10";
+		
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		params.setDepotId(new ListParam<String>("depot_id_002"));
+		
+		String ordersStr = "{\"propName\":\"goods[goodsId=goodsId].formatName\",\"orderType\":\"desc\"}";
+
+		SpdDepotCards depotCards = mockMvcHelper.mockGet(SpdDepotCards.class, urlTemplate, accessToken, Global.defaultObjectMapper.writeValueAsString(params), ordersStr);
+		assertEquals(10, depotCards.size());
+	}
+	
+	@Test public void testFindMineCount() throws Exception{
+        String accessToken = getAccessToken(xyfUserCode);
+		String urlTemplate = "/spd/spdDepotCards/mine/count?accessToken={accessToken}&params={params}";
+		
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		params.setDepotId(new ListParam<String>("depot_id_002"));
+		
+		int count = mockMvcHelper.mockGet(Integer.class, urlTemplate, accessToken, Global.defaultObjectMapper.writeValueAsString(params));
+		assertEquals(37, count);
+	}
+	
+	@Test public void testFindByShelfCode() throws Exception{
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		params.setDepotId(new ListParam<String>("depot_id_002"));
+		params.setAreaId(new ListParam<String>("area_id_006"));
+		params.setShelfCode(new ListParam<String>("202DSXYFZC004"));
+		params.setGoodsId(new ListParam<String>("goods_id_011"));
+		
+		SpdDepotCards depotCards = mockMvcHelper.findList(SpdDepotCards.class, xykUserCode, params);
+		assertEquals(1, depotCards.size());
+	}
+
+	
+	@Test public void testList() throws Exception{
+		SpdDepotCards depotCards = mockMvcHelper.findList(SpdDepotCards.class, xykUserCode, null, 20);
+		assertEquals(20, depotCards.size());
+	}
+	
+	@Test public void testDownloadExcelFile() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdDepotCards/mine/excel?accessToken={accessToken}");
+		
+		mockMvc.perform(get(urlTemplate,accessToken))
+//		.andDo(print())
+		.andExpect(status().isOk())
+		.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", URLEncoder.encode("仓库帐页信息", Global.defaultCharset.name()))))
+		.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"));
+	}
+	
+	@Test public void testAddError() throws Exception{
+		NewSpdDepotCardTO to = buildNewSpdDepotCardTO();
+		mockMvcHelper.add(SpdDepotCard.class, testUserCode, to, status().is4xxClientError(), YardExceptionType.invalid_exist_depot_card);
+	}
+	
+	@Test public void modify() throws Exception{
+		String depotCardId = "depot_card_id_098";
+		
+		SpdDepotCard depotCard = mockMvcHelper.findOne(SpdDepotCard.class, testUserCode, depotCardId);
+		assertNotNull(depotCard);
+		assertEquals(true, depotCard.isEnabled());
+		
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.new_created.getCode(), depotCard.getLastUpdateTime());
+		mockMvcHelper.updateCheckState(SpdDepotCard.class, testUserCode, checkStateTO, false, depotCardId);
+		
+		depotCard = mockMvcHelper.findOne(SpdDepotCard.class, testUserCode, depotCardId);
+		assertEquals(CheckState.new_created, depotCard.getCheckState());
+		
+		depotCard.setEnabled(false);
+		
+		SpdDepotCard newDepotCard = mockMvcHelper.modify(SpdDepotCard.class, testUserCode, depotCardId, depotCard);
+		assertEquals(false, newDepotCard.isEnabled());
+		
+		depotCardId = "depot_card_id_022";
+		SpdDepotCard depotCard022 = mockMvcHelper.findOne(SpdDepotCard.class, testUserCode, depotCardId);
+		
+		assertNotNull(depotCard022);
+		assertEquals(true, depotCard022.isEnabled());
+		
+		depotCard022.setEnabled(false);
+		mockMvcHelper.modify(SpdDepotCard.class, testUserCode, depotCardId, depotCard022, status().is4xxClientError(), YardExceptionType.forbid_exist_uncomplete_task);
+	}
+	
+	private NewSpdDepotCardTO buildNewSpdDepotCardTO(){
+		NewSpdDepotCardTO to = new NewSpdDepotCardTO();
+		to.setDepotId("depot_id_001");
+		to.setGoodsId("goods_id_007");
+		to.setStoreUnitLv("3");
+		to.setStoreUnitName("片");
+		to.setShelfId("shelf_id_031");
+		to.setEnabled(true);
+		return to;
+	}
+}

@@ -1,0 +1,55 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+
+import org.junit.Test;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.params.SpdFeedbackRuleParams;
+import cn.ak4j.yard.spd.bizrule.to.SpdFeedbackRuleTO;
+
+public class SpdFeedbackRuleResourceTest extends BaseTest{
+
+	@Test public void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		
+		//基本查询
+		String url = "/spd/spdFeedbackRules?accessToken={accessToken}";
+		List<SpdFeedbackRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdFeedbackRuleTO>>() {}, url, accessToken);
+		assertEquals(20, rules.size());
+		
+		//测试业务类型查询
+		SpdFeedbackRuleParams params = new SpdFeedbackRuleParams();
+		SpdBizType bizType = SpdBizType.replenish_biz;
+		params.setBizTypeCode(new ListParam<String>(bizType.getCode()));
+		url = "/spd/spdFeedbackRules?params={params}&accessToken={accessToken}";
+		rules = mockMvcHelper.mockGet(new TypeReference<List<SpdFeedbackRuleTO>>() {}, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		rules.forEach(rule->{
+			assertTrue(rule.getName().contains(bizType.getName()));
+		});
+		
+	}
+	
+	@Test public void testCount() throws Exception{
+		//基本查询
+		int count = mockMvcHelper.count(Integer.class, testUserCode, "spd", "spdFeedbackRules", null, status().isOk(), null);
+		assertEquals(35, count);
+		
+		//测试业务类型查询
+		SpdFeedbackRuleParams params = new SpdFeedbackRuleParams();
+		SpdBizType bizType = SpdBizType.replenish_biz;
+		params.setBizTypeCode(new ListParam<String>(bizType.getCode()));
+		count = mockMvcHelper.count(Integer.class, testUserCode, "spd", "spdFeedbackRules", params, status().isOk(), null);
+		assertEquals(11, count);
+	}	
+	
+}

@@ -1,0 +1,176 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdConsumeBizs;
+import cn.ak4j.yard.spd.bizrule.domain.SpdConsumeRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStock;
+import cn.ak4j.yard.spd.stock.domain.SpdDepotStocks;
+import cn.ak4j.yard.spd.stock.repository.SpdDepotStockRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdConsumeBizResourceTest extends BaseTest{
+
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private YardCodeService codeService;
+	@Autowired private SpdDepotStockRepository dsRepository;
+	
+	@Test public void testAdd() throws Exception{
+		String ruleId = "cns_rule_id_02";
+		SpdConsumeRule rule = (SpdConsumeRule)brRepository.findAllWithRelations().findById(ruleId);
+		SpdConsumeBiz consume = addConsume(yhmanagerUserCode, rule);
+		assertNotNull(consume.getBizId());
+		assertEquals(ruleId, consume.getBizRuleId());
+		assertEquals(rule.getAreaType(), consume.getAreaType());
+		assertEquals(rule.getDepotId(), consume.getDepotId());
+		assertEquals(rule.getDepotId(), consume.getCreatorDepotId());
+		assertEquals(CheckState.new_created, consume.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.xiaohaodan);
+		assertEquals(CodeSort.xiaohaodan.getCode()+getCurrentDateCode()+sequenceCode, consume.getBizCode());
+		
+		wait(2);
+	}
+	
+	@Test public void testAddByEis() throws Exception{
+		String ruleId = "cns_rule_id_02";
+		SpdConsumeRule rule = (SpdConsumeRule)brRepository.findAllWithRelations().findById(ruleId);
+		SpdConsumeBiz consume = addConsume(eisUserCode, rule);
+		assertNotNull(consume.getBizId());
+		assertEquals(ruleId, consume.getBizRuleId());
+		assertEquals(rule.getAreaType(), consume.getAreaType());
+		assertEquals(rule.getDepotId(), consume.getDepotId());
+		assertEquals(rule.getDepotId(), consume.getCreatorDepotId());
+		assertEquals(CheckState.new_created, consume.getCheckState());
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.xiaohaodan);
+		assertEquals(CodeSort.xiaohaodan.getCode()+getCurrentDateCode()+sequenceCode, consume.getBizCode());
+		assertEquals("user_id_006", consume.getMaintenanceInfo().getCreateUserId());
+		wait(1);
+	}
+	
+	private SpdConsumeBiz addConsume(String userCode, SpdConsumeRule rule) throws Exception{
+		SpdConsumeBiz consume = new SpdConsumeBiz();
+		consume.setBizRuleId(rule.getId());
+		consume.setCreatorDepotId(rule.getDepotId());
+		consume = mockMvcHelper.add(SpdConsumeBiz.class, userCode, "spd", "spdConsumes", consume, status().isOk(), null);
+		return consume;
+	}
+	
+	@Test public void testReview() throws Exception{
+		String ruleId = "cns_rule_id_03";
+		SpdConsumeRule rule = (SpdConsumeRule)brRepository.findAllWithRelations().findById(ruleId);
+		
+		//新增一个没有明细的消耗业务
+		SpdConsumeBiz consume = addConsume(mzmanagerUserCode, rule);
+		
+		//审核后进行异常断言
+		CheckStateTO checkStateTo = new CheckStateTO(CheckState.reviewed.getCode(), consume.getLastUpdateTime());
+		String url = "/spd/spdConsumes/{id}/checkState/reviewed?accessToken={accessToken}";
+		
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, status().is4xxClientError(), YardExceptionType.invalid_item_not_data, consume.getBizId(), getAccessToken(mzmanagerUserCode));
+		
+		//增加明细
+		SpdBizItems items = new SpdBizItems(createBizItems(consume.getBizId()));
+		items.fillGoods(goodsRepository);
+		List<SpdBizItem> newItems = new ArrayList<SpdBizItem>();
+		for(SpdBizItem item : items){
+			item = mockMvcHelper.add(SpdBizItem.class, mzmanagerUserCode, item);
+			newItems.add(item);
+		}
+		
+		//审核后进行异常断言
+		mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, status().is4xxClientError(), YardExceptionType.invalid_item_not_confirm, consume.getBizId(), getAccessToken(mzmanagerUserCode));
+				
+		//确认明细
+		for(SpdBizItem item : newItems){
+			item.confirmAsPlaned();
+			item = mockMvcHelper.modify(SpdBizItem.class, mzmanagerUserCode, item.getBizItemId(), item);
+		}
+		
+		SpdDepotStocks originDepotStocks = dsRepository.findByDepotAndGoodsLots(consume.getDepotId(), CollectionUtils.pluck("lotId", items));
+		
+		//审核消耗
+		
+		CheckStateTO to = mockMvcHelper.mockPut(CheckStateTO.class, checkStateTo, url, consume.getBizId(), getAccessToken(mzmanagerUserCode));
+		assertTrue(CheckState.reviewed.getCode() == to.getCheckStateCode());
+		
+		wait(6);
+		consume = mockMvcHelper.findOne(SpdConsumeBiz.class, mzmanagerUserCode, "spd", "spdConsumes", consume.getBizId(), status().isOk(), null);
+		assertEquals(CheckState.completed, consume.getCheckState());
+		
+		//断言仓库库存
+		SpdDepotStocks newDepotStocks = dsRepository.findByDepotAndGoodsLots(consume.getDepotId(), CollectionUtils.pluck("lotId", items));
+		newDepotStocks.forEach(newDepotStock->{
+			SpdDepotStock originDepotStock = CollectionUtils.findWhere("goodsLotId", newDepotStock.getGoodsLotId(), originDepotStocks);
+			SpdBizItem bizItem = CollectionUtils.findWhere("lotId", newDepotStock.getGoodsLotId(), items);
+			int expectedDepotStockQty = originDepotStock.getMinStockQty() - bizItem.getPlanQtyByBaseUnit();
+			assertEquals(expectedDepotStockQty, newDepotStock.getMinStockQty().intValue());
+		});
+	}
+	
+	@Test public void testFind() throws Exception{
+		String accessToken = getAccessToken(mzmanagerUserCode);
+		
+		testFindByUncompleted(accessToken);
+		testFindByUncompletedCount(accessToken);
+		testFindByCompleted(accessToken);
+		testFindByCompletedCount(accessToken);
+	}
+	
+	private void testFindByUncompleted(String accessToken) throws Exception{
+		String url = "/spd/spdConsumes/iTakeChargeOfConsumes/uncompleteConsumes?accessToken={accessToken}";
+		SpdConsumeBizs consumes = mockMvcHelper.mockGet(SpdConsumeBizs.class, url, accessToken);
+		assertEquals(0, consumes.size());
+	}
+	
+	private void testFindByUncompletedCount(String accessToken) throws Exception{
+		String url = "/spd/spdConsumes/iTakeChargeOfConsumes/uncompleteConsumes/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(0, count);
+	}
+	
+	private void testFindByCompleted(String accessToken) throws Exception{
+		String url = "/spd/spdConsumes/iTakeChargeOfConsumes/completedConsumes?accessToken={accessToken}";
+		SpdConsumeBizs consumes = mockMvcHelper.mockGet(SpdConsumeBizs.class, url, accessToken);
+		assertEquals(0, consumes.size());
+	}
+	
+	private void testFindByCompletedCount(String accessToken) throws Exception{
+		String url = "/spd/spdConsumes/iTakeChargeOfConsumes/completedConsumes/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(0, count);
+	}
+	
+	private List<SpdBizItem> createBizItems(String bizId){
+		List<SpdBizItem> result = new ArrayList<SpdBizItem>();
+		SpdBizItem item1 = new SpdBizItem("goods_id_023", "goods_lot_id_066", YdsUnitLv.min.getLv(), 3, -1, 88.0f);
+		SpdBizItem item2 = new SpdBizItem("goods_id_024", "goods_lot_id_068", YdsUnitLv.min.getLv(), 4, -1, 48.0f);
+		item1.setBizId(bizId);
+		item2.setBizId(bizId);
+		result.add(item1);
+		result.add(item2);
+		return result;
+	}
+	
+}

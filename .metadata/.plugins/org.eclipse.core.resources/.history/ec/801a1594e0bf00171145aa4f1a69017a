@@ -1,0 +1,29 @@
+package cn.ak4j.yard.web;
+
+import java.util.ArrayList;
+
+import javax.servlet.http.HttpServletRequest;
+
+public class ResourceDefines extends ArrayList<ResourceDefine>{
+
+	private static final long serialVersionUID = -6367345171747706561L;
+	private static ResourceDefines allResources = new ResourceDefines();
+	
+	public static ResourceDefines getAllResources(){
+		return allResources;
+	}
+	
+	public boolean isSupport(HttpServletRequest request){
+		return false;
+	}
+	
+	public ResourceDefine findResource(String moduleName, String subModuleName, String resourceName, String domainName){
+		for(ResourceDefine define : this){
+			if(define.getModuleName().equals(moduleName) && define.getResourceName().equals(resourceName)){
+				return define;
+			}
+		}
+		return null;
+	}
+	
+}

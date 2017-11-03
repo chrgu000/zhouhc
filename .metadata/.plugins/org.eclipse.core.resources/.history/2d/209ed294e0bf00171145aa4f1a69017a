@@ -1,0 +1,29 @@
+package cn.ak4j.yard.spd.bizrule.params;
+
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdConsumeRuleParams extends QueryParams{
+
+	private ListParam<String> id;
+	private IntegerRangeParam prior;
+	private ListParam<String> name;
+	private ListParam<String> primaryName;
+	private ListParam<String> ruleCode;
+	private ListParam<String> customName;
+	private ListParam<String> feedbackRuleId;
+	private ListParam<String> depotId;
+	private ListParam<String> areaType;
+	private ListParam<String> displayName;
+	private ListParam<String> usage;
+	private ListParam<Boolean> enabled;
+	private ListParam<Boolean> canBeOriginRule;
+	private ListParam<Boolean> manualApply;
+	private ListParam<String> depot_depotName;
+}

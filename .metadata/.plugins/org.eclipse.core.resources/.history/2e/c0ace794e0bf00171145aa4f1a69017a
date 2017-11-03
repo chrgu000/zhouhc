@@ -1,0 +1,47 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.Arrays;
+import java.util.List;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings("serial")
+public class SpdFinacialReconciliationRules extends SpdBizRules<SpdFinacialReconciliationRule>{
+
+	public SpdFinacialReconciliationRules(List<SpdFinacialReconciliationRule> rules){
+		super(rules);
+	}
+
+	public void fillAllRelations(PcsDepots allDepots, PcsDepts allDepts) {
+		this.forEach(rule->{
+			PcsDept dept = allDepts.findById(rule.getApplyDeptId());
+			PcsDept supplierDept = allDepts.findById(rule.getSupplierDeptId());
+			PcsDepots depots = allDepots.findByIds(Arrays.asList(rule.getTargetDepotIds().split(",")));
+			
+			rule.setApplyDept(dept);
+			rule.setSupplierDept(supplierDept);
+			rule.setTargetDepots(depots);
+		});
+	}
+
+	public PcsDepots getAllDepots() {
+		PcsDepots targetDepots = new PcsDepots();
+		this.forEach(frRule->{
+			if(!targetDepots.contains(frRule.getTargetDepots())){
+				targetDepots.addAll(frRule.getTargetDepots());
+			}
+		});
+		return targetDepots;
+	}
+
+	
+	public SpdFinacialReconciliationRule findByRuleCode(String ruleCode) {
+		return CollectionUtils.findWhere("ruleCode", ruleCode, this);
+	}
+
+}

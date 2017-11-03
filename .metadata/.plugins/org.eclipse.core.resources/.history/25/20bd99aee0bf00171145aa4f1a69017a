@@ -1,0 +1,25 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLogs;
+import cn.ak4j.yard.spd.bizplan.params.SpdBizLogParams;
+
+public class SpdBizLogResourceTest extends BaseTest{
+
+	@Test public void testFindList() throws Exception{
+		String bizId = "rep_biz_id_001";
+		SpdBizLogParams params = new SpdBizLogParams();
+		params.setBizId(new ListParam<String>(bizId));
+		SpdBizLogs bizLogs = mockMvcHelper.findList(SpdBizLogs.class, testUserCode, params);
+		assertEquals(1, bizLogs.size());
+		bizLogs.forEach(bizLog->{
+			assertEquals(bizId, bizLog.getBizId());
+		});
+	}
+	
+}

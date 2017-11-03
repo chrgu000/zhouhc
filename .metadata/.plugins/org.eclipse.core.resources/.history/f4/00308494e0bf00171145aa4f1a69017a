@@ -1,0 +1,39 @@
+package cn.ak4j.yard.spd.stock.domain;
+
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 库存变更
+* @author zhengyf
+* @date 2017年3月23日 下午4:34:35
+* @version V1.0.0
+*/
+@NoArgsConstructor
+public abstract class SpdStockChange {
+
+	@Getter @Setter
+	private YdsGoodsLot goodsLot;
+	
+	@Getter @Setter
+	private PcsDepot depot;
+	
+	/**
+	 * 变更数量，正数表示库存增加、负数表示库存减少，数量是以最小单位来统计的
+	 */
+	@Getter @Setter
+	private int qtyByStoreUnit;
+	
+	public int getQtyByBaseUnit() {
+		YdsGoods goods = getGoodsLot().getGoods();
+ 		float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(goods, goods.getStoreUnitLv(), YdsUnitLv.base.getLv());
+		int baseStockQty = (int)(getQtyByStoreUnit()*unitRatio);
+		return baseStockQty;
+	}
+}

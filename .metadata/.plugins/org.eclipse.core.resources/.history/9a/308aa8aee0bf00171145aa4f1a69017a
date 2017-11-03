@@ -1,0 +1,21 @@
+package cn.ak4j.yard.extend.zsy;
+
+import static org.junit.Assert.assertNotNull;
+
+import org.junit.Ignore;
+import org.junit.Test;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.extend.zsy.SpdZsyProxy;
+
+@Ignore
+public class SpdZsyProxyTest extends BaseTest{
+
+	
+	@Test public void testGetAccessToken(){
+		java.net.HttpURLConnection.setFollowRedirects(false);
+		SpdZsyProxy zsyProxy = new SpdZsyProxy();
+		assertNotNull(zsyProxy.getAccessToken());
+	}
+	
+}

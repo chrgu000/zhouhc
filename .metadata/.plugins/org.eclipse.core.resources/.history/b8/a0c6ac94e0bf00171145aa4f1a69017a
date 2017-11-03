@@ -1,0 +1,35 @@
+package cn.ak4j.yard.spd.reconciliation.params;
+
+import cn.ak4j.entity.query.param.DateRange;
+import cn.ak4j.entity.query.param.FloatRangeParam;
+import cn.ak4j.entity.query.param.IntegerRangeParam;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.QueryParams;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@SuppressWarnings("serial")
+@Data
+@EqualsAndHashCode(callSuper=false)
+public class SpdGeneralLedgerItemParams extends QueryParams{
+
+	private ListParam<String> goodsId;
+	private ListParam<String> lotId;
+	private ListParam<String> ownerDeptId;
+	private ListParam<String> ownerOrgId;
+	private ListParam<Integer> unitLv;
+	private FloatRangeParam unitPrice;
+	private FloatRangeParam totalAmount;
+	private IntegerRangeParam currentStorageQty;
+	private IntegerRangeParam storageQty;
+	private IntegerRangeParam dealQty;
+	private IntegerRangeParam returnQty;
+	private IntegerRangeParam verificationQty;
+	private DateRange createTime;
+	private DateRange lastUpdateTime;
+	
+	private ListParam<String> formatName;
+	private ListParam<String> lotNo;
+	private ListParam<String> orgName;
+	private ListParam<String> deptName;
+}

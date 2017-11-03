@@ -1,0 +1,3 @@
+ insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) values ('adjust_stock_usage_001','库存调节事由','adjust_stock_usage','库存初始化','库存初始化',1,'1',626,1,626,626,sysDate,626,626,sysDate,null,'0');
+ insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) values ('adjust_stock_usage_002','库存调节事由','adjust_stock_usage','库存盘点','库存盘点',2,'1',626,1,626,626,sysDate,626,626,sysDate,null,'0');
+  

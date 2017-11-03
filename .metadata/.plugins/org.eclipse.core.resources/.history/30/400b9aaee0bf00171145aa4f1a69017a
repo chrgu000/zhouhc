@@ -1,0 +1,255 @@
+package cn.ak4j.yard.spd.bizplan.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizLogs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdMoveAreaBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdMoveAreaBizs;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdMoveAreaBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizplan.params.SpdMoveAreaBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizLogRepository;
+
+public class SpdMoveAreaBizResourceTest extends BaseTest{
+	
+	@Autowired private SpdBizLogRepository blRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	
+	private String depotId = "depot_id_003";
+
+	@Test public void testAddWithItems() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, mzmanagerUserId);
+		
+		SpdMoveAreaBiz moveAreaBiz = createNewMoveAreaBiz(user);
+		moveAreaBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		PcsDepot depot = CollectionUtils.findWhere("manageDeptId", user.getDeptId(), depotRepository.findAllWithRelations());
+		moveAreaBiz.setCreatorDepotId(depot.getDepotId());
+		//新增移仓业务
+		moveAreaBiz = mockMvcHelper.add(SpdMoveAreaBiz.class, mzmanagerUserCode, "spd", "spdMoveAreas", moveAreaBiz, status().isOk(), null);
+		assertEquals(CheckState.new_created.getCode(), moveAreaBiz.getCheckStateCode().intValue());
+		
+		wait(1);
+		
+		//检查新增的移仓业务
+		moveAreaBiz = mockMvcHelper.findOne(SpdMoveAreaBiz.class, mzmanagerUserCode, "spd", "spdMoveAreas", moveAreaBiz.getBizId(), status().isOk(), null);
+		assertEquals(SpdMoveAreaBizSteps.create_move_area.getStatusCode(), moveAreaBiz.getBizStatusCode());
+		
+		//检查明细
+		String url = "/spd/spdBizItems/bizId,{bizId}?accessToken={accessToken}";
+		SpdBizItems items = mockMvcHelper.mockGet(SpdBizItems.class, url,  moveAreaBiz.getBizId(), getAccessToken(mzmanagerUserCode));
+		assertEquals(2, items.size());
+		for(SpdBizItem item : items){
+			assertEquals(moveAreaBiz.getBizId(), item.getBizId());
+			SpdBizItem createdItem = CollectionUtils.findWhere("lotId", item.getLotId(), items);
+			assertEquals(item.getPlanQty(), createdItem.getPlanQty());
+			assertEquals(item.getGoodsId(), createdItem.getGoodsId());
+			assertEquals(item.getConfirmQty(), createdItem.getConfirmQty());
+			assertEquals(item.getUnitLv(), createdItem.getUnitLv());
+			assertEquals(item.getUnitPrice(), createdItem.getUnitPrice());
+		}
+		
+	}
+	
+	@Test public void testAddWithoutItems() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, mzmanagerUserId);
+		
+		SpdMoveAreaBiz moveAreaBiz = new SpdMoveAreaBiz(depotId, PcsAreaType.normal.getCode(), PcsAreaType.isolation.getCode());
+		moveAreaBiz.setMaintenanceInfo(new MaintenanceInfo(user));
+		PcsDepot depot = CollectionUtils.findWhere("manageDeptId", user.getDeptId(), depotRepository.findAllWithRelations());
+		moveAreaBiz.setCreatorDepotId(depot.getDepotId());
+		
+		//新增移仓业务
+		moveAreaBiz = mockMvcHelper.add(SpdMoveAreaBiz.class, mzmanagerUserCode, "spd", "spdMoveAreas", moveAreaBiz, status().isOk(), null);
+		assertEquals(CheckState.new_created.getCode(), moveAreaBiz.getCheckStateCode().intValue());
+		
+		wait(1);
+		
+		//检查新增移仓业务
+		moveAreaBiz = mockMvcHelper.findOne(SpdMoveAreaBiz.class, mzmanagerUserCode, "spd", "spdMoveAreas", moveAreaBiz.getBizId(), status().isOk(), null);
+		assertEquals(SpdMoveAreaBizSteps.create_move_area.getStatusCode(), moveAreaBiz.getBizStatusCode());
+		
+		//检查明细
+		String url = "/spd/spdBizItems/bizId,{bizId}?accessToken={accessToken}";
+		SpdBizItems items = mockMvcHelper.mockGet(SpdBizItems.class, url,  moveAreaBiz.getBizId(), getAccessToken(mzmanagerUserCode));
+		assertEquals(0, items.size());
+		
+		//检查业务日志
+		SpdBizLogs logs = blRepository.findByBizId(moveAreaBiz.getBizId());
+		assertEquals(1, logs.size());
+		assertEquals(SpdMoveAreaBizSteps.create_move_area.getStatusCode(), logs.get(0).getBizStatusCode());
+		assertEquals("user_id_005", logs.get(0).getUserId());
+	}
+	
+	@Test public void testAddByBizRuleId() throws Exception{
+		SpdMoveAreaBiz moveAreaBiz = new SpdMoveAreaBiz();
+		moveAreaBiz.setBizRuleId("ma_rule_id_01");
+		//新增移仓业务
+		moveAreaBiz = mockMvcHelper.add(SpdMoveAreaBiz.class, xykUserCode, "spd", "spdMoveAreas", moveAreaBiz, status().isOk(), null);
+		assertEquals(CheckState.new_created.getCode(), moveAreaBiz.getCheckStateCode().intValue());
+		
+	}
+	
+	@Test public void testGetList() throws Exception{
+		SpdMoveAreaBizs moveAreaBizs = mockMvcHelper.findList(SpdMoveAreaBizs.class, mzmanagerUserCode, "spd", "spdMoveAreas", null, status().isOk(), null);
+		assertEquals(1, moveAreaBizs.size());
+		
+		PcsUser user = userRepository.findAll().findById(mzmanagerUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		moveAreaBizs.forEach(moveAreaBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", moveAreaBiz.getDepotId(), depots));
+		});
+		
+		moveAreaBizs.forEach(moveAreaBiz->{
+			assertEquals(SpdBizType.move_area_biz, moveAreaBiz.getBizType());
+		});
+	}
+	
+	@Test public void testGetListCount() throws Exception{
+		int count = mockMvcHelper.count(Integer.class, mzmanagerUserCode, "spd", "spdMoveAreas", null, status().isOk(), null);
+		assertEquals(1, count);
+	}
+	
+	@Test public void testGetCreatedList() throws Exception{
+		SpdMoveAreaBizParams params = new SpdMoveAreaBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode()));
+		SpdMoveAreaBizs moveAreaBizs = mockMvcHelper.findList(SpdMoveAreaBizs.class, mzmanagerUserCode, "spd", "spdMoveAreas", params, status().isOk(), null);
+		assertEquals(1, moveAreaBizs.size());
+		
+		PcsUser user = userRepository.findAll().findById(mzmanagerUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		moveAreaBizs.forEach(moveAreaBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", moveAreaBiz.getDepotId(), depots));
+		});
+		moveAreaBizs.forEach(moveAreaBiz->{
+			assertEquals(SpdBizType.move_area_biz, moveAreaBiz.getBizType());
+			assertEquals(CheckState.completed, moveAreaBiz.getCheckState());
+		});
+	}
+	
+	@Test public void testGetCreatedListCount() throws Exception{
+		SpdMoveAreaBizParams params = new SpdMoveAreaBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.completed.getCode()));
+		int count = mockMvcHelper.count(Integer.class, mzmanagerUserCode, "spd", "spdMoveAreas", params, status().isOk(), null);
+		assertEquals(1, count);
+	}
+	
+	@Test public void testGetCommitedList() throws Exception{
+		SpdMoveAreaBizParams params = new SpdMoveAreaBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		SpdMoveAreaBizs moveAreaBizs = mockMvcHelper.findList(SpdMoveAreaBizs.class, mzmanagerUserCode, "spd", "spdMoveAreas", params, status().isOk(), null);
+		assertEquals(0, moveAreaBizs.size());
+		
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		moveAreaBizs.forEach(moveAreaBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", moveAreaBiz.getDepotId(), depots));
+		});
+		
+		moveAreaBizs.forEach(moveAreaBiz->{
+			assertEquals(CheckState.commited, moveAreaBiz.getCheckState());
+			assertEquals(SpdBizType.move_area_biz, moveAreaBiz.getBizType());
+		});
+	}
+	
+	@Test public void testGetCommitedListCount() throws Exception{
+		SpdMoveAreaBizParams params = new SpdMoveAreaBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		int count = mockMvcHelper.count(Integer.class, mzmanagerUserCode, "spd", "spdMoveAreas", params, status().isOk(), null);
+		assertEquals(0, count);
+	}
+	
+	@Test public void testGetReviewedList() throws Exception{
+		SpdMoveAreaBizParams params = new SpdMoveAreaBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()));
+		SpdMoveAreaBizs moveAreaBizs = mockMvcHelper.findList(SpdMoveAreaBizs.class, mzmanagerUserCode, "spd", "spdMoveAreas", params, status().isOk(), null);
+		assertEquals(0, moveAreaBizs.size());
+		
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		PcsDepots depots = depotRepository.findAll().findByDept(user.getDeptId());
+		moveAreaBizs.forEach(moveAreaBiz->{
+			assertNotNull(CollectionUtils.findWhere("depotId", moveAreaBiz.getDepotId(), depots));
+		});
+		
+		moveAreaBizs.forEach(moveAreaBiz->{
+			assertEquals(CheckState.reviewed, moveAreaBiz.getCheckState());
+			assertEquals(SpdBizType.move_area_biz, moveAreaBiz.getBizType());
+		});
+	}
+	
+	@Test public void testGetReviewedListCount() throws Exception{
+		SpdMoveAreaBizParams params = new SpdMoveAreaBizParams();
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.reviewed.getCode()));
+		int count = mockMvcHelper.count(Integer.class, mzmanagerUserCode, "spd", "spdMoveAreas", params, status().isOk(), null);
+		assertEquals(0, count);
+	}
+	
+	@Test public void testGetListById() throws Exception{
+		String bizId = "move_biz_id_001";
+		SpdMoveAreaBiz moveAreaBiz = mockMvcHelper.findOne(SpdMoveAreaBiz.class, xykUserCode, "spd", "spdMoveAreas", bizId, status().isOk(), null);
+		assertNotNull(moveAreaBiz);
+		assertEquals(bizId, moveAreaBiz.getBizId());
+	}
+	
+	@Test public void testGetListByIds() throws Exception{
+		List<String> bizIds = new ArrayList<String>();
+		bizIds.add("move_biz_id_001");
+		SpdMoveAreaBizs moveAreas = mockMvcHelper.getByIds(SpdMoveAreaBizs.class, xykUserCode, "spd", "spdMoveAreas", bizIds, status().isOk(), null);
+		assertEquals(1, moveAreas.size());
+	}
+	
+	@Test public void testPrintPdf() throws Exception{
+		String bizId = "move_biz_id_001";
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdMoveAreas/bizId,{bizId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, bizId, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("药品隔离记录单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+	}
+
+	private SpdMoveAreaBiz createNewMoveAreaBiz(PcsUser user) {
+		SpdMoveAreaBiz moveArea = new SpdMoveAreaBiz(depotId, PcsAreaType.normal.getCode(), PcsAreaType.isolation.getCode());
+		moveArea.setMaintenanceInfo(new MaintenanceInfo(user));
+		PcsDepot depot = CollectionUtils.findWhere("manageDeptId", user.getDeptId(), depotRepository.findAllWithRelations());
+		moveArea.setCreatorDepotId(depot.getDepotId());
+		
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item1 = new SpdBizItem("goods_id_001", "goods_lot_id_019", 2, 10, null, 20.5f);
+		items.add(item1);
+		
+		SpdBizItem item2 = new SpdBizItem("goods_id_002", "goods_lot_id_024", 2, 12, null, 123.2f);
+		items.add(item2);
+		moveArea.setItems(items);
+		
+		return moveArea;
+	}
+
+}

@@ -1,0 +1,2 @@
+update sys_global_info set description = 'depotId:备货收货仓库ID;params:对应中山医记录的医院收货仓库对象,outClientId:仓库Id,outClientName:仓库名称,outAddressId:仓库地址Id,outAddressName:仓库地址' 
+where key='zsy_integration_params';

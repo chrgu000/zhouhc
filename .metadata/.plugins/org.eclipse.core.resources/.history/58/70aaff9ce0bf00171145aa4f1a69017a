@@ -1,0 +1,4 @@
+alter table spd_fin_rec_biz rename column begining_rec_ids to begining_rec_id;
+alter table spd_fin_rec_biz modify(begining_rec_id varchar2(32));
+
+alter table spd_fin_rec_item drop column unit_lv;

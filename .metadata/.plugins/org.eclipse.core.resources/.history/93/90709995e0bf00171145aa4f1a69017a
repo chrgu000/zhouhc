@@ -1,0 +1,33 @@
+package cn.ak4j.yard;
+
+import java.sql.Connection;
+
+import javax.sql.DataSource;
+
+import org.apache.commons.io.IOUtils;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.Global;
+
+@Component
+public class BaseDataImporter {
+
+	public void importData(DataSource dataSource, String yardId, String orgCode, String orgName){
+		try{
+			String sql = new String(IOUtils.toByteArray(this.getClass().getResource("/db/data/oracle_base_data.sql")), Global.defaultCharset);
+			sql = sql.replaceAll("\\{YARD_ID\\}", yardId)
+					 .replaceAll("\\{ORG_CODE\\}", orgCode)
+					 .replaceAll("\\{ORG_NAME\\}", orgName);
+	    	Connection conn = dataSource.getConnection();
+	    	conn.setAutoCommit(false);
+			ScriptUtils.executeSqlScript(conn, new ByteArrayResource(sql.getBytes(Global.defaultCharset)));
+			conn.commit();
+		}catch(Exception e){
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+	
+}

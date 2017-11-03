@@ -1,0 +1,27 @@
+package cn.ak4j.yard.configuration;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import cn.ak4j.yard.domain.Conf;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Configuration
+public class ThreadPoolConfiguration {
+
+	@Autowired private Conf conf;
+	
+	@Bean(name="depotCardQueryThreadPool")
+	@SuppressWarnings("static-access")
+	public ExecutorService depotCardQueryThreadPool(){
+		ExecutorService threadPool = Executors.newFixedThreadPool(conf.getDepotCardQueryThreadPoolSize());
+		log.info("初始化账页加载线程池:{}", conf.getDepotCardQueryThreadPoolSize());
+		return threadPool;
+	}
+	
+}

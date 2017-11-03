@@ -1,0 +1,148 @@
+package cn.ak4j.yard.spd.utils;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.vo.UnitExchangeRatio;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+
+public class SpdUnitUtils {
+	
+	public static UnitExchangeRatio computeUnitExchange(YdsGoods ydsGoods, int sourceLv, int targetLv){
+		return computeUnitExchange(ydsGoods, YdsUnitLv.unitOf(sourceLv), YdsUnitLv.unitOf(targetLv));
+	}
+	
+	
+	/**
+	 * 功能：单位转换
+	 * @param ydsGoods  标准产品实例
+	 * @param sourceUnitLv  要转换的单位级别 例如：大包装；
+	 * @param targetUnitLv  目标单位级别 例如：中包装包装；
+	 * @return UnitObject 转换后成一个对象，对象中包含一个转换后的单位，和转换的比例
+	 */
+	public static UnitExchangeRatio computeUnitExchange(YdsGoods ydsGoods, YdsUnitLv sourceUnitLv, YdsUnitLv targetUnitLv){
+		int sourceLv = sourceUnitLv.getLv();
+		int targetLv = targetUnitLv.getLv();
+//		int sec = sourceLv==targetLv?0:(sourceLv>targetLv?1:-1);
+		
+		List<UnitExchangeRatio> list = new ArrayList<UnitExchangeRatio>();
+		
+		UnitExchangeRatio bigUnit = new UnitExchangeRatio();
+		bigUnit.setSourceLv(sourceUnitLv);
+		bigUnit.setTargetLv(YdsUnitLv.big);
+		bigUnit.setRatio(ydsGoods.getBigSum());
+		list.add(bigUnit);
+	
+		UnitExchangeRatio midUnit = new UnitExchangeRatio();
+		midUnit.setSourceLv(sourceUnitLv);
+		midUnit.setTargetLv(YdsUnitLv.mid);
+		midUnit.setRatio(ydsGoods.getMidSum());
+		list.add(midUnit);
+		
+		UnitExchangeRatio minUnit = new UnitExchangeRatio();
+		minUnit.setSourceLv(sourceUnitLv);
+		minUnit.setTargetLv(YdsUnitLv.min);
+		minUnit.setRatio(ydsGoods.getMinSum());
+		list.add(minUnit);
+		
+		UnitExchangeRatio baseUnit = new UnitExchangeRatio();
+		baseUnit.setSourceLv(sourceUnitLv);
+		baseUnit.setTargetLv(YdsUnitLv.base);
+		baseUnit.setRatio(1);
+		list.add(baseUnit);
+		
+		UnitExchangeRatio result = new UnitExchangeRatio(sourceUnitLv, targetUnitLv);
+		
+		if (sourceLv==targetLv){
+			result.setRatio(1);
+		}else{
+			//计算单位转换比时始终从大到小来遍历
+			int startInx = sourceLv>targetLv?(4-sourceLv):(4-targetLv);
+			int endInx = sourceLv>targetLv?(4-targetLv):(4-sourceLv);
+			
+			float ratio = 1;
+			for(int i = startInx; i < endInx; i++){
+				ratio *= list.get(i).getRatio();
+			}
+
+			if(sourceLv > targetLv){
+				result.setRatio(ratio);
+			}else{
+				result.setRatio(1/ratio);
+			}
+			
+//			int minLv = sourceLv<targetLv?sourceLv:targetLv;
+//			int manLv = sourceLv>targetLv?sourceLv:targetLv;
+//			
+//			for(int i = minLv; i < manLv; i++){
+//				tmpSum = tmpSum*list.get(i-1).getRatio();
+//			}
+//			if (targetLv > sourceLv){
+//				unitObject.setRatio(1/tmpSum);
+//			}else{
+//				unitObject.setRatio(tmpSum);
+//			}
+		}
+		
+		return result;
+	}
+	
+	/**
+	 * 功能：计算单位转换比例
+	 * @param ydsGoods  标准产品实例
+	 * @param sourceLv  要转换的单位级别 例如：大包装；
+	 * @param targetLv  目标单位级别 例如：中包装；
+	 * @return  转换的比例
+	 */
+	public static float computeUnitExchangeRatio(YdsGoods ydsGoods, Integer sourceLv, Integer targetLv){
+		UnitExchangeRatio UnitObject = computeUnitExchange(ydsGoods, YdsUnitLv.unitOf(sourceLv), YdsUnitLv.unitOf(targetLv));
+		return UnitObject.getRatio();
+	}
+	
+	public static float computeUnitExchangeRatio(YdsGoods ydsGoods, YdsUnitLv sourceLv, YdsUnitLv targetLv){
+		UnitExchangeRatio UnitObject = computeUnitExchange(ydsGoods, sourceLv, targetLv);
+		return UnitObject.getRatio();
+	}
+	
+	/**
+	 * 功能：取得标准产品的相应单位
+	 * @param ydsGoods  标准产品实例
+	 * @param unitLv  单位级别
+	 * @return UnitEntity 级别对应的单位名称
+	 */
+	public static String computeGoodsUnitName(YdsGoods ydsGoods, Integer unitLv){
+		int v_unitLv = unitLv.intValue();
+		
+		switch (v_unitLv){
+			case 4:
+				return ydsGoods.getBigName(); 
+		    case 3:
+		    	return ydsGoods.getMidName(); 
+		    case 2:
+		    	return ydsGoods.getMinName(); 
+		    case 1:
+		    	return ydsGoods.getBaseName();
+		    default:
+		    	return null;
+		}
+	}
+	
+	/**
+	 * 功能：取得标准产品的相应级别
+	 * @param ydsGoods  标准产品实例
+	 * @param name  单位
+	 * @return UnitEntity 单位对应的级别
+	 */
+	public static Integer getGoodsUnitLvl(YdsGoods ydsGoods, String name){
+		if (name.equals(ydsGoods.getBigName())){
+           return 4;//大包装
+		}else if (name.equals(ydsGoods.getMidName())){
+	           return 3;//中包装
+		}else if (name.equals(ydsGoods.getMinName())){
+	           return 2;//小包装
+		}
+		return 1;
+	}
+
+}

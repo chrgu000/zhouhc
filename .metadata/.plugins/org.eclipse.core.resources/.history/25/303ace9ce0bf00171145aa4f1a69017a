@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.3.1.final using JasperReports Library version 6.3.1  -->
+<!-- 2017-05-13T17:35:16 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="report2" pageWidth="198" pageHeight="141" orientation="Landscape" columnWidth="182" leftMargin="8" rightMargin="8" topMargin="8" bottomMargin="8" uuid="6da82dac-eb01-494f-aca5-f2c82b6df1a3">
+	<property name="ireport.zoom" value="3.0"/>
+	<property name="ireport.x" value="0"/>
+	<property name="ireport.y" value="0"/>
+	<parameter name="depotNm" class="java.lang.String"/>
+	<parameter name="orgNm" class="java.lang.String"/>
+	<field name="boxNo" class="java.lang.String"/>
+	<field name="wholeFlag" class="java.lang.Boolean">
+		<fieldDescription><![CDATA[wholeFlag]]></fieldDescription>
+	</field>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<detail>
+		<band height="125" splitType="Stretch">
+			<textField>
+				<reportElement x="116" y="100" width="20" height="18" uuid="efb0ae66-455a-4db4-903a-b69714dfd8c3"/>
+				<textElement textAlignment="Right" verticalAlignment="Bottom" rotation="None">
+					<font pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField evaluationTime="Report">
+				<reportElement x="135" y="100" width="20" height="18" uuid="c53d7598-11cc-430f-8bed-7b502d65866e"/>
+				<textElement verticalAlignment="Bottom">
+					<font pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA["/"+$V{PAGE_NUMBER}]]></textFieldExpression>
+			</textField>
+			<textField isBlankWhenNull="true">
+				<reportElement x="34" y="84" width="139" height="20" uuid="ab21c9fa-c791-4c2d-b284-60d21be0e406"/>
+				<textElement verticalAlignment="Bottom" markup="none">
+					<font fontName="微软雅黑" size="10" isItalic="false" isUnderline="false" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{depotNm}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="13" y="84" width="32" height="20" uuid="f482f46d-6780-47a4-8d81-856a11b169fe"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="12" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[To：]]></text>
+			</staticText>
+			<textField isBlankWhenNull="true">
+				<reportElement x="40" y="100" width="30" height="18" uuid="99bbe54e-b81f-4b1b-b832-eb79e41d1374"/>
+				<textElement textAlignment="Left" verticalAlignment="Bottom">
+					<font size="11" pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{wholeFlag}?"是":"否"]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="13" y="100" width="30" height="18" uuid="c8f1c071-c8bc-4fb8-9224-c084472df11f"/>
+				<textElement verticalAlignment="Bottom">
+					<font pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[整件：]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="14" y="7" width="49" height="20" uuid="33962b6e-9f6b-410b-8a64-91291b50604a"/>
+				<textElement>
+					<font pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H" isPdfEmbedded="true"/>
+				</textElement>
+				<text><![CDATA[Form：]]></text>
+			</staticText>
+			<textField isBlankWhenNull="true">
+				<reportElement x="48" y="7" width="100" height="20" uuid="9522be3a-c361-4cbb-80fb-ba6c4918cda7"/>
+				<textElement>
+					<font pdfFontName="STSong-Light" pdfEncoding="UniGB-UCS2-H"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{orgNm}]]></textFieldExpression>
+			</textField>
+			<elementGroup>
+				<componentElement>
+					<reportElement isPrintRepeatedValues="false" x="14" y="27" width="153" height="58" uuid="d8142813-e6d8-4efe-ba7b-4747dc0ec81c"/>
+					<jr:Code128 xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd" evaluationTime="Band" moduleWidth="2.0" textPosition="bottom">
+						<jr:codeExpression><![CDATA[$F{boxNo}]]></jr:codeExpression>
+						<jr:patternExpression><![CDATA[$F{boxNo}]]></jr:patternExpression>
+					</jr:Code128>
+				</componentElement>
+			</elementGroup>
+		</band>
+	</detail>
+</jasperReport>

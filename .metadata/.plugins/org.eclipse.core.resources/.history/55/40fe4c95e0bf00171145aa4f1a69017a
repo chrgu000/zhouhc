@@ -1,0 +1,45 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.params.PcsUserParams;
+
+@SuppressWarnings({"serial"})
+public class PcsUsers extends Entities<PcsUser> {
+	
+	public PcsUsers(){}
+	
+	public PcsUsers(List<PcsUser> users){
+		super(users);
+	}
+	
+	public PcsUser findByUserCode(String userCode){
+		return CollectionUtils.findWhere("userCode", userCode, this);
+	}
+	
+	public PcsUser findByUserName(String userName){
+		return CollectionUtils.findWhere("userName", userName, this);
+	}
+	
+	public PcsUser findById(String userId){
+		return CollectionUtils.findWhere("userId", userId, this);
+	}
+	
+	public PcsUser findByUserNameAndDeptId(String userName, String deptId){
+		return new PcsUsers(CollectionUtils.find("deptId", deptId, this)).findByUserName(userName);
+	}
+	
+	public PcsUser findByUserCodeAndDeptId(String userCode, String deptId){
+		return new PcsUsers(CollectionUtils.find("deptId", deptId, this)).findByUserCode(userCode);
+	}
+
+	public PcsUsers findByIds(List<String> ids) {
+		PcsUserParams params = new PcsUserParams();
+		params.setUserId(new ListParam<String>(ids));
+		return new PcsUsers(find(params));
+	}
+	
+}

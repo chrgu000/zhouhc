@@ -1,0 +1,118 @@
+package cn.ak4j.yard.spd.reconciliation.repository;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDeptRepository;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedgerItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdGeneralLedgerItems;
+import cn.ak4j.yard.spd.reconciliation.params.SpdGeneralLedgerItemParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.Getter;
+
+@Repository
+public class SpdGeneralLedgerItemRepository extends BaseRepository<SpdGeneralLedgerItem, SpdGeneralLedgerItems, SpdGeneralLedgerItemParams, String>{
+
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private SpdDepotCardRepository dcRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsOrgRepository orgRepository;
+	@Autowired private PcsDeptRepository deptRepository;
+	
+	@Cacheable(value="longTimeCache", key="\"allGeneralLedgerItems\"")
+	public SpdGeneralLedgerItems findAll(){
+		return getAll();
+	}
+	
+	public SpdGeneralLedgerItems find(SpdGeneralLedgerItemParams params, OrderParam order, int pageNo, int pageSize){
+		SpdGeneralLedgerItems items = findAll();
+		
+		if(setRelationParams(params)){
+			return new SpdGeneralLedgerItems(items.findByPage(params, order, pageNo, pageSize));
+		}
+		
+		return new SpdGeneralLedgerItems();
+	}
+	
+	public int count(SpdGeneralLedgerItemParams params){
+		SpdGeneralLedgerItems items = findAll();
+		
+		if(setRelationParams(params)){
+			return new SpdGeneralLedgerItems(items.find(params)).size();
+		}
+		
+		return 0;
+	}
+
+
+	private boolean setRelationParams(SpdGeneralLedgerItemParams params) {
+		if (params != null) {
+			
+			YdsGoodsParams goodsParams = new YdsGoodsParams();
+			goodsParams.setFormatName(params.getFormatName());
+			if(goodsParams.isNotEmpty()){
+				YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(goodsParams, depotRepository, dcRepository));
+				if (CollectionUtils.isEmpty(goodss)) {
+					return false;
+				}
+				params.setGoodsId(new ListParam<String>(goodss.getIds()));
+			}
+			
+			YdsGoodsLotParams lotParams = new YdsGoodsLotParams();
+			lotParams.setLotNo(params.getLotNo());
+			if(lotParams.isNotEmpty()){
+				YdsGoodsLots lots = new YdsGoodsLots(glRepository.findAll().find(lotParams));
+				if(CollectionUtils.isEmpty(lots)){
+					return false;
+				}	
+				params.setLotId(new ListParam<String>(lots.getIds()));
+			}
+			
+			PcsOrgParams orgParams = new PcsOrgParams();
+			orgParams.setOrgName(params.getOrgName());
+			if(orgParams.isNotEmpty()){
+				PcsOrgs orgs = new PcsOrgs(orgRepository.findAll().find(orgParams));
+				if(CollectionUtils.isEmpty(orgs)){
+					return false;
+				}
+				
+				params.setOwnerOrgId(new ListParam<String>(orgs.getIds()));
+			}
+			
+			PcsDeptParams deptParams = new PcsDeptParams();
+			deptParams.setDeptName(params.getDeptName());
+			if(deptParams.isNotEmpty()){
+				PcsDepts depts = new PcsDepts(deptRepository.findAll().find(deptParams));
+				if(CollectionUtils.isEmpty(depts)){
+					return false;
+				}
+				
+				params.setOwnerDeptId(new ListParam<String>(depts.getIds()));
+			}
+			
+		}
+		return true;
+	}
+	
+}

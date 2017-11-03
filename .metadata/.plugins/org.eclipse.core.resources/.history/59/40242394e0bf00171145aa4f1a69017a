@@ -1,0 +1,113 @@
+package cn.ak4j.yard.sys.service;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import cn.ak4j.mgproxy.MGProxy;
+import cn.ak4j.mgproxy.MailMsg;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.amqp.RabbitProxy;
+import cn.ak4j.yard.enums.YardBatchTaskType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.repository.YardBatchTaskRepository;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.spd.supply.service.SpdDeliveryOrderService;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.factory.YardBatchTaskProcessorFactory;
+import cn.ak4j.yard.sys.service.taskprocessor.IBatchTaskProcessor;
+
+@Service
+@SuppressWarnings({"rawtypes"})
+public class YardBatchTaskService {
+	@Autowired private YardBatchTaskRepository batchTaskRepository;
+	@Autowired private RabbitProxy rabbitProxy;
+	@Autowired private MGProxy mgProxy;
+	@Autowired private SpdDeliveryOrderService doService;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YardBatchTaskProcessorFactory btpFactory;
+
+	
+	@Transactional public YardBatchTask createBatchTask(PcsUser user, YardBatchTask batchTask) {
+		batchTask.verifyChecksum(batchTaskRepository);
+		
+		YardBatchTaskType taskType = YardBatchTaskType.typeOf(batchTask.getTaskType());
+		switch (taskType) {
+			case batch_create_delivery_order_task:
+				SpdDeliveryOrders deliveryOrders = (SpdDeliveryOrders) batchTask.getData();
+				if(CollectionUtils.isEmpty(deliveryOrders)){
+					return null;
+				}
+				doService.checkExteralSystemDeliveryOrders(deliveryOrders, user);
+				break;
+			case batch_import_depot_cards_task:
+				break;
+			
+			case batch_import_goods_lot_task:
+				break;
+				
+			case batch_import_eds_goods_lot_task:
+				break;
+			case batch_import_initial_stock_task:
+				break;
+			case batch_import_initial_ending_task:
+				break;
+			case batch_import_prepare_inform_item_task:
+				break;
+		}
+
+		batchTask.setCreatorId(user.getUserId());
+		
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter(){
+			public void afterCommit(){		
+				rabbitProxy.sendCreateBatchTaskMsg(batchTask.getId());
+            }
+		});
+		
+		batchTaskRepository.save(batchTask);
+		return batchTask;
+	}
+
+	@Transactional 
+	public YardBatchTask processBatchTask(String taskId) throws Exception{
+		YardBatchTask batchTask = null;
+		MailMsg hisMail = null;
+		MailMsg supplyMail = null;
+		try{
+			batchTask = batchTaskRepository.findOne(taskId);
+			PcsUser user = userRepository.findAll().findById(batchTask.getCreatorId());
+			YardBatchTaskType taskType = YardBatchTaskType.typeOf(batchTask.getTaskType());
+			
+			IBatchTaskProcessor processor = btpFactory.getBatchTaskProcessor(taskType);
+			processor.process(batchTask, user, hisMail, supplyMail);
+			batchTask.complete(true);
+			
+			batchTaskRepository.save(batchTask);
+		}catch(Exception e){
+			e.printStackTrace();
+			batchTask.complete(false);
+			batchTaskRepository.save(batchTask);
+		}
+		
+		mgProxy.sendMail(hisMail);
+		mgProxy.sendMail(supplyMail);
+		
+		return batchTask;
+	}
+	
+	
+	
+	
+	
+
+	
+	
+	
+	
+	
+	
+}

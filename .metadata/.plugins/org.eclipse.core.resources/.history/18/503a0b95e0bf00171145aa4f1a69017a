@@ -1,0 +1,53 @@
+package cn.ak4j.yard.spd.bizplan.enums;
+
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+
+import cn.ak4j.yard.enums.CommonEnumJsonSerializer;
+import cn.ak4j.yard.enums.ITypeEnum;
+
+@JsonSerialize(using=CommonEnumJsonSerializer.class)
+public enum SpdBizType implements ITypeEnum{
+
+	receive_biz("receive_biz", "收货", "接收供应商所配送的药品，并完整库房上架作业的一个业务流程"),
+	replenish_biz("replenish_biz", "申领", "用于支持仓库与仓库之间的药品流通，其作业的起点是送货方库房的下架，终点是接收方库房的上架"),
+	adjust_stock_biz("adjust_stock_biz", "库存调节", "主要用于仓库库存盘点等机动性的调整库存，目前库存调节仅针对不影响业务账的库存变更场景"),
+	move_area_biz("move_area_biz", "移仓", "用于仓库内部不同货区之间的移动，常用于退货时将药品从正常货区转移到隔离货区"),
+	prepare_inform_biz("prepare_inform_biz", "备货通知", "通知院外供应商给SPD仓库进行备货的业务，起于创建备货通知业务，止于将备货信息同步给供应商系统"),
+	return_goods_biz("return_goods_biz", "退货", "将SPD仓库的产品退给供应商的业务，起于创建退货业务，经过出库作业，止于产品到达供应商"),
+	consume_biz("consume_biz", "消耗", "院内库的库存消耗行为，例如医生领用或病人取药"),
+	
+	daily_clean_biz("daily_clean_biz", "日清对账", "业务人员对每天的业务进行流水汇总后的一个对账"),
+	finacial_reconciliation_biz("financial_reconciliation_biz", "财务对账", "针对一个结算周期中的所有日清单进行汇总做结算前的财务对账的业务");
+	
+	private String code;
+	private String name;
+	private String description;
+	
+	private SpdBizType(String code, String name, String description){
+		this.code = code;
+		this.name= name;
+		this.description = description;
+	}
+	
+	public static SpdBizType typeOf(String code){
+		for(SpdBizType bizType : SpdBizType.values()){
+			if(bizType.getCode().equals(code)){
+				return bizType;
+			}
+		}
+		return null;
+	}
+
+	public String getCode() {
+		return code;
+	}
+
+	public String getName() {
+		return name;
+	}
+	
+	public String getDescription(){
+		return description;
+	}
+	
+}

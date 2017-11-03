@@ -1,0 +1,22 @@
+package cn.ak4j.yard.spd.reconciliation.report.base;
+
+import java.util.ArrayList;
+
+/**
+* @Description: 报表明细集合的基类
+* @author zhengyf
+* @date 2017年10月14日 下午3:02:53
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+public class SpdReconciliationReportItems<T extends SpdReconciliationReportItem> extends ArrayList<T>{
+
+	public float getTotalAmount(){
+		float result = 0f;
+		for(SpdReconciliationReportItem item : this){
+			result += item.getQty()*item.getUnitPrice();
+		}
+		return result;
+	}
+	
+}

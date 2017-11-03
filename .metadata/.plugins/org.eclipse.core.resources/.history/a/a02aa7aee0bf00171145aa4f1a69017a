@@ -1,0 +1,64 @@
+package cn.ak4j.yard.fmtemplates;
+
+import static org.junit.Assert.assertTrue;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateException;
+
+public class CreateDepotCardTemplateTest extends BaseTest{
+
+	@Autowired @Qualifier("defaultFmConfiguration") private Configuration fmConfiguration;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private SpdDepotCardRepository cardRepository;
+	@Autowired private PcsDepotRepository depotRepository;
+	
+	@Test public void testTemplate() throws IOException, TemplateException{
+		String goodsId = "goods_id_001";
+		YdsGoods goods = goodsRepository.findAll().findById(goodsId);
+		PcsDepots depots = depotRepository.findAll();
+		List<String> goodsIds = new ArrayList<String>();
+		goodsIds.add(goodsId);
+		SpdDepotCards depotCards = cardRepository.findAll().findEnableCardByGoodsIds(goodsIds);
+		
+		Template template = fmConfiguration.getTemplate("createDepotCardTemplate.fm");
+		Map<String, Object> model = new HashMap<String, Object>();
+		model.put("goods", goods);
+		model.put("depotCards", depotCards);
+		model.put("depots", depots);
+		model.put("count", depots.size());
+		String content = FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+		assertTrue(content.contains(goods.getFormatName()));
+		for(PcsDepot depot : depots){
+			for(SpdDepotCard depotCard : depotCards){
+				if(depotCard.getDepotId().equals(depot.getDepotId()) && depotCard.getGoodsId().equals(goods.getGoodsId())){
+					String msg = String.format("仓库:[%s],[帐页编码:%s,启用:%b]", depot.getDepotName(), depotCard.getCardCode(), depotCard.isEnabled());
+					assertTrue(content.contains(msg));
+				}
+			}
+		}
+		
+	}
+	
+	
+}

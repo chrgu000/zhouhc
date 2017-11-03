@@ -1,0 +1,119 @@
+package cn.ak4j.yard.web;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
+
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsOperations;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.domain.PcsUserToken;
+import cn.ak4j.yard.pcs.domain.PcsWebApi;
+import cn.ak4j.yard.pcs.domain.PcsWebApis;
+import cn.ak4j.yard.pcs.service.PcsUserService;
+import cn.ak4j.yard.pcs.service.SysAuthorityService;
+import lombok.extern.slf4j.Slf4j;
+
+
+@Slf4j
+@Component
+public class AccessCheckInterceptor implements HandlerInterceptor{
+
+	@Autowired private PcsUserService pcsUserService;
+	@Autowired private SysAuthorityService authorityService;
+	
+	private String getAccessToken(HttpServletRequest request){
+		String accessToken = request.getHeader("Authorization");
+		
+		//这里通过简单的字符串校验来判断是否是nginx输出的authorization头部属性，对于nginx输出的authorization进行忽略处理
+		if(StringUtils.isEmpty(accessToken) || accessToken.indexOf("Basic ") == 0){
+			accessToken = request.getParameter(Constant.access_token_attr_name);
+		}
+		
+		return accessToken;
+	}
+	
+	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object arg2) throws Exception {
+		String uri = request.getRequestURI();
+		String method = request.getMethod();
+
+//		logger.debug("request url:"+uri + " method:"+method );
+		boolean result = true;
+		PcsUser user = null;
+		
+		//尝试获取用户访问凭证，并获取用户并设置request级别属性
+		String accessToken = getAccessToken(request);
+		if(StringUtils.isNotEmpty(accessToken)){
+			request.setAttribute(Constant.access_token_attr_name, accessToken);
+			user = pcsUserService.getUserWithAccessToken(accessToken);
+		}
+		
+		//当前接口在白名单中直接返回
+		if(PcsWebApis.publicWebApis.contained(uri, method)){
+			request.setAttribute(Constant.user_attr_name, user);
+			return result;
+		}
+		
+		//当前请求接口属于基本接口
+		if(PcsWebApis.basicWebApis.contained(uri, method)){
+			if(user == null){
+				log.warn("未授权  url:{} method:{}", uri, method );
+				throw new OperateForbiddenException(YardExceptionType.forbide_unallow_operation, uri, method);
+			}else{
+				request.setAttribute(Constant.user_attr_name, user);
+				String clientType = PcsUserToken.getClientTypeFromAccessToken(accessToken);
+				new Thread(new TryUpdateTokenRefreshTimeThread(pcsUserService, user, clientType)).start();
+				return true;
+			}
+		}
+
+		//检查当前请求接口是否在用户授权的接口列表中
+		if(user != null && authorityService.getWebApisByUser(user).contained(uri, method)){
+			request.setAttribute("user", user);
+			String clientType = PcsUserToken.getClientTypeFromAccessToken(accessToken);
+			new Thread(new TryUpdateTokenRefreshTimeThread(pcsUserService, user, clientType)).start();
+		}else{
+			PcsOperations relatedOperations = authorityService.findOperationsByWebApi(new PcsWebApi(uri, method));
+			log.warn("未授权  url:{} method:{}, 依赖该接口的操作有:{}", uri, method, relatedOperations.pluck("opName"));
+			throw new OperateForbiddenException(YardExceptionType.forbide_unallow_operation, uri, method);
+		}
+		return result;
+	}
+	
+	public void afterCompletion(HttpServletRequest arg0,
+			HttpServletResponse arg1, Object arg2, Exception arg3)
+			throws Exception {
+	}
+
+	@Override
+	public void postHandle(HttpServletRequest arg0, HttpServletResponse arg1,
+			Object arg2, ModelAndView arg3) throws Exception {
+		
+	}
+	
+}
+
+class TryUpdateTokenRefreshTimeThread implements Runnable{
+	
+	private PcsUserService userService;
+	private PcsUser user;
+	private String clientType;
+	
+	public TryUpdateTokenRefreshTimeThread(PcsUserService userService, PcsUser user, String clientType){
+		this.userService = userService;
+		this.user = user;
+		this.clientType = clientType;
+	}
+	
+	public void run() {
+		userService.updateTokenRefreshTime(user.getUserId(), clientType);
+	}
+	
+}

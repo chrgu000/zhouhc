@@ -1,0 +1,5 @@
+--业务计划表新增biz_rule_id字段
+ALTER TABLE spd_adjust_stock_biz ADD(biz_rule_id VARCHAR2(32));
+ALTER TABLE spd_move_area_biz ADD(biz_rule_id VARCHAR2(32));
+ALTER TABLE spd_receive_biz ADD(biz_rule_id VARCHAR2(32));
+ALTER TABLE spd_replenish_biz ADD(biz_rule_id VARCHAR2(32));

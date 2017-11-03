@@ -1,0 +1,24 @@
+package cn.ak4j.yard.sys.service;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.List;
+
+import org.apache.commons.io.IOUtils;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.sys.to.SpdDepotCardImportTO;
+
+public class YardExcelTranslatorTest extends BaseTest{
+
+	@Autowired private YardExcelTranslator excelTranslator;
+	
+	@Test public void testTranslateToDepotCards() throws Exception{
+		byte[] data = IOUtils.toByteArray(this.getClass().getResource("/files/depot_card.xls"));
+		List<SpdDepotCardImportTO> depotCards = excelTranslator.translateToDepotCards(data);
+		assertEquals(10, depotCards.size());
+	}
+	
+}

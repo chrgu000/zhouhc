@@ -1,0 +1,183 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdAbstractFeedbackRule;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdFeedbackRules;
+import cn.ak4j.yard.spd.bizrule.params.SpdBizRuleParams;
+import lombok.NoArgsConstructor;
+
+@SuppressWarnings({ "rawtypes", "serial" })
+@NoArgsConstructor
+public class SpdAbstractBizRules extends Entities<SpdAbstractBizRule>{
+
+	public SpdAbstractBizRules(List<SpdAbstractBizRule> rules) {
+		super(rules);
+	}
+	
+	public SpdAbstractBizRule findById(String id){
+		return CollectionUtils.findWhere("id", id, this);
+	}
+	
+	public SpdAbstractBizRules findByIds(List<String> ids) {
+		SpdAbstractBizRules result = new SpdAbstractBizRules();
+		this.forEach(rule->{
+			if(ids.contains(rule.getId())){
+				result.add(rule);
+			}
+		});
+		return result;
+	}
+	
+	public Entities<SpdAbstractBizRule> findByPage(SpdBizRuleParams params, OrderParam order, int pageNo, int pageSize){
+		Entities<SpdAbstractBizRule> rules = super.findByPage(params, order, pageNo, pageSize);
+		Entities<SpdAbstractBizRule> result = new Entities<SpdAbstractBizRule>();
+		if(params != null && params.getBizTypeCode() != null && !params.getBizTypeCode().isEmpty()){
+			rules.forEach(rule->{
+				boolean inOperation = params.getBizTypeCode().isInOperation();
+				if((params.getBizTypeCode().getValue().contains(rule.getBizTypeCode()) && inOperation)
+					|| (!params.getBizTypeCode().getValue().contains(rule.getBizTypeCode()) && !inOperation)){
+					result.add(rule);
+				}
+			});
+			return result;
+		}else{
+			return rules;
+		}
+	}
+	
+	public SpdAbstractBizRules getEnabledRules(){
+		return new SpdAbstractBizRules(CollectionUtils.find("enabled", true, Boolean.class, this));
+	}
+
+	@SuppressWarnings("unchecked")
+	public void fillFeedbackRules(SpdFeedbackRules feedbackRules) {
+		for(SpdAbstractBizRule bizRule : this){
+			SpdAbstractFeedbackRule feedbackRule = feedbackRules.findById(bizRule.getFeedbackRuleId());
+			bizRule.setFeedbackRule(feedbackRule);
+		}
+	}
+
+	public SpdReplenishRules getAllReplenishRules() {
+		return new SpdReplenishRules(findRuleByBizType(SpdBizType.replenish_biz, SpdReplenishRule.class));
+	}
+	
+	public SpdReceiveRules getAllReceiveRules() {
+		return new SpdReceiveRules(findRuleByBizType(SpdBizType.receive_biz, SpdReceiveRule.class));
+	}
+	
+	public SpdAdjustStockRules getAllAdjustStockRules() {
+		return new SpdAdjustStockRules(findRuleByBizType(SpdBizType.adjust_stock_biz, SpdAdjustStockRule.class));
+	}
+	
+	public SpdMoveAreaRules getAllMoveAreaRules() {
+		return new SpdMoveAreaRules(findRuleByBizType(SpdBizType.move_area_biz, SpdMoveAreaRule.class));
+	}
+	
+	public SpdPrepareInformRules getAllPrepareInformRules(){
+		return new SpdPrepareInformRules(findRuleByBizType(SpdBizType.prepare_inform_biz, SpdPrepareInformRule.class));
+	}
+	
+	public SpdConsumeRules getAllConsumeRules() {
+		return new SpdConsumeRules(findRuleByBizType(SpdBizType.consume_biz, SpdConsumeRule.class));
+	}
+	
+	public SpdReturnGoodsRules getAllReturnGoodsRules(){
+		return new SpdReturnGoodsRules(findRuleByBizType(SpdBizType.return_goods_biz, SpdReturnGoodsRule.class));
+	}
+	
+	public SpdDailyCleanRules getAllDailyCleanRules(){
+		return new SpdDailyCleanRules(findRuleByBizType(SpdBizType.daily_clean_biz, SpdDailyCleanRule.class));
+	}
+	
+	public SpdFinacialReconciliationRules getAllFinacialReconciliationRules(){
+		return new SpdFinacialReconciliationRules(findRuleByBizType(SpdBizType.finacial_reconciliation_biz, SpdFinacialReconciliationRule.class));
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends SpdAbstractBizRule> List<T> findRuleByBizType(SpdBizType bizType, Class<T> ruleType){
+		List<T> result = new ArrayList<T>();
+		for(SpdAbstractBizRule bizRule : this){
+			if(bizRule.getBizType().equals(bizType)){
+				result.add((T) bizRule);
+			}
+		}
+		return result;
+	}
+	
+	public SpdReplenishRules getAllEnabledReplenishRules(){
+		SpdReplenishRules replenishRules = this.getAllReplenishRules();
+		SpdReplenishRules result = new SpdReplenishRules(CollectionUtils.find("enabled", true, Boolean.class, replenishRules));
+		return result;
+	}
+	
+	public SpdAbstractBizRule getTopPriorRule(SpdBizType bizType){
+		SpdAbstractBizRule result = null;
+		for(SpdAbstractBizRule bizRule : this){
+			if(bizRule.getBizType().equals(bizType)){
+				if(result == null){
+					result = bizRule;
+				}else{
+					if(bizRule.getPrior().intValue() > result.getPrior().intValue()){
+						result = bizRule;
+					}
+				}
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 查找规则属性一样的业务规则
+	 */
+	public SpdAbstractBizRule findWithSameRuleProps(SpdAbstractBizRule theRule) {
+		for(SpdAbstractBizRule rule : this){
+			if(theRule.equalsRule(rule)){
+				return rule;
+			}
+		}
+		return null;
+	}
+
+	
+	public SpdBizRules findByBizTypesAndDepotIds(Collection<SpdBizType> bizTypes, String depotId) {
+		List<String> depotIds = new ArrayList<String>();
+		depotIds.add(depotId);
+		return findByBizTypesAndDepotIds(bizTypes, depotIds);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public SpdBizRules findByBizTypesAndDepotIds(Collection<SpdBizType> bizTypes, List<String> depotIds) {
+		SpdBizRules rules = new SpdBizRules();
+		this.forEach(rule->{
+			if(bizTypes.contains(rule.getBizType())){
+				switch (rule.getBizType()) {
+				case replenish_biz:
+					SpdReplenishRule replenishRule = (SpdReplenishRule)rule;
+					depotIds.forEach(depotId->{
+						if(replenishRule.isRelateDepot(depotId)){
+							rules.add(rule);
+						}
+					});
+					break;
+				case consume_biz:
+					SpdConsumeRule consumeRule = (SpdConsumeRule)rule;
+					if(depotIds.contains(consumeRule.getDepotId())){
+						rules.add(rule);
+					}
+					break;
+				default:
+					break;
+				}
+			}
+		});
+		return rules;
+	}
+
+}

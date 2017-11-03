@@ -1,0 +1,28 @@
+package cn.ak4j.yard.enums;
+
+import java.io.IOException;
+
+import org.junit.Ignore;
+import org.junit.Test;
+
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+import cn.ak4j.Global;
+import cn.ak4j.yard.BaseTest;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Ignore
+public class EnumJsonDeserializerTest extends BaseTest{
+	
+	@Test public void testDeserialize() throws JsonParseException, JsonMappingException, IOException{
+		String json = "[{\"库房调拨\":\"depot_allocation\"},{\"科室调拨\":\"dept_allocation\"},"
+				+ "{\"库房补货\":\"depot_replenish\"},{\"科室请领\":\"dept_apply\"},{\"退货\":\"refund\"}]";
+		
+		SpdDepotTaskType input = Global.defaultObjectMapper.readValue(json, SpdDepotTaskType.class);
+		log.debug("enum:{}", input);
+		
+	}
+}
+

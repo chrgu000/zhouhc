@@ -1,0 +1,82 @@
+package cn.ak4j.yard.pcs.service;
+
+import java.util.Date;
+
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.exception.common.OperateForbiddenException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.IYardService;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.IUser;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.repository.PcsOrgRepository;
+
+@Service
+public class PcsOrgService extends IYardService<PcsOrg>{
+
+	@Autowired private PcsOrgRepository pcsOrgRepository;
+
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allPcsOrgs\""),
+			@CacheEvict(value="longTimeCache", key="\"allPcsDeptsWithRelations\"")})
+	public PcsOrg add(@Valid PcsOrg pcsOrg, IUser user){
+		pcsOrg.fillDefaultValue();
+		PcsOrgs pcsOrgs = pcsOrgRepository.findAll();
+		pcsOrgs.checkOrgExist(pcsOrg);
+		if(!pcsOrg.isValid()){
+			pcsOrg.setEnabled(false);
+		}
+		pcsOrgRepository.save(pcsOrg);
+		return pcsOrg;
+	}
+
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allPcsOrgs\""),
+			@CacheEvict(value="longTimeCache", key="\"allPcsDeptsWithRelations\"")})
+	public PcsOrg modify(@Valid PcsOrg pcsOrg, IUser user){
+		PcsOrgs pcsOrgs = pcsOrgRepository.findAll();
+		pcsOrgs.checkOrgExist(pcsOrg);
+		
+		PcsOrg pcsOrgPO = CollectionUtils.findWhere("orgId", pcsOrg.getOrgId(), pcsOrgs);
+		if(!pcsOrg.isValid()){
+			pcsOrg.setEnabled(false);
+		}
+		pcsOrgPO.update(pcsOrg, user.getOrgId(), user.getUserId());
+		pcsOrgRepository.save(pcsOrgPO);
+		return pcsOrgPO;
+	}
+
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allPcsOrgs\""),
+			@CacheEvict(value="longTimeCache", key="\"allPcsDeptsWithRelations\"")})
+	public PcsOrg updateCheckState(String orgId, int checkStateCode,Date lastDate, IUser user){
+		PcsOrg pcsOrgPO = pcsOrgRepository.findAll().findById(orgId);
+		pcsOrgPO.updateCheckState(checkStateCode, lastDate, user.getOrgId(), user.getUserId());
+		if(!pcsOrgPO.isValid()){
+			if(pcsOrgPO.getCheckStateCode() == CheckState.new_created.getCode()){
+				pcsOrgPO.setEnabled(false);
+			}else{
+				throw new InvalidDataException(pcsOrgPO.getValidateMsg());
+			}
+		}
+		pcsOrgRepository.save(pcsOrgPO);
+		return pcsOrgPO;
+	}
+	
+	@Caching(evict={@CacheEvict(value="longTimeCache", key="\"allPcsOrgs\""),
+			@CacheEvict(value="longTimeCache", key="\"allPcsDeptsWithRelations\"")})
+	public void delete(String orgId, IUser user){
+		PcsOrg pcsOrgPO = pcsOrgRepository.findAll().findById(orgId);
+		if(!pcsOrgPO.canDelete()){
+			throw new OperateForbiddenException(YardExceptionType.forbide_delete, pcsOrgPO.getOrgName());
+		}
+		pcsOrgRepository.delete(pcsOrgPO);
+	}
+	
+}

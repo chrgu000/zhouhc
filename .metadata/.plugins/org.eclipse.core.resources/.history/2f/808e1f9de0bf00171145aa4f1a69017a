@@ -1,0 +1,1 @@
+Insert into SYS_GLOBAL_INFO (KEY,NAME,VALUE,DESCRIPTION,CREATE_TIME,LAST_UPDATE_TIME,EDITABLE) values ('yds_goods_price_unit_lv','标准产品价格单位级别','4','该属性用来表示标准产品中单价信息是关于什么单位级别的',sysDate,sysDate,'0');

@@ -1,0 +1,1 @@
+ALTER TABLE spd_biz_item RENAME COLUMN return_qty_by_base_unit TO return_qty;

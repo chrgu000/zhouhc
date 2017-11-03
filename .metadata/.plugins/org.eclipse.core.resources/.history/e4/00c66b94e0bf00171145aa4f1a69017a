@@ -1,0 +1,60 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.domain.YardEntity;
+import cn.ak4j.yard.spd.domain.SpdGoodsItems;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="SPD_DISPATCHER_REF")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"rawtypes", "serial"})
+public class SpdDispatcherRef extends YardEntity{
+	
+	public static final String ref_object_type_biz = "biz";
+	public static final String ref_object_type_logistics_task = "logistics_task";
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String dispatcherRefId;//明细ID
+	
+	@Getter @Setter
+	private String dispatcherId;//调度单
+	
+	@NotNull @Getter @Setter
+	private String areaType;
+	
+	@Column(name="REF_SHEET_ID") @Getter @Setter
+	private String refObjectId;//来源id(业务id或者是作业id)
+	
+	@Column(name="REF_OBJECT_TYPE") @Getter @Setter
+	private String refObjectType;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private Date createTime = new Date();
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private Date lastUpdateTime;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private SpdGoodsItems goodsItems;
+
+}

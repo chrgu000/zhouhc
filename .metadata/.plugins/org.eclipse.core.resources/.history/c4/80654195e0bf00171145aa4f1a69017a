@@ -1,0 +1,114 @@
+package cn.ak4j.yard.pcs.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class PcsMenu implements IEntity ,Comparable<PcsMenu>{
+
+	private static final long serialVersionUID = -4876577583257218778L;
+	
+	@Getter @Setter
+	private String systemName;
+	
+	@Getter @Setter
+	private String menuId;
+	
+	@Getter @Setter
+	private String menuCode;
+	
+	@Getter @Setter
+	private String menuParentId;
+	
+	@Getter @Setter
+	private String icon;
+	
+	@Getter @Setter
+	private Integer menuSort;
+	
+	@Getter @Setter
+	private String name;
+	
+	@Getter @Setter
+	private int level;
+	
+	@Getter @Setter
+	private String anchor;
+	
+	@Getter @Setter
+	private PcsFunctions functions = new PcsFunctions();
+	
+	@Getter @Setter
+	private PcsMenus children = new PcsMenus();
+	
+	@Setter
+	private PcsMenu parentMenu;
+	
+	public PcsMenu(){
+	}
+	
+	public PcsMenu(String systemName, String menuId, String menuCode, String menuParentId, String icon, Integer menuSort, String name, int level, String anchor, PcsMenu parentMenu){
+		setSystemName(systemName);
+		setMenuId(menuId);
+		setMenuCode(menuCode);
+		setMenuParentId(menuParentId);
+		setIcon(icon);
+		setMenuSort(menuSort);
+		setName(name);
+		setLevel(level);
+		setAnchor(anchor);
+		setParentMenu(parentMenu);
+	}
+	
+	public PcsMenu buildSimpleMenu(){
+		return new PcsMenu(getSystemName(), getMenuId(), getMenuCode(), getMenuParentId(), getIcon(), getMenuSort(), getName(), getLevel(), getAnchor(), getParentMenu());
+	}
+	
+	public boolean isTopMenu(){
+		return getMenuParentId().equals("-1");
+	}
+	
+	public boolean containFunction(String functionId){
+		if(functions == null){
+			return false;
+		}
+		for(PcsFunction function : functions){
+			if(function.getFunctionId().equals(functionId)){
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public String getParentMenuName(){
+		String result = "";
+		if(!isTopMenu()){
+			result += (getParentMenu().getParentMenuName()+">"+getName());
+		}else{
+			result = getName();
+		}
+		return result;
+	}
+	
+	public void addChild(PcsMenu menu){
+		this.children.add(menu);
+	}
+	
+	
+
+	public int compareTo(PcsMenu menu) {
+		return this.getMenuSort().compareTo(menu.getMenuSort());
+	}
+
+	@JsonIgnore
+	public PcsMenu getParentMenu() {
+		return parentMenu;
+	}
+
+	
+	
+}

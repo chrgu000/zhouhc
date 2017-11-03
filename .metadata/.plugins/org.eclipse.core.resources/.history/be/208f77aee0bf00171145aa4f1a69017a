@@ -1,0 +1,137 @@
+package cn.ak4j.yard.spd.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Conf;
+import cn.ak4j.yard.enums.SpdInventoryType;
+import cn.ak4j.yard.enums.SpdInventoryWay;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.domain.SpdInventory;
+import cn.ak4j.yard.spd.domain.SpdInventoryItems;
+import cn.ak4j.yard.spd.domain.SpdInventorys;
+import cn.ak4j.yard.spd.params.SpdInventoryParams;
+import cn.ak4j.yard.spd.repository.SpdInventoryItemRepository;
+import cn.ak4j.yard.spd.to.CheckStateTO;
+import cn.ak4j.yard.spd.to.NewSpdInventoryTO;
+import cn.ak4j.yard.sys.domain.YardGlobalInfo;
+
+public class SpdInventoryResourceTest extends BaseTest{
+
+	@Autowired private SpdInventoryItemRepository iiRepository;
+	
+	@Test public void testPrintPdf() throws Exception{
+		String inventoryId = "inventory_id_001";
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = getUrlTemplate("/spd/spdInventoryItems/inventoryId,{inventoryId}/pdf?accessToken={accessToken}");
+		mockMvc.perform(get(urlTemplate, inventoryId, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("物资盘点单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+		
+		String blindInventoryId = "inventory_id_002";
+		mockMvc.perform(get(urlTemplate, blindInventoryId, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("inline; filename=%s.pdf", URLEncoder.encode("物资盘点单", Global.defaultCharset.name()))))
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
+		
+	}
+	
+	@Test public void testFindAll() throws Exception{
+		SpdInventorys inventorys = mockMvcHelper.findList(SpdInventorys.class, testUserCode, null);
+		assertEquals(3, inventorys.size());
+	}
+	
+	@Test public void testFindAllCount() throws Exception{
+		int count = mockMvcHelper.count(SpdInventorys.class, testUserCode, null);
+		assertEquals(3, count);
+	}
+	
+	@Test public void testFindByNewCreated() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		SpdInventoryParams params = new SpdInventoryParams();
+		params.setDeptId(new ListParam<String>(user.getDeptId()));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.new_created.getCode()));
+		params.setFixed(new ListParam<String>(SpdInventoryType.spare_parts.getCode()));
+		                    
+		SpdInventorys inventorys = mockMvcHelper.findList(SpdInventorys.class, testUserCode, params);
+		assertEquals(2, inventorys.size());
+	}
+	
+	@Test public void testFindByReviewedAndCompleted() throws Exception{
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		
+		SpdInventoryParams params = new SpdInventoryParams();
+		params.setDeptId(new ListParam<String>(user.getDeptId()));
+		List<Integer> checkStates = new ArrayList<Integer>();
+		checkStates.add(CheckState.reviewed.getCode());
+		checkStates.add(CheckState.completed.getCode());
+		params.setCheckStateCode(new ListParam<Integer>(checkStates));
+		params.setFixed(new ListParam<String>(SpdInventoryType.spare_parts.getCode()));
+		
+		SpdInventorys inventorys = mockMvcHelper.findList(SpdInventorys.class, xykUserCode, params);
+		assertEquals(1, inventorys.size());
+	}
+	
+	@Test public void testAddAndReviewed() throws Exception{
+		NewSpdInventoryTO to = buildNewSpdInventoryTO();
+		SpdInventory newInventory = mockMvcHelper.add(SpdInventory.class, xykUserCode, to);
+		
+		assertEquals(to.getDepotId(), newInventory.getDepotId());
+		assertEquals(to.getDeptId(), newInventory.getDeptId());
+		assertEquals(to.getOrgId(), newInventory.getOrgId());
+		assertEquals(to.getInventoryType(), newInventory.getInventoryType());
+		assertEquals(to.getFixed(), newInventory.getFixed());
+		assertEquals(to.getInventoryUser(), newInventory.getInventoryUser());
+		assertEquals(CheckState.new_created, newInventory.getCheckState());
+		
+		CheckStateTO checkStateTO = new CheckStateTO(CheckState.reviewed.getCode(), newInventory.getLastUpdateTime());
+		mockMvcHelper.updateCheckState(SpdInventory.class, xykUserCode, checkStateTO, newInventory.getInventoryId(), status().is4xxClientError(), YardExceptionType.invalid_item_not_data);
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Test public void testInventoryCreateTasks() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String urlTemplate = "/spd/inventoryCreateTasks?inventoryId={inventoryId}&accessToken={accessToken}";
+		String inventoryId = "inventory_id_003";
+		
+		mockMvcHelper.mockPost(String.class, null, urlTemplate, inventoryId, accessToken);
+		
+		wait(2);
+		
+		SpdInventoryItems itmes = iiRepository.findByInventoryId(inventoryId);
+		
+		List<String> goodsIds = itmes.pluck("goodsId");
+		int batchGoodsSize = Conf.getAllGlobalInfos().findByKey(YardGlobalInfo.inventory_batch_goods_size).getIntValue();
+		assertEquals(batchGoodsSize, goodsIds.size());
+	}
+
+	
+	private NewSpdInventoryTO buildNewSpdInventoryTO() {
+		NewSpdInventoryTO to = new NewSpdInventoryTO();
+		to.setDepotId("depot_id_001");
+		to.setAreaId("area_id_016");
+		to.setDeptId("dept_id_001");
+		to.setFixed(SpdInventoryType.spare_parts.getCode());
+		to.setInventoryType(SpdInventoryWay.static_disc.getCode());
+		to.setInventoryUser("user_id_002");
+		return to;
+	}
+	
+}

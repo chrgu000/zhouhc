@@ -1,0 +1,55 @@
+package cn.ak4j.yard.pcs.service;
+
+import static org.junit.Assert.*;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+
+public class PcsUserServiceTest extends BaseTest{
+
+	@Autowired private PcsUserService userService;
+	@Autowired private PcsUserRepository userRepository;
+	@Rule public ExpectedException thrown = ExpectedException.none();
+ 	
+	@Test public void testAdd(){
+		PcsUser newUser = getUser();
+		thrown.expect(InvalidDataException.class);
+		PcsUser user = userRepository.findAll().findById(xykUserId);
+		userService.add(newUser, user);
+	}
+
+	private PcsUser getUser() {
+		PcsUser user = new PcsUser();
+		user.setUserCode("test_code");
+		user.setDeptId("dept_id_006");
+		user.setUserName("门诊药房管理员");
+		user.setEmail("132@qq.com");
+		user.setOriginPassword("ak1234");
+		user.setLinkTel("13800138000");
+		user.setOrgId("626");
+		return user;
+	}
+	
+	
+	@Test public void testGetDeptDefaultUser(){
+		String deptId = "dept_id_002";
+		PcsUser user = userService.getDeptDefaultUser(deptId);
+		assertEquals("user_id_003", user.getUserId());
+		assertEquals(deptId, user.getDeptId());
+	}
+	
+	//没有找到部门默认用户
+	@Test public void testGetDeptDefaultUserError(){
+		String deptId = "dept_id_004";
+		thrown.expect(InvalidDataException.class);
+		userService.getDeptDefaultUser(deptId);
+	}
+
+}

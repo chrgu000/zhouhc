@@ -1,0 +1,40 @@
+package cn.ak4j.yard.sys.logging.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+
+@Entity
+@Table(name="LOGGING_EVENT_PROPERTY")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial"})
+public class SysLoggingEventProperty implements IEntity{
+
+	@Id
+	private Integer eventId;
+	private String mappedKey;
+	private String mappedValue;
+	
+	public Integer getEventId() {
+		return eventId;
+	}
+	public void setEventId(Integer eventId) {
+		this.eventId = eventId;
+	}
+	public String getMappedKey() {
+		return mappedKey;
+	}
+	public void setMappedKey(String mappedKey) {
+		this.mappedKey = mappedKey;
+	}
+	public String getMappedValue() {
+		return mappedValue;
+	}
+	public void setMappedValue(String mappedValue) {
+		this.mappedValue = mappedValue;
+	}	
+}

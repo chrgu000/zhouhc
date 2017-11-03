@@ -1,0 +1,3 @@
+update spd_feedback_rule set auto_commit_adjust_stock='0';
+update spd_feedback_rule set auto_review_adjust_stock='0';
+

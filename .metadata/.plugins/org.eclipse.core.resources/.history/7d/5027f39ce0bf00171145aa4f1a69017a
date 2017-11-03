@@ -1,0 +1,4 @@
+alter table spd_adjust_stock_rule add(depot_id varchar2(50));
+alter table spd_adjust_stock_rule add(area_type varchar2(32));
+alter table spd_adjust_stock_rule add(usage varchar2(100));
+alter table spd_adjust_stock_rule add(type_code varchar2(32));

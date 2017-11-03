@@ -1,0 +1,19 @@
+package cn.ak4j.yard.spd.utils;
+
+import java.util.Comparator;
+
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+
+public class YdsGoodsLotSorter implements Comparator<YdsGoodsLot>{
+
+	public int compare(YdsGoodsLot lot1, YdsGoodsLot lot2) {
+		if(Constant.lot_prior_strategy.equals(Constant.lot_prior_strategy_create_time_prior)){
+			return (int)(lot1.getMaintenanceInfo().getCreateDate().getTime() - lot2.getMaintenanceInfo().getCreateDate().getTime());
+		}else if(Constant.lot_prior_strategy.equals(Constant.lot_prior_strategy_validity_prior)){
+			return (int)(lot1.getLotValidity().getTime()-lot2.getLotValidity().getTime());
+		}
+		return 0;
+	}
+	
+}

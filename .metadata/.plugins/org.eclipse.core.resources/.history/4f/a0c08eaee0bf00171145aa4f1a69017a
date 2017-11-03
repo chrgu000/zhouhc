@@ -1,0 +1,406 @@
+package cn.ak4j.yard.spd.bizrule.web;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.query.param.QueryParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.SpdOriginItemCondition;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishOperation;
+import cn.ak4j.yard.spd.bizrule.params.SpdReplenishRuleParams;
+import cn.ak4j.yard.spd.bizrule.to.SpdReplenishRuleTO;
+import cn.ak4j.yard.sys.domain.CodeSort;
+import cn.ak4j.yard.sys.service.YardCodeService;
+
+public class SpdReplenishRuleResourceTest extends BaseTest{
+
+	@Autowired private PcsDepotRepository depotRepository;
+	@Autowired private YardCodeService codeService;
+	
+	@Test public void testFind() throws Exception{
+		testList();
+		testCount();
+		testGetByIds();
+		testGetListByParamStr();
+		
+		testWhichICanApply();
+		testWhichICanConfirm();
+		testGetMyOperations();
+	}
+	
+	private void testList() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		
+		//测试设置翻页大小
+		int pageSize = 10;
+		String url = "/spd/spdReplenishRules?pageSize={pageSize}&accessToken={accessToken}";
+		List<SpdReplenishRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, pageSize, accessToken);
+		assertEquals(pageSize, rules.size());
+		
+		//测试根据名字查询
+		SpdReplenishRuleParams params = new SpdReplenishRuleParams();
+		String ruleName = "请领";
+		params.setName(new ListParam<String>(ruleName,QueryParam.operation_like_in));
+		url = "/spd/spdReplenishRules?params={params}&accessToken={accessToken}";
+		rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		rules.forEach(rule->{
+			assertTrue(rule.getName().contains(ruleName));
+		});
+		
+		//测试根据发货方、收货方仓库查询
+		params = new SpdReplenishRuleParams();
+		String fromDepotId = "depot_id_002";
+		String toDepotId = "depot_id_001";
+		params.setDirectionRule_fromDepotId(new ListParam<String>(fromDepotId));
+		params.setDirectionRule_toDepotId(new ListParam<String>(toDepotId));
+		url = "/spd/spdReplenishRules?params={params}&accessToken={accessToken}";
+		rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		rules.forEach(rule->{
+			assertEquals(fromDepotId, rule.getFromDepotId());
+			assertEquals(toDepotId, rule.getToDepotId());
+		});
+		
+	}
+	
+	private void testCount() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReplenishRules/count?accessToken={accessToken}";
+		int count = mockMvcHelper.mockGet(Integer.class, url, accessToken);
+		assertEquals(39, count);
+		
+		//测试根据名字查询
+		SpdReplenishRuleParams params = new SpdReplenishRuleParams();
+		String ruleName = "请领";
+		params.setName(new ListParam<String>(ruleName,QueryParam.operation_like_in));
+		url = "/spd/spdReplenishRules/count?params={params}&accessToken={accessToken}";
+		count = mockMvcHelper.mockGet(Integer.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(9, count);
+		
+		//测试根据发货方、收货方仓库查询
+		params = new SpdReplenishRuleParams();
+		String fromDepotId = "depot_id_002";
+		String toDepotId = "depot_id_001";
+		params.setDirectionRule_fromDepotId(new ListParam<String>(fromDepotId));
+		params.setDirectionRule_toDepotId(new ListParam<String>(toDepotId));
+		url = "/spd/spdReplenishRules/count?params={params}&accessToken={accessToken}";
+		count = mockMvcHelper.mockGet(Integer.class, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+		assertEquals(4, count);
+		
+	}
+	
+	private void testGetByIds() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReplenishRules/ids,{ids}?accessToken={accessToken}";
+		String[] ids = new String[]{"rep_rule_id_01", "rep_rule_id_03", "rep_rule_id_04", "rep_rule_id_20"};
+		List<SpdReplenishRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, StringUtils.join(ids, ","), accessToken);
+		assertEquals(4, rules.size());
+		for(String id : ids){
+			assertNotNull(CollectionUtils.findWhere("id", id, rules));
+		}
+	}
+	
+	private void testWhichICanApply() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		String url = "/spd/spdReplenishRules/whichICanApply?accessToken={accessToken}";
+		List<SpdReplenishRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, accessToken);
+		assertEquals(13, rules.size());
+		
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		rules.forEach(rule->{
+			PcsDepot fromDepot = allDepots.findById(rule.getFromDepotId());
+			PcsDepot toDepot = allDepots.findById(rule.getToDepotId());
+			assertEquals(true, rule.getEnabled());
+			assertTrue(fromDepot.getManageDeptId().equals(user.getDeptId()) || toDepot.getManageDeptId().equals(user.getDeptId()));
+		});
+	}
+	
+	private void testWhichICanConfirm() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		PcsUser user = mockMvcHelper.findOne(PcsUser.class, testUserCode, xykUserId);
+		String url = "/spd/spdReplenishRules/whichICanConfirm?accessToken={accessToken}";
+		List<SpdReplenishRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, accessToken);
+		assertEquals(22, rules.size());
+		
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		rules.forEach(rule->{
+			PcsDepot fromDepot = allDepots.findById(rule.getFromDepotId());
+			PcsDepot toDepot = allDepots.findById(rule.getToDepotId());
+			assertEquals(true, rule.getEnabled());
+			assertTrue(fromDepot.getManageDeptId().equals(user.getDeptId()) || toDepot.getManageDeptId().equals(user.getDeptId()));
+		});
+	}
+	
+	private void testGetMyOperations() throws Exception{
+		String accessToken = getAccessToken(xykUserCode);
+		String url = "/spd/spdReplenishRules/ids,{ids}/myBizOperations?accessToken={accessToken}";
+		
+		List<SpdReplenishOperation> operations = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishOperation>>() {}, url, "rep_rule_id_19,rep_rule_id_09", accessToken);
+		for(SpdReplenishOperation operation : operations){
+			if(operation.getRuleId().equals("rep_rule_id_19")){
+				assertTrue(operation.getCanApply());
+				assertTrue(operation.getCanConfirm());
+			}else if(operation.getRuleId().equals("rep_rule_id_09")){
+				assertFalse(operation.getCanApply());
+				assertTrue(operation.getCanConfirm());
+			}
+		}
+	}
+
+	private void testGetListByParamStr() throws Exception{
+       String accessToken = getAccessToken(testUserCode);
+			
+		//测试关联筛选、
+       SpdReplenishRuleParams params = new SpdReplenishRuleParams();
+       params.setDirectionRule_fromDepotId(new ListParam<String>("depot_id_002"));
+       params.setDirectionRule_toDepotId(new ListParam<String>("depot_id_004"));
+       String url = "/spd/spdReplenishRules?params={params}&accessToken={accessToken}";
+       List<SpdReplenishRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, Global.defaultObjectMapper.writeValueAsString(params), accessToken);
+       assertTrue(rules.size()>0);
+	}
+	
+	@Test public void testListApplyRules() throws Exception{
+		String accessToken = getAccessToken(eisUserCode, eisPassword);
+		
+		String url = "/spd/spdReplenishRules/applyRules?accessToken={accessToken}";
+		
+		List<SpdReplenishRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, accessToken);
+		assertEquals(9, rules.size());
+		
+		//测试根据发货方、收货方仓库查询
+		url = "/spd/spdReplenishRules/applyRules?params={params}&pageSize=-1&orders={orders}&accessToken={accessToken}";
+		SpdReplenishRuleParams params = new SpdReplenishRuleParams();
+		String fromDepotId = "depot_id_001";
+		List<String> toDepotIds = new ArrayList<String>();
+		toDepotIds.add("depot_id_002");
+		toDepotIds.add("depot_id_003");
+		toDepotIds.add("depot_id_004");
+		
+		params.setDirectionRule_fromDepotId(new ListParam<String>(fromDepotId));
+		params.setDirectionRule_toDepotId(new ListParam<String>(toDepotIds));
+		
+		OrderParam order = new OrderParam("prior", "desc");
+		String orderStr = Global.defaultObjectMapper.writeValueAsString(order);
+		rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, Global.defaultObjectMapper.writeValueAsString(params), orderStr, accessToken);
+		assertEquals(8, rules.size());
+		
+		for(int i = 0; i < 4; i++){
+			SpdReplenishRuleTO rule = rules.get(i);
+			assertEquals(99, rule.getPrior().intValue());
+		}
+		
+		for(int i = 5; i < 8; i++){
+			SpdReplenishRuleTO rule = rules.get(i);
+			assertEquals(1, rule.getPrior().intValue());
+		}
+	}
+
+	@Test public void testListAllocateRules() throws Exception{
+		String accessToken = getAccessToken(eisUserCode, eisPassword);
+		
+		String url = "/spd/spdReplenishRules/fromDepotAllocateRules?accessToken={accessToken}";
+		List<SpdReplenishRuleTO> rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, accessToken);
+		assertEquals(20, rules.size());
+		
+		//测试根据发货方、收货方仓库查询
+		url = "/spd/spdReplenishRules/fromDepotAllocateRules?params={params}&pageSize=-1&orders={orders}&accessToken={accessToken}";
+		SpdReplenishRuleParams params = new SpdReplenishRuleParams();
+		String fromDepotId = "depot_id_001";
+		List<String> toDepotIds = new ArrayList<String>();
+		toDepotIds.add("depot_id_002");
+		toDepotIds.add("depot_id_003");
+		toDepotIds.add("depot_id_004");
+		
+		params.setDirectionRule_fromDepotId(new ListParam<String>(fromDepotId));
+		params.setDirectionRule_toDepotId(new ListParam<String>(toDepotIds));
+		
+		OrderParam order = new OrderParam("prior", "desc");
+		String orderStr = Global.defaultObjectMapper.writeValueAsString(order);
+		rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, Global.defaultObjectMapper.writeValueAsString(params), orderStr, accessToken);
+		rules.forEach(rule->{
+			assertEquals(fromDepotId, rule.getFromDepotId());
+			assertTrue(toDepotIds.contains(rule.getToDepotId()));
+		});
+		
+		url = "/spd/spdReplenishRules/toDepotAllocateRules?accessToken={accessToken}";
+		rules = mockMvcHelper.mockGet(new TypeReference<List<SpdReplenishRuleTO>>() {}, url, accessToken);
+		assertEquals(8, rules.size());
+	}
+	
+	@Test public void testCreate() throws Exception{
+		SpdReplenishRuleTO to = createReplenishRuleTO();
+		SpdReplenishRuleTO newTo = mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to);
+		assertTrue(newTo.getId() != null);
+		int sequenceCode = codeService.findCurrentCodeSequence(CodeSort.shenlingguize);
+		assertEquals(CodeSort.shenlingguize.getCode()+getCurrentDateCode()+sequenceCode, newTo.getRuleCode());
+		assertEquals(to.getName(), newTo.getName());
+		assertEquals(to.getCustomName(), newTo.getCustomName());
+		assertEquals(to.getPrior(), newTo.getPrior());
+		assertEquals(to.getFromDepotId(), newTo.getFromDepotId());
+		assertEquals(to.getFromDepotAreaType(), newTo.getFromDepotAreaType());
+		assertEquals(to.getToDepotId(), newTo.getToDepotId());
+		assertEquals(to.getToDepotAreaType(), newTo.getToDepotAreaType());
+		assertEquals(to.getFromDepotCanApply(), newTo.getFromDepotCanApply());
+		assertEquals(to.getFromDepotCanConfirm(), newTo.getFromDepotCanConfirm());
+		assertEquals(to.getToDepotCanApply(), newTo.getToDepotCanApply());
+		assertEquals(to.getToDepotCanConfirm(), newTo.getToDepotCanConfirm());
+		assertEquals(to.getSpecificationTypeCode(), newTo.getSpecificationTypeCode());
+		assertEquals(to.getFeedbackRuleId(), newTo.getFeedbackRuleId());
+		
+		to.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+	
+		to.setFeedbackRuleId("rep_fb_id_09");
+		mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		
+		to.setToDepotId(to.getFromDepotId());
+		mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to, status().is4xxClientError(), YardExceptionType.invalid_data);
+		
+		to.setToDepotId("depot_id_007");
+		mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to, status().is4xxClientError(), YardExceptionType.invalid_depot_goods_type_different);
+	}
+	
+	@Test public void testCreateRuleByConfirmDepotEnabledStateError() throws Exception{
+		SpdReplenishRuleTO to = createReplenishRuleTO();
+		to.setFromDepotCanConfirm(true);
+		to.setToDepotCanConfirm(true);
+		mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to, status().is4xxClientError(), YardExceptionType.invalid_both_can_confirm);
+	}
+	
+	@Test public void testCreateExistOriginRuleId() throws Exception{
+		SpdReplenishRuleTO to = createReplenishRuleTO();
+		to.setOriginRuleId("rep_rule_id_13");
+		to.setOriginItemCondition(SpdOriginItemCondition.as_planned.getCode());
+		SpdReplenishRuleTO newTO = mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to, status().isOk(), null);
+		
+		assertEquals(to.getOriginRuleId(), newTO.getOriginRuleId());
+		assertEquals(to.getOriginItemCondition(), newTO.getOriginItemCondition());
+		
+		to.setOriginItemCondition("");
+		mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to, status().is4xxClientError(), null);
+	}
+	
+	@Test public void testModify() throws Exception{
+		//新增申领规则
+		SpdReplenishRuleTO to = createReplenishRuleTO();
+		SpdReplenishRuleTO newTo = mockMvcHelper.add(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", to, status().isOk(), null);
+
+		//修改申领规则的反馈规则
+		String newFeedbackRuleId = "rep_fb_id_02";
+		newTo.setFeedbackRuleId(newFeedbackRuleId);
+		newTo.setCustomName("自定义请领");
+		newTo = mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", newTo.getId(), newTo, status().isOk(), null);
+		assertEquals(newFeedbackRuleId, newTo.getFeedbackRuleId());
+		assertEquals("自定义请领", newTo.getCustomName());
+		
+		SpdReplenishRuleTO sameNewTo  = mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", newTo.getId(), newTo, status().isOk(), null);
+		
+		assertTrue(newTo.getId().equals(sameNewTo.getId()));
+		assertTrue(newTo.getDisplayName().equals(sameNewTo.getDisplayName()));
+		assertTrue(newTo.getFeedbackRuleId().equals(sameNewTo.getFeedbackRuleId()));
+		assertTrue(newTo.getFromDepotAreaType().equals(sameNewTo.getFromDepotAreaType()));
+		assertTrue(newTo.getFromDepotCanApply() == sameNewTo.getFromDepotCanApply());
+		assertTrue(newTo.getFromDepotCanConfirm() == sameNewTo.getFromDepotCanConfirm());
+		assertTrue(newTo.getFromDepotId().equals(sameNewTo.getFromDepotId()));
+		assertTrue(newTo.getName().equals(sameNewTo.getName()));
+		assertTrue(newTo.getPrior() == sameNewTo.getPrior());
+		assertTrue(newTo.getSpecificationTypeCode().equals(sameNewTo.getSpecificationTypeCode()));
+		assertTrue(newTo.getToDepotAreaType().equals(sameNewTo.getToDepotAreaType()));
+		assertTrue(newTo.getToDepotCanApply() == sameNewTo.getToDepotCanApply());
+		assertTrue(newTo.getToDepotCanConfirm() == sameNewTo.getToDepotCanConfirm());
+		assertTrue(newTo.getToDepotId().equals(sameNewTo.getToDepotId()));
+		
+		newTo.setFeedbackRuleId("as_fb_id_03");
+		mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", newTo.getId(), newTo, status().is4xxClientError(), YardExceptionType.invalid_rule_biz_type_different);
+		
+		newTo.setFeedbackRuleId("rep_fb_id_09");
+		mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", newTo.getId(), newTo, status().is4xxClientError(), YardExceptionType.invalid_rule_exsit);
+		
+		newTo.setToDepotId(to.getFromDepotId());
+		mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", newTo.getId(), newTo, status().is4xxClientError(), YardExceptionType.invalid_data);
+		
+		newTo.setToDepotId("depot_id_007");
+		mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", newTo.getId(), newTo, status().is4xxClientError(), YardExceptionType.invalid_depot_goods_type_different);
+	}
+	
+	@Test public void testModifyByEnabled() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReplenishRules/{id}?accessToken={accessToken}";
+		String ruleId = "rep_rule_id_01";
+		
+		SpdReplenishRuleTO originReplenishRuleTO = mockMvcHelper.mockGet(SpdReplenishRuleTO.class, url, ruleId, accessToken);
+		originReplenishRuleTO.setEnabled(false);
+		SpdReplenishRuleTO sameNewTo = mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", ruleId, originReplenishRuleTO, status().isOk(), null);
+		assertEquals(false, sameNewTo.getEnabled());
+	}
+	
+	@Test public void testModifyByEnabledButExistIncompleteReplenish() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReplenishRules/{id}?accessToken={accessToken}";
+		String ruleId = "rep_rule_id_07";
+		SpdReplenishRuleTO originReplenishRuleTO = mockMvcHelper.mockGet(SpdReplenishRuleTO.class, url, ruleId, accessToken);
+		originReplenishRuleTO.setEnabled(false);
+		mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", ruleId, originReplenishRuleTO, status().is4xxClientError(), null);
+	}
+	
+	@Test public void testModifyByConfirmDepotEnabledStateError() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = "/spd/spdReplenishRules/{id}?accessToken={accessToken}";
+		String ruleId = "rep_rule_id_07";
+		
+		SpdReplenishRuleTO originReplenishRuleTO = mockMvcHelper.mockGet(SpdReplenishRuleTO.class, url, ruleId, accessToken);
+		originReplenishRuleTO.setFromDepotCanConfirm(true);
+		originReplenishRuleTO.setToDepotCanConfirm(true);
+		mockMvcHelper.modify(SpdReplenishRuleTO.class, testUserCode, "spd", "spdReplenishRules", ruleId, originReplenishRuleTO, status().is4xxClientError(), null);
+	}
+
+	
+
+	
+	private SpdReplenishRuleTO createReplenishRuleTO() {
+		SpdReplenishRuleTO to = new SpdReplenishRuleTO();
+		to.setName("科室请领");
+		to.setCustomName("自定义科室请领");
+		to.setPrior(1);
+		to.setFromDepotId("depot_id_001");
+		to.setFromDepotAreaType(PcsAreaType.normal.getCode());
+		to.setToDepotId("depot_id_002");
+		to.setToDepotAreaType(PcsAreaType.normal.getCode());
+		to.setFromDepotCanApply(false);
+		to.setFromDepotCanConfirm(true);
+		to.setToDepotCanApply(true);
+		to.setToDepotCanConfirm(false);
+		to.setSpecificationTypeCode("goods");
+		to.setFeedbackRuleId("rep_fb_id_02");
+		to.setAutoSetBizConfirmQty(true);
+		to.setAutoSetOffShelfTaskConfirmQty(true);
+		to.setUseTurnoverBox(true);
+		to.setEnabled(true);
+		to.setCanBeOriginRule(false);
+		return to;
+	}
+	
+}

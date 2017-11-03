@@ -1,0 +1,1 @@
+update spd_prepare_inform_rule set inform_component ='gepSupplierProxy';

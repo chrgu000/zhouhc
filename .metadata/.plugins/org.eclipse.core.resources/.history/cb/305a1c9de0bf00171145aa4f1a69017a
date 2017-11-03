@@ -1,0 +1,1 @@
+update yds_eds_goods set owner_org_id ='ff8080815e371d0c015e375fcbc50b29' where owner_org_id = 'ff8080815e371d0c015e375de44504af';

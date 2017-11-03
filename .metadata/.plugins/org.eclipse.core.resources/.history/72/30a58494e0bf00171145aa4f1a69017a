@@ -1,0 +1,36 @@
+/**
+ */
+package cn.ak4j.yard.spd.stock.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * 产品库存
+ * @Description:
+ * @author wuyw
+ * @date 2017年10月24日上午11:03:48
+ *
+ */
+@SuppressWarnings("serial")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdGoodsStock implements IEntity{
+
+	@Getter @Setter private String depotId;
+	@Getter @Setter private String goodsId;
+	@Getter @Setter private Integer normalQtyByStoreUnit;
+	@Getter @Setter private Integer isolationQtyByStoreUnit;
+	@Getter @Setter private Integer unqualifiedQtyByStoreUnit;
+	
+	@JsonIgnore @Getter @Setter
+	private YdsGoods goods;
+	
+	@JsonIgnore @Getter @Setter
+	private PcsDepot depot;
+}

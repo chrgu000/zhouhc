@@ -1,0 +1,22 @@
+<#if prepareInform??>
+<h4>供应商:${prepareInform.fromDept.org.orgName}</h4>
+<h4>收货仓库:${prepareInform.toDepot.depotName}</h4>
+<#if prepareInform.collectDepot??>
+<h4>代收仓库:${prepareInform.collectDepot.depotName}</h4>
+</#if>
+<h4>备货单码:${prepareInform.bizCode}</h4>
+</br>
+<h4>详细信息:</h4>
+<ul>
+<#list prepareInform.items as bizItem>
+<li>
+<pre>
+产品:${"[${bizItem.goods.goodsCode}]${bizItem.goods.wareName}"}
+单价:${"[#{bizItem.unitPrice;M2}]"}
+确认数量:${"[${bizItem.confirmQty}${bizItem.preparePackageUnitName}]"}
+确认金额:${"[#{bizItem.confirmAmount;M2}]"}
+</pre>
+</li>
+</#list>
+</ul>
+</#if>

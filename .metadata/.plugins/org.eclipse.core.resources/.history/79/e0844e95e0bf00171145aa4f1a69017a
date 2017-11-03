@@ -1,0 +1,52 @@
+package cn.ak4j.yard.pcs.domain;
+
+import cn.ak4j.entity.IEntity;
+import lombok.Getter;
+import lombok.Setter;
+
+@SuppressWarnings({"serial"})
+public class PcsMixedOperation implements IEntity{
+
+	@Getter @Setter
+	private String opId;
+	
+	@Getter @Setter
+	private String opName;
+	
+	@Getter @Setter
+	private String opSort;
+	
+	@Getter @Setter
+	private String elementClass;
+	
+	@Getter @Setter
+	private String systemName;
+	
+	@Getter @Setter
+	private String functionId;
+	
+	@Getter @Setter
+	private String functionName;
+	
+	@Getter @Setter
+	private String menuId;
+	
+	@Getter @Setter
+	private String menuName;
+	
+	@Getter @Setter
+	private String anchor;
+	
+	@Getter @Setter
+	private String parentMenuName;
+	
+	public PcsMixedOperation(){}
+	
+	public PcsMixedOperation(PcsOperation operation){
+		setOpId(operation.getOpId());
+		setOpName(operation.getOpName());
+		setElementClass(operation.getElementClass());
+		setOpSort(operation.getOpSort());
+	}
+	
+}

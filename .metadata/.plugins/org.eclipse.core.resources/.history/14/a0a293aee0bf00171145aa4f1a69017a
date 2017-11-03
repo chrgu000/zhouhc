@@ -1,0 +1,115 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.spd.bizplan.enums.SpdAdjustStockType;
+
+public class SpdAdjustStockRuleTest {
+
+	@Test public void testEqualsRule(){
+		SpdAdjustStockRule rule01 = createAdjustStockRule();
+		SpdAdjustStockRule rule02 = createAdjustStockRule();
+		
+		assertTrue(rule01.equalsRule(rule02));
+		
+		rule02.setFeedbackRuleId("as_fb_id_01");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createAdjustStockRule();
+		rule02.setDepotId("depot_id_003");
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createAdjustStockRule();
+		rule02.setAreaType(PcsAreaType.isolation.getCode());
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createAdjustStockRule();
+		rule02.setTypeCode(SpdAdjustStockType.decrement.getCode());
+		assertFalse(rule01.equalsRule(rule02));
+		
+		rule02 = createAdjustStockRule();
+		rule02.setInitAdjust(true);
+		assertFalse(rule01.equalsRule(rule02));
+		
+	}
+	
+	@Test public void testUpdate(){
+		SpdAdjustStockRule rule01 = createAdjustStockRule();
+		SpdAdjustStockRule rule02 = createAdjustStockRule();
+		SpdAdjustStockRule rule03 = createAdjustStockRule();
+		
+		rule02.setDepotId("depot_id_003");
+		rule01.update(rule02);
+		assertEquals(rule01.getDepotId(), rule03.getDepotId());
+		
+		rule02 = createAdjustStockRule();
+		rule02.setAreaType(PcsAreaType.normal.getCode());;
+		rule01.update(rule02);
+		assertEquals(rule01.getAreaType(), rule03.getAreaType());
+		
+		rule02 = createAdjustStockRule();
+		rule02.setFeedbackRuleId("as_fb_id_01");
+		rule01.update(rule02);
+		assertEquals(rule01.getFeedbackRuleId(), rule03.getFeedbackRuleId());
+		
+		rule02 = createAdjustStockRule();
+		rule02.setTypeCode(SpdAdjustStockType.decrement.getCode());;
+		rule01.update(rule02);
+		assertEquals(rule01.getTypeCode(), rule03.getTypeCode());
+		
+		rule02 = createAdjustStockRule();
+		rule02.setName("自动库存报溢");;
+		rule01.update(rule02);
+		assertEquals(rule01.getName(), rule02.getName());
+		
+		rule02 = createAdjustStockRule();
+		rule02.setPrior(1);;
+		rule01.update(rule02);
+		assertEquals(rule01.getPrior(), rule02.getPrior());
+		
+		rule02 = createAdjustStockRule();
+		rule01.update(rule02);
+		
+		rule02 = createAdjustStockRule();
+		rule02.setEnabled(false);;
+		rule01.update(rule02);
+		assertEquals(rule01.getEnabled(), rule02.getEnabled());
+		
+		rule02 = createAdjustStockRule();
+		rule02.setCanBeOriginRule(false);
+		rule01.update(rule02);
+		assertEquals(rule01.getCanBeOriginRule(), rule02.getCanBeOriginRule());
+		
+		rule02 = createAdjustStockRule();
+		rule02.setManualApply(false);
+		rule01.update(rule02);
+		assertEquals(rule01.getManualApply(), rule02.getManualApply());
+		
+		rule02 = createAdjustStockRule();
+		rule02.setInitAdjust(true);
+		rule01.update(rule02);
+		assertNotEquals(rule01.getInitAdjust(), rule02.getInitAdjust());
+	}
+	
+	private SpdAdjustStockRule createAdjustStockRule(){
+		SpdAdjustStockRule rule = new SpdAdjustStockRule();
+		rule.setName("库存报溢");
+		rule.setPrior(99);
+		rule.setEnabled(true);
+		rule.setCanBeOriginRule(true);
+		rule.setFeedbackRuleId("as_fb_id_03");
+		rule.setDepotId("depot_id_001");
+		rule.setAreaType(PcsAreaType.normal.getCode());
+		rule.setTypeCode(SpdAdjustStockType.increment.getCode());
+		rule.setInitAdjust(false);
+		return rule;
+	}
+}

@@ -1,0 +1,44 @@
+package cn.ak4j.yard.spd.to;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import lombok.Data;
+
+@Data
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class NewSpdSellerSendItemTO{
+	private String sendId;//收货单ID
+	private String goodsId;//产品ID
+	private String edsGoodsId;//企业产品ID
+	private String edsGoodsType;//企业产品类型
+	private String edsGoodsName;//企业产品名称
+	private String edsGoodsCode;//企业产品编码
+	private String edsGoodsSpec;//企业产品规格
+	private String edsGoodsModel;//企业型号剂型/剂型
+	private String edsGoodsDesc;//企业产品描述
+	private String edsPackingSpec;//企业包装规格
+	private String edsGoodsFormatName;//企业格式化名称
+	private String edsUnitName;//企业使用包装单位
+	private String edsLotId;//企业批次ID
+	private String edsLotNo;//企业批次号
+	private Date edsLotValidity;//批次效期
+	private Date produceDate;//生产日期
+	private float unitPrice;//单价
+	private boolean wholeFlag;//整件标识
+	private String boxInputNo;//箱码(录入)
+	private String boxNo;//箱码
+	private String faxNo;//发票号
+	private Integer faxQty;//已开发票数量
+	private Integer planQty;//计划数量
+	private Integer checkQty;//确认数量
+	private float execQty;//执行数量
+	private float planAmount;//计划金额
+	private float checkAmount;//确认金额
+	private float execAmount;//执行金额
+	
+	private String refPurchId;//来源POID
+	private String refPurchItemId;//来源PO明细ID
+
+}

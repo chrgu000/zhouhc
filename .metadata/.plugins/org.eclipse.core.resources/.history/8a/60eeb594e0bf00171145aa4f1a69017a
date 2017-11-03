@@ -1,0 +1,129 @@
+package cn.ak4j.yard.spd.reconciliation.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang.SerializationUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.utils.DateUtils;
+import cn.ak4j.yard.domain.StateFlowTemplates;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdDailyCleanRule;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 日清对账业务
+* @author zhengyf
+* @date 2017年8月15日 下午12:09:41
+* @version V1.0.0
+*/
+
+@SuppressWarnings("serial")
+@NoArgsConstructor
+@Entity
+@Table(name="spd_daily_clean_biz")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class SpdDailyCleanBiz extends SpdReconciliationBizPlan<SpdDailyCleanRule>{
+	
+	@Transient @Getter
+	private final String stateFlow = StateFlowTemplates.statesFlow_n_r;
+
+	@Getter @Setter @Column(name="fin_rec_id")
+	private String finacialReconciliationId;
+	
+	/**
+	 * 对账日期
+	 */
+	@Getter @NotNull(message="对账日期不能为空")
+	private Date targetDate;
+	
+	@Getter @Setter @Column(name="confirm_user_id")
+	private String reviewUserId;
+	
+	@Getter @Setter
+	private String depotId;
+	
+	@Getter @Setter
+	private String description;
+	
+	@Getter @Setter @Transient @JsonIgnore
+	private SpdPropertyChangeRecords propertyChangeRecords;
+	
+	@Transient @Getter @Setter
+	private PcsDepot depot;
+	
+	public SpdDailyCleanBiz(String ruleId, Date targetDate){
+		this.setBizRuleId(ruleId);
+		this.targetDate = targetDate;
+	}
+	
+	@Override
+	public SpdBizType getBizType() {
+		return SpdBizType.daily_clean_biz;
+	}
+
+	public void update(SpdDailyCleanBiz dailyClean, String orgId, String userId){
+		String bizStatusCode = this.getBizStatusCode();
+		SpdDailyCleanBiz modifingEntity = (SpdDailyCleanBiz)SerializationUtils.clone(this);
+		modifingEntity.setDescription(dailyClean.getDescription());
+		modifingEntity.setReviewUserId(userId);
+		super.update(modifingEntity, orgId, userId);
+		this.setBizStatusCode(bizStatusCode);
+	}
+	
+	@Override
+	public void applyRule(SpdDailyCleanRule rule, PcsUser user) {
+		setBizRule(rule);
+		if(rule == null){
+			return ;
+		}
+		setDepotId(rule.getDepotId());
+	}
+	
+	public void setBizRule(SpdDailyCleanRule rule){
+		if(rule != null){
+			super.setBizRule(rule);
+			setDepot(rule.getDepot());
+		}
+	}
+	
+	public void setTargetDate(Date targetDate){
+		if(targetDate != null){
+//			Calendar cal = Calendar.getInstance();
+//			cal.setTime(targetDate);
+//			cal.set(Calendar.HOUR_OF_DAY, 0);
+//			cal.set(Calendar.MINUTE, 0);
+//			cal.set(Calendar.SECOND, 0);
+//			cal.set(Calendar.MILLISECOND, 0);
+			this.targetDate = DateUtils.setZeroTimePoint(targetDate);
+		}
+	}
+
+	public boolean hasPropertyChange() {
+		return CollectionUtils.isNotEmpty(propertyChangeRecords);
+	}
+
+	/**
+	 * 校验对账日期是否有效：目前只能在第二天以后对前一天的物权变更记录进行日清对账
+	 */
+	@Transient @JsonIgnore
+	public boolean isTargetDateValid() {
+		Date now = new Date();
+		now = DateUtils.setZeroTimePoint(now);
+		return now.after(getTargetDate());
+	}
+	
+}

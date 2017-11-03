@@ -1,0 +1,7 @@
+package cn.ak4j.yard.spd.reconciliation.report.hspt_credit_rep_aggr_by_goods;
+
+import cn.ak4j.yard.spd.reconciliation.report.base.SpdReconciliationReportItem;
+
+public class Item extends SpdReconciliationReportItem{
+
+}

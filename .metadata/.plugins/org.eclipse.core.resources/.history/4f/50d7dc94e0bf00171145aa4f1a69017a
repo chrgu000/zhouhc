@@ -1,0 +1,102 @@
+/**
+ */
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import java.io.Serializable;
+
+import javax.persistence.Embeddable;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import cn.ak4j.yard.domain.IDescribable;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * @Description: 收货业务的流向规则
+ * @author wuyw
+ * @date 2017年7月6日上午10:03:55
+ *
+ */
+@SuppressWarnings("serial")
+@Embeddable
+public class SpdReceiveDirectionRule implements Serializable, IChildRule, IDescribable {
+
+	@NotNull(message="发货机构不能为空") @Getter @Setter
+	private String fromOrgId;
+	
+	@NotNull(message="发货部门不能为空") @Getter @Setter
+	private String fromDeptId;
+	
+	@NotNull(message="收货仓库不能为空") @Getter @Setter
+	private String toDepotId;
+	
+	@NotNull(message="收货仓库货区类型不能为空") @Getter @Setter
+	private String toAreaType;
+	
+	@Getter @Setter
+	private String finalDepotId;
+	
+	/**
+	 * 实收货区类型
+	 */
+	@Getter @Setter
+	private String finalAreaType;
+	
+	@Transient @Getter @Setter
+	private PcsDept fromDept;
+	
+	@Transient @Getter @Setter @JsonIgnore
+	private PcsDepot toDepot;
+	
+	@Transient @Getter @Setter @JsonIgnore
+	private PcsDepot finalDepot;
+	
+	@Override
+	public String getDescription() {
+		if(toDepot != null){
+			return String.format("[%s][%s]>[%s]", fromDept.getOrg().getOrgName(), fromDept.getDeptName(), toDepot.getDepotName());
+		}
+		
+		return null;
+	}
+	
+	public boolean equals(SpdReceiveDirectionRule directionRule) {
+		boolean sameFinalDepotId = (StringUtils.isEmpty(getFinalDepotId()) 
+											&& StringUtils.isEmpty(directionRule.getFinalDepotId()))
+										|| (StringUtils.isNotEmpty(getFinalDepotId()) 
+											&& getFinalDepotId().equals(directionRule.getFinalDepotId()));
+		
+		boolean sameFinalAreaType = (StringUtils.isEmpty(getFinalAreaType()) 
+											&& StringUtils.isEmpty(directionRule.getFinalAreaType()))
+										|| (StringUtils.isNotEmpty(getFinalAreaType()) 
+											&& getFinalAreaType().equals(directionRule.getFinalAreaType()));
+		
+		if(getFromOrgId().equals(directionRule.getFromOrgId())
+				&& getFromDeptId().equals(directionRule.getFromDeptId())
+				&& getToDepotId().equals(directionRule.getToDepotId())
+				&& getToAreaType().equals(directionRule.getToAreaType())
+				&& sameFinalDepotId && sameFinalAreaType){
+			return true;
+		}
+		return false;
+	}
+
+
+	public void fillDepotRelations(PcsDepotRepository depotRepository) {
+		PcsDepots allDepots = depotRepository.findAllWithRelations();
+		PcsDepot toDepot = allDepots.findById(getToDepotId());
+		PcsDepot finalDepot = allDepots.findById(getFinalDepotId());
+		setToDepot(toDepot);
+		setFinalDepot(finalDepot);
+	}
+	
+}

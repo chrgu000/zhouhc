@@ -1,0 +1,83 @@
+package cn.ak4j.yard.spd.reconciliation.factory;
+
+import java.util.Date;
+
+import org.springframework.stereotype.Component;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdFinancialReconciliationBizSteps;
+import cn.ak4j.yard.spd.bizrule.domain.SpdFinacialReconciliationRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBiz;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRecordItems;
+
+@Component
+public class SpdFinacialReconciliationFactory {
+
+	
+	/**
+	 * 对物权变更明细进行归并汇总，汇总的原子化级别是：批次+价格组合，一个批次有多个价格则按多条记录保存
+	 */
+	public SpdFinacialReconciliationItems buildReconciliationItems(SpdPropertyChangeRecordItems recordItems){
+		SpdFinacialReconciliationItems result = new SpdFinacialReconciliationItems();
+		
+		recordItems.forEach(recordItem->{
+			//一个物权变更明细可能产生多条对账明细，因为涉及到核销多次收货
+			SpdFinacialReconciliationItems reconcilicationItems = buildReconciliationItem(recordItem);
+			reconcilicationItems.forEach(reconciliationItem->result.aggregate(reconciliationItem));
+		});
+		
+		return result;
+	}
+	
+	public SpdFinacialReconciliationItems buildReconciliationItem(SpdPropertyChangeRecordItem recordItem){
+		SpdFinacialReconciliationItems result = new SpdFinacialReconciliationItems();
+		
+		recordItem.getItems().forEach(relationItem->{
+			SpdFinacialReconciliationItem reconciliationItem = new SpdFinacialReconciliationItem();
+			reconciliationItem.setGoodsId(recordItem.getGoodsId());
+			reconciliationItem.setLotId(recordItem.getLotId());
+			
+			//实际是最小单位数量
+			//float unitRatio = SpdUnitUtils.computeUnitExchangeRatio(recordItem.getGoods(), recordItem.getUnitLv(), reconciliationItem.getUnitLv().getLv());
+			//int reconciliationQty = (int)(relationItem.getDealQty()*unitRatio);
+			//log.info("goods:{}, recordItem");
+			int reconciliationQty = relationItem.getDealQty();
+			
+			reconciliationItem.setReconciliationQty(reconciliationQty);
+			reconciliationItem.setSettlementUnitLv(recordItem.getGoods().getSettleUnitLv());
+			reconciliationItem.setSettlementUnitName(recordItem.getGoods().getSettlementUnitName());
+			reconciliationItem.setUnitName(recordItem.getGoods().getBaseName());
+			
+			//最小单位单价
+			//float reconciliationUnitPrice = relationItem.getUnitPrice()/unitRatio;
+			reconciliationItem.setUnitPrice(relationItem.getUnitPrice());
+			
+			reconciliationItem.initDateInfo();
+			reconciliationItem.setGoods(recordItem.getGoods());
+			reconciliationItem.updateSettlementQty();
+			
+			result.add(reconciliationItem);
+		});
+		
+		return result;
+	}
+
+	public SpdFinacialReconciliationBiz buildInitReconciliation(SpdFinacialReconciliationRule rule, PcsUser user) {
+		SpdFinacialReconciliationBiz reconciliation = new SpdFinacialReconciliationBiz();
+		reconciliation.setBeginingReconciliationId(SpdFinacialReconciliationBiz.init_rec_id);
+		reconciliation.setItemGenerated(true);
+		reconciliation.applyRule(rule, user);
+		reconciliation.setReconciliationDate(new Date());
+		reconciliation.setCheckStateCode(CheckState.completed.getCode());
+		reconciliation.setBizStatusCode(SpdFinancialReconciliationBizSteps.complete_financial_reconciliation.getStatusCode());
+		reconciliation.setMaintenanceInfo(new MaintenanceInfo(user));
+		reconciliation.initDateInfo();
+		return reconciliation;
+	}
+	
+}

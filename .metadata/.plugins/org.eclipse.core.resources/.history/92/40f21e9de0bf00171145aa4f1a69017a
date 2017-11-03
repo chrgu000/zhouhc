@@ -1,0 +1,18 @@
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) values ('feedback_rule_033','反馈规则','feedback_rule','日清对账反馈','日清对账反馈',33,'1','626',1,'626','626',sysDate,'626','626',sysDate,null,'0');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) values ('feedback_rule_034','反馈规则','feedback_rule','日清对账自动反馈','日清对账自动反馈',34,'1','626',1,'626','626',sysDate,'626','626',sysDate,null,'0');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) values ('feedback_rule_035','反馈规则','feedback_rule','财务对账反馈','财务对账反馈',35,'1','626',1,'626','626',sysDate,'626','626',sysDate,null,'0');
+
+
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) values ('daily_clean_rule_01','日清对账规则','daily_clean_rule','日清对账','日清对账',1,'1','626',1,'626','626',sysDate,'626','626',sysDate,null,'0');
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) values ('daily_clean_rule_02','日清对账规则','daily_clean_rule','自动日清对账','自动日清对账',1,'1','626',1,'626','626',sysDate,'626','626',sysDate,null,'0');
+  
+insert into yds_workbook (workbook_id,sort_name,sort_code,key_value,key_name,key_inx,enabled,yard_id,check_state_code,create_user,create_org,create_date,last_user,last_org,last_date,describe,edit_able) values ('fin_rec_rule_01','财务对账规则','fin_rec_rule','财务对账规则','财务对账规则',1,'1','626',1,'626','626',sysDate,'626','626',sysDate,null,'0');
+
+insert into spd_feedback_rule (id,name,auto_review_daily_clean,create_time,last_update_time,biz_type)
+values('daily_clean_fb_id_01', '日清对账反馈', '0', sysDate, sysDate, 'daily_clean');
+
+insert into spd_feedback_rule (id,name,auto_review_daily_clean,create_time,last_update_time,biz_type)
+values('daily_clean_fb_id_02', '日清对账自动反馈', '1', sysDate, sysDate, 'daily_clean');
+  
+insert into spd_feedback_rule (id, name, auto_commit_fin_rec, auto_review_fin_rec, auto_sync_to_supplier, auto_complete_fin_rec,create_time,last_update_time,biz_type)
+values('fin_rec_fb_id_01', '财务对账反馈', '0', '0', '0', '1', sysDate, sysDate, 'financial_reconciliation');

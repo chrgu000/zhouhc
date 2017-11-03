@@ -1,0 +1,174 @@
+package cn.ak4j.yard.spd.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelf;
+import cn.ak4j.yard.pcs.domain.PcsDepotShelfs;
+import cn.ak4j.yard.pcs.domain.PcsDepots;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotShelfRepository;
+import cn.ak4j.yard.spd.params.SpdDepotCardParams;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+@SuppressWarnings({"rawtypes", "unchecked", "serial"})
+public class SpdDepotCards extends Entities<SpdDepotCard>{
+
+	public SpdDepotCards(){}
+	
+	public SpdDepotCards(List entities){
+		super(entities);
+	}
+	
+	public SpdDepotCards(int length){
+		super(length);
+	}
+	
+	public SpdDepotCard findById(String depotCardId){
+		return CollectionUtils.findWhere("depotCardId", depotCardId, this);
+	}
+	
+	public SpdDepotCards findByDepotAndGoodsIds(String depotId, List<String> goodsIds){
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		params.setDepotId(new ListParam<String>(depotId));
+		params.setGoodsId(new ListParam<String>(goodsIds));
+		SpdDepotCards spdDepotCards = new SpdDepotCards(this.find(params));
+		return spdDepotCards;
+	}
+	
+	public SpdDepotCard findByDepotAndGoodsId(String depotId, String goodsId){
+		String[] str = {"depotId", "goodsId"};
+		return CollectionUtils.findWhere(str, this, depotId, goodsId);
+	}
+	
+	public SpdDepotCards getEnableCards(){
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		params.setEnabled(new ListParam<Boolean>(true));
+		params.setCheckStateCode(new ListParam<Integer>(CheckState.commited.getCode()));
+		SpdDepotCards spdDepotCards = new SpdDepotCards(find(params));
+		return spdDepotCards;
+	}
+
+	public SpdDepotCards findByDepot(String depotId) {
+		return new SpdDepotCards(CollectionUtils.find("depotId", depotId, this));
+	}
+	
+	public SpdDepotCard findEnableCardByGoodsId(String goodsId){
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		params.setGoodsId(new ListParam(goodsId));
+		params.setEnabled(new ListParam<Boolean>(true));
+		SpdDepotCards cards = new SpdDepotCards(find(params));
+		if(cards.size() > 1){
+			throw new InvalidDataException(YardExceptionType.invalid_multiple_enable_card, goodsId);
+		}
+		return cards.size()==0?null:cards.get(0);
+	}
+	
+	public SpdDepotCards findEnableCardByGoodsIds(List<String> goodsIds){
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		params.setGoodsId(new ListParam<String>(goodsIds));
+		params.setEnabled(new ListParam<Boolean>(true));
+		SpdDepotCards spdDepotCards = new SpdDepotCards(find(params));
+		return spdDepotCards;
+	}
+
+	public SpdDepotCards findEnableCardByShelfIds(List<String> shelfIds, String areaType) {
+		SpdDepotCardParams params = new SpdDepotCardParams();
+		if(areaType.equals(PcsAreaType.isolation.getCode())){
+			params.setIsolationShelfId(new ListParam<String>(shelfIds));
+		}else if(areaType.equals(PcsAreaType.unqualified.getCode())){
+			params.setUnqualifiedShelfId(new ListParam<String>(shelfIds));
+		}else{
+			params.setShelfId(new ListParam<String>(shelfIds));
+		}
+		params.setEnabled(new ListParam<Boolean>(true));
+		SpdDepotCards spdDepotCards = new SpdDepotCards(find(params));
+		return spdDepotCards;
+	}
+	
+	public void fillGoodss(YdsGoodsRepository goodsRepository, PcsDepotRepository depotRepository, SpdDepotCardRepository dcRepository){
+		YdsGoodsParams params = new YdsGoodsParams();
+		params.setGoodsId(new ListParam<String>(this.pluck("goodsId")));
+		YdsGoodss goodss = new YdsGoodss(goodsRepository.findAll().find(params, depotRepository, dcRepository));
+		if(CollectionUtils.isEmpty(goodss)){
+			return ;
+		}
+		
+		fillGoodss(goodss);
+	}
+
+	public void fillGoodss(YdsGoodss goodss) {
+		this.forEach(card->{
+			card.setGoods(CollectionUtils.findWhere("goodsId", card.getGoodsId(), goodss));
+		});
+		
+	}
+	
+	public SpdDepotCards getUsableCards(){
+		SpdDepotCards depotCards = new SpdDepotCards();
+		this.forEach(card->{
+			if(card.isEnabled()&&card.getCheckState()==CheckState.commited){
+				depotCards.add(card);
+			}
+		});
+		
+		return depotCards;
+	}
+	
+	public SpdDepotCards getUsableCardsByShelfs(PcsDepotShelfs shelfs ,String areaType){
+		SpdDepotCards depotCards = new SpdDepotCards();
+		PcsAreaType theAreaType = PcsAreaType.typeOf(areaType);
+		this.getUsableCards().forEach(card->{
+			PcsDepotShelf shelf = null;
+			switch (theAreaType) {
+			case normal:
+				shelf = CollectionUtils.findWhere("depotShelfId", card.getShelfId(), shelfs);
+				break;
+			case isolation:
+				shelf = CollectionUtils.findWhere("depotShelfId", card.getIsolationShelfId(), shelfs);
+				break;
+			case unqualified:
+				shelf = CollectionUtils.findWhere("depotShelfId", card.getUnqualifiedShelfId(), shelfs);
+				break;
+			default:
+				break;
+			}
+			if(shelf!=null){
+				depotCards.add(card);
+			}
+		});
+		
+		return depotCards;
+	}
+	
+	public SpdDepotCard getUsableCardsByShelfIdAndGoodsId(String shelfId, String goodsId){
+		String[] fieldNames = {"shelfId", "goodsId"};
+		return CollectionUtils.findWhere(fieldNames, this.getUsableCards(), shelfId, goodsId);
+	}
+
+	public void fillDepotShelf(PcsDepotShelfRepository dsRepository) {
+		PcsDepotShelfs depotShelfs = dsRepository.findAll();
+		this.forEach(depotCard->{
+			depotCard.setNormalDepotShelf(CollectionUtils.findWhere("depotShelfId", depotCard.getShelfId(), depotShelfs));
+			depotCard.setIsolationDepotShelf(CollectionUtils.findWhere("depotShelfId", depotCard.getIsolationShelfId(), depotShelfs));
+			depotCard.setUnqualifiedDepotShelf(CollectionUtils.findWhere("depotShelfId", depotCard.getUnqualifiedShelfId(), depotShelfs));
+		});
+		
+	}
+
+	public void fillDepot(PcsDepots depots) {
+		this.forEach(card->{
+			card.setDepot(CollectionUtils.findWhere("depotId", card.getDepotId(), depots));
+		});
+	}
+	
+}

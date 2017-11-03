@@ -1,0 +1,153 @@
+package cn.ak4j.yard.sys.service;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.repository.YardBatchTaskRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveBizs;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReceiveItems;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdReceiveBizRepository;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItem;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.domain.YardBatchTasks;
+import cn.ak4j.yard.sys.to.YardBatchTaskTO;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsEdsGoodsRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+
+public class YardBatchTaskServiceTest extends BaseTest{
+
+	@Autowired private YardBatchTaskService btService;
+	@Autowired private YardBatchTaskRepository btRepository;
+	@Autowired private YdsEdsGoodsRepository egRepository;
+	@Autowired private YdsEdsGoodsLotRepository eglRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private SpdReceiveBizRepository receiveRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	
+	private YardBatchTasks tasks;
+	
+	
+	@Before
+	public void setUp() throws Exception{
+		File sqlDir = new File(BaseTest.class.getResource("/data/").toURI());
+		
+		Iterator<File> files = FileUtils.iterateFiles(sqlDir, new String[]{"json"}, false);
+		btRepository.deleteAll();
+		while(files.hasNext()){
+			File jsonFile = files.next();
+			if(jsonFile.getName().equals("sys_batch_task.json")){
+				String json = FileUtils.readFileToString(jsonFile);
+				tasks = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTasks>() {});
+				btRepository.saveAll(tasks);
+			}
+		}
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test public void testProcessBatchTask() throws Exception {
+		YardBatchTask batchTask = tasks.get(0);
+		
+		YardBatchTaskTO<SpdDeliveryOrders> taskTO = Global.defaultObjectMapper.readValue(batchTask.getJson(), new TypeReference<YardBatchTaskTO<SpdDeliveryOrders>>(){});
+		batchTask.setData(taskTO.getData());
+		batchTask = btService.processBatchTask(batchTask.getId());
+		
+		wait(4);
+		
+		SpdDeliveryOrders deliveryOrders = (SpdDeliveryOrders) batchTask.getData();
+		List<String> sendCodes = CollectionUtils.pluck("orderNo", deliveryOrders);
+		List<SpdDeliveryOrderItem> orderItems = deliveryOrders.getAllItems();
+		List<String> edsGoodsCodes = CollectionUtils.pluck("edsGoodsCode", orderItems);
+		List<String> lotNos = getEdsLotNoFromOrderItem(orderItems);
+		YdsEdsGoodss edsGoodss = egRepository.findAll().findByEdsGoodsCodes(edsGoodsCodes);
+		List<String> goodsIds = CollectionUtils.pluck("yardGoodsId", edsGoodss);
+		
+
+		//断言企业产品批次和标准产品批次
+		YdsEdsGoodsLots edsGoodsLots = eglRepository.findAll().findByEdsLotNos(lotNos);
+		YdsGoodsLots goodsLots = glRepository.findAll().findByGoodsIds(goodsIds);
+		
+		lotNos.forEach(lotNo->{
+			YdsEdsGoodsLot edsGoodsLot = CollectionUtils.findWhere("edsLotNo", lotNo, edsGoodsLots);
+			assertNotNull(edsGoodsLot);
+			YdsGoodsLot goodsLot = CollectionUtils.findWhere("lotNo", lotNo, goodsLots);
+			assertNotNull(goodsLot);
+		});
+		
+		//断言收货单及明细
+		SpdReceiveBizs receives = receiveRepository.findBySendCodes(sendCodes);
+		List<String> bizIds = CollectionUtils.pluck("bizId", receives);
+		SpdReceiveItems receiveItems = new SpdReceiveItems(biRepository.findByBizIds(bizIds));
+		
+		String[] strArr = {"goodsId", "lotId"};
+		
+		deliveryOrders.forEach(order->{
+			SpdReceiveBiz receive = CollectionUtils.findWhere("sendCode", order.getOrderNo(), receives);
+			assertNotNull(receive);
+			
+			SpdReceiveItems theReceiveItems = new SpdReceiveItems(CollectionUtils.find("bizId", receive.getBizId(), receiveItems));
+			assertNotNull(theReceiveItems);
+			assertEquals(order.getItems().size(), theReceiveItems.size());
+			order.getItems().forEach(orderItem->{
+				YdsEdsGoods edsGoods = CollectionUtils.findWhere("edsGoodsCode", orderItem.getEdsGoodsCode(), edsGoodss);
+				
+				String edsLotNo = orderItem.getEdsLotNo();
+				if(StringUtils.isNotEmpty(orderItem.getSn())){
+					edsLotNo = new YdsEdsGoodsLot().attachSN(orderItem.getEdsLotNo(), orderItem.getSn());
+				}
+				YdsEdsGoodsLot edsGoodsLot = CollectionUtils.findWhere("edsLotNo", edsLotNo, edsGoodsLots);
+				
+				SpdReceiveItem receiveItem = CollectionUtils.findWhere(strArr, theReceiveItems, edsGoods.getYardGoodsId(), edsGoodsLot.getYardGoodsLotId());
+				assertNotNull(receiveItem);
+				assertEquals(orderItem.getItemId(), receiveItem.getSendItemCode());
+				assertEquals(orderItem.getItemCode(), receiveItem.getBoxNo());
+				assertEquals(orderItem.getQty().intValue()*edsGoods.getEdsYdsUnitRatio(), receiveItem.getPlanQty().intValue(), 0);
+				assertEquals(orderItem.getUnitPrice()/edsGoods.getEdsYdsUnitRatio(), receiveItem.getUnitPrice(), 0);
+			});
+		});
+		
+	}
+	
+	private List<String> getEdsLotNoFromOrderItem(List<SpdDeliveryOrderItem> items) {
+		List<String> edsLotNos = new ArrayList<String>();
+		items.forEach(item->{
+			String lotNo = "";
+			if(StringUtils.isNotEmpty(item.getSn())){
+				lotNo = new YdsEdsGoodsLot().attachSN(item.getEdsLotNo(), item.getSn());
+			}else{
+				lotNo = item.getEdsLotNo();
+			}
+			if(!edsLotNos.contains(lotNo)){
+				edsLotNos.add(lotNo);
+			}
+		});
+		return edsLotNos;
+	}
+	
+}

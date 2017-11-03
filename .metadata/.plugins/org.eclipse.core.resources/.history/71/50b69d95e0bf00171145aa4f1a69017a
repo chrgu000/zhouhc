@@ -1,0 +1,1976 @@
+package cn.ak4j.yard;
+
+import cn.ak4j.yard.pcs.domain.PcsFunction;
+import cn.ak4j.yard.pcs.domain.PcsMenu;
+import cn.ak4j.yard.pcs.domain.PcsMenus;
+import cn.ak4j.yard.pcs.domain.PcsOperation;
+import cn.ak4j.yard.pcs.domain.PcsWebApi;
+
+public class AkAuthorityInitTool {
+
+	public static PcsMenus initAuththor(){
+		
+		PcsMenus menus = new PcsMenus();
+		PcsMenu menu1 = new PcsMenu("收货系统", "10001", "10001", "-1", "fa-database", 1, "基础数据管理", 1, null, null);
+		PcsMenu menu2 = new PcsMenu("收货系统", "10002", "10003", "-1", "fa-map-signs", 2, "规则配置管理", 1, null, null);
+		PcsMenu menu3 = new PcsMenu("收货系统", "10003", "10003", "-1", "fa-cart-arrow-down", 3, "采购业务管理", 1, null, null);
+		PcsMenu menu6 = new PcsMenu("收货系统", "10006", "10006", "-1", "fa-university", 6, "库房库存管理", 1, null, null);
+		PcsMenu menu7 = new PcsMenu("收货系统", "10007", "10007", "-1", "fa fa-bed", 7, "科室库存管理", 1, null, null);
+		PcsMenu menu8 = new PcsMenu("收货系统", "10008", "10008", "-1", "fa-cube", 8, "仓库业务管理", 1, null, null);
+		PcsMenu menu9 = new PcsMenu("收货系统", "10009", "10009", "-1", "fa-cubes", 9, "仓库作业管理", 1, null, null);
+		PcsMenu menu10 = new PcsMenu("收货系统", "10010", "10010", "-1", "fa-medkit", 10, "院内配送管理", 1, null, null);
+		PcsMenu menu13 = new PcsMenu("收货系统", "10013", "10013", "-1", "fa-bar-chart", 13, "业务报表查询", 1, null, null);
+		PcsMenu menu14 = new PcsMenu("收货系统", "10014", "10014", "-1", "fa-cogs", 14, "应用配置管理", 1, null, null);
+		PcsMenu menu15 = new PcsMenu("收货系统", "10015", "10015", "-1", "fa-exclamation-triangle", 15, "异常数据管理", 1, null, null);
+		PcsMenu menu16 = new PcsMenu("收货系统", "10016", "10016", "-1", "fa-exchange", 16, "数据同步管理", 1, null, null);
+
+		PcsMenu menu1_1 = new PcsMenu("收货系统", "10001-001", "10001-001", "10001", null, 1, "字典数据管理", 2, "#basics/ydsWorkbooks", null);
+		PcsMenu menu1_2 = new PcsMenu("收货系统", "10001-002", "10001-002", "10001", null, 2, "标准产品管理", 2, "#basics/standardProducts", null);
+		PcsMenu menu1_3 = new PcsMenu("收货系统", "10001-003", "10001-003", "10001", null, 3, "标准产品批次", 2, "#spd/ydsGoodsLots", null);
+
+		PcsMenu menu2_1 = new PcsMenu("收货系统", "10002-001", "10002-001", "10002", null, 1, "请领流向策略", 2, "#basics/spdDepotRoutes", null);
+		PcsMenu menu2_3 = new PcsMenu("收货系统", "10002-003", "10002-003", "10002", null, 3, "仓库帐页管理", 2, "#spd/spdDepotCards", null);
+
+		PcsMenu menu3_1 = new PcsMenu("收货系统", "10003-001", "10003-001", "10003", null, 1, "物资价格维护", 2, "#spd/ydsGoodsInfos", null);
+		PcsMenu menu3_2 = new PcsMenu("收货系统", "10003-002", "10003-002", "10003", null, 2, "采购合同管理", 2, "#spd/spdPoContracts", null);
+		PcsMenu menu3_3 = new PcsMenu("收货系统", "10003-003", "10003-003", "10003", null, 3, "配额调节管理", 2, "#spd/spdPoContractItems", null);
+
+		PcsMenu menu6_1 = new PcsMenu("收货系统", "10006-001", "10006-001", "10006", null, 1, "库房收货确认", 2, "#spd/spdReceives", null);
+		PcsMenu menu6_2 = new PcsMenu("收货系统", "10006-002", "10006-002", "10006", null, 2, "库房收货记录", 2, "#spd/spdReceivesHis", null);
+		PcsMenu menu6_3 = new PcsMenu("收货系统", "10006-003", "10006-003", "10006", null, 3, "库房入库调度", 2, "#spd/spdDispatchers", null);
+		PcsMenu menu6_4 = new PcsMenu("收货系统", "10006-004", "10006-004", "10006", null, 4, "库房出库调度", 2, "#spd/spdApplyDispatchers", null);
+		PcsMenu menu6_5 = new PcsMenu("收货系统", "10006-005", "10006-005", "10006", null, 5, "库房补货计划", 2, "#spd/spdApplyReqReplenishments", null);
+		PcsMenu menu6_6 = new PcsMenu("收货系统", "10006-006", "10006-006", "10006", null, 6, "申领审核管理", 2, "#spd/spdApplys", null);
+		PcsMenu menu6_7 = new PcsMenu("收货系统", "10006-007", "10006-007", "10006", null, 7, "申领出库确认", 2, "#spd/spdApplyOutStockNotarizes", null);
+		PcsMenu menu6_8 = new PcsMenu("收货系统", "10006-008", "10006-008", "10006", null, 8, "申领出库记录", 2, "#spd/spdApplyStoreroomHiss", null);
+
+		PcsMenu menu7_3 = new PcsMenu("收货系统", "10007-003", "10007-003", "10007", null, 3, "科室请领计划", 2, "#spd/spdApplyReqs", null);
+		PcsMenu menu7_4 = new PcsMenu("收货系统", "10007-004", "10007-004", "10007", null, 4, "申领入库确认", 2, "#spd/spdApplyChecks", null);
+		PcsMenu menu7_5 = new PcsMenu("收货系统", "10007-005", "10007-005", "10007", null, 5, "科室申领记录", 2, "#spd/spdApplyAbteilungHiss", null);
+
+		PcsMenu menu8_1 = new PcsMenu("收货系统", "10008-001", "10008-001", "10008", null, 1, "仓库帐页查询", 2, "#spd/spdDepotCardAbteilungs", null);
+		PcsMenu menu8_2 = new PcsMenu("收货系统", "10008-002", "10008-002", "10008", null, 2, "仓库库存查询", 2, "#spd/spdMyDepotStocks", null);
+		PcsMenu menu8_3 = new PcsMenu("收货系统", "10008-003", "10008-003", "10008", null, 3, "仓库退货管理", 2, "#spd/spdApplyRefunds", null);
+		PcsMenu menu8_4 = new PcsMenu("收货系统", "10008-004", "10008-004", "10008", null, 4, "退货入库确认", 2, "#spd/spdApplyRefundInStockNotarizes", null);
+		PcsMenu menu8_5 = new PcsMenu("收货系统", "10008-005", "10008-005", "10008", null, 5, "仓库退货记录", 2, "#spd/spdApplyRefundHiss", null);
+		PcsMenu menu8_6 = new PcsMenu("收货系统", "10008-006", "10008-006", "10008", null, 6, "仓库调拨管理", 2, "#spd/spdApplyAllots", null);
+		PcsMenu menu8_7 = new PcsMenu("收货系统", "10008-007", "10008-007", "10008", null, 7, "调拨入库确认", 2, "#spd/spdApplyAllotInStockNotarizes", null);
+		PcsMenu menu8_8 = new PcsMenu("收货系统", "10008-008", "10008-008", "10008", null, 8, "仓库调拨记录", 2, "#spd/spdApplyAllotHiss", null);
+		PcsMenu menu8_12 = new PcsMenu("收货系统", "10008-012", "10008-012", "10008", null, 12, "药品隔离申请", 2, "#spd/spdIsolations", null);
+		PcsMenu menu8_13 = new PcsMenu("收货系统", "10008-013", "10008-013", "10008", null, 13, "药品隔离确认", 2, "#spd/spdIsolationChecks", null);
+		PcsMenu menu8_14 = new PcsMenu("收货系统", "10008-014", "10008-014", "10008", null, 14, "药品隔离记录", 2, "#spd/spdIsolationHiss", null);
+		PcsMenu menu8_15 = new PcsMenu("收货系统", "10008-015", "10008-015", "10008", null, 15, "收货信息录入", 2, "#spd/spdReceiveEnterIngs", null);
+
+		PcsMenu menu9_1 = new PcsMenu("收货系统", "10009-001", "10009-001", "10009", null, 1, "收货上架作业", 2, "#spd/spdTasks", null);
+		PcsMenu menu9_2 = new PcsMenu("收货系统", "10009-002", "10009-002", "10009", null, 2, "拣货下架作业", 2, "#spd/spdTaskOuts", null);
+		PcsMenu menu9_3 = new PcsMenu("收货系统", "10009-003", "10009-003", "10009", null, 3, "仓库作业记录", 2, "#spd/spdTaskHiss", null);
+		PcsMenu menu9_4 = new PcsMenu("收货系统", "10009-004", "10009-004", "10009", null, 4, "库存盘点管理", 2, "#spd/spdInventory", null);
+		PcsMenu menu9_5 = new PcsMenu("收货系统", "10009-005", "10009-005", "10009", null, 5, "报损报溢申请", 2, "#spd/spdPlApplys", null);
+		PcsMenu menu9_6 = new PcsMenu("收货系统", "10009-006", "10009-006", "10009", null, 6, "报损报溢确认", 2, "#spd/spdPls", null);
+		PcsMenu menu9_7 = new PcsMenu("收货系统", "10009-007", "10009-007", "10009", null, 7, "报损报溢记录", 2, "#spd/spdPlHiss", null);
+
+		PcsMenu menu10_1 = new PcsMenu("收货系统", "10010-001", "10010-001", "10010", null, 1, "周转箱配置项", 2, "#spd/spdTurnoverBoxs", null);
+		PcsMenu menu10_2 = new PcsMenu("收货系统", "10010-002", "10010-002", "10010", null, 2, "运输调度管理", 2, null, null);
+		PcsMenu menu10_3 = new PcsMenu("收货系统", "10010-003", "10010-003", "10010", null, 3, "周转装箱作业", 2, null, null);
+		PcsMenu menu10_4 = new PcsMenu("收货系统", "10010-004", "10010-004", "10010", null, 4, "物流配送签收", 2, null, null);
+
+		PcsMenu menu13_1 = new PcsMenu("收货系统", "10013-001", "10013-001", "10013", null, 1, "全院库存查询", 2, "#spd/spdDepotStocks", null);
+
+		PcsMenu menu14_1 = new PcsMenu("收货系统", "10014-001", "10014-001", "10014", null, 1, "业务机构管理", 2, "#pcs/orgs", null);
+		PcsMenu menu14_2 = new PcsMenu("收货系统", "10014-002", "10014-002", "10014", null, 2, "部门仓库管理", 2, "#pcs/depots", null);
+		PcsMenu menu14_4 = new PcsMenu("收货系统", "10014-004", "10014-004", "10014", null, 4, "角色权限管理", 2, "#pcs/roles", null);
+		PcsMenu menu14_5 = new PcsMenu("收货系统", "10014-005", "10014-005", "10014", null, 5, "业务用户管理", 2, "#pcs/users", null);
+
+		PcsMenu menu15_1 = new PcsMenu("收货系统", "10015-001", "10015-001", "10015", null, 1, "错误日志管理", 2, "#basics/loggingEvents", null);
+		PcsMenu menu15_2 = new PcsMenu("收货系统", "10015-002", "10015-002", "10015", null, 2, "数据检查报告", 2, "#basics/sysDataCheckTaskReports", null);
+
+		PcsMenu menu16_1 = new PcsMenu("收货系统", "10016-001", "10016-001", "10016", null, 1, "标准产品关联", 2, "#eis/goodsSyncResources", null);
+		PcsMenu menu16_2 = new PcsMenu("收货系统", "10016-002", "10016-002", "10016", null, 2, "产品批次关联", 2, "#eis/goodsLotSyncResources", null);
+		PcsMenu menu16_3 = new PcsMenu("收货系统", "10016-003", "10016-003", "10016", null, 3, "字典数据关联", 2, "#eis/workbookSyncResources", null);
+		PcsMenu menu16_4 = new PcsMenu("收货系统", "10016-004", "10016-004", "10016", null, 4, "库房收货关联", 2, "#eis/receiveSyncResources", null);
+		PcsMenu menu16_5 = new PcsMenu("收货系统", "10016-005", "10016-005", "10016", null, 5, "仓库调拨关联", 2, "#eis/applySyncResources", null);
+		PcsMenu menu16_7 = new PcsMenu("收货系统", "10016-007", "10016-007", "10016", null, 7, "使用类型关联", 2, "#eis/usedTypeSyncResources", null);
+		PcsMenu menu16_8 = new PcsMenu("收货系统", "10016-008", "10016-008", "10016", null, 8, "供应机构关联", 2, "#eis/supplierSyncResources", null);
+		PcsMenu menu16_9 = new PcsMenu("收货系统", "10016-009", "10016-009", "10016", null, 9, "部门数据关联", 2, "#eis/deptSyncResources", null);
+		PcsMenu menu16_10 = new PcsMenu("收货系统", "10016-010", "10016-010", "10016", null, 10, "仓库数据关联", 2, "#eis/depotSyncResources", null);
+		PcsMenu menu16_11 = new PcsMenu("收货系统", "10016-011", "10016-011", "10016", null, 11, "数据同步报告", 2, "#eis/syncReports", null);
+
+		menus.add(menu1);
+		menus.add(menu2);
+		menus.add(menu3);
+		menus.add(menu6);
+		menus.add(menu7);
+		menus.add(menu8);
+		menus.add(menu9);
+		menus.add(menu10);
+		menus.add(menu13);
+		menus.add(menu14);
+		menus.add(menu15);
+		menus.add(menu16);
+
+		menu1.addChild(menu1_1);
+		menu1.addChild(menu1_2);
+		menu1.addChild(menu1_3);
+
+		menu2.addChild(menu2_1);
+		menu2.addChild(menu2_3);
+
+		menu3.addChild(menu3_1);
+		menu3.addChild(menu3_2);
+		menu3.addChild(menu3_3);
+
+		menu6.addChild(menu6_1);
+		menu6.addChild(menu6_2);
+		menu6.addChild(menu6_3);
+		menu6.addChild(menu6_4);
+		menu6.addChild(menu6_5);
+		menu6.addChild(menu6_6);
+		menu6.addChild(menu6_7);
+		menu6.addChild(menu6_8);
+
+		menu7.addChild(menu7_3);
+		menu7.addChild(menu7_4);
+		menu7.addChild(menu7_5);
+
+		menu8.addChild(menu8_1);
+		menu8.addChild(menu8_2);
+		menu8.addChild(menu8_3);
+		menu8.addChild(menu8_4);
+		menu8.addChild(menu8_5);
+		menu8.addChild(menu8_6);
+		menu8.addChild(menu8_7);
+		menu8.addChild(menu8_8);
+		menu8.addChild(menu8_12);
+		menu8.addChild(menu8_13);
+		menu8.addChild(menu8_14);
+		menu8.addChild(menu8_15);
+
+		menu9.addChild(menu9_1);
+		menu9.addChild(menu9_2);
+		menu9.addChild(menu9_3);
+		menu9.addChild(menu9_4);
+		menu9.addChild(menu9_5);
+		menu9.addChild(menu9_6);
+		menu9.addChild(menu9_7);
+
+		menu10.addChild(menu10_1);
+		menu10.addChild(menu10_2);
+		menu10.addChild(menu10_3);
+		menu10.addChild(menu10_4);
+
+		menu13.addChild(menu13_1);
+
+		menu14.addChild(menu14_1);
+		menu14.addChild(menu14_2);
+		menu14.addChild(menu14_4);
+		menu14.addChild(menu14_5);
+
+		menu15.addChild(menu15_1);
+		menu15.addChild(menu15_2);
+
+		menu16.addChild(menu16_1);
+		menu16.addChild(menu16_2);
+		menu16.addChild(menu16_3);
+		menu16.addChild(menu16_4);
+		menu16.addChild(menu16_5);
+		menu16.addChild(menu16_7);
+		menu16.addChild(menu16_8);
+		menu16.addChild(menu16_9);
+		menu16.addChild(menu16_10);
+		menu16.addChild(menu16_11);
+
+		PcsFunction function1_1 = new PcsFunction("F0001", "字典数据管理");
+		menu1_1.getFunctions().add(function1_1);
+
+		PcsOperation operation1_1_view = new PcsOperation("P0001", "字典数据管理查看", "P0001", "acl_view_ydsWorkBook");
+		operation1_1_view.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "GET"));
+		operation1_1_view.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/{workbookId}", "GET"));
+		operation1_1_view.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "GET"));
+		operation1_1_view.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "GET"));
+		operation1_1_view.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/count", "GET"));
+
+		PcsOperation operation1_1_add = new PcsOperation("P0002", "字典数据管理新增", "P0002", "acl_add_ydsWorkBook");
+		operation1_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "POST"));
+		operation1_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "GET"));
+		operation1_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/{workbookId}", "GET"));
+		operation1_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "POST"));
+		operation1_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/count", "GET"));
+
+		PcsOperation operation1_1_edit = new PcsOperation("P0003", "字典数据管理编辑", "P0003", "acl_edit_ydsWorkBook");
+		operation1_1_edit.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/{workbookId}", "PUT"));
+		operation1_1_edit.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "GET"));
+		operation1_1_edit.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/{workbookId}", "GET"));
+		operation1_1_edit.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/count", "GET"));
+		operation1_1_edit.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/{workbookId}", "PUT"));
+
+		function1_1.getOperations().add(operation1_1_view);
+		function1_1.getOperations().add(operation1_1_add);
+		function1_1.getOperations().add(operation1_1_edit);
+
+
+		PcsFunction function1_2 = new PcsFunction("F0002", "标准产品管理");
+		menu1_2.getFunctions().add(function1_2);
+
+		PcsOperation operation1_2_view = new PcsOperation("P0008", "标准产品管理查看", "P0008", "acl_view_ydsGood");
+		operation1_2_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/count", "GET"));
+		operation1_2_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss", "GET"));
+		operation1_2_view.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "GET"));
+		operation1_2_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss", "GET"));
+		operation1_2_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/{goodsId}", "GET"));
+		operation1_2_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/count", "GET"));
+		operation1_2_view.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/byUse", "GET"));
+
+		PcsOperation operation1_2_add = new PcsOperation("P0009", "标准产品管理新增", "P0009", "acl_add_ydsGood");
+		operation1_2_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss", "POST"));
+		operation1_2_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss", "GET"));
+		operation1_2_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/{goodsId}", "GET"));
+		operation1_2_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/count", "GET"));
+
+		PcsOperation operation1_2_edit = new PcsOperation("P0010", "标准产品管理编辑", "P0010", "acl_edit_ydsGood");
+		operation1_2_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss", "GET"));
+		operation1_2_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/count", "GET"));
+		operation1_2_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/{goodsId}", "GET"));
+		operation1_2_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/{goodsId}", "PUT"));
+
+		PcsOperation operation1_2_commitEntity = new PcsOperation("P0012", "标准产品管理提交", "P0012", "acl_commitEntity_ydsGood");
+		operation1_2_commitEntity.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/{goodsId}/checkState/commited", "PUT"));
+
+		PcsOperation operation1_2_export = new PcsOperation("P0015", "标准产品管理导出", "P0015", "acl_export_ydsGood");
+		operation1_2_export.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss", "GET"));
+		operation1_2_export.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/count", "GET"));
+		operation1_2_export.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/{goodsId}", "GET"));
+		operation1_2_export.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ydsgoodsExcel", "GET"));
+
+		PcsOperation operation1_2_cancelCommit = new PcsOperation("P0276", "标准产品管理撤回", "P0276", "acl_cancelCommit_ydsGood");
+		operation1_2_cancelCommit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/{goodsId}/checkState/commited", "PUT"));
+
+		PcsOperation operation1_2_commitEntities = new PcsOperation("P0279", "标准产品批量提交", "P0279", "acl_commitEntities_ydsGood");
+		operation1_2_commitEntities.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/{goodsId}/checkState/commited", "PUT"));
+
+		function1_2.getOperations().add(operation1_2_view);
+		function1_2.getOperations().add(operation1_2_add);
+		function1_2.getOperations().add(operation1_2_edit);
+		function1_2.getOperations().add(operation1_2_commitEntity);
+		function1_2.getOperations().add(operation1_2_export);
+		function1_2.getOperations().add(operation1_2_cancelCommit);
+		function1_2.getOperations().add(operation1_2_commitEntities);
+
+
+		PcsFunction function1_3 = new PcsFunction("F0016", "标准产品批次");
+		menu1_3.getFunctions().add(function1_3);
+
+		PcsOperation operation1_3_view = new PcsOperation("P0105", "标准产品批次查看", "P0105", "acl_view_ydsGoodsLot");
+		operation1_3_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/count", "GET"));
+		operation1_3_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots", "GET"));
+		operation1_3_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots", "GET"));
+
+		PcsOperation operation1_3_add = new PcsOperation("P0107", "标准产品批次新增", "P0107", "acl_add_ydsGoodsLot");
+		operation1_3_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots", "GET"));
+		operation1_3_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots", "POST"));
+		operation1_3_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots", "POST"));
+		operation1_3_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/count", "GET"));
+		operation1_3_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots", "GET"));
+
+		PcsOperation operation1_3_edit = new PcsOperation("P0106", "标准产品批次编辑", "P0106", "acl_edit_ydsGoodsLot");
+		operation1_3_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/{goodsLotId}", "PUT"));
+		operation1_3_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots", "GET"));
+
+		function1_3.getOperations().add(operation1_3_view);
+		function1_3.getOperations().add(operation1_3_add);
+		function1_3.getOperations().add(operation1_3_edit);
+
+
+		PcsFunction function2_1 = new PcsFunction("F0036", "请领流向策略");
+		menu2_1.getFunctions().add(function2_1);
+
+		PcsOperation operation2_1_view = new PcsOperation("P0238", "请领流向策略查看", "P0238", "acl_view_spdDepotRoute");
+		operation2_1_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/count", "GET"));
+		operation2_1_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes", "GET"));
+		operation2_1_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes", "GET"));
+
+		PcsOperation operation2_1_delete = new PcsOperation("P0241", "请领流向策略删除", "P0241", "acl_delete_spdDepotRoute");
+		operation2_1_delete.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/{depotRouteId}", "DELETE"));
+		operation2_1_delete.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes", "GET"));
+		operation2_1_delete.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/count", "GET"));
+
+		PcsOperation operation2_1_edit = new PcsOperation("P0240", "请领流向策略编辑", "P0240", "acl_edit_spdDepotRoute");
+		operation2_1_edit.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/{depotRouteId}", "PUT"));
+
+		PcsOperation operation2_1_add = new PcsOperation("P0239", "请领流向策略新增", "P0239", "acl_add_spdDepotRoute");
+		operation2_1_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes", "POST"));
+		operation2_1_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes", "POST"));
+		operation2_1_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/count", "GET"));
+		operation2_1_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes", "GET"));
+		operation2_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUse", "GET"));
+		operation2_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUse/count", "GET"));
+		operation2_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byTakePoint/count", "GET"));
+		operation2_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byTakePoint", "GET"));
+
+		function2_1.getOperations().add(operation2_1_view);
+		function2_1.getOperations().add(operation2_1_delete);
+		function2_1.getOperations().add(operation2_1_edit);
+		function2_1.getOperations().add(operation2_1_add);
+
+
+		PcsFunction function2_3 = new PcsFunction("F0017", "仓库帐页管理");
+		menu2_3.getFunctions().add(function2_3);
+
+		PcsOperation operation2_3_view = new PcsOperation("P0108", "仓库帐页管理查看", "P0108", "acl_view_spdDepotCard");
+		operation2_3_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+		operation2_3_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/count", "GET"));
+		operation2_3_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards", "GET"));
+		operation2_3_view.addWebApi(new PcsWebApi("/yard/spd/SpdDepotCardByStockTotalViews/ids,{ids}", "GET"));
+
+		PcsOperation operation2_3_edit = new PcsOperation("P0109", "仓库帐页管理编辑", "P0109", "acl_edit_spdDepotCard");
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/{DepotCardId}", "PUT"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byLoseSheft,{depotId}", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byLoseSheft,{depotId}/count", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byIsolationShelf,{depotId}", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byIsolationShelf,{depotId}/count", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/{shelfId}", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/spd/SpdDepotCardByStockTotalViews/ids,{ids}", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byWMGDepotShelf,{depotId}/count", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byWMGDepotShelf,{depotId}", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/WMGDepotShelf", "GET"));
+		operation2_3_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/WMGDepotShelf/count", "GET"));
+
+		PcsOperation operation2_3_add = new PcsOperation("P0110", "仓库帐页管理新增", "P0110", "acl_add_spdDepotCard");
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/WMGDepotShelf/count", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/WMGDepotShelf", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards", "POST"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/spd/SpdDepotCardByStockTotalViews/ids,{ids}", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/ids,{ids}", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byLoseSheft,{depotId}", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byLoseSheft,{depotId}/count", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byIsolationShelf,{depotId}", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byIsolationShelf,{depotId}/count", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byWMGDepotShelf,{depotId}/count", "GET"));
+		operation2_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/byWMGDepotShelf,{depotId}", "GET"));
+
+		PcsOperation operation2_3_delete = new PcsOperation("P0111", "仓库帐页管理删除", "P0111", "acl_delete_spdDepotCard");
+		operation2_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/{depotCardId}", "DELETE"));
+		operation2_3_delete.addWebApi(new PcsWebApi("/yard/spd/SpdDepotCardByStockTotalViews/ids,{ids}", "GET"));
+		operation2_3_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+
+		PcsOperation operation2_3_cancelCommit = new PcsOperation("P0307", "仓库帐页管理撤回", "P0307", "acl_cancelCommit_spdDepotCard");
+		operation2_3_cancelCommit.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/{depotCardId}/checkState/commited", "PUT"));
+		operation2_3_cancelCommit.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/{depotCardId}", "GET"));
+
+		PcsOperation operation2_3_commitEntity = new PcsOperation("P0277", "仓库帐页管理提交", "P0277", "acl_commitEntity_spdDepotCard");
+		operation2_3_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/{depotCardId}/checkState/commited", "PUT"));
+		operation2_3_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/{depotCardId}", "GET"));
+
+		PcsOperation operation2_3_commitEntities = new PcsOperation("P0674", "仓库帐页管理批量提交", "P0674", "acl_commitEntities_spdDepotCard");
+		operation2_3_commitEntities.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/{depotCardId}/checkState/commited", "PUT"));
+		operation2_3_commitEntities.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/{depotCardId}", "GET"));
+
+		function2_3.getOperations().add(operation2_3_view);
+		function2_3.getOperations().add(operation2_3_edit);
+		function2_3.getOperations().add(operation2_3_add);
+		function2_3.getOperations().add(operation2_3_delete);
+		function2_3.getOperations().add(operation2_3_cancelCommit);
+		function2_3.getOperations().add(operation2_3_commitEntity);
+		function2_3.getOperations().add(operation2_3_commitEntities);
+
+
+		PcsFunction function3_1 = new PcsFunction("F0011", "物资价格维护");
+		menu3_1.getFunctions().add(function3_1);
+
+		PcsOperation operation3_1_add = new PcsOperation("P0077", "物资价格维护新增", "P0077", "acl_add_ydsGoodsInfo");
+		operation3_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos", "POST"));
+		operation3_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos", "POST"));
+		operation3_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos/count", "GET"));
+		operation3_1_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos", "GET"));
+
+		PcsOperation operation3_1_delete = new PcsOperation("P0078", "物资价格维护删除", "P0078", "acl_delete_ydsGoodsInfo");
+		operation3_1_delete.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos/{goodsId}", "DELETE"));
+
+		PcsOperation operation3_1_edit = new PcsOperation("P0079", "物资价格维护编辑", "P0079", "acl_edit_ydsGoodsInfo");
+		operation3_1_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos/count", "GET"));
+		operation3_1_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos", "GET"));
+		operation3_1_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos/{goodsId}", "PUT"));
+
+		PcsOperation operation3_1_view = new PcsOperation("P0080", "物资价格维护查看", "P0080", "acl_view_ydsGoodsInfo");
+		operation3_1_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos/count", "GET"));
+		operation3_1_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos", "GET"));
+
+		function3_1.getOperations().add(operation3_1_add);
+		function3_1.getOperations().add(operation3_1_delete);
+		function3_1.getOperations().add(operation3_1_edit);
+		function3_1.getOperations().add(operation3_1_view);
+
+
+		PcsFunction function3_2 = new PcsFunction("F0012", "采购合同管理");
+		menu3_2.getFunctions().add(function3_2);
+
+		PcsOperation operation3_2_edit = new PcsOperation("P0083", "采购合同管理编辑", "P0083", "acl_edit_spdPoContract,acl_edit_spdPoContractItem,acl_delete_spdPoContractItem,acl_add_spdPoContractItem,acl_view_spdPoContractItem");
+		operation3_2_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems", "POST"));
+		operation3_2_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/{conId}", "GET"));
+		operation3_2_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/conId,{conId}", "GET"));
+		operation3_2_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/{conId}", "PUT"));
+		operation3_2_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/conId,{conId}", "GET"));
+		operation3_2_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/{conItemId}", "PUT"));
+		operation3_2_edit.addWebApi(new PcsWebApi("/yard/pcs/PcsDepts/byProcurementDept", "GET"));
+
+		PcsOperation operation3_2_add = new PcsOperation("P0084", "采购合同管理新增", "P0084", "acl_add_spdPoContract,acl_add_spdPoContractItem,acl_view_spdPoContractItem,acl_edit_spdPoContractItem,acl_delete_spdPoContractItem");
+		operation3_2_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems", "POST"));
+		operation3_2_add.addWebApi(new PcsWebApi("/yard/pcs/PcsDepts/byProcurementType", "GET"));
+		operation3_2_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/count", "GET"));
+		operation3_2_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts", "GET"));
+		operation3_2_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts", "POST"));
+		operation3_2_add.addWebApi(new PcsWebApi("/yard/pcs/PcsDepts/byUse", "GET"));
+		operation3_2_add.addWebApi(new PcsWebApi("/yard/pcs/PcsDepts/byProcurementDept", "GET"));
+
+		PcsOperation operation3_2_delete = new PcsOperation("P0085", "采购合同管理删除", "P0085", "acl_delete_spdPoContract,acl_delete_spdPoContractItem");
+		operation3_2_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/{conId}", "DELETE"));
+		operation3_2_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/count", "GET"));
+		operation3_2_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/conId,{conId}", "GET"));
+		operation3_2_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/{conItemId}", "DELETE"));
+		operation3_2_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts", "GET"));
+
+		PcsOperation operation3_2_commitEntity = new PcsOperation("P0086", "采购合同管理提交", "P0086", "acl_commitEntity_spdPoContract");
+		operation3_2_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/{conId}/checkState/commited", "PUT"));
+		operation3_2_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/count", "GET"));
+		operation3_2_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts", "GET"));
+		operation3_2_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/{conId}", "GET"));
+
+		PcsOperation operation3_2_reviewEntity = new PcsOperation("P0087", "采购合同管理审核", "P0087", "acl_reviewEntity_spdPoContract");
+		operation3_2_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/{conId}", "PUT"));
+
+		PcsOperation operation3_2_cancelCommit = new PcsOperation("P0088", "采购合同管理撤回", "P0088", "acl_cancelCommit_spdPoContract");
+		operation3_2_cancelCommit.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/{conId}/checkState/commited", "PUT"));
+		operation3_2_cancelCommit.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/count", "GET"));
+		operation3_2_cancelCommit.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts", "GET"));
+		operation3_2_cancelCommit.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/{conId}", "GET"));
+
+		PcsOperation operation3_2_view = new PcsOperation("P0082", "采购合同管理查看", "P0082", "acl_view_spdPoContract,acl_view_spdPoContractItem");
+		operation3_2_view.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/count", "GET"));
+		operation3_2_view.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts", "GET"));
+		operation3_2_view.addWebApi(new PcsWebApi("/yard/pcs/PcsDepts/byProcurementType", "GET"));
+		operation3_2_view.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/conId,{conId}", "GET"));
+
+		function3_2.getOperations().add(operation3_2_edit);
+		function3_2.getOperations().add(operation3_2_add);
+		function3_2.getOperations().add(operation3_2_delete);
+		function3_2.getOperations().add(operation3_2_commitEntity);
+		function3_2.getOperations().add(operation3_2_reviewEntity);
+		function3_2.getOperations().add(operation3_2_cancelCommit);
+		function3_2.getOperations().add(operation3_2_view);
+
+
+		PcsFunction function3_3 = new PcsFunction("F0040", "配额调节管理");
+		menu3_3.getFunctions().add(function3_3);
+
+		PcsOperation operation3_3_edit = new PcsOperation("P0478", "配额调节管理编辑", "P0478", "acl_edit_spdPoContractItemAdjust,acl_edit_spdPoContractAdjust");
+		operation3_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust/count", "GET"));
+		operation3_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust", "GET"));
+		operation3_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/ids,{ids}", "GET"));
+		operation3_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}/count", "GET"));
+		operation3_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}", "GET"));
+		operation3_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/{adjustId}", "PUT"));
+
+		PcsOperation operation3_3_delete = new PcsOperation("P0480", "配额调节管理删除", "P0480", "acl_edit_spdPoContractItemAdjust,acl_delete_spdPoContractAdjust");
+		operation3_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/{adjustId}", "DELETE"));
+		operation3_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust/count", "GET"));
+		operation3_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust", "GET"));
+		operation3_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}", "GET"));
+		operation3_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}/count", "GET"));
+		operation3_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/ids,{ids}", "GET"));
+
+		PcsOperation operation3_3_add = new PcsOperation("P0479", "配额调节管理新增", "P0479", "acl_edit_spdPoContractItemAdjust,acl_add_spdPoContractAdjust");
+		operation3_3_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts", "POST"));
+		operation3_3_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust/count", "GET"));
+		operation3_3_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust", "GET"));
+		operation3_3_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/ids,{ids}", "GET"));
+		operation3_3_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}/count", "GET"));
+		operation3_3_add.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}", "GET"));
+
+		PcsOperation operation3_3_commit = new PcsOperation("P0481", "配额调节管理提交", "P0481", "acl_edit_spdPoContractItemAdjust,acl_commitEntity_spdPoContractAdjust");
+		operation3_3_commit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust/count", "GET"));
+		operation3_3_commit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust", "GET"));
+		operation3_3_commit.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/ids,{ids}", "GET"));
+		operation3_3_commit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}/count", "GET"));
+		operation3_3_commit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}", "GET"));
+		operation3_3_commit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/{adjustId}/checkState/commited", "PUT"));
+		operation3_3_commit.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/{adjustId}", "GET"));
+
+		PcsOperation operation3_3_review = new PcsOperation("P0482", "配额调节管理审核", "P0482", "acl_edit_spdPoContractItemAdjust,acl_reviewEntity_spdPoContractAdjust");
+		operation3_3_review.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/{adjustId}/checkState/reviewed", "PUT"));
+		operation3_3_review.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust/count", "GET"));
+		operation3_3_review.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust", "GET"));
+		operation3_3_review.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/ids,{ids}", "GET"));
+		operation3_3_review.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}", "GET"));
+		operation3_3_review.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}/count", "GET"));
+		operation3_3_review.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/{adjustId}", "GET"));
+
+		PcsOperation operation3_3_view = new PcsOperation("P0098", "配额调节管理查看", "P0098", "acl_view_spdPoContractItemAdjust,acl_view_spdPoContractAdjust");
+		operation3_3_view.addWebApi(new PcsWebApi("/yard/spd/spdPoContracts/ids,{ids}", "GET"));
+		operation3_3_view.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust/count", "GET"));
+		operation3_3_view.addWebApi(new PcsWebApi("/yard/spd/spdPoContractItems/byAdjust", "GET"));
+		operation3_3_view.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}/count", "GET"));
+		operation3_3_view.addWebApi(new PcsWebApi("/yard/spd/spdPoContractAdjusts/conItemId,{conItemId}", "GET"));
+
+		function3_3.getOperations().add(operation3_3_edit);
+		function3_3.getOperations().add(operation3_3_delete);
+		function3_3.getOperations().add(operation3_3_add);
+		function3_3.getOperations().add(operation3_3_commit);
+		function3_3.getOperations().add(operation3_3_review);
+		function3_3.getOperations().add(operation3_3_view);
+
+
+		PcsFunction function6_1 = new PcsFunction("F0005", "库房收货确认");
+		menu6_1.getFunctions().add(function6_1);
+
+		PcsOperation operation6_1_view = new PcsOperation("P0032", "库房收货确认查看", "P0032", "acl_view_spdReceive");
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/receiveCode,{receiveCode}", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/code,{code}", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdSellerSends/ids,{ids}", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byChecked/count", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byChecked", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byChecked", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byChecked/count", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdSellerSends", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdSellerSends/count", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/count", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation6_1_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/{depotId}", "GET"));
+
+		PcsOperation operation6_1_update = new PcsOperation("P0282", "库房收货确认保存", "P0282", "acl_update_spdReceive");
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/spd/spdSellerSendItems/{sendItemId}", "PUT"));
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/{receiveItemId}", "PUT"));
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/{receiveItemId}", "PUT"));
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/spd/spdReceives/code,{code}", "GET"));
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/{depotId}", "GET"));
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/spd/spdSellerSends/ids,{ids}", "GET"));
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/receiveCode,{receiveCode}", "GET"));
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation6_1_update.addWebApi(new PcsWebApi("/yard/spd/spdReceives/{receiveId}", "GET"));
+
+		PcsOperation operation6_1_confirm = new PcsOperation("P0281", "库房收货确认收货", "P0281", "acl_confirm_spdReceive");
+		operation6_1_confirm.addWebApi(new PcsWebApi("/yard/spd/spdReceives/{receiveId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation6_1_inStorage = new PcsOperation("P0655", "库房收货确认收货入库", "P0655", "acl_inStorage_spdReceive");
+		operation6_1_inStorage.addWebApi(new PcsWebApi("/yard/spd/spdReceives/{receiveId}/checkState/byQuick/reviewed", "PUT"));
+
+		function6_1.getOperations().add(operation6_1_view);
+		function6_1.getOperations().add(operation6_1_update);
+		function6_1.getOperations().add(operation6_1_confirm);
+		function6_1.getOperations().add(operation6_1_inStorage);
+
+
+		PcsFunction function6_2 = new PcsFunction("F0014", "库房收货记录");
+		menu6_2.getFunctions().add(function6_2);
+
+		PcsOperation operation6_2_view = new PcsOperation("P0100", "库房收货记录查看", "P0100", "acl_view_spdReceive,acl_view_spdReceiveItem");
+		operation6_2_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives", "GET"));
+		operation6_2_view.addWebApi(new PcsWebApi("/yard/spd/spdSellerSends/ids,{ids}", "GET"));
+		operation6_2_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation6_2_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byHis/count", "GET"));
+		operation6_2_view.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/receiveId,{receiveId}", "GET"));
+		operation6_2_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byHis", "GET"));
+
+		PcsOperation operation6_2_exportReceive = new PcsOperation("P0101", "库房收货记录打印", "P0101", "acl_exportReceive");
+		operation6_2_exportReceive.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/receiveId,{receiveId}/pdf", "GET"));
+
+		function6_2.getOperations().add(operation6_2_view);
+		function6_2.getOperations().add(operation6_2_exportReceive);
+
+
+		PcsFunction function6_3 = new PcsFunction("F0082", "库房入库调度");
+		menu6_3.getFunctions().add(function6_3);
+
+		PcsOperation operation6_3_view = new PcsOperation("P0231", "库房入库调度查看", "P0231", "acl_view_spdDispatcher");
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/ids,{ids}", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/byReceipt/count", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byYetDispatchedSpdReceives,{dispatcherId}/count", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byYetDispatchedSpdReceives,{dispatcherId}", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byNotDispatchedSpdReceives,{dispatcherId}/count", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byNotDispatchedSpdReceives,{dispatcherId}", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/byReceipt", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/receiveIds,{receiveIds}", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/dispatcherId,{dispatcherId}", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/yetDispatchedSpdReceives/count", "GET"));
+		operation6_3_view.addWebApi(new PcsWebApi("/yard/spd/spdReceives/yetDispatchedSpdReceives", "GET"));
+
+		PcsOperation operation6_3_add = new PcsOperation("P0232", "库房入库调度新增", "P0232", "acl_add_spdDispatcher");
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers", "POST"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/byReceipt", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/dispatcherId,{dispatcherId}", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byYetDispatchedSpdReceives,{dispatcherId}", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byYetDispatchedSpdReceives,{dispatcherId}/count", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byNotDispatchedSpdReceives,{dispatcherId}", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byNotDispatchedSpdReceives,{dispatcherId}/count", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/receiveIds,{receiveIds}", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/ownerOrgId,{ownerOrgId}", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/ownerOrgId,{ownerOrgId}/count", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers", "POST"));
+		operation6_3_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byReceivePointDept/{manageOrgId}", "GET"));
+		operation6_3_add.addWebApi(new PcsWebApi("//yard/pcs/pcsDepots/byReceivePointDept/{manageOrgId}/count", "GET"));
+
+		PcsOperation operation6_3_edit = new PcsOperation("P0233", "库房入库调度编辑", "P0233", "acl_edit_spdDispatcher");
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{dispatcherId}", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/{dispatcherRefId}", "PUT"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/receiveIds,{receiveIds}", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/dispatcherId,{dispatcherId}", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byNotDispatchedSpdReceives,{dispatcherId}", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byNotDispatchedSpdReceives,{dispatcherId}/count", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byYetDispatchedSpdReceives,{dispatcherId}", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byYetDispatchedSpdReceives,{dispatcherId}/count", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceives/notDispatchedSpdReceives", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceives/notDispatchedSpdReceives/count", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs", "POST"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems", "GET"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/{dispatcherRefId}", "DELETE"));
+		operation6_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/{depotRouteId}", "PUT"));
+
+		PcsOperation operation6_3_delete = new PcsOperation("P0234", "库房入库调度删除", "P0234", "acl_delete_spdDispatcher");
+		operation6_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{dispatcherId}", "DELETE"));
+		operation6_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/dispatcherId,{dispatcherId}", "GET"));
+		operation6_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byYetDispatchedSpdReceives,{dispatcherId}/count", "GET"));
+		operation6_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/byReceipt", "GET"));
+		operation6_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdReceives/byYetDispatchedSpdReceives,{dispatcherId}", "GET"));
+
+		PcsOperation operation6_3_confirmSpdDispatcher = new PcsOperation("P0287", "库房入库调度调度", "P0297", "acl_confirmSpdDispatcher");
+		operation6_3_confirmSpdDispatcher.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{routeId}/reviewed", "PUT"));
+
+		PcsOperation operation6_3_reviewEntity = new PcsOperation("P0236", "库房入库调度审核", "P0236", "acl_reviewEntity_spdDispatcher");
+		operation6_3_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{routeId}/reviewed", "PUT"));
+
+		function6_3.getOperations().add(operation6_3_view);
+		function6_3.getOperations().add(operation6_3_add);
+		function6_3.getOperations().add(operation6_3_edit);
+		function6_3.getOperations().add(operation6_3_delete);
+		function6_3.getOperations().add(operation6_3_confirmSpdDispatcher);
+		function6_3.getOperations().add(operation6_3_reviewEntity);
+
+
+		PcsFunction function6_4 = new PcsFunction("F0035", "库房出库调度");
+		menu6_4.getFunctions().add(function6_4);
+
+		PcsOperation operation6_4_view = new PcsOperation("P0245", "库房出库调度查看", "P0245", "acl_view_spdApplyDispatcher");
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyIds,{applyIds}", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/byPicking", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byNotDispatchedSpdApply,{dispatcherId}/count", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byNotDispatchedSpdApply,{dispatcherId}", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byYetDisaptchedSpdApply,{dispatcherId}", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byYetDisaptchedSpdApply,{dispatcherId}/count", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/{dispatcherId}", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/ids,{ids}", "GET"));
+		operation6_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers/ids,{ids}", "GET"));
+
+		PcsOperation operation6_4_add = new PcsOperation("P0246", "库房出库调度新增", "P0246", "acl_add_spdApplyDispatcher");
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyIds,{applyIds}", "GET"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers", "POST"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs", "POST"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/{dispatcherRefId}", "DELETE"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/{dispatcherRefId}", "PUT"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/byPicking", "GET"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byYetDisaptchedSpdApply,{dispatcherId}/count", "GET"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byYetDisaptchedSpdApply,{dispatcherId}", "GET"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byNotDispatchedSpdApply,{dispatcherId}/count", "GET"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byNotDispatchedSpdApply,{dispatcherId}", "GET"));
+		operation6_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byReceivePointDept/{manageOrgId}", "GET"));
+		operation6_4_add.addWebApi(new PcsWebApi("//yard/pcs/pcsDepots/byReceivePointDept/{manageOrgId}/count", "GET"));
+
+		PcsOperation operation6_4_edit = new PcsOperation("P0247", "库房出库调度编辑", "P0247", "acl_edit_spdApplyDispatcher");
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{dispatcherId}", "PUT"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdDispatcherRefs/{dispatcherId}", "GET"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyIds,{applyIds}", "GET"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byYetDisaptchedSpdApply,{dispatcherId}/count", "GET"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byYetDisaptchedSpdApply,{dispatcherId}", "GET"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byNotDispatchedSpdApply,{dispatcherId}", "GET"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byNotDispatchedSpdApply,{dispatcherId}/count", "GET"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/notDispatchedSpdApply", "GET"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/notDispatchedSpdApply/count", "GET"));
+		operation6_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems", "GET"));
+
+		PcsOperation operation6_4_delete = new PcsOperation("P0248", "库房出库调度删除", "P0248", "acl_delete_spdApplyDispatcher");
+		operation6_4_delete.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/byPicking", "GET"));
+		operation6_4_delete.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byYetDisaptchedSpdApply,{dispatcherId}/count", "GET"));
+		operation6_4_delete.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byYetDisaptchedSpdApply,{dispatcherId}", "GET"));
+		operation6_4_delete.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{dispatcherId}", "DELETE"));
+
+		PcsOperation operation6_4_reviewEntity = new PcsOperation("P0250", "库房出库调度审核", "P0236", "acl_reviewEntity_spdApplyDispatcher");
+		operation6_4_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{routeId}/reviewed", "PUT"));
+
+		PcsOperation operation6_4_confirmSpdApplyDispatcher = new PcsOperation("P0198", "库房出库调度调度", "P0198", "acl_confirmSpdApplyDispatcher");
+		operation6_4_confirmSpdApplyDispatcher.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{routeId}/reviewed", "PUT"));
+		operation6_4_confirmSpdApplyDispatcher.addWebApi(new PcsWebApi("/yard/spd/spdDispatchers/{dispatcherId}", "GET"));
+
+		function6_4.getOperations().add(operation6_4_view);
+		function6_4.getOperations().add(operation6_4_add);
+		function6_4.getOperations().add(operation6_4_edit);
+		function6_4.getOperations().add(operation6_4_delete);
+		function6_4.getOperations().add(operation6_4_reviewEntity);
+		function6_4.getOperations().add(operation6_4_confirmSpdApplyDispatcher);
+
+
+		PcsFunction function6_5 = new PcsFunction("F0058", "库房补货计划");
+		menu6_5.getFunctions().add(function6_5);
+
+		PcsOperation operation6_5_view = new PcsOperation("P0460", "库房补货计划查看", "P0460", "acl_view_spdApplyReqReplenishment");
+		operation6_5_view.addWebApi(new PcsWebApi("/yard/spd/SpdApplyReqReplenishments/count", "GET"));
+		operation6_5_view.addWebApi(new PcsWebApi("/yard/spd/SpdApplyReqReplenishments", "GET"));
+		operation6_5_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqReplenishmentViews/ids,{ids}", "GET"));
+
+		PcsOperation operation6_5_add = new PcsOperation("P0499", "库房补货计划新增", "P0499", "acl_add_spdApplyReqReplenishment");
+		operation6_5_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqReplenishmentViews", "GET"));
+		operation6_5_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqReplenishmentViews/count", "GET"));
+		operation6_5_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqReplenishmentViews/ids,{ids}", "GET"));
+		operation6_5_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}", "DELETE"));
+		operation6_5_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs", "GET"));
+		operation6_5_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/count", "GET"));
+		operation6_5_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs", "POST"));
+		PcsOperation operation6_5_batchCommited = new PcsOperation("P0502", "库房补货计划提交", "P0502", "acl_batchCommited_spdApplyReqReplenishment");
+		operation6_5_batchCommited.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}/checkState/commited", "PUT"));
+
+		PcsOperation operation6_5_batchDelete = new PcsOperation("P0501", "库房补货计划删除", "P0501", "acl_batchDelete_spdApplyReqReplenishment");
+		operation6_5_batchDelete.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}", "DELETE"));
+
+		PcsOperation operation6_5_update = new PcsOperation("P0500", "库房补货计划保存", "P0500", "acl_update_spdApplyReqReplenishment");
+		operation6_5_update.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}", "PUT"));
+
+		PcsOperation operation6_5_batchReview = new PcsOperation("P0503", "库房补货计划审核", "P0503", "acl_batchReview_spdApplyReqReplenishment");
+		operation6_5_batchReview.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}/checkState/reviewed", "PUT"));
+
+		function6_5.getOperations().add(operation6_5_view);
+		function6_5.getOperations().add(operation6_5_add);
+		function6_5.getOperations().add(operation6_5_batchCommited);
+		function6_5.getOperations().add(operation6_5_batchDelete);
+		function6_5.getOperations().add(operation6_5_update);
+		function6_5.getOperations().add(operation6_5_batchReview);
+
+
+		PcsFunction function6_6 = new PcsFunction("F0023", "申领审核管理");
+		menu6_6.getFunctions().add(function6_6);
+
+		PcsOperation operation6_6_view = new PcsOperation("P0147", "申领审核管理查看", "P0147", "acl_view_spdApply,acl_view_spdApplyItem");
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/count", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/yds/ydsEdsGoodsLots/ids,{ids}", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/yds/ydsEdsGoodsLots/{edsGoodsLotId}", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems", "GET"));
+		operation6_6_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/{depotRouteId}", "GET"));
+
+		PcsOperation operation6_6_reviewEntities = new PcsOperation("P0459", "申领审核管理批量审核", "P0459", "acl_reviewEntities_spdApply");
+
+		PcsOperation operation6_6_edit = new PcsOperation("P0148", "申领审核管理编辑", "P0148", "acl_edit_spdApply,acl_edit_spdApplyItem,acl_view_spdApplyItem,acl_add_spdApplyItem,acl_delete_spdApplyItem,acl_update_spdApplyItem");
+		operation6_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems", "GET"));
+		operation6_6_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation6_6_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/{goodsLotId}", "GET"));
+		operation6_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/{applyItemId}", "PUT"));
+		operation6_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys", "GET"));
+		operation6_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/count", "GET"));
+		operation6_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation6_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/{applyId}", "PUT"));
+
+		PcsOperation operation6_6_add = new PcsOperation("P0149", "申领审核管理新增", "P0149", "acl_add_spdApply,acl_add_spdApplyItem,acl_view_spdApplyItem,acl_edit_spdApplyItem,acl_delete_spdApplyItem");
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys", "POST"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys/count", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/byUse", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/byUse/count", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/count", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots", "GET"));
+		operation6_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems", "POST"));
+
+		PcsOperation operation6_6_delete = new PcsOperation("P0150", "申领审核管理删除", "P0150", "acl_delete_spdApply,acl_delete_spdApplyItem,acl_view_spdApplyItem");
+		operation6_6_delete.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/{applyItemId}", "DELETE"));
+		operation6_6_delete.addWebApi(new PcsWebApi("/yard/spd/spdApplys/{applyId}", "DELETE"));
+
+		PcsOperation operation6_6_reviewEntity = new PcsOperation("P0152", "申领审核管理审核", "P0152", "acl_reviewEntity_spdApply,acl_confirm_spdApply");
+		operation6_6_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdApplys/{applyId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation6_6_cancelCommit = new PcsOperation("P0153", "申领审核管理撤回", "P0153", "acl_cancelCommit_spdApply");
+
+		PcsOperation operation6_6_inStorage = new PcsOperation("P0657", "申领审核管理一键完成", "P0657", "acl_inStorage_spdApply");
+		operation6_6_inStorage.addWebApi(new PcsWebApi("/yard/spd/spdApplys/{applyId}/checkState/byQuick/reviewed", "PUT"));
+
+		function6_6.getOperations().add(operation6_6_view);
+		function6_6.getOperations().add(operation6_6_reviewEntities);
+		function6_6.getOperations().add(operation6_6_edit);
+		function6_6.getOperations().add(operation6_6_add);
+		function6_6.getOperations().add(operation6_6_delete);
+		function6_6.getOperations().add(operation6_6_reviewEntity);
+		function6_6.getOperations().add(operation6_6_cancelCommit);
+		function6_6.getOperations().add(operation6_6_inStorage);
+
+
+		PcsFunction function6_7 = new PcsFunction("F0052", "申领出库确认");
+		menu6_7.getFunctions().add(function6_7);
+
+		PcsOperation operation6_7_view = new PcsOperation("P0417", "申领出库确认查看", "P0417", "acl_view_spdApplyOutStockNotarize");
+		operation6_7_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byOutStockOperation", "GET"));
+		operation6_7_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byOutStockOperation/count", "GET"));
+		operation6_7_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation6_7_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/count", "GET"));
+
+		PcsOperation operation6_7_edit = new PcsOperation("P0475", "申领出库确认编辑", "P0475", "acl_edit_spdApplyOutStockNotarize");
+
+		PcsOperation operation6_7_print = new PcsOperation("P0509", "申领出库确认打印", "P0509", "acl_print_spdApplyOutStockNotarize");
+		operation6_7_print.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/pdf", "GET"));
+
+		PcsOperation operation6_7_confirm = new PcsOperation("P0508", "申领出库确认审核", "P0508", "acl_confirm_spdApplyOutStock");
+		operation6_7_confirm.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byOutStockOperation/{applyId}", "PUT"));
+
+		function6_7.getOperations().add(operation6_7_view);
+		function6_7.getOperations().add(operation6_7_edit);
+		function6_7.getOperations().add(operation6_7_print);
+		function6_7.getOperations().add(operation6_7_confirm);
+
+
+		PcsFunction function6_8 = new PcsFunction("F0062", "申领出库记录");
+		menu6_8.getFunctions().add(function6_8);
+
+		PcsOperation operation6_8_view = new PcsOperation("P0476", "申领出库记录查看", "P0476", "acl_view_spdApplyOutStockNotarize");
+		operation6_8_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byStoreroomHis", "GET"));
+		operation6_8_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byStoreroomHis/count", "GET"));
+		operation6_8_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation6_8_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/count", "GET"));
+
+		function6_8.getOperations().add(operation6_8_view);
+
+
+		PcsFunction function7_3 = new PcsFunction("F0057", "科室请领计划");
+		menu7_3.getFunctions().add(function7_3);
+
+		PcsOperation operation7_3_view = new PcsOperation("P0458", "科室请领计划查看", "P0458", "acl_view_spdApplyReq");
+		operation7_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/count", "GET"));
+		operation7_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs", "GET"));
+		operation7_3_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/ids,{ids}", "GET"));
+		operation7_3_view.addWebApi(new PcsWebApi("/yard/spd/ydsGoodsByStockSelectViews/count", "GET"));
+		operation7_3_view.addWebApi(new PcsWebApi("/yard/spd/ydsGoodsByStockSelectViews", "GET"));
+		operation7_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/byManual/count", "GET"));
+		operation7_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/byManual", "GET"));
+
+		PcsOperation operation7_3_batchDelete = new PcsOperation("P0506", "科室请领计划删除", "P0506", "acl_batchDelete_spdApplyReqRep");
+		operation7_3_batchDelete.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}", "DELETE"));
+
+		PcsOperation operation7_3_update = new PcsOperation("P0505", "科室请领计划保存", "P0505", "acl_update_spdApplyReq");
+		operation7_3_update.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}", "PUT"));
+
+		PcsOperation operation7_3_add = new PcsOperation("P0504", "科室请领计划增加", "P0504", "acl_add_spdApplyReq");
+		operation7_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqAbteilungViews", "GET"));
+		operation7_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqAbteilungViews/count", "GET"));
+		operation7_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqAbteilungViews/ids,{ids}", "GET"));
+		operation7_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs", "POST"));
+		operation7_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}", "DELETE"));
+		operation7_3_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/ids,{ids}", "GET"));
+
+		PcsOperation operation7_3_batchCommited = new PcsOperation("P0507", "科室请领计划提交", "P0507", "acl_batchCommited_spdApplyReq");
+		operation7_3_batchCommited.addWebApi(new PcsWebApi("/yard/spd/spdApplyReqs/{applyReqId}/checkState/commited", "PUT"));
+
+		function7_3.getOperations().add(operation7_3_view);
+		function7_3.getOperations().add(operation7_3_batchDelete);
+		function7_3.getOperations().add(operation7_3_update);
+		function7_3.getOperations().add(operation7_3_add);
+		function7_3.getOperations().add(operation7_3_batchCommited);
+
+
+		PcsFunction function7_4 = new PcsFunction("F0024", "申领入库确认");
+		menu7_4.getFunctions().add(function7_4);
+
+		PcsOperation operation7_4_view = new PcsOperation("P0154", "申领入库确认查看", "P0154", "acl_view_spdApplyCheck");
+		operation7_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation7_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation7_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byCommited/count", "GET"));
+		operation7_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byCommited", "GET"));
+		operation7_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/count", "GET"));
+		operation7_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks", "GET"));
+
+		PcsOperation operation7_4_none = new PcsOperation("P0155", "申领入库确认编辑", "P0155", "acl_none");
+		operation7_4_none.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byCommited/count", "GET"));
+		operation7_4_none.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byCommited", "GET"));
+
+		PcsOperation operation7_4_confirm = new PcsOperation("P0159", "申领入库确认审核", "P0159", "acl_confirm_spdApplyCheck");
+		operation7_4_confirm.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/{applyId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation7_4_print = new PcsOperation("P0510", "申领入库确认打印", "P0510", "acl_print_spdApplyCheck");
+		operation7_4_print.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/pdf", "GET"));
+
+		function7_4.getOperations().add(operation7_4_view);
+		function7_4.getOperations().add(operation7_4_none);
+		function7_4.getOperations().add(operation7_4_confirm);
+		function7_4.getOperations().add(operation7_4_print);
+
+
+		PcsFunction function7_5 = new PcsFunction("F0081", "科室申领记录");
+		menu7_5.getFunctions().add(function7_5);
+
+		PcsOperation operation7_5_none = new PcsOperation("P0477", "科室申领记录查看", "P0477", "acl_none");
+		operation7_5_none.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation7_5_none.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation7_5_none.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byAbteilungHis", "GET"));
+		operation7_5_none.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byAbteilungHis/count", "GET"));
+
+		PcsOperation operation7_5_export = new PcsOperation("P0512", "科室申领记录打印", "P0512", "acl_export_spdApplyItem");
+		operation7_5_export.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/pdf", "GET"));
+
+		function7_5.getOperations().add(operation7_5_none);
+		function7_5.getOperations().add(operation7_5_export);
+
+
+		PcsFunction function8_1 = new PcsFunction("F0051", "仓库帐页查询");
+		menu8_1.getFunctions().add(function8_1);
+
+		PcsOperation operation8_1_view = new PcsOperation("P0408", "仓库帐页查询查看", "P0408", "acl_view_spdDepotCardAbteilung");
+		operation8_1_view.addWebApi(new PcsWebApi("/yard/spd/SpdDepotCardByStockTotalViews/ids,{ids}", "GET"));
+		operation8_1_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/byAbteilung/count", "GET"));
+		operation8_1_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotCards/byAbteilung", "GET"));
+
+		function8_1.getOperations().add(operation8_1_view);
+
+
+		PcsFunction function8_2 = new PcsFunction("F0030", "仓库库存查询");
+		menu8_2.getFunctions().add(function8_2);
+
+		PcsOperation operation8_2_view = new PcsOperation("P0196", "仓库库存查询查看", "P0196", "acl_view_spdMyDepotStocks");
+		operation8_2_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotStocks/byMyStock/count", "GEt"));
+		operation8_2_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotStocks/byMyStock", "GET"));
+		operation8_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+
+		function8_2.getOperations().add(operation8_2_view);
+
+
+		PcsFunction function8_3 = new PcsFunction("F0071", "仓库退货管理");
+		menu8_3.getFunctions().add(function8_3);
+
+		PcsOperation operation8_3_view = new PcsOperation("P0632", "仓库退货管理查看", "P0632", "acl_view_spdApplyRefund,acl_view_spdApplyRefundItem");
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefunds", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefunds/count", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefunds/{applyId}", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems/count", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems/{applyItemId}", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUse", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/byUse", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation8_3_view.addWebApi(new PcsWebApi(" /yard/spd/spdGoodsLotStockViews/{id}", "GET"));
+
+		PcsOperation operation8_3_edit = new PcsOperation("P0633", "仓库退货管理编辑", "P0633", "acl_edit_spdApplyRefund,acl_edit_spdApplyRefundItem,acl_view_spdApplyRefundItem");
+		operation8_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefunds/{applyId}", "PUT"));
+		operation8_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems", "POST"));
+		operation8_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems/{applyItemId}", "PUT"));
+		operation8_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems/{applyItemId}", "DELETE"));
+		operation8_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byAllot/{applyId}", "GET"));
+		operation8_3_edit.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byAllot/{applyId}/count", "GET"));
+
+		PcsOperation operation8_3_reviewEntity = new PcsOperation("P0634", "仓库退货管理审核", "P0634", "acl_reviewEntity_spdApplyRefund,acl_view_spdApplyRefund,acl_view_spdApplyRefundItem");
+		operation8_3_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefunds/{applyId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation8_3_add = new PcsOperation("P0635", "仓库退货管理增加", "P0635", "acl_add_spdApplyRefund,acl_add_spdApplyRefundItem,acl_view_spdApplyRefundItem,acl_edit_spdApplyRefundItem");
+		operation8_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefunds", "POST"));
+		operation8_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems", "POST"));
+		operation8_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems/{applyItemId}", "DELETE"));
+		operation8_3_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefundItems/{applyItemId}", "PUT"));
+		operation8_3_add.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byAllot/{applyId}", "GET"));
+		operation8_3_add.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byAllot/{applyId}/count", "GET"));
+
+		PcsOperation operation8_3_delete = new PcsOperation("P0636", "仓库退货管理删除", "P0636", "acl_delete_spdApplyRefund");
+		operation8_3_delete.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefunds/{applyId}", "DELETE"));
+
+		PcsOperation operation8_3_reviewEntities = new PcsOperation("P0637", "仓库退货管理批量审核", "P0637", "acl_reviewEntities_spdApplyRefund");
+		operation8_3_reviewEntities.addWebApi(new PcsWebApi("/yard/spd/spdApplyRefunds/{applyId}/checkState/reviewed", "PUT"));
+
+		function8_3.getOperations().add(operation8_3_view);
+		function8_3.getOperations().add(operation8_3_edit);
+		function8_3.getOperations().add(operation8_3_reviewEntity);
+		function8_3.getOperations().add(operation8_3_add);
+		function8_3.getOperations().add(operation8_3_delete);
+		function8_3.getOperations().add(operation8_3_reviewEntities);
+
+
+		PcsFunction function8_4 = new PcsFunction("F0072", "退货入库确认");
+		menu8_4.getFunctions().add(function8_4);
+
+		PcsOperation operation8_4_confirm = new PcsOperation("P0638", "退货入库确认确认", "P0638", "acl_confirm_spdApplyRefundInStock");
+		operation8_4_confirm.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/{applyId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation8_4_view = new PcsOperation("P0639", "退货入库确认查看", "P0639", "acl_view_spdApplyRefundInStock");
+		operation8_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byRefund", "GET"));
+		operation8_4_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byRefund/count", "GET"));
+
+		function8_4.getOperations().add(operation8_4_confirm);
+		function8_4.getOperations().add(operation8_4_view);
+
+
+		PcsFunction function8_5 = new PcsFunction("F0073", "仓库退货记录");
+		menu8_5.getFunctions().add(function8_5);
+
+		PcsOperation operation8_5_view = new PcsOperation("P0640", "仓库退货记录查看", "P0640", "acl_view_spdApplyRefundInStockNotarize");
+		operation8_5_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byRefundHis", "GET"));
+		operation8_5_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byRefundHis/count", "GET"));
+		operation8_5_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation8_5_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/count", "GET"));
+		operation8_5_view.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/{id}", "GET"));
+
+		function8_5.getOperations().add(operation8_5_view);
+
+
+		PcsFunction function8_6 = new PcsFunction("F0037", "仓库调拨管理");
+		menu8_6.getFunctions().add(function8_6);
+
+		PcsOperation operation8_6_view = new PcsOperation("P0096", "仓库调拨管理查看", "P0096", "acl_view_spdApplyAllot,acl_view_spdApplyAllotItem");
+		operation8_6_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byAllot", "GET"));
+		operation8_6_view.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byAllot/count", "GET"));
+		operation8_6_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUse", "GET"));
+		operation8_6_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/byUse", "GET"));
+		operation8_6_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation8_6_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/count", "GET"));
+		operation8_6_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation8_6_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation8_6_view.addWebApi(new PcsWebApi(" /yard/spd/spdGoodsLotStockViews/{id}", "GET"));
+
+		PcsOperation operation8_6_reviewEntity = new PcsOperation("P0484", "仓库调拨管理审核", "P0484", "acl_reviewEntity_spdApplyAllot");
+		operation8_6_reviewEntity.addWebApi(new PcsWebApi(" /yard/spd/spdApplys/{applyId}/checkState/reviewed", "PUT"));
+		operation8_6_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdApplys/{applyId}", "GET"));
+
+		PcsOperation operation8_6_add = new PcsOperation("P0483", "仓库调拨管理增加", "P0483", "acl_add_spdApplyAllot,acl_add_spdApplyAllotItem,acl_view_spdApplyAllotItem,acl_add_spdApplyFixedItem");
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys", "POST"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems", "POST"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byAllot/count", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/{applyItemId}", "DELETE"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/{applyItemId}", "PUT"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byAllot/{applyId}", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byAllot/{applyId}/count", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUse", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/byUse", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/count", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation8_6_add.addWebApi(new PcsWebApi(" /yard/spd/spdGoodsLotStockViews/{id}", "GET"));
+
+		PcsOperation operation8_6_reviewEntities = new PcsOperation("P0485", "仓库调拨管理批量审核", "P0485", "acl_reviewEntities_spdApplyAllot");
+		operation8_6_reviewEntities.addWebApi(new PcsWebApi(" /yard/spd/spdApplys/{applyId}/checkState/reviewed", "PUT"));
+		operation8_6_reviewEntities.addWebApi(new PcsWebApi("/yard/spd/spdApplys/{applyId}", "GET"));
+
+		PcsOperation operation8_6_delete = new PcsOperation("P0486", "仓库调拨管理删除", "P0486", "acl_delete_spdApplyAllot,acl_delete_spdApplyAllotItem");
+		operation8_6_delete.addWebApi(new PcsWebApi("/yard/spd/spdApplys/{applyId}", "DELETE"));
+		operation8_6_delete.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/{applyItemId}", "DELETE"));
+
+		PcsOperation operation8_6_commitEntities = new PcsOperation("P0487", "仓库调拨管理批量提交", "P0487", "acl_commitEntities_spdApplyAllot,acl_view_spdApplyAllot,acl_view_spdApplyAllotItem");
+
+		PcsOperation operation8_6_edit = new PcsOperation("P0488", "仓库调拨管理编辑", "P0488", "acl_edit_spdApplyAllot,acl_add_spdApplyAllotItem,acl_edit_spdApplyAllotItem,acl_view_spdApplyAllotItem,,acl_delete_spdApplyAllotItem");
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/{applyId}", "PUT"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems", "POST"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplys/byAllot/count", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/{applyItemId}", "DELETE"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/{applyItemId}", "PUT"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byAllot/{applyId}", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byAllot/{applyId}/count", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUse", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdDepotRoutes/byUse", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/count", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation8_6_edit.addWebApi(new PcsWebApi(" /yard/spd/spdGoodsLotStockViews/{id}", "GET"));
+
+		function8_6.getOperations().add(operation8_6_view);
+		function8_6.getOperations().add(operation8_6_reviewEntity);
+		function8_6.getOperations().add(operation8_6_add);
+		function8_6.getOperations().add(operation8_6_reviewEntities);
+		function8_6.getOperations().add(operation8_6_delete);
+		function8_6.getOperations().add(operation8_6_commitEntities);
+		function8_6.getOperations().add(operation8_6_edit);
+
+
+		PcsFunction function8_7 = new PcsFunction("F0046", "调拨入库确认");
+		menu8_7.getFunctions().add(function8_7);
+
+		PcsOperation operation8_7_view = new PcsOperation("P0112", "调拨入库确认查看", "P0112", "acl_view_spdApplyAllotInStock");
+		operation8_7_view.addWebApi(new PcsWebApi("/yard/yds/ydsEdsGoodsLots/ids,{ids}", "GET"));
+		operation8_7_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byAllot", "GET"));
+		operation8_7_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byAllot/count", "GET"));
+
+		PcsOperation operation8_7_confirm = new PcsOperation("P0113", "调拨入库确认确认", "P0113", "acl_confirm_spdApplyAllotInStock");
+		operation8_7_confirm.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/{applyId}/checkState/reviewed", "PUT"));
+
+		function8_7.getOperations().add(operation8_7_view);
+		function8_7.getOperations().add(operation8_7_confirm);
+
+
+		PcsFunction function8_8 = new PcsFunction("F0064", "仓库调拨记录");
+		menu8_8.getFunctions().add(function8_8);
+
+		PcsOperation operation8_8_view = new PcsOperation("P0511", "仓库调拨记录查看", "P0511", "acl_view_spdApplyAllotHis");
+		operation8_8_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byApplyAllotHis", "GET"));
+		operation8_8_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyChecks/byApplyAllotHis/count", "GET"));
+		operation8_8_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}", "GET"));
+		operation8_8_view.addWebApi(new PcsWebApi("/yard/spd/spdApplyItems/applyId,{applyId}/count", "GET"));
+		operation8_8_view.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/{id}", "GET"));
+		operation8_8_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/{goodsLotId}", "GET"));
+
+		function8_8.getOperations().add(operation8_8_view);
+
+
+		PcsFunction function8_12 = new PcsFunction("F0133", "药品隔离申请");
+		menu8_12.getFunctions().add(function8_12);
+
+		PcsOperation operation8_12_view = new PcsOperation("P0743", "药品隔离查看", "P0743", "acl_view_spdIsolation,acl_view_spdIsolationItem");
+		operation8_12_view.addWebApi(new PcsWebApi("/yard/spd/spdIsolations", "GET"));
+		operation8_12_view.addWebApi(new PcsWebApi("/yard/spd/spdIsolations/count", "GET"));
+
+		PcsOperation operation8_12_edit = new PcsOperation("P0746", "药品隔离编辑", "P0746", "acl_edit_spdIsolation,acl_view_spdIsolation,acl_edit_spdIsolationItem,acl_view_spdIsolationItem,acl_add_spdIsolationItem");
+		operation8_12_edit.addWebApi(new PcsWebApi("/yard/spd/spdIsolationItems/{isolationItemId}", "PUT"));
+		operation8_12_edit.addWebApi(new PcsWebApi("/yard/spd/spdIsolations/{isolationId}", "PUT"));
+		operation8_12_edit.addWebApi(new PcsWebApi("/yard/spd/spdIsolationItems/isolationId,{isolationId}", "GET"));
+		operation8_12_edit.addWebApi(new PcsWebApi("/yard/spd/spdIsolationItems/isolationId,{isolationId}/count", "GET"));
+		operation8_12_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/{depotAreaId}", "GET"));
+		operation8_12_edit.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byIsolation/{depotId}", "GET"));
+		operation8_12_edit.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byIsolation/{depotId}/count", "GET"));
+
+		PcsOperation operation8_12_add = new PcsOperation("P0747", "药品隔离增加", "P0747", "acl_add_spdIsolation,acl_add_spdIsolationItem,acl_view_spdIsolationItem,acl_edit_spdIsolationItem");
+		operation8_12_add.addWebApi(new PcsWebApi("/yard/spd/spdIsolations", "POST"));
+		operation8_12_add.addWebApi(new PcsWebApi("/yard/spd/spdIsolationItems", "POST"));
+		operation8_12_add.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers/{userId}", "GET"));
+
+		PcsOperation operation8_12_delete = new PcsOperation("P0748", "药品隔离删除", "P0748", "acl_delete_spdIsolation,acl_delete_spdIsolationItem,acl_view_spdIsolationItem");
+		operation8_12_delete.addWebApi(new PcsWebApi("/yard/spd/spdIsolations/{isolationId}", "DELETE"));
+		operation8_12_delete.addWebApi(new PcsWebApi("/yard/spd/spdIsolationItems/{isolationItemId}", "DELETE"));
+
+		PcsOperation operation8_12_commitEntity = new PcsOperation("P0749", "药品隔离提交", "P0749", "acl_commitEntity_spdIsolation");
+		operation8_12_commitEntity.addWebApi(new PcsWebApi("/yard/yds/spdIsolations/{isolationId}/checkState/commited", "PUT"));
+
+		function8_12.getOperations().add(operation8_12_view);
+		function8_12.getOperations().add(operation8_12_edit);
+		function8_12.getOperations().add(operation8_12_add);
+		function8_12.getOperations().add(operation8_12_delete);
+		function8_12.getOperations().add(operation8_12_commitEntity);
+
+
+		PcsFunction function8_13 = new PcsFunction("F0134", "药品隔离确认");
+		menu8_13.getFunctions().add(function8_13);
+
+		PcsOperation operation8_13_view = new PcsOperation("P0744", "药品隔离确认查看", "P0744", "acl_view_spdIsolationCheck,acl_view_spdIsolationCheckItem");
+		operation8_13_view.addWebApi(new PcsWebApi("/yard/spd/spdIsolations/byCheck", "GET"));
+		operation8_13_view.addWebApi(new PcsWebApi("/yard/spd/spdIsolations/byCheck/count", "GET"));
+
+		PcsOperation operation8_13_edit = new PcsOperation("P0750", "药品隔离确认编辑", "P0750", "acl_edit_spdIsolation");
+		operation8_13_edit.addWebApi(new PcsWebApi("/yard/spd/spdIsolationItems/{isolationItemId}", "PUT"));
+
+		PcsOperation operation8_13_reviewEntity = new PcsOperation("P0751", "药品隔离确认审核", "P0751", "acl_reviewEntity_spdIsolationCheck");
+		operation8_13_reviewEntity.addWebApi(new PcsWebApi(" /yard/spd/spdIsolations/{isolationId}/checkState/reviewed", "PUT"));
+		operation8_13_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdIsolations/{isolationId}", "GET"));
+
+		function8_13.getOperations().add(operation8_13_view);
+		function8_13.getOperations().add(operation8_13_edit);
+		function8_13.getOperations().add(operation8_13_reviewEntity);
+
+
+		PcsFunction function8_14 = new PcsFunction("F0135", "药品隔离记录");
+		menu8_14.getFunctions().add(function8_14);
+
+		PcsOperation operation8_14_view = new PcsOperation("P0745", "药品隔离记录查看", "P0745", "acl_view_spdIsolationHis,acl_view_spdIsolationHisItem");
+		operation8_14_view.addWebApi(new PcsWebApi("/yard/spd/spdIsolations/byHis", "GET"));
+		operation8_14_view.addWebApi(new PcsWebApi("/yard/spd/spdIsolations/byHis/count", "GET"));
+
+		function8_14.getOperations().add(operation8_14_view);
+
+
+		PcsFunction function8_15 = new PcsFunction("F0026", "收货信息录入");
+		menu8_15.getFunctions().add(function8_15);
+
+		PcsOperation operation8_15_view = new PcsOperation("P0665", "收货信息录入查看", "P0665", "acl_view_spdReceiveEnterIng,acl_view_spdReceiveEnterIngItem");
+
+		PcsOperation operation8_15_add = new PcsOperation("P0690", "收货信息录入新增", "P0690", "acl_add_spdReceiveEnterIng,acl_add_spdReceiveEnterIngItem,acl_view_spdReceiveEnterIngItem");
+		operation8_15_add.addWebApi(new PcsWebApi("/yard/spd/spdReceives", "POST"));
+
+		PcsOperation operation8_15_edit = new PcsOperation("P0685", "收货信息录入编辑", "P0685", "acl_edit_spdReceiveEnterIng,acl_view_spdReceiveEnterIngItem,acl_add_spdReceiveEnterIngItem,acl_delete_spdReceiveEnterIngItem,acl_edit_spdReceiveEnterIngItem");
+		operation8_15_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceives/{receiveId}", "PUT"));
+		operation8_15_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems", "POST"));
+		operation8_15_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/{receiveItemId}", "PUT"));
+		operation8_15_edit.addWebApi(new PcsWebApi("/yard/spd/spdReceiveItems/{receiveItemId}", "DELETE"));
+
+		PcsOperation operation8_15_delete = new PcsOperation("P0686", "收货信息录入删除", "P0686", "acl_delete_spdReceiveEnterIng");
+		operation8_15_delete.addWebApi(new PcsWebApi("/yard/spd/spdReceives/{receiveId}", "DELETE"));
+
+		PcsOperation operation8_15_commitEntity = new PcsOperation("P0687", "收货信息录入提交", "P0687", "acl_commitEntity_spdReceiveEnterIng");
+
+		PcsOperation operation8_15_cancelCommit = new PcsOperation("P0688", "收货信息录入撤回", "P0688", "acl_cancelCommit_spdReceiveEnterIng");
+
+		PcsOperation operation8_15_reviewEntity = new PcsOperation("P0689", "收货信息录入审核", "P0689", "acl_reviewEntity_spdReceiveEnterIng");
+		operation8_15_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdReceives/{receiveId}/checkState/byQuick/reviewed", "PUT"));
+
+		function8_15.getOperations().add(operation8_15_view);
+		function8_15.getOperations().add(operation8_15_add);
+		function8_15.getOperations().add(operation8_15_edit);
+		function8_15.getOperations().add(operation8_15_delete);
+		function8_15.getOperations().add(operation8_15_commitEntity);
+		function8_15.getOperations().add(operation8_15_cancelCommit);
+		function8_15.getOperations().add(operation8_15_reviewEntity);
+
+
+		PcsFunction function9_1 = new PcsFunction("F0041", "收货上架作业");
+		menu9_1.getFunctions().add(function9_1);
+
+		PcsOperation operation9_1_none = new PcsOperation("P0298", "收货上架作业查看", "P0298", "acl_none");
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/yds/ydsEdsGoodsLots/ids,{ids}", "GET"));
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/spd/spdTasks/byPutaway", "GET"));
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/spd/spdTasks/byPutaway/count", "GET"));
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/spd/spdTaskItems/taskId,{taskId}", "GET"));
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/spd/spdTasks", "GET"));
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/yds/ydsEdsGoodsLots/ids,{ids}", "GET"));
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/spd/spdTaskItems", "GET"));
+		operation9_1_none.addWebApi(new PcsWebApi("/yard/spd/spdOnShelfTaskItems/taskId,{taskId}", "GET"));
+
+		PcsOperation operation9_1_confirm = new PcsOperation("P0299", "收货上架作业确认", "P0299", "acl_confirm_spdTask");
+		operation9_1_confirm.addWebApi(new PcsWebApi("/yard/spd/spdTasks/{taskId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation9_1_update = new PcsOperation("P0300", "收货上架作业保存", "P0300", "acl_update_spdTask");
+		operation9_1_update.addWebApi(new PcsWebApi("/yard/spd/spdOnShelfTaskItems/{taskId}", "PUT"));
+
+		function9_1.getOperations().add(operation9_1_none);
+		function9_1.getOperations().add(operation9_1_confirm);
+		function9_1.getOperations().add(operation9_1_update);
+
+
+		PcsFunction function9_2 = new PcsFunction("F0042", "拣货下架作业");
+		menu9_2.getFunctions().add(function9_2);
+
+		PcsOperation operation9_2_view = new PcsOperation("P0301", "拣货下架作业查看", "P0301", "acl_view_spdTaskOffShelfItem");
+		operation9_2_view.addWebApi(new PcsWebApi("/yard/spd/spdTasks/byOffShelf", "GET"));
+		operation9_2_view.addWebApi(new PcsWebApi("/yard/spd/spdTasks/byOffShelf/count", "GET"));
+		operation9_2_view.addWebApi(new PcsWebApi("/yard/spd/spdTasks", "GET"));
+		operation9_2_view.addWebApi(new PcsWebApi("/yard/spd/spdTaskItems", "GET"));
+		operation9_2_view.addWebApi(new PcsWebApi("/yard/spd/spdOffShelfTaskItems/taskId,{taskId}", "GET"));
+		operation9_2_view.addWebApi(new PcsWebApi("/yard/spd/spdOffShelfTaskItems/ids,{ids}", "GET"));
+
+		PcsOperation operation9_2_confirm = new PcsOperation("P0302", "拣货下架作业确认", "P0302", "acl_confirm_spdTaskOut");
+		operation9_2_confirm.addWebApi(new PcsWebApi("/yard/spd/spdTasks/{taskId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation9_2_update = new PcsOperation("P0303", "拣货下架作业保存", "P0303", "acl_update_spdTaskOut");
+		operation9_2_update.addWebApi(new PcsWebApi("/yard/spd/spdOffShelfTaskItems/{taskId}", "PUT"));
+
+		PcsOperation operation9_2_delete = new PcsOperation("P0304", "删除周转箱作业明细", "P0304", "acl_delete_spdTaskOffShelfItem");
+		operation9_2_delete.addWebApi(new PcsWebApi("/yard/spd/spdOffShelfTaskItems/{taskItemId}", "DELETE"));
+
+		PcsOperation operation9_2_add = new PcsOperation("P0305", "新增周转箱作业明细", "P0305", "acl_add_spdOffShelfTaskItem");
+		operation9_2_add.addWebApi(new PcsWebApi("/yard/spd/spdOffShelfTaskItems", "POST"));
+
+		function9_2.getOperations().add(operation9_2_view);
+		function9_2.getOperations().add(operation9_2_confirm);
+		function9_2.getOperations().add(operation9_2_update);
+		function9_2.getOperations().add(operation9_2_delete);
+		function9_2.getOperations().add(operation9_2_add);
+
+
+		PcsFunction function9_3 = new PcsFunction("F0053", "仓库作业记录");
+		menu9_3.getFunctions().add(function9_3);
+
+		PcsOperation operation9_3_none = new PcsOperation("P0308", "仓库作业记录查看", "P0308", "acl_none");
+		operation9_3_none.addWebApi(new PcsWebApi("/yard/spd/spdTasks/byHis", "GET"));
+		operation9_3_none.addWebApi(new PcsWebApi("/yard/spd/spdTasks/byHis/count", "GET"));
+		operation9_3_none.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/ids,{ids}", "GET"));
+		operation9_3_none.addWebApi(new PcsWebApi("/yard/pcs/pcsDepts/ids,{ids}", "GET"));
+		operation9_3_none.addWebApi(new PcsWebApi("/yard/spd/spdTaskItems/taskId,{taskId}", "GET"));
+		operation9_3_none.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+		operation9_3_none.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation9_3_none.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+
+		PcsOperation operation9_3_exportPdf = new PcsOperation("P0498", "仓库作业记录打印", "P0498", "acl_exportPdf_spdTaskHis");
+		operation9_3_exportPdf.addWebApi(new PcsWebApi("/yard/spd/spdTaskItems/taskId,{taskId}/pdf", "GET"));
+
+		function9_3.getOperations().add(operation9_3_none);
+		function9_3.getOperations().add(operation9_3_exportPdf);
+
+
+		PcsFunction function9_4 = new PcsFunction("F0047", "库存盘点管理");
+		menu9_4.getFunctions().add(function9_4);
+
+		PcsOperation operation9_4_delete = new PcsOperation("P0403", "库存盘点管理删除", "P0403", "acl_delete_spdInventory");
+		operation9_4_delete.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/{inventoryId}", "DELETE"));
+
+		PcsOperation operation9_4_cancelCommit = new PcsOperation("P0447", "库存盘点管理撤回", "P0447", "acl_cancelCommit_spdInventory");
+		operation9_4_cancelCommit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/ids,{ids}", "GET"));
+		operation9_4_cancelCommit.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/{inventoryId}", "GET"));
+
+		PcsOperation operation9_4_print = new PcsOperation("P0416", "库存盘点管理打印", "P0416", "acl_print_Inventory,acl_view_spdInventory");
+		operation9_4_print.addWebApi(new PcsWebApi("/yard/spd/spdInventoryItems/inventoryId,{inventoryId}/pdf", "GET"));
+
+		PcsOperation operation9_4_commitEntity = new PcsOperation("P0413", "库存盘点管理提交", "P0413", "acl_commitEntity_spdInventory");
+		operation9_4_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/ids,{ids}", "GET"));
+		operation9_4_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/{inventoryId}/checkState/commited", "PUT"));
+		operation9_4_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/{inventoryId}", "GET"));
+
+		PcsOperation operation9_4_reviewEntity = new PcsOperation("P0414", "库存盘点管理审核", "P0414", "acl_reviewEntity_spdInventory");
+		operation9_4_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/{inventoryId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation9_4_view = new PcsOperation("P0400", "库存盘点管理查看", "P0400", "acl_view_spdInventory,acl_view_spdInventoryItem");
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/ids,{ids}", "GET"));
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers", "GET"));
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/spd/spdInventoryItems/inventoryId,{inventoryId}", "GET"));
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/byUser/count", "GET"));
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/byUser", "GET"));
+		operation9_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/depotId,{depotId}", "GET"));
+
+		PcsOperation operation9_4_add = new PcsOperation("P0401", "库存盘点管理增加", "P0401", "acl_add_spdInventory,acl_add_spdInventoryItem,acl_edit_spdInventoryItem,acl_view_spdInventoryItem,acl_delete_spdInventoryItem");
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/byUser/count", "GET"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/byUser", "GET"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/spd/spdInventoryItems/inventoryId,{inventoryId}", "GET"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUMdepot/count", "GET"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUMdepot", "GET"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/depotId,{depotId}", "GET"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotInventorys", "POST"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/spd/spdInventorys", "GET"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/spd/spdInventorys", "POST"));
+		operation9_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers", "GET"));
+
+		PcsOperation operation9_4_edit = new PcsOperation("P0402", "库存盘点管理编辑", "P0402", "acl_edit_spdInventory,acl_view_spdInventory,acl_view_spdInventoryItem,acl_save_Inventory");
+		operation9_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdInventorys/byUser/count", "GET"));
+		operation9_4_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/ids,{ids}", "GET"));
+		operation9_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdDepotInventorys/byUser", "GET"));
+		operation9_4_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers", "GET"));
+		operation9_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdInventoryItems/inventoryId,{inventoryId}", "GET"));
+		operation9_4_edit.addWebApi(new PcsWebApi("/yard/spd/spdInventoryItems/{inventoryItemId}", "PUT"));
+
+		PcsOperation operation9_4_save = new PcsOperation("P0660", "库存盘点管理保存", "P0660", "acl_save_Inventory");
+
+		function9_4.getOperations().add(operation9_4_delete);
+		function9_4.getOperations().add(operation9_4_cancelCommit);
+		function9_4.getOperations().add(operation9_4_print);
+		function9_4.getOperations().add(operation9_4_commitEntity);
+		function9_4.getOperations().add(operation9_4_reviewEntity);
+		function9_4.getOperations().add(operation9_4_view);
+		function9_4.getOperations().add(operation9_4_add);
+		function9_4.getOperations().add(operation9_4_edit);
+		function9_4.getOperations().add(operation9_4_save);
+
+
+		PcsFunction function9_5 = new PcsFunction("F0020", "报损报溢申请");
+		menu9_5.getFunctions().add(function9_5);
+
+		PcsOperation operation9_5_commitEntity = new PcsOperation("P0312", "报损报溢申请提交", "P0312", "acl_commitEntity_spdPlApply");
+
+		PcsOperation operation9_5_view = new PcsOperation("P0314", "报损报溢申请查看", "P0314", "acl_view_spdPlApply,acl_view_spdPlItemApply");
+		operation9_5_view.addWebApi(new PcsWebApi("/yard/spd/spdPlApplys", "GET"));
+		operation9_5_view.addWebApi(new PcsWebApi("/yard/spd/spdPlApplys/count", "GET"));
+
+		PcsOperation operation9_5_add = new PcsOperation("P0309", "报损报溢申请新增", "P0309", "acl_add_spdPlApply,acl_add_spdPlItemApply,acl_view_spdPlApply,acl_view_spdPlItemApply");
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/spd/spdPlApplys/count", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/spd/spdPlApplys", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/pcs/PcsDepts/byUse", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUMdepot/count", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/byUMdepot", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/pcs/PcsDepts/byUse", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/spd/spdPls", "POST"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/spd/spdPlItems", "POST"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotStocks", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/spd/spdDepotStocks/count", "GET"));
+		operation9_5_add.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos/{goodsId}", "GET"));
+
+		PcsOperation operation9_5_edit = new PcsOperation("P0310", "报损报溢申请编辑", "P0310", "acl_edit_spdPlApply,acl_edit_spdPlItemApply,acl_view_spdPlApply,acl_view_spdPlItemApply,acl_delete_spdPlItemApply");
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/plId,{plId}/count", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/plId,{plId}", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdPlApplys/count", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdPlApplys", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsLots/ids,{ids}", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdPls/{plId}", "PUT"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodss/ids,{ids}", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/ids,{ids}", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/{plItemId}", "PUT"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdPlItems", "POST"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byDepot/{depotId}", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/spd/spdGoodsLotStockViews/byDepot/{depotId}/count", "GET"));
+		operation9_5_edit.addWebApi(new PcsWebApi("/yard/yds/ydsGoodsInfos/{goodsId}", "GET"));
+
+		PcsOperation operation9_5_delete = new PcsOperation("P0311", "报损报溢申请删除", "P0311", "acl_delete_spdPlApply");
+		operation9_5_delete.addWebApi(new PcsWebApi("/yard/spd/spdPls/{plId}", "DELETE"));
+		operation9_5_delete.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/{plItemId}", "DELETE"));
+
+		function9_5.getOperations().add(operation9_5_commitEntity);
+		function9_5.getOperations().add(operation9_5_view);
+		function9_5.getOperations().add(operation9_5_add);
+		function9_5.getOperations().add(operation9_5_edit);
+		function9_5.getOperations().add(operation9_5_delete);
+
+
+		PcsFunction function9_6 = new PcsFunction("F0054", "报损报溢确认");
+		menu9_6.getFunctions().add(function9_6);
+
+		PcsOperation operation9_6_view = new PcsOperation("P0439", "报损报溢确认查看", "P0439", "acl_view_spdPl");
+		operation9_6_view.addWebApi(new PcsWebApi("/yard/spd/spdPls/{plId}", "GET"));
+		operation9_6_view.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/plId,{plId}/count", "GET"));
+		operation9_6_view.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/{plItemId}", "PUT"));
+		operation9_6_view.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/plId,{plId}", "GET"));
+		operation9_6_view.addWebApi(new PcsWebApi("/yard/spd/spdPls", "GET"));
+		operation9_6_view.addWebApi(new PcsWebApi("/yard/spd/spdPls/count", "GET"));
+
+		PcsOperation operation9_6_reviewEntity = new PcsOperation("P0441", "报损报溢确认审核", "P0441", "acl_reviewEntity_spdPl");
+		operation9_6_reviewEntity.addWebApi(new PcsWebApi("/yard/spd/spdPls/{plId}/checkState/reviewed", "PUT"));
+
+		PcsOperation operation9_6_commitEntity = new PcsOperation("P0442", "报损报溢确认提交", "P0442", "acl_commitEntity_spdPl");
+		operation9_6_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdPls/{plId}/checkState/commited", "PUT"));
+
+		PcsOperation operation9_6_cancelCommit = new PcsOperation("P0444", "报损报溢确认撤回", "P0444", "acl_cancelCommit_spdPl");
+
+		PcsOperation operation9_6_update = new PcsOperation("P0658", "报损报溢确认保存", "P0658", "acl_update_pl");
+
+		PcsOperation operation9_6_confirm = new PcsOperation("P0659", "报损报溢确认确认", "P0659", "acl_confirm_pl");
+
+		function9_6.getOperations().add(operation9_6_view);
+		function9_6.getOperations().add(operation9_6_reviewEntity);
+		function9_6.getOperations().add(operation9_6_commitEntity);
+		function9_6.getOperations().add(operation9_6_cancelCommit);
+		function9_6.getOperations().add(operation9_6_update);
+		function9_6.getOperations().add(operation9_6_confirm);
+
+
+		PcsFunction function9_7 = new PcsFunction("F0029", "报损报溢记录");
+		menu9_7.getFunctions().add(function9_7);
+
+		PcsOperation operation9_7_view = new PcsOperation("P0197", "报损报溢记录查看", "P0197", "acl_view_spdPl");
+		operation9_7_view.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/plId,{plId}/count", "GET"));
+		operation9_7_view.addWebApi(new PcsWebApi("/yard/spd/spdPlItems/plId,{plId}", "GET"));
+		operation9_7_view.addWebApi(new PcsWebApi("/yard/spd/spdPlsHis/count", "GET"));
+		operation9_7_view.addWebApi(new PcsWebApi("/yard/spd/spdPlsHis", "GET"));
+
+		function9_7.getOperations().add(operation9_7_view);
+
+
+		PcsFunction function10_1 = new PcsFunction("F0136", "周转箱配置项");
+		menu10_1.getFunctions().add(function10_1);
+
+		PcsOperation operation10_1_view = new PcsOperation("P0753", "周转箱配置项查看", "P0753", "acl_view_spdTurnoverBox");
+		operation10_1_view.addWebApi(new PcsWebApi("/yard/spd/spdTurnoverBoxs", "GET"));
+		operation10_1_view.addWebApi(new PcsWebApi("/yard/spd/spdTurnoverBoxs/count", "GET"));
+		operation10_1_view.addWebApi(new PcsWebApi("/yard/spd/spdTurnoverBoxs/{0}", "GET"));
+
+		PcsOperation operation10_1_add = new PcsOperation("P0754", "周转箱配置项新增", "P0754", "acl_add_spdTurnoverBox");
+		operation10_1_add.addWebApi(new PcsWebApi("/yard/spd/spdTurnoverBoxs", "POST"));
+
+		PcsOperation operation10_1_edit = new PcsOperation("P0755", "周转箱配置项修改", "P0755", "acl_edit_spdTurnoverBox");
+		operation10_1_edit.addWebApi(new PcsWebApi("/yard/spd/spdTurnoverBoxs/{turnoverBoxId}", "PUT"));
+
+		PcsOperation operation10_1_commitEntity = new PcsOperation("P0756", "周装箱配置项提交", "P0756", "acl_commitEntity_spdTurnoverBox");
+		operation10_1_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdTurnoverBoxs/{turnoverBoxId}/checkState/commited", "PUT"));
+
+		PcsOperation operation10_1_cancelCommit = new PcsOperation("P0757", "周装箱配置项撤回", "P0757", "acl_cancelCommit_spdTurnoverBox");
+		operation10_1_cancelCommit.addWebApi(new PcsWebApi("/yard/spd/spdTurnoverBoxs/{turnoverBoxId}/checkState/commited", "PUT"));
+
+		function10_1.getOperations().add(operation10_1_view);
+		function10_1.getOperations().add(operation10_1_add);
+		function10_1.getOperations().add(operation10_1_edit);
+		function10_1.getOperations().add(operation10_1_commitEntity);
+		function10_1.getOperations().add(operation10_1_cancelCommit);
+
+
+		PcsFunction function10_2 = new PcsFunction("F0049", "运输调度管理");
+		menu10_2.getFunctions().add(function10_2);
+
+		PcsOperation operation10_2_none = new PcsOperation("P0405", "运输调度管理查看", "P0405", "acl_none");
+
+		function10_2.getOperations().add(operation10_2_none);
+
+
+		PcsFunction function10_3 = new PcsFunction("F0050", "周转装箱作业");
+		menu10_3.getFunctions().add(function10_3);
+
+		PcsOperation operation10_3_none = new PcsOperation("P0406", "周转装箱作业查看", "P0406", "acl_none");
+
+		function10_3.getOperations().add(operation10_3_none);
+
+
+		PcsFunction function10_4 = new PcsFunction("F0018", "物流配送签收");
+		menu10_4.getFunctions().add(function10_4);
+
+		PcsOperation operation10_4_none = new PcsOperation("P0407", "物流配送签收查看", "P0407", "acl_none");
+
+		function10_4.getOperations().add(operation10_4_none);
+
+
+		PcsFunction function13_1 = new PcsFunction("F0022", "全院库存查询");
+		menu13_1.getFunctions().add(function13_1);
+
+		PcsOperation operation13_1_view = new PcsOperation("P0140", "全院库存查询查看", "P0140", "acl_view_spdDepotStocks");
+		operation13_1_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotStocks", "GET"));
+		operation13_1_view.addWebApi(new PcsWebApi("/yard/spd/spdDepotStocks/count", "GET"));
+
+		function13_1.getOperations().add(operation13_1_view);
+
+
+		PcsFunction function14_1 = new PcsFunction("F0006", "业务机构管理");
+		menu14_1.getFunctions().add(function14_1);
+
+		PcsOperation operation14_1_view = new PcsOperation("P0040", "业务机构查看", "P0040", "acl_view_pcsOrg");
+		operation14_1_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepts", "GET"));
+		operation14_1_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepts/orgId,{orgId}", "GET"));
+		operation14_1_view.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "GET"));
+		operation14_1_view.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId}", "GET"));
+
+		PcsOperation operation14_1_add = new PcsOperation("P0041", "业务机构增加", "P0041", "acl_add_pcsOrg,acl_add_pcsDept");
+		operation14_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepts", "GET"));
+		operation14_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "POST"));
+		operation14_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId}", "GET"));
+		operation14_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "POST"));
+		operation14_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "GET"));
+		operation14_1_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepts", "POST"));
+
+		PcsOperation operation14_1_edit = new PcsOperation("P0042", "业务机构编辑", "P0042", "acl_edit_pcsOrg,acl_edit_pcsDept");
+		operation14_1_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId}", "PUT"));
+		operation14_1_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepts/{deptId}", "PUT"));
+		operation14_1_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "GET"));
+		operation14_1_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId}", "GET"));
+		operation14_1_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "PUT"));
+
+		PcsOperation operation14_1_cancelCommit = new PcsOperation("P0286", "业务机构撤回", "P0286", "acl_cancelCommit_pcsOrg");
+		operation14_1_cancelCommit.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId}/checkState/commited", "PUT"));
+
+		PcsOperation operation14_1_delete = new PcsOperation("P0043", "业务机构删除", "P0043", "acl_delete_pcsOrg,acl_delete_pcsDept");
+		operation14_1_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "GET"));
+		operation14_1_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId}", "GET"));
+		operation14_1_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "DELETE"));
+
+		PcsOperation operation14_1_commitEntity = new PcsOperation("P0044", "业务机构提交", "P0044", "acl_commitEntity_pcsOrg");
+		operation14_1_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId}/checkState/commited", "PUT"));
+		operation14_1_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "GET"));
+		operation14_1_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs/{orgId}", "GET"));
+		operation14_1_commitEntity.addWebApi(new PcsWebApi("/yard/spd/spdSellerSendItems/{sendItemId}/checkState/commited", "PUT"));
+
+		function14_1.getOperations().add(operation14_1_view);
+		function14_1.getOperations().add(operation14_1_add);
+		function14_1.getOperations().add(operation14_1_edit);
+		function14_1.getOperations().add(operation14_1_cancelCommit);
+		function14_1.getOperations().add(operation14_1_delete);
+		function14_1.getOperations().add(operation14_1_commitEntity);
+
+
+		PcsFunction function14_2 = new PcsFunction("F0007", "部门仓库管理");
+		menu14_2.getFunctions().add(function14_2);
+
+		PcsOperation operation14_2_view = new PcsOperation("P0047", "部门仓库查看", "P0047", "acl_view_pcsDepot,acl_view_pcsDepotArea,acl_view_pcsDepotShelf");
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/count", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/depotId,{depotId}", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/count", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/areaId,{areaId}/count", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/areaId,{areaId}", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/count", "GET"));
+		operation14_2_view.addWebApi(new PcsWebApi("yard/pcs/pcsDepots/{depotId}", "GET"));
+
+		PcsOperation operation14_2_commitEntity = new PcsOperation("P0051", "部门仓库提交", "P0051", "acl_commitEntity_pcsDepot");
+		operation14_2_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/depotId,{depotId}", "GET"));
+		operation14_2_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/areaId,{areaId}", "GET"));
+		operation14_2_commitEntity.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "GET"));
+		operation14_2_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation14_2_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/count", "GET"));
+		operation14_2_commitEntity.addWebApi(new PcsWebApi("yard/pcs/pcsDepots/{depotId}", "GET"));
+		operation14_2_commitEntity.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/{depotId}/checkState/commited", "PUT"));
+
+		PcsOperation operation14_2_cancelCommit = new PcsOperation("P0283", "部门仓库撤回", "P0283", "acl_cancelCommit_pcsDepot");
+		operation14_2_cancelCommit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/depotId,{depotId}", "GET"));
+		operation14_2_cancelCommit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/areaId,{areaId}", "GET"));
+		operation14_2_cancelCommit.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks", "GET"));
+
+		PcsOperation operation14_2_edit = new PcsOperation("P0049", "部门仓库编辑", "P0049", "acl_edit_pcsDepot,acl_edit_pcsDepotArea,acl_edit_pcsDepotShelf,acl_view_pcsDepotArea,acl_view_pcsDepotShelf,acl_add_pcsDepotShelf,acl_add_pcsDepotArea");
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/depotId,{depotId}", "GET"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/{shelfId}", "PUT"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/yds/ydsWorkBooks/byUse", "GET"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/PcsDepts/byUse", "GET"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/areaId,{areaId}", "GET"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/areaId,{areaId}/count", "GET"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/{depotAreaId}", "PUT"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/count", "GET"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/{depotId}", "GET"));
+		operation14_2_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/{depotId}", "PUT"));
+
+		PcsOperation operation14_2_add = new PcsOperation("P0048", "部门仓库增加", "P0048", "acl_add_pcsDepot,acl_add_pcsDepotArea,acl_add_pcsDepotShelf,acl_view_pcsDepotArea,acl_view_pcsDepotShelf,acl_edit_pcsDepotArea,acl_edit_pcsDepotShelf");
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas", "POST"));
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "POST"));
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/areaId,{areaId}", "GET"));
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs/areaId,{areaId}/count", "GET"));
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotShelfs", "POST"));
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepotAreas/{depotAreaId}", "PUT"));
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "GET"));
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots/count", "GET"));
+		operation14_2_add.addWebApi(new PcsWebApi("yard/pcs/pcsDepots/{depotId}", "GET"));
+		operation14_2_add.addWebApi(new PcsWebApi("/yard/pcs/pcsDepots", "POST"));
+
+		function14_2.getOperations().add(operation14_2_view);
+		function14_2.getOperations().add(operation14_2_commitEntity);
+		function14_2.getOperations().add(operation14_2_cancelCommit);
+		function14_2.getOperations().add(operation14_2_edit);
+		function14_2.getOperations().add(operation14_2_add);
+
+
+		PcsFunction function14_4 = new PcsFunction("F0009", "角色权限管理");
+		menu14_4.getFunctions().add(function14_4);
+
+		PcsOperation operation14_4_deleteEntitis = new PcsOperation("P0065", "角色权限管理批量删除", "P0065", "acl_deleteEntitis_pcsRoleOp");
+		operation14_4_deleteEntitis.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles", "GET"));
+		operation14_4_deleteEntitis.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles/count", "GET"));
+		operation14_4_deleteEntitis.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleTypes/ids,{ids}", "GET"));
+
+		PcsOperation operation14_4_view = new PcsOperation("P0061", "角色权限查看", "P0061", "acl_view_pcsRole");
+		operation14_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles/count", "GET"));
+		operation14_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps/roleId", "GET"));
+		operation14_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles", "GET"));
+		operation14_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleTypes/ids,{ids}", "GET"));
+		operation14_4_view.addWebApi(new PcsWebApi("/yard/pcs/sysSystemFunctionOpViews/ids,{ids}", "GET"));
+		operation14_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps/count", "GET"));
+		operation14_4_view.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps", "GET"));
+
+		PcsOperation operation14_4_edit = new PcsOperation("P0062", "角色权限编辑", "P0062", "acl_edit_pcsRole,acl_add_pcsRoleOp,acl_delete_pcsRoleOp,acl_view_pcsRoleOp");
+		operation14_4_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles", "GET"));
+		operation14_4_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles/count", "GET"));
+		operation14_4_edit.addWebApi(new PcsWebApi("/yard/pcs/sysSystemFunctionOpViews", "GET"));
+		operation14_4_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps", "GET"));
+		operation14_4_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps/roleId,{roleId}", "GET"));
+		operation14_4_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps/{roleId}/count", "GET"));
+		operation14_4_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles/{roleId}", "PUT"));
+
+		PcsOperation operation14_4_delete = new PcsOperation("P0063", "角色权限删除", "P0063", "acl_delete_pcsRole");
+		operation14_4_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles", "GET"));
+		operation14_4_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles/count", "GET"));
+		operation14_4_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleTypeOps/{id}", "DELETE"));
+		operation14_4_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps/{id}", "DELETE"));
+		operation14_4_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles/{roleId}", "DELETE"));
+
+		PcsOperation operation14_4_add = new PcsOperation("P0064", "角色权限增加", "P0064", "acl_add_pcsRole,acl_add_pcsRoleOp,acl_delete_pcsRoleOp,acl_view_pcsRoleOp");
+		operation14_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles/count", "GET"));
+		operation14_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles", "GET"));
+		operation14_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleTypes/ids,{ids}", "GET"));
+		operation14_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps/{id}", "GET"));
+		operation14_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles", "POST"));
+		operation14_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsRoleOps", "POST"));
+		operation14_4_add.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles", "POST"));
+
+		function14_4.getOperations().add(operation14_4_deleteEntitis);
+		function14_4.getOperations().add(operation14_4_view);
+		function14_4.getOperations().add(operation14_4_edit);
+		function14_4.getOperations().add(operation14_4_delete);
+		function14_4.getOperations().add(operation14_4_add);
+
+
+		PcsFunction function14_5 = new PcsFunction("F0010", "业务用户管理");
+		menu14_5.getFunctions().add(function14_5);
+
+		PcsOperation operation14_5_refreshAuthorty = new PcsOperation("P0661", "业务用户权限刷新", "P0661", "acl_refreshAuthorty_pcsUser");
+
+		PcsOperation operation14_5_view = new PcsOperation("P0068", "业务用户查看", "P0068", "acl_view_pcsUser");
+		operation14_5_view.addWebApi(new PcsWebApi("/yard/pcs/pcsUserRoles/userId,{userId}", "GET"));
+		operation14_5_view.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers", "GET"));
+		operation14_5_view.addWebApi(new PcsWebApi("/yard/pcs/pcsOrgs", "GET"));
+		operation14_5_view.addWebApi(new PcsWebApi("/yard/pcs/pcsRoles/ids,{ids}", "GET"));
+
+		PcsOperation operation14_5_add = new PcsOperation("P0070", "业务用户增加", "P0070", "acl_add_pcsUser");
+		operation14_5_add.addWebApi(new PcsWebApi("/yard/pcs/pcsUserRoles", "POST"));
+		operation14_5_add.addWebApi(new PcsWebApi("/yard/pcs/pcsUserRoles/{id}", "GET"));
+		operation14_5_add.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers", "POST"));
+		operation14_5_add.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers", "GET"));
+		operation14_5_add.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers", "POST"));
+
+		PcsOperation operation14_5_delete = new PcsOperation("P0071", "业务用户删除", "P0071", "acl_delete_pcsUser");
+		operation14_5_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers", "GET"));
+		operation14_5_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsUserRoles/{id}", "DELETE"));
+		operation14_5_delete.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers/{userId}", "DELETE"));
+
+		PcsOperation operation14_5_edit = new PcsOperation("P0069", "业务用户编辑", "P0069", "acl_edit_pcsUser,acl_add_pcsUserRole,acl_delete_pcsUserRole,acl_view_pcsUserRole");
+		operation14_5_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsDepts/{deptId}", "GET"));
+		operation14_5_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers/{userId}", "PUT"));
+		operation14_5_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsUserRoles/userId,{userId}", "GET"));
+		operation14_5_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsUsers/{userId}", "PUT"));
+		operation14_5_edit.addWebApi(new PcsWebApi("/yard/pcs/pcsUserRoles", "POST"));
+
+		function14_5.getOperations().add(operation14_5_refreshAuthorty);
+		function14_5.getOperations().add(operation14_5_view);
+		function14_5.getOperations().add(operation14_5_add);
+		function14_5.getOperations().add(operation14_5_delete);
+		function14_5.getOperations().add(operation14_5_edit);
+
+
+		PcsFunction function15_1 = new PcsFunction("F0075", "错误日志管理");
+		menu15_1.getFunctions().add(function15_1);
+
+		PcsOperation operation15_1_view = new PcsOperation("P0663", "错误日志管理查看", "P0663", "acl_view_loggingEvent");
+		operation15_1_view.addWebApi(new PcsWebApi("/yard/loggingEvents", "GET"));
+		operation15_1_view.addWebApi(new PcsWebApi("/yard/loggingEvents/{eventId}", "GET"));
+		operation15_1_view.addWebApi(new PcsWebApi("/yard/loggingEvents/count", "GET"));
+
+		PcsOperation operation15_1_delete = new PcsOperation("P0664", "错误日志管理删除", "P0664", "acl_delete_loggingEvent");
+		operation15_1_delete.addWebApi(new PcsWebApi("/yard/loggingEvents/{eventId}", "DELETE"));
+
+		function15_1.getOperations().add(operation15_1_view);
+		function15_1.getOperations().add(operation15_1_delete);
+
+
+		PcsFunction function15_2 = new PcsFunction("F0076", "数据检查报告");
+		menu15_2.getFunctions().add(function15_2);
+
+		PcsOperation operation15_2_view = new PcsOperation("P0666", "数据检查报告查看", "P0666", "acl_view_sysDataCheckTaskReport");
+		operation15_2_view.addWebApi(new PcsWebApi("/yard/sysDataCheckTaskReports", "GET"));
+		operation15_2_view.addWebApi(new PcsWebApi("/yard/sysDataCheckTaskReports/{id}", "GET"));
+		operation15_2_view.addWebApi(new PcsWebApi("/yard/sysDataCheckTaskReports/count", "GET"));
+		operation15_2_view.addWebApi(new PcsWebApi("/yard/sysDataCheckTasks/ids,{ids}", "GET"));
+		operation15_2_view.addWebApi(new PcsWebApi("/yard/sysDataCheckTaskItems/{reportId}", "GET"));
+		operation15_2_view.addWebApi(new PcsWebApi("/yard/sysDataCheckTaskItems/{reportId}/count", "GET"));
+
+		PcsOperation operation15_2_checkData = new PcsOperation("P0667", "数据检查任务执行", "P0667", "acl_checkData_sysCheckDataTask");
+		operation15_2_checkData.addWebApi(new PcsWebApi("/yard/sysDataCheckTaskManualStart", "GET"));
+
+		function15_2.getOperations().add(operation15_2_view);
+		function15_2.getOperations().add(operation15_2_checkData);
+
+
+		PcsFunction function16_1 = new PcsFunction("F0084", "标准产品关联");
+		menu16_1.getFunctions().add(function16_1);
+
+		PcsOperation operation16_1_view = new PcsOperation("P0692", "标准产品关联查看", "P0692", "acl_view_goodsSyncResource");
+		operation16_1_view.addWebApi(new PcsWebApi("/eis/goodsSyncResources", "GET"));
+
+		PcsOperation operation16_1_add = new PcsOperation("P0693", "标准产品关联新增", "P0693", "acl_add_goodsSyncResource");
+		operation16_1_add.addWebApi(new PcsWebApi("/eis/goodsSyncResources", "POST"));
+
+		PcsOperation operation16_1_edit = new PcsOperation("P0694", "标准产品关联编辑", "P0694", "acl_edit_goodsSyncResource");
+		operation16_1_edit.addWebApi(new PcsWebApi("/eis/goodsSyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_1_delete = new PcsOperation("P0695", "标准产品关联删除", "P0695", "acl_delete_goodsSyncResource");
+		operation16_1_delete.addWebApi(new PcsWebApi("/eis/goodsSyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		PcsOperation operation16_1_sync = new PcsOperation("P0740", "标准产品关联同步", "P0740", "acl_sync_goods");
+		operation16_1_sync.addWebApi(new PcsWebApi("/yard/syncTaskMsgs", "POST"));
+
+		function16_1.getOperations().add(operation16_1_view);
+		function16_1.getOperations().add(operation16_1_add);
+		function16_1.getOperations().add(operation16_1_edit);
+		function16_1.getOperations().add(operation16_1_delete);
+		function16_1.getOperations().add(operation16_1_sync);
+
+
+		PcsFunction function16_2 = new PcsFunction("F0085", "产品批次关联");
+		menu16_2.getFunctions().add(function16_2);
+
+		PcsOperation operation16_2_view = new PcsOperation("P0696", "产品批次关联查看", "P0696", "acl_view_goodsLotSyncResource");
+		operation16_2_view.addWebApi(new PcsWebApi("/eis/goodsLotSyncResources", "GET"));
+
+		PcsOperation operation16_2_add = new PcsOperation("P0697", "产品批次关联新增", "P0697", "acl_add_goodsLotSyncResource");
+		operation16_2_add.addWebApi(new PcsWebApi("/eis/goodsLotSyncResources", "POST"));
+
+		PcsOperation operation16_2_edit = new PcsOperation("P0698", "产品批次关联编辑", "P0698", "acl_edit_goodsLotSyncResource");
+		operation16_2_edit.addWebApi(new PcsWebApi("/eis/goodsLotSyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_2_delete = new PcsOperation("P0699", "产品批次关联删除", "P0699", "acl_delete_goodsLotSyncResource");
+		operation16_2_delete.addWebApi(new PcsWebApi("/eis/goodsLotSyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		PcsOperation operation16_2_sync = new PcsOperation("P0732", "产品批次关联同步", "P0732", "acl_sync_goodsLot");
+		operation16_2_sync.addWebApi(new PcsWebApi("/yard/syncTaskMsgs", "POST"));
+
+		function16_2.getOperations().add(operation16_2_view);
+		function16_2.getOperations().add(operation16_2_add);
+		function16_2.getOperations().add(operation16_2_edit);
+		function16_2.getOperations().add(operation16_2_delete);
+		function16_2.getOperations().add(operation16_2_sync);
+
+
+		PcsFunction function16_3 = new PcsFunction("F0086", "字典数据关联");
+		menu16_3.getFunctions().add(function16_3);
+
+		PcsOperation operation16_3_view = new PcsOperation("P0700", "字典数据关联查看", "P0700", "acl_view_workbookSyncResource");
+		operation16_3_view.addWebApi(new PcsWebApi("/eis/workbookSyncResources", "GET"));
+
+		PcsOperation operation16_3_add = new PcsOperation("P0701", "字典数据关联新增", "P0701", "acl_add_workbookSyncResource");
+		operation16_3_add.addWebApi(new PcsWebApi("/eis/workbookSyncResources", "POST"));
+
+		PcsOperation operation16_3_edit = new PcsOperation("P0702", "字典数据关联编辑", "P0702", "acl_edit_workbookSyncResource");
+		operation16_3_edit.addWebApi(new PcsWebApi("/eis/workbookSyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_3_delete = new PcsOperation("P0703", "字典数据关联删除", "P0703", "acl_delete_workbookSyncResource");
+		operation16_3_delete.addWebApi(new PcsWebApi("/eis/workbookSyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		PcsOperation operation16_3_sync = new PcsOperation("P0733", "字典数据关联同步", "P0733", "acl_sync_workbook");
+		operation16_3_sync.addWebApi(new PcsWebApi("/yard/syncTaskMsgs", "POST"));
+
+		function16_3.getOperations().add(operation16_3_view);
+		function16_3.getOperations().add(operation16_3_add);
+		function16_3.getOperations().add(operation16_3_edit);
+		function16_3.getOperations().add(operation16_3_delete);
+		function16_3.getOperations().add(operation16_3_sync);
+
+
+		PcsFunction function16_4 = new PcsFunction("F0087", "库房收货关联");
+		menu16_4.getFunctions().add(function16_4);
+
+		PcsOperation operation16_4_view = new PcsOperation("P0704", "库房收货关联查看", "P0704", "acl_view_receiveSyncResource");
+		operation16_4_view.addWebApi(new PcsWebApi("/eis/receiveSyncResources", "GET"));
+
+		PcsOperation operation16_4_add = new PcsOperation("P0705", "库房收货关联新增", "P0705", "acl_add_receiveSyncResource");
+		operation16_4_add.addWebApi(new PcsWebApi("/eis/receiveSyncResources", "POST"));
+
+		PcsOperation operation16_4_edit = new PcsOperation("P0706", "库房收货关联编辑", "P0706", "acl_edit_receiveSyncResource");
+		operation16_4_edit.addWebApi(new PcsWebApi("/eis/receiveSyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_4_delete = new PcsOperation("P0707", "库房收货关联删除", "P0707", "acl_delete_receiveSyncResource");
+		operation16_4_delete.addWebApi(new PcsWebApi("/eis/receiveSyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		PcsOperation operation16_4_sync = new PcsOperation("P0735", "库房收货关联同步", "P0735", "acl_sync_receive");
+		operation16_4_sync.addWebApi(new PcsWebApi("/yard/syncTaskMsgs", "POST"));
+
+		function16_4.getOperations().add(operation16_4_view);
+		function16_4.getOperations().add(operation16_4_add);
+		function16_4.getOperations().add(operation16_4_edit);
+		function16_4.getOperations().add(operation16_4_delete);
+		function16_4.getOperations().add(operation16_4_sync);
+
+
+		PcsFunction function16_5 = new PcsFunction("F0088", "仓库调拨关联");
+		menu16_5.getFunctions().add(function16_5);
+
+		PcsOperation operation16_5_view = new PcsOperation("P0708", "仓库调拨关联查看", "P0708", "acl_view_applySyncResource");
+		operation16_5_view.addWebApi(new PcsWebApi("/eis/applySyncResources", "GET"));
+
+		PcsOperation operation16_5_add = new PcsOperation("P0709", "仓库调拨关联新增", "P0709", "acl_add_applySyncResource");
+		operation16_5_add.addWebApi(new PcsWebApi("/eis/applySyncResources", "POST"));
+
+		PcsOperation operation16_5_edit = new PcsOperation("P0710", "仓库调拨关联编辑", "P0710", "acl_edit_applySyncResource");
+		operation16_5_edit.addWebApi(new PcsWebApi("/eis/applySyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_5_delete = new PcsOperation("P0711", "仓库调拨关联删除", "P0711", "acl_delete_applySyncResource");
+		operation16_5_delete.addWebApi(new PcsWebApi("/eis/applySyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		PcsOperation operation16_5_sync = new PcsOperation("P0736", "仓库调拨关联同步", "P0736", "acl_sync_apply");
+		operation16_5_sync.addWebApi(new PcsWebApi("/yard/syncTaskMsgs", "POST"));
+
+		function16_5.getOperations().add(operation16_5_view);
+		function16_5.getOperations().add(operation16_5_add);
+		function16_5.getOperations().add(operation16_5_edit);
+		function16_5.getOperations().add(operation16_5_delete);
+		function16_5.getOperations().add(operation16_5_sync);
+
+
+		PcsFunction function16_7 = new PcsFunction("F0090", "使用类型关联");
+		menu16_7.getFunctions().add(function16_7);
+
+		PcsOperation operation16_7_view = new PcsOperation("P0716", "使用类型关联查看", "P0716", "acl_view_usedTypeSyncResource");
+		operation16_7_view.addWebApi(new PcsWebApi("/eis/usedTypeSyncResources", "GET"));
+
+		PcsOperation operation16_7_add = new PcsOperation("P0717", "使用类型关联新增", "P0717", "acl_add_usedTypeSyncResource");
+		operation16_7_add.addWebApi(new PcsWebApi("/eis/usedTypeSyncResources", "POST"));
+
+		PcsOperation operation16_7_edit = new PcsOperation("P0718", "使用类型关联编辑", "P0718", "acl_edit_usedTypeSyncResource");
+		operation16_7_edit.addWebApi(new PcsWebApi("/eis/usedTypeSyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_7_delete = new PcsOperation("P0719", "使用类型关联删除", "P0719", "acl_delete_usedTypeSyncResource");
+		operation16_7_delete.addWebApi(new PcsWebApi("/eis/usedTypeSyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		PcsOperation operation16_7_sync = new PcsOperation("P0738", "使用类型关联同步", "P0738", "acl_sync_usedType");
+		operation16_7_sync.addWebApi(new PcsWebApi("/yard/syncTaskMsgs", "POST"));
+
+		function16_7.getOperations().add(operation16_7_view);
+		function16_7.getOperations().add(operation16_7_add);
+		function16_7.getOperations().add(operation16_7_edit);
+		function16_7.getOperations().add(operation16_7_delete);
+		function16_7.getOperations().add(operation16_7_sync);
+
+
+		PcsFunction function16_8 = new PcsFunction("F0091", "供应机构关联");
+		menu16_8.getFunctions().add(function16_8);
+
+		PcsOperation operation16_8_view = new PcsOperation("P0720", "供应机构关联查看", "P0720", "acl_view_supplierSyncResource");
+		operation16_8_view.addWebApi(new PcsWebApi("/eis/supplierSyncResources", "GET"));
+
+		PcsOperation operation16_8_add = new PcsOperation("P0721", "供应机构关联新增", "P0721", "acl_add_supplierSyncResource");
+		operation16_8_add.addWebApi(new PcsWebApi("/eis/supplierSyncResources", "POST"));
+
+		PcsOperation operation16_8_edit = new PcsOperation("P0722", "供应机构关联编辑", "P0722", "acl_edit_supplierSyncResource");
+		operation16_8_edit.addWebApi(new PcsWebApi("/eis/supplierSyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_8_delete = new PcsOperation("P0723", "供应机构关联删除", "P0723", "acl_delete_supplierSyncResource");
+		operation16_8_delete.addWebApi(new PcsWebApi("/eis/supplierSyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		PcsOperation operation16_8_sync = new PcsOperation("P0739", "供应机构关联同步", "P0739", "acl_sync_supplier");
+		operation16_8_sync.addWebApi(new PcsWebApi("/yard/syncTaskMsgs", "POST"));
+
+		function16_8.getOperations().add(operation16_8_view);
+		function16_8.getOperations().add(operation16_8_add);
+		function16_8.getOperations().add(operation16_8_edit);
+		function16_8.getOperations().add(operation16_8_delete);
+		function16_8.getOperations().add(operation16_8_sync);
+
+
+		PcsFunction function16_9 = new PcsFunction("F0092", "部门数据关联");
+		menu16_9.getFunctions().add(function16_9);
+
+		PcsOperation operation16_9_view = new PcsOperation("P0724", "部门数据关联查看", "P0724", "acl_view_deptSyncResource");
+		operation16_9_view.addWebApi(new PcsWebApi("/eis/deptSyncResources", "GET"));
+
+		PcsOperation operation16_9_add = new PcsOperation("P0725", "部门数据关联新增", "P0725", "acl_add_deptSyncResource");
+		operation16_9_add.addWebApi(new PcsWebApi("/eis/deptSyncResources", "POST"));
+
+		PcsOperation operation16_9_edit = new PcsOperation("P0726", "部门数据关联编辑", "P0726", "acl_edit_deptSyncResource");
+		operation16_9_edit.addWebApi(new PcsWebApi("/eis/deptSyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_9_delete = new PcsOperation("P0727", "部门数据关联删除", "P0727", "acl_delete_deptSyncResource");
+		operation16_9_delete.addWebApi(new PcsWebApi("/eis/deptSyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		function16_9.getOperations().add(operation16_9_view);
+		function16_9.getOperations().add(operation16_9_add);
+		function16_9.getOperations().add(operation16_9_edit);
+		function16_9.getOperations().add(operation16_9_delete);
+
+
+		PcsFunction function16_10 = new PcsFunction("F0093", "仓库数据关联");
+		menu16_10.getFunctions().add(function16_10);
+
+		PcsOperation operation16_10_view = new PcsOperation("P0728", "仓库数据关联查看", "P0728", "acl_view_depotSyncResource");
+		operation16_10_view.addWebApi(new PcsWebApi("/eis/depotSyncResources", "GET"));
+
+		PcsOperation operation16_10_add = new PcsOperation("P0729", "仓库数据关联新增", "P0729", "acl_add_depotSyncResource");
+		operation16_10_add.addWebApi(new PcsWebApi("/eis/depotSyncResources", "POST"));
+
+		PcsOperation operation16_10_edit = new PcsOperation("P0730", "仓库数据关联编辑", "P0730", "acl_edit_depotSyncResource");
+		operation16_10_edit.addWebApi(new PcsWebApi("/eis/depotSyncResources/id,{id}", "PUT"));
+
+		PcsOperation operation16_10_delete = new PcsOperation("P0731", "仓库数据关联删除", "P0731", "acl_delete_depotSyncResource");
+		operation16_10_delete.addWebApi(new PcsWebApi("/eis/depotSyncResources/spdResourceId,{spdResourceId}", "DELETE"));
+
+		function16_10.getOperations().add(operation16_10_view);
+		function16_10.getOperations().add(operation16_10_add);
+		function16_10.getOperations().add(operation16_10_edit);
+		function16_10.getOperations().add(operation16_10_delete);
+
+
+		PcsFunction function16_11 = new PcsFunction("F0094", "数据同步报告");
+		menu16_11.getFunctions().add(function16_11);
+
+		PcsOperation operation16_11_view = new PcsOperation("P0741", "数据同步报告查看", "P0741", "acl_view_syncReport");
+		operation16_11_view.addWebApi(new PcsWebApi("/eis/syncReports", "GET"));
+		operation16_11_view.addWebApi(new PcsWebApi("/eis/syncReports/count", "GET"));
+		operation16_11_view.addWebApi(new PcsWebApi("/eis/syncReports/{id}", "GET"));
+
+		PcsOperation operation16_11_delete = new PcsOperation("P0742", "数据同步报告删除", "P0742", "acl_delete_syncReport");
+		operation16_11_delete.addWebApi(new PcsWebApi("/eis/syncReports/{id}", "DELETE"));
+
+		function16_11.getOperations().add(operation16_11_view);
+		function16_11.getOperations().add(operation16_11_delete);
+		
+		return menus;
+	}
+}

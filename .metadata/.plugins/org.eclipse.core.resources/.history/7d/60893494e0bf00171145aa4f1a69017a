@@ -1,0 +1,107 @@
+package cn.ak4j.yard.sys.domain;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.entity.IEntity;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.utils.MD5Util;
+import cn.ak4j.yard.enums.YardBatchTaskStatus;
+import cn.ak4j.yard.enums.YardBatchTaskType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.repository.YardBatchTaskRepository;
+import cn.ak4j.yard.sys.params.YardBatchTaskParams;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name="SYS_BATCH_TASK")
+@JsonIgnoreProperties(ignoreUnknown=true)
+public class YardBatchTask<T> implements IEntity{
+
+	private static final long serialVersionUID = -5039351823289079365L;
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Column(name="id")
+	@Getter @Setter
+	private String id;
+	
+	@Getter @Setter
+	private String taskType;
+	
+	@Getter
+	private String json;
+	
+	@Getter @Setter
+	private String checksum;
+	
+	@Transient @JsonIgnore @Getter @Setter
+	private T data;
+	
+	@Getter @Setter
+	private String taskStatus = YardBatchTaskStatus.task_status_created.getCode();
+	
+	@Getter @Setter
+	private String notifyUrl;
+	
+	@Getter @Setter
+	private String creatorId;
+	
+	@Getter @Setter
+	private Date createTime = new Date();
+	
+	public YardBatchTask(){}
+	
+	public YardBatchTask(YardBatchTaskType taskType, T data, String json, String notifyUrl){
+		setTaskType(taskType.getCode());
+		setData(data);
+		setJson(json);
+		setNotifyUrl(notifyUrl);
+	}
+	
+	public void verifyChecksum(YardBatchTaskRepository batchTaskRepository){
+		YardBatchTaskParams params = new YardBatchTaskParams();
+		params.setChecksum(new ListParam<String>(getChecksum()));
+//		String[] statuses = new String[]{YardBatchTaskStatus.task_status_created.getCode(), 
+//										 YardBatchTaskStatus.task_status_processing.getCode(), 
+//										 YardBatchTaskStatus.task_status_success.getCode()};
+//		params.setTaskStatus(new ListParam<String>(statuses));
+		YardBatchTasks taskPOs = batchTaskRepository.find(params, new OrderParam(), -1, -1);
+		if(CollectionUtils.isNotEmpty(taskPOs)){
+			throw new InvalidDataException(YardExceptionType.invalid_batch_task_exist, taskPOs.get(0).getId());
+		}
+	}
+	
+	public void complete(boolean success){
+		setTaskStatus(success?YardBatchTaskStatus.task_status_success.getCode():YardBatchTaskStatus.task_status_failure.getCode());
+	}
+	
+	
+	public void setJson(String data) {
+		this.json = data;
+		this.checksum = MD5Util.md5(data);
+	}
+
+	public String toString() {
+		return "YardBatchTask [id=" + id + ", taskType=" + taskType + ", data=" + json + ", taskStatus=" + taskStatus
+				+ ", notifyUrl=" + notifyUrl + ", creatorId=" + creatorId + ", createTime=" + createTime + "]";
+	}
+	
+}

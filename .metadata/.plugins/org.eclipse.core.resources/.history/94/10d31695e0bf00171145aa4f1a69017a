@@ -1,0 +1,160 @@
+package cn.ak4j.yard.spd.bizplan.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.persistence.Embedded;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.GenericGenerator;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.exception.common.OperateFailException;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.domain.YardMaintenceEntity;
+import cn.ak4j.yard.enums.YardChannelType;
+import cn.ak4j.yard.enums.YardExceptionType;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizStep;
+import cn.ak4j.yard.spd.bizplan.domain.bizstep.SpdBizSteps;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRule;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAbstractBizRules;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+* @Description: 业务计划抽象父类
+* @author zhengyf
+* @date 2017年8月12日 下午2:30:30
+* @version V1.0.0
+*/
+
+@JsonIgnoreProperties(ignoreUnknown=true)
+@SuppressWarnings({"serial", "rawtypes"})
+@MappedSuperclass
+public abstract class SpdBizPlan<R extends SpdAbstractBizRule> extends YardMaintenceEntity {
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.AUTO, generator = "uuidGenerator")
+	@GenericGenerator(name="uuidGenerator", strategy="uuid")
+	@Getter @Setter
+	private String bizId;
+	
+	@Getter @Setter//状态编码
+	private String bizStatusCode;
+	
+	@Getter @Setter//业务编码
+	private String bizCode;
+	
+	//业务规则
+	@NotNull(message="业务规则不能为空") @Getter @Setter
+	private String bizRuleId;
+	
+	@Transient @JsonIgnore @Getter
+	private R bizRule;
+	
+	@Transient @Getter @Setter
+	private SpdBizLogs logs;
+	
+	@Embedded @NotNull(message="maintenanceInfo不能为空")
+	@Getter @Setter
+	private MaintenanceInfo maintenanceInfo;
+	
+	@NotNull(message="渠道类型不能为空") @Getter @Setter
+	private String channelTypeCode = YardChannelType.spd_web.getCode();
+	
+	@Getter @Setter
+	private String remark;
+	
+	@Getter @Setter
+	private Integer checkStateCode = CheckState.new_created.getCode();
+
+	@JsonIgnore public SpdBizSteps getBizSteps() {
+		return Constant.all_biz_steps.get(getBizType());
+	}
+
+	public SpdBizStep getCurrentBizStep() {
+		return getBizSteps().stepOf(getBizStatusCode());
+	}
+	
+	@Transient @JsonIgnore
+	public YardChannelType getChannelType(){
+		return YardChannelType.typeOf(getChannelTypeCode());
+	}
+	
+	public abstract SpdBizType getBizType();
+	
+	public abstract void applyRule(R rule, PcsUser user) ;
+	
+	@SuppressWarnings("unchecked")
+	public void autoFillBizRule(SpdAbstractBizRules rules) {
+		R rule = (R)rules.getTopPriorRule(getBizType());
+		if(rule == null){
+			throw new OperateFailException(YardExceptionType.not_found_default_biz_rule, getBizType().getName());
+		}
+		setBizRule(rule);
+	}
+	
+	public void setBizRule(R bizRule){
+		this.bizRule = bizRule;
+		if(bizRule != null){
+			this.bizRuleId = bizRule.getId();
+		}
+	}
+	
+	/**
+	 * 不能直接编辑业务事务状态
+	 */
+	public void update(SpdGoodsBizPlan biz, String userOrgId, String userId){
+		String bizStatusCode = this.getBizStatusCode();
+		super.update(biz, userOrgId, userId);
+		this.setBizStatusCode(bizStatusCode);
+	}
+	
+	/**
+	 * 判断业务是否完成
+	 */
+	public boolean isCompleted(){
+		SpdBizStep currentStatus = getCurrentBizStep();
+		if(currentStatus == null){
+			return false;
+		}
+		SpdBizStep lastStatus = null;
+		for(SpdBizStep status: getBizSteps()){
+			if(lastStatus == null){
+				lastStatus = status;
+			}else{
+				if(lastStatus.getIndex() < status.getIndex()){
+					lastStatus = status;
+				}
+			}
+		}
+		return currentStatus.getIndex().intValue() == lastStatus.getIndex().intValue();
+	}
+		
+	@Transient @JsonIgnore
+	public List<String> getPlanSteps() {
+		List<String> steps = new ArrayList<String>();
+		for(int i = 1; i <= getBizSteps().size(); i++){
+			steps.add(getBizSteps().get(i-1).getAction());
+		}
+		return steps;
+	}
+	
+	@Transient @JsonIgnore
+	public SpdBizStep getNextStep() {
+		SpdBizStep nextStep = CollectionUtils.findWhere("index", getCurrentBizStep().getIndex()+1, Integer.class, getBizSteps());
+		return nextStep;
+	}
+}

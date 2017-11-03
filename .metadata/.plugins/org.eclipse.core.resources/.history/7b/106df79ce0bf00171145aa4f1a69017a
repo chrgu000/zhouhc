@@ -1,0 +1,2 @@
+update spd_prepare_inform_rule set excess_delivery ='0';
+update spd_prepare_inform_rule set multi_delivery ='0';

@@ -1,0 +1,100 @@
+package cn.ak4j.yard.configuration;
+
+import org.springframework.amqp.core.AcknowledgeMode;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import cn.ak4j.yard.amqp.LedgerAMQPMsgListener;
+import cn.ak4j.yard.amqp.SpdAMQPMsgListener;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Configuration
+public class RabbitMQConfiguration {
+
+	private String batchTaskQueueName = "batch_task";
+	private String spdBizQueueName = "spd_biz_queue";
+	private String settlementBizQueueName = "settlement_biz_queue";
+	
+	@Value("${ak.spdRabbitMQAddress}") private String rabbitMQAddress;
+	@Value("${ak.spdRabbitMQUserName}") private String rabbitMQUserName;
+	@Value("${ak.spdRabbitMQPassword}") private String rabbitMQPassword;
+	@Value("${ak.spdRabbitMQVirtualHost}") private String rabbitMQVirtualHost;
+	
+	
+	@Bean(name="yardConnectionFactory")
+	ConnectionFactory spdConnectionFactory(){
+		CachingConnectionFactory cf = new CachingConnectionFactory();
+		cf.setAddresses(rabbitMQAddress);
+		cf.setUsername(rabbitMQUserName);
+		cf.setPassword(rabbitMQPassword);
+		cf.setVirtualHost(rabbitMQVirtualHost);
+		cf.setRequestedHeartBeat(2);
+		cf.setPublisherConfirms(true);
+		return cf;
+	}
+	
+	@Bean(name="yardRabbitTemplate")
+	RabbitTemplate yardRabbitTemplate(@Qualifier("yardConnectionFactory")ConnectionFactory connectionFactory){
+		return new RabbitTemplate(connectionFactory);
+	}
+	
+	@Bean(name="yardRabbitAdmin")
+    public RabbitAdmin rabbitAdmin(@Qualifier("yardConnectionFactory")ConnectionFactory connectionFactory) {
+        return new RabbitAdmin(connectionFactory);
+    }
+
+	@Bean(name="spdAmqpMsgListener")
+	SpdAMQPMsgListener spdAmqpMsgListener(){
+		return new SpdAMQPMsgListener();
+	}
+	
+	@Bean
+	SimpleMessageListenerContainer spdMsgListenerContainer(@Qualifier("yardConnectionFactory")ConnectionFactory connectionFactory, 
+															  @Qualifier("spdAmqpMsgListener")Object amqpMsgListener){
+		SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
+		container.setConnectionFactory(connectionFactory);
+		container.setQueueNames(new String[]{batchTaskQueueName, spdBizQueueName});
+		container.setMessageListener(amqpMsgListener);
+		container.setAutoStartup(true);
+		container.setPrefetchCount(1);
+		//定义三个的处理消息的worker，相当于拥有三个并发处理消息的线程
+		container.setConcurrentConsumers(1);
+		//设置应答模式
+		container.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+		log.info("初始化主业务消息监听容器");
+		return container;
+	}
+	
+	@Bean(name="ledgerAmqpMsgListener")
+	LedgerAMQPMsgListener ledgerAmqpMsgListener(){
+		return new LedgerAMQPMsgListener();
+	}
+	
+	@Bean
+	SimpleMessageListenerContainer ledgerMsgListenerContainer(@Qualifier("yardConnectionFactory")ConnectionFactory connectionFactory, 
+															  @Qualifier("ledgerAmqpMsgListener")Object amqpMsgListener){
+		SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
+		container.setConnectionFactory(connectionFactory);
+		container.setQueueNames(new String[]{settlementBizQueueName});
+		container.setMessageListener(amqpMsgListener);
+		container.setAutoStartup(true);
+		container.setPrefetchCount(1);
+		//定义三个的处理消息的worker，相当于拥有三个并发处理消息的线程
+		container.setConcurrentConsumers(1);
+		//设置应答模式
+		container.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+		log.info("初始化账务消息监听容器");
+		return container;
+	}
+	
+}
+
+

@@ -1,0 +1,4 @@
+update yds_goods set unit_big_name='套' where goods_id ='ff8080815d54f613015d54fa79c600fd';
+update yds_goods set unit_mid_name='套' where goods_id ='ff8080815d54f613015d54fa79c600fd';
+update yds_goods set unit_min_name='套' where goods_id ='ff8080815d54f613015d54fa79c600fd';
+update yds_goods set unit_base_name='套' where goods_id ='ff8080815d54f613015d54fa79c600fd';

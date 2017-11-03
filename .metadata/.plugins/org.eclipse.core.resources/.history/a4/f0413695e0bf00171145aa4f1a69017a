@@ -1,0 +1,69 @@
+package cn.ak4j.yard.pcs.repository;
+
+import java.util.List;
+
+import javax.persistence.EntityManager;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Repository;
+
+import cn.ak4j.entity.query.param.OrderParam;
+import cn.ak4j.entity.repository.BaseRepository;
+import cn.ak4j.yard.domain.Constant;
+import cn.ak4j.yard.pcs.domain.PcsDept;
+import cn.ak4j.yard.pcs.domain.PcsDepts;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.domain.PcsUsers;
+import cn.ak4j.yard.pcs.params.PcsDepotParams;
+import cn.ak4j.yard.pcs.params.PcsDeptParams;
+import lombok.Getter;
+
+@Repository
+public class PcsDeptRepository extends BaseRepository<PcsDept, PcsDepts, PcsDeptParams, String>{
+	
+	@Autowired @Getter private EntityManager entityManager;
+	@Autowired PcsOrgRepository orgRepository;
+	@Autowired PcsUserRepository userRepository;
+	
+	@Cacheable(value="longTimeCache", key="\"allPcsDeptsWithRelations\"")
+	public PcsDepts findAllWithRelations(){
+		PcsDepts allDepts = getAll();
+		PcsOrgs orgs = orgRepository.findAll();
+		PcsUsers users = userRepository.findAll();
+		allDepts.fillOrg(orgs);
+		allDepts.fillDefaultUser(users);
+		return allDepts;
+	}
+	
+	@Cacheable(value="longTimeCache", key="\"allPcsDepts\"")
+	public PcsDepts findAll(){
+		return getAll();
+	}
+	
+	@Deprecated
+	public PcsDepts find(PcsDepotParams params, OrderParam order, int pageNo, int pageSize){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	};
+	
+	@Deprecated
+	public PcsDepts find(PcsDeptParams params) {
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public PcsDepts findByIds(List<String> ids){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public PcsDept findOne(String deptId){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+	@Deprecated
+	public int count(PcsDeptParams params){
+		throw new UnsupportedOperationException(Constant.repository_method_not_support_msg);
+	}
+	
+}

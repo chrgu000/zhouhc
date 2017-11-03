@@ -1,0 +1,389 @@
+package cn.ak4j.yard.sys.web;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.io.File;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.commons.io.FileUtils;
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import cn.ak4j.Global;
+import cn.ak4j.entity.query.param.ListParam;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.enums.YardDataType;
+import cn.ak4j.yard.pcs.domain.PcsOrg;
+import cn.ak4j.yard.pcs.domain.PcsOrgs;
+import cn.ak4j.yard.pcs.params.PcsOrgParams;
+import cn.ak4j.yard.repository.YardBatchTaskRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdAdjustStockBiz;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.params.SpdAdjustStockBizParams;
+import cn.ak4j.yard.spd.bizplan.repository.SpdAdjustStockBizRepository;
+import cn.ak4j.yard.spd.bizplan.repository.SpdBizItemRepository;
+import cn.ak4j.yard.spd.bizrule.domain.SpdAdjustStockRule;
+import cn.ak4j.yard.spd.bizrule.repository.SpdBizRuleRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationBizs;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItem;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdFinacialReconciliationItems;
+import cn.ak4j.yard.spd.reconciliation.params.SpdFinacialReconciliationBizParams;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationBizRepository;
+import cn.ak4j.yard.spd.reconciliation.repository.SpdFinacialReconciliationItemRepository;
+import cn.ak4j.yard.sys.domain.YardBatchTask;
+import cn.ak4j.yard.sys.domain.YardBatchTasks;
+import cn.ak4j.yard.sys.to.InitialEndingImportTO;
+import cn.ak4j.yard.sys.to.InitialStockImportTO;
+import cn.ak4j.yard.sys.to.SpdDepotCardImportTO;
+import cn.ak4j.yard.sys.to.SpdPrepareInformItemImportTO;
+import cn.ak4j.yard.sys.to.YdsEdsGoodsLotImportTO;
+import cn.ak4j.yard.sys.to.YdsGoodsLotImportTO;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsGoodss;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsEdsGoodsParams;
+import cn.ak4j.yard.yds.params.YdsGoodsLotParams;
+import cn.ak4j.yard.yds.params.YdsGoodsParams;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class YardBatchImportResourceTest extends BaseTest{
+
+	@Autowired private YardBatchTaskRepository btRepository;
+	@Autowired private SpdBizRuleRepository brRepository;
+	@Autowired private SpdAdjustStockBizRepository asbRepository;
+	@Autowired private SpdBizItemRepository biRepository;
+	@Autowired private SpdFinacialReconciliationBizRepository frbRepository;
+	@Autowired private SpdFinacialReconciliationItemRepository frbiRepository;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	
+	@Before
+	public void setUp() throws Exception{
+		File sqlDir = new File(BaseTest.class.getResource("/data/").toURI());
+		
+		Iterator<File> files = FileUtils.iterateFiles(sqlDir, new String[]{"json"}, false);
+		btRepository.deleteAll();
+		YardBatchTasks tasks = null;
+		while(files.hasNext()){
+			File jsonFile = files.next();
+			if(jsonFile.getName().equals("sys_batch_task.json")){
+				String json = FileUtils.readFileToString(jsonFile);
+				tasks = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTasks>() {});
+				
+				btRepository.saveAll(tasks);
+			}
+		}
+	}
+	
+	@Test public void testUploadBatchTaskFile() throws Exception{
+		String url = getUrlTemplate("/sys/batchImportDataTasks?accessToken={accessToken}");
+		testUploadDepotCardFile(url);
+		testUploadGoodsLotFile(url);
+		testUploadEdsGoodsLotFile(url);
+		testUploadInitialStockFile(url);
+	}
+	
+	@Test public void testDownloadExcelTemplate() throws Exception{
+		String accessToken = getAccessToken(testUserCode);
+		String url = getUrlTemplate("/sys/dataImporterTemplates/{dataType}?accessToken={accessToken}");
+		
+		String dataType = YardDataType.depot_card.getCode();
+		byte[] bytes = mockMvc.perform(get(url, dataType, accessToken))
+			.andExpect(status().isOk())
+			.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", dataType)))
+			.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"))
+			.andReturn().getResponse().getContentAsByteArray();
+		assertTrue(bytes.length > 1024);
+		
+		dataType = YardDataType.goods_lot.getCode();
+		bytes = mockMvc.perform(get(url, dataType, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", dataType)))
+				.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"))
+				.andReturn().getResponse().getContentAsByteArray();
+		assertTrue(bytes.length > 1024);
+		
+		dataType = YardDataType.eds_goods_lot.getCode();
+		bytes = mockMvc.perform(get(url, dataType, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", dataType)))
+				.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"))
+				.andReturn().getResponse().getContentAsByteArray();
+		assertTrue(bytes.length > 1024);
+		
+		dataType = YardDataType.initial_stock.getCode();
+		bytes = mockMvc.perform(get(url, dataType, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", dataType)))
+				.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"))
+				.andReturn().getResponse().getContentAsByteArray();
+		assertTrue(bytes.length > 1024);
+		
+		dataType = YardDataType.initial_ending.getCode();
+		bytes = mockMvc.perform(get(url, dataType, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", dataType)))
+				.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"))
+				.andReturn().getResponse().getContentAsByteArray();
+		assertTrue(bytes.length > 1024);
+		
+		dataType = YardDataType.prepare_inform_item.getCode();
+		bytes = mockMvc.perform(get(url, dataType, accessToken))
+				.andExpect(status().isOk())
+				.andExpect(header().string("Content-disposition", String.format("attachment;filename=%s.xls", dataType)))
+				.andExpect(content().contentTypeCompatibleWith("application/vnd.ms-excel"))
+				.andReturn().getResponse().getContentAsByteArray();
+		assertTrue(bytes.length > 1024);
+	}
+	
+	private void testUploadDepotCardFile(String url) throws Exception{
+		Resource resource = new ClassPathResource("/files/depot_card.xls");
+	
+		String accessToken = getAccessToken(testUserCode);
+		MockMultipartFile fstmp = new MockMultipartFile("file", resource.getFilename(), "multipart/form-data", resource.getInputStream());
+		String json = mockMvc.perform(MockMvcRequestBuilders.fileUpload(url, accessToken)
+									.file(fstmp)
+									.param("dataType", YardDataType.depot_card.getCode()))
+								.andExpect(status().isOk())
+								.andReturn().getResponse().getContentAsString();
+		
+		YardBatchTask<List<SpdDepotCardImportTO>> task = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTask<List<SpdDepotCardImportTO>>>() {});
+		assertNotNull(task);
+		assertNotNull(task.getId());
+		wait(8);
+		
+		String[] goodsCodes = new String[]{"gc_170418001", "gc_170418003", "gc_170418004", "gc_170418006", "gc_170418008", "gc_170418009", "gc_170418010", "gc_170418011", "gc_170418012", "gc_170418013"};
+		
+		SpdDepotCards allDepotCards = mockMvcHelper.findList(SpdDepotCards.class, testUserCode, null);
+		SpdDepotCards depotCards = new SpdDepotCards(CollectionUtils.find("depotId", "depot_id_005", allDepotCards));
+		YdsGoodss goodss = mockMvcHelper.findList(YdsGoodss.class, testUserCode, null);
+		depotCards.fillGoodss(goodss);
+		
+		for(String goodsCode : goodsCodes){
+			SpdDepotCard theDepotCard = null;
+			for(SpdDepotCard depotCard : depotCards){
+				if(depotCard.getGoods().getGoodsCode().equals(goodsCode)){
+					theDepotCard = depotCard;
+					break;
+				}
+			}
+			assertNotNull(theDepotCard);
+		}
+	}
+	
+	private void testUploadGoodsLotFile(String url) throws Exception {
+		Resource resource = new ClassPathResource("/files/goods_lot.xls");
+		
+		String accessToken = getAccessToken(testUserCode);
+		MockMultipartFile fstmp = new MockMultipartFile("file", resource.getFilename(), "multipart/form-data", resource.getInputStream());
+		String json = mockMvc.perform(MockMvcRequestBuilders.fileUpload(url, accessToken)
+									.file(fstmp)
+									.param("dataType", YardDataType.goods_lot.getCode()))
+								.andExpect(status().isOk())
+								.andReturn().getResponse().getContentAsString();
+		
+		YardBatchTask<List<YdsGoodsLotImportTO>> task = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTask<List<YdsGoodsLotImportTO>>>() {});
+		assertNotNull(task);
+		assertNotNull(task.getId());
+		wait(8);
+		
+		String[] goodsCodes = new String[]{"gc_170307002", "gc_170320109", "gc_170320030", "gc_170418002", "gc_170320054", "gc_170418007", "gc_170418008", "gc_170418009",
+											"gc_170418010", "gc_170418011", "gc_170418001", "gc_170418005", "gc_170515003", "gc_0515009"};
+		String[] lotNos = new String[]{"ln_0001", "ln_0002", "ln_0003", "ln_0004", "ln_0005", "ln_0006", "ln_0007", "ln_0008",
+										"ln_0009", "ln_0010", "ln_0011", "ln_0011", "ln_0012", "ln_0013"};
+		
+		YdsGoodsParams goodsParams = new YdsGoodsParams();
+		goodsParams.setGoodsCode(new ListParam<String>(goodsCodes));
+		YdsGoodss goodss = mockMvcHelper.findList(YdsGoodss.class, testUserCode, goodsParams);
+		
+		YdsGoodsLotParams glParams = new YdsGoodsLotParams();
+		glParams.setLotNo(new ListParam<String>(lotNos));
+		YdsGoodsLots goodsLots = mockMvcHelper.findList(YdsGoodsLots.class, testUserCode, glParams);
+		
+		List<String> goodsIds = CollectionUtils.pluck("goodsId", goodss);
+		goodsLots = goodsLots.findByGoodsIds(goodsIds);
+		
+		for(String goodsId : goodsIds){
+			YdsGoodsLot theGoodsLot = null;
+			for(String lotNo : lotNos){
+				theGoodsLot = goodsLots.findByGoodsLotNoAndGoodsId(lotNo, goodsId);
+				if(theGoodsLot != null){
+					break;
+				}
+			}
+			assertNotNull(theGoodsLot);
+		}
+		
+	}
+
+	private void testUploadEdsGoodsLotFile(String url) throws Exception {
+		Resource resource = new ClassPathResource("/files/eds_goods_lot.xls");
+		
+		String accessToken = getAccessToken(testUserCode);
+		MockMultipartFile fstmp = new MockMultipartFile("file", resource.getFilename(), "multipart/form-data", resource.getInputStream());
+		String json = mockMvc.perform(MockMvcRequestBuilders.fileUpload(url, accessToken)
+									.file(fstmp)
+									.param("dataType", YardDataType.eds_goods_lot.getCode()))
+								.andExpect(status().isOk())
+								.andReturn().getResponse().getContentAsString();
+		
+		YardBatchTask<List<YdsEdsGoodsLotImportTO>> task = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTask<List<YdsEdsGoodsLotImportTO>>>() {});
+		assertNotNull(task);
+		assertNotNull(task.getId());
+		wait(8);
+		
+		String[] edsGoodsCodes = new String[]{"zsy_1701023", "zsy_1701024", "zsy_1701025", "zsy_1701026", "zsy_1701031", "zsy_1701027", "zsy_1701029", "zsy_1701030",
+											"yj_1901042", "yj_1901043"};
+		String[] edsLotNos = new String[]{"zsy_000001", "zsy_000002", "zsy_000003", "zsy_000004", "zsy_000005", "zsy_000006", "zsy_000007", "zsy_000007",
+										"yj_000008", "yj_000009"};
+		
+		String[] ownerOrgCodes = new String[]{"orgcodezsy001", "gdyjyy001"};
+		
+		YdsEdsGoodsParams edsGoodsParams = new YdsEdsGoodsParams();
+		edsGoodsParams.setEdsGoodsCode(new ListParam<String>(edsGoodsCodes));
+		
+		YdsEdsGoodss edsGoodss = mockMvcHelper.findList(YdsEdsGoodss.class, testUserCode, edsGoodsParams);
+		
+		YdsEdsGoodsLotParams eglParams = new YdsEdsGoodsLotParams();
+		eglParams.setEdsLotNo(new ListParam<String>(edsLotNos));
+		YdsEdsGoodsLots edsGoodsLots = mockMvcHelper.findList(YdsEdsGoodsLots.class, testUserCode, eglParams);
+		
+		PcsOrgParams orgParams = new PcsOrgParams();
+		orgParams.setOrgCode(new ListParam<String>(ownerOrgCodes));
+		PcsOrgs ownerOrgs = mockMvcHelper.findList(PcsOrgs.class, testUserCode, orgParams); 
+		
+		List<String> edsGoodsIds = CollectionUtils.pluck("edsGoodsId", edsGoodss);
+		edsGoodsLots = edsGoodsLots.findByEdsGoodsIds(edsGoodsIds);
+		
+		for(String edsGoodsId : edsGoodsIds){
+			YdsEdsGoodsLot theEdsGoodsLot = null;
+			for(String ownerOrgCode : ownerOrgCodes){
+				PcsOrg ownerOrg = ownerOrgs.findByOrgCode(ownerOrgCode);
+				for(String edsLotNo : edsLotNos){
+					YdsEdsGoodsLots theEdsGoodsLots = edsGoodsLots.findByLotNoAndOrgIdAndEdsGoodsId(edsLotNo, ownerOrg.getOrgId(), edsGoodsId);
+					if(CollectionUtils.isNotEmpty(theEdsGoodsLots)){
+						theEdsGoodsLot = theEdsGoodsLots.get(0);
+						break;
+					}
+				}
+			}
+			assertNotNull(theEdsGoodsLot);
+		}
+		
+	}
+	
+	private void testUploadInitialStockFile(String url) throws Exception{
+		Resource resource = new ClassPathResource("/files/initial_stock.xls");
+		
+		String accessToken = getAccessToken(testUserCode);
+		MockMultipartFile fstmp = new MockMultipartFile("file", resource.getFilename(), "multipart/form-data", resource.getInputStream());
+		String json = mockMvc.perform(MockMvcRequestBuilders.fileUpload(url, accessToken)
+									.file(fstmp)
+									.param("dataType", YardDataType.initial_stock.getCode()))
+								.andExpect(status().isOk())
+								.andReturn().getResponse().getContentAsString();
+		
+		YardBatchTask<List<InitialStockImportTO>> task = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTask<List<InitialStockImportTO>>>() {});
+		assertNotNull(task);
+		assertNotNull(task.getId());
+		
+		wait(8);
+		
+		String depotId = "depot_id_001";
+		String[] goodsCodes = new String[]{"gc_170418015", "gc_170418003"};
+		YdsGoodss goodss = mockMvcHelper.findList(YdsGoodss.class, testUserCode, null); 
+		
+		SpdAdjustStockRule rule = brRepository.findAllWithRelations().getAllAdjustStockRules().getInitAdjustRule(depotId, PcsAreaType.normal.getCode());
+		
+		SpdAdjustStockBizParams params = new SpdAdjustStockBizParams();
+		params.setBizRuleId(new ListParam<String>(rule.getId()));
+		SpdAdjustStockBiz adjustStock = asbRepository.find(params).get(0);
+		SpdBizItems items = biRepository.findByBizId(adjustStock.getBizId());
+		
+		for(String goodsCode : goodsCodes){
+			YdsGoods goods = goodss.findByGoodsCode(goodsCode);
+			assertNotNull(goods);
+			SpdBizItem item = CollectionUtils.findWhere("goodsId", goods.getGoodsId(), items);
+			assertNotNull(item);
+		}
+	}
+
+	@Test public void testUploadInitialEndingFile() throws Exception{
+		String url = getUrlTemplate("/sys/batchImportDataTasks?accessToken={accessToken}");
+		Resource resource = new ClassPathResource("/files/initial_ending.xls");
+		
+		String accessToken = getAccessToken(testUserCode);
+		MockMultipartFile fstmp = new MockMultipartFile("file", resource.getFilename(), "multipart/form-data", resource.getInputStream());
+		String json = mockMvc.perform(MockMvcRequestBuilders.fileUpload(url, accessToken)
+									.file(fstmp)
+									.param("dataType", YardDataType.initial_ending.getCode()))
+								.andExpect(status().isOk())
+								.andReturn().getResponse().getContentAsString();
+		
+		YardBatchTask<List<InitialEndingImportTO>> task = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTask<List<InitialEndingImportTO>>>() {});
+		assertNotNull(task);
+		assertNotNull(task.getId());
+		
+		wait(8);
+		
+		String bizRuleId = "fin_rec_rule_id_02";
+		SpdFinacialReconciliationBizParams params = new SpdFinacialReconciliationBizParams();
+		params.setBizRuleId(new ListParam<String>(bizRuleId));
+		SpdFinacialReconciliationBizs reconciliations = frbRepository.find(params);
+		
+		assertTrue(reconciliations.size()>0);
+		
+		String[] goodsCodes = new String[]{"gc_170418001", "gc_170418003", "gc_170418006", "gc_170418010"};
+		YdsGoodss goodss = goodsRepository.findAll();
+		SpdFinacialReconciliationItems items = frbiRepository.findByReconciliationId(reconciliations.get(0).getBizId());
+		
+		for(String goodsCode : goodsCodes){
+			YdsGoods goods = goodss.findByGoodsCode(goodsCode);
+			assertNotNull(goods);
+			SpdFinacialReconciliationItem item = CollectionUtils.findWhere("goodsId", goods.getGoodsId(), items);
+			assertNotNull(item);
+		}
+	}
+	
+	@Test public void testUploadPrepareInformItemFile() throws Exception{
+		String url = getUrlTemplate("/sys/batchImportDataTasks?accessToken={accessToken}");
+		Resource resource = new ClassPathResource("/files/prepare_inform_item.xls");
+		
+		String accessToken = getAccessToken(testUserCode);
+		MockMultipartFile fstmp = new MockMultipartFile("file", resource.getFilename(), "multipart/form-data", resource.getInputStream());
+		String json = mockMvc.perform(MockMvcRequestBuilders.fileUpload(url, accessToken)
+									.file(fstmp)
+									.param("dataType", YardDataType.prepare_inform_item.getCode()))
+								.andExpect(status().isOk())
+								.andReturn().getResponse().getContentAsString();
+		
+		YardBatchTask<List<SpdPrepareInformItemImportTO>> task = Global.defaultObjectMapper.readValue(json, new TypeReference<YardBatchTask<List<SpdPrepareInformItemImportTO>>>() {});
+		assertNotNull(task);
+		assertNotNull(task.getId());
+		
+		wait(2);
+		
+	}
+}

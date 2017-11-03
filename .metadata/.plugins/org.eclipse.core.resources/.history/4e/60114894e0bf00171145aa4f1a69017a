@@ -1,0 +1,27 @@
+package cn.ak4j.yard.spd.wrapper.domain;
+
+/**
+* @Description: 可包装接口类
+* 该接口类定义了作为一个可以被包装起来的对象所需要具备的行为能力
+* @author zhengyf
+* @date 2017年7月13日 上午11:43:04
+* @version V1.0.0
+*/
+public interface SpdIWrappable {
+
+	/**
+	 * 被指定的包装物包装起来
+	 */
+	public void wrapped(SpdAbstractWrapper wrapper);
+	
+	/**
+	 * 从当前所在包装物中拆包出来
+	 */
+	public void unwrap();
+	
+	/**
+	 * 获得当前对象的外包装物
+	 */
+	public SpdAbstractWrapper getParentWrapper();
+	
+}

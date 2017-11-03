@@ -1,0 +1,99 @@
+package cn.ak4j.yard.yds.domain;
+
+import java.io.Serializable;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import cn.ak4j.Global;
+import cn.ak4j.utils.AKStringUtils;
+import lombok.Getter;
+import net.sourceforge.pinyin4j.PinyinHelper;
+import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
+
+/**
+* @Description: 标准产品索引名
+* @author zhengyf
+* @date 2017年4月25日 下午2:47:10
+* @version V1.0.0
+*/
+@SuppressWarnings({"serial"})
+public class YdsGoodsIndexName implements Serializable{
+
+	@Getter @JsonIgnore 
+	private String formatNamePY;
+	
+	@Getter @JsonProperty("spy")
+	private String formatNameSimplePY;
+	
+	@Getter @JsonProperty("wb")
+	private String formatNameWB;
+	
+	@Getter @JsonProperty("n")
+	private String formatName;
+	
+	@Getter @JsonProperty("id")
+	private String goodsId;
+	
+	public YdsGoodsIndexName(){}
+	
+	public YdsGoodsIndexName(YdsGoods goods){
+		this.goodsId = goods.getGoodsId();
+		this.formatName = goods.getFormatName();
+		
+		if(StringUtils.isEmpty(formatName)){
+			return ;
+		}
+		char[] input = formatName.toCharArray();  
+        StringBuffer buf = new StringBuffer();  
+  
+        try {  
+            for (int i = 0; i < input.length; i++) {  
+                if (Character.toString(input[i]).matches("[\\u4E00-\\u9FA5]+")) {  
+                    String[] temp = PinyinHelper.toHanyuPinyinStringArray(input[i], Global.pinyinFormat);  
+                    buf.append(temp[0]);  
+                } else {
+                	buf.append(Character.toString(input[i]));
+                }
+            }  
+            formatNamePY = buf.toString();
+            formatNamePY = formatNamePY.replaceAll("\\[", "").replaceAll("\\]", "");
+        } catch (BadHanyuPinyinOutputFormatCombination e) {  
+            e.printStackTrace();  
+        }
+        
+        buf = new StringBuffer();  
+  	  
+        try {  
+            for (int i = 0; i < input.length; i++) {  
+                if (Character.toString(input[i]).matches("[\\u4E00-\\u9FA5]+")) {  
+                    String[] temp = PinyinHelper.toHanyuPinyinStringArray(input[i], Global.pinyinFormat);  
+                    buf.append(temp[0].charAt(0));  
+                } else {
+                	buf.append(Character.toString(input[i]));
+                }
+            }  
+            formatNameSimplePY = buf.toString();
+            formatNameSimplePY = formatNameSimplePY.replaceAll("\\[", "").replaceAll("\\]", "");
+        } catch (BadHanyuPinyinOutputFormatCombination e) {  
+            e.printStackTrace();  
+        }  
+        
+        buf = new StringBuffer();  
+        for (int i = 0; i < input.length; i++) {  
+        	 if (Character.toString(input[i]).matches("[\\u4E00-\\u9FA5]+")) {  
+        		 String wb = AKStringUtils.getWubiIndexChar(input[i]);
+        		 if(StringUtils.isNotEmpty(wb)){
+        			 buf.append(wb);
+        		 }
+        	 }else{
+        		 buf.append(Character.toString(input[i]));
+        	 }
+        }  
+        formatNameWB = buf.toString();
+        formatNameWB = formatNameWB.replaceAll("\\[", "").replaceAll("\\]", "");
+	}
+	
+}

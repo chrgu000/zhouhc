@@ -1,0 +1,1 @@
+update yds_workbook set key_value='半自动备货收货',key_name = '半自动备货收货' where workbook_id = 'receive_rule_002';

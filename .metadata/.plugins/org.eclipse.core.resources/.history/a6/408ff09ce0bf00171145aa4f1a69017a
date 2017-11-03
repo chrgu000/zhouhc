@@ -1,0 +1,3 @@
+alter table spd_replenish_rule modify(origin_item_condition VARCHAR2(30 BYTE));
+
+update spd_replenish_rule set origin_item_condition = 'any' where origin_item_condition = '0';

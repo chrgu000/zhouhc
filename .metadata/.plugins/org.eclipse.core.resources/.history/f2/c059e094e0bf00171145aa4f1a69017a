@@ -1,0 +1,113 @@
+package cn.ak4j.yard.spd.bizrule.domain;
+
+import javax.persistence.Entity;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import javax.validation.constraints.NotNull;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.domain.PcsDepot;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.spd.bizplan.enums.SpdBizType;
+import cn.ak4j.yard.spd.bizrule.domain.feedbackrule.SpdConsumeFeedbackRule;
+import cn.ak4j.yard.spd.reconciliation.domain.SpdPropertyChangeRules;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+* @Description: 消耗规则
+* @author zhengyf
+* @date 2017年7月27日 上午10:39:28
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+@Entity
+@Table(name="spd_consume_rule")
+@JsonIgnoreProperties(ignoreUnknown=true)
+@NoArgsConstructor
+public class SpdConsumeRule extends SpdAbstractBizRule<SpdConsumeFeedbackRule>{
+
+	@Getter @Setter @NotNull(message="消耗仓库不能为空") 
+	private String depotId;
+	
+	@Getter @Setter @NotNull(message="货区类型不能为空") 
+	private String areaType;
+	
+	@Transient private String displayName;
+	
+	/**
+	 * 用途
+	 */
+	@Getter @Setter private String usage;
+	
+	@Transient @Getter @Setter 
+	private PcsDepot depot;
+	
+	@Override public String getDescription() {
+		if(depot != null){
+			return String.format("%s%s区的消耗，消耗用途：%s，系统流程为：%s", depot.getDepotName(), PcsAreaType.typeOf(areaType).getName(), usage, getFeedbackRule().getDescription());
+		}
+		return "";
+	}
+
+	public String getDisplayName(){
+		return String.format("%s[%s]", getName(), getUsage());
+	}
+	
+	@Override public SpdBizType getBizType() {
+		return SpdBizType.consume_biz;
+	}
+	
+	@Override public void checkRule(SpdBizRules<?> allRules, SpdPropertyChangeRules propertyChangeRules) {
+	}
+	
+	@SuppressWarnings("rawtypes") @Override
+	public void update(SpdAbstractBizRule theRule) {
+		SpdConsumeRule rule = (SpdConsumeRule)theRule;
+		setName(rule.getName());
+		setCustomName(rule.getCustomName());
+		setPrior(rule.getPrior());
+		setUsage(rule.getUsage());
+		setEnabled(rule.getEnabled());
+		setCanBeOriginRule(rule.getCanBeOriginRule());
+		setManualApply(rule.getManualApply());
+	}
+
+	@SuppressWarnings("rawtypes") @Override
+	public boolean equalsRule(SpdAbstractBizRule theRule) {
+		if(theRule.getBizType() != getBizType()){
+			return false;
+		}
+		SpdConsumeRule rule = (SpdConsumeRule)theRule;
+		if(getFeedbackRuleId().equals(rule.getFeedbackRuleId())
+			&& getDepotId().equals(rule.getDepotId())
+			&& getAreaType().equals(rule.getAreaType())
+			&& getUsage().equals(rule.getUsage())){
+			return true;
+		}
+		
+		return false;
+	}
+
+	@Override
+	public boolean canApplyByUser(PcsUser user) {
+		return getEnabled() && getDepot().getManageDeptId().equals(user.getDeptId());
+	}
+	
+	public boolean equals(Object obj){
+		if(obj == null || !(obj instanceof SpdConsumeRule)){
+			return false;
+		}
+		SpdConsumeRule theRule = (SpdConsumeRule)obj;
+		return equalsRule(theRule) 
+				&& getName().equals(theRule.getName())
+				&& getEnabled().equals(theRule.getEnabled())
+				&& getPrior().equals(theRule.getPrior())
+				&& getCanBeOriginRule().equals(theRule.getCanBeOriginRule()
+				&& getManualApply().equals(theRule.getManualApply()));
+	}
+
+}

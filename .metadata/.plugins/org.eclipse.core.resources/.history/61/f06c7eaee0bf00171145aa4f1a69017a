@@ -1,0 +1,126 @@
+package cn.ak4j.yard.spd.task.factory;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.domain.MaintenanceInfo;
+import cn.ak4j.yard.enums.YdsUnitLv;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItem;
+import cn.ak4j.yard.spd.bizplan.domain.SpdBizItems;
+import cn.ak4j.yard.spd.bizplan.domain.SpdReplenishBiz;
+import cn.ak4j.yard.spd.bizplan.service.SpdReplenishBizService;
+import cn.ak4j.yard.spd.stock.repository.SpdShelfStockRepository;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTask;
+import cn.ak4j.yard.spd.task.domain.SpdDepotTasks;
+import cn.ak4j.yard.spd.task.domain.SpdDispatcher;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItem;
+import cn.ak4j.yard.spd.task.domain.SpdOffShelfTaskItems;
+import cn.ak4j.yard.spd.task.repository.SpdDepotTaskRepository;
+import cn.ak4j.yard.spd.task.repository.SpdDispatcherRepository;
+import cn.ak4j.yard.spd.utils.SpdUnitUtils;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.repository.YdsGoodsLotRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+
+public class SpdDepotTaskFactoryOneBlockItemPerLotTest extends BaseTest{
+
+	@Autowired private SpdDispatcherRepository dispatcherRepository;
+	@Autowired private SpdDepotTaskFactoryOneBlockItemPerLot depotTaskFactory;
+	@Autowired private YdsGoodsRepository goodsRepository;
+	@Autowired private YdsGoodsLotRepository glRepository;
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private SpdReplenishBizService rbService;
+	@Autowired private SpdDepotTaskRepository dtRepository;
+	@Autowired private SpdShelfStockRepository ssRepository;
+	
+	@Test public void testBuildFromDispatcher(){
+		String dispatcherId = "disp_id_013";
+		SpdDispatcher dispatcher = dispatcherRepository.findWithRelationsById(dispatcherId);
+		
+		SpdDepotTasks tasks = depotTaskFactory.buildFromDispatcher(dispatcher);
+		
+		assertEquals(1, tasks.size());
+		SpdDepotTask depotTask = tasks.get(0);
+		
+		depotTask.getItems().fillGoodsWithUsableLots(goodsRepository, glRepository, ssRepository);
+		depotTask.getItems().forEach(item->{
+			checkItem(depotTask, item.getLotId());
+		});
+	}
+	
+	/**
+	 * 构造一个申领业务来创建调度，其中申领业务包含一个明细，情况如下：
+	 * 该明细有两个批次的货位库存，优先级高的批次库存无可用库存，另一个有足够库存
+	 */
+	@SuppressWarnings("unused")
+	@Test public void testBuildFromDispatcher2(){
+//		Conf.setCenterDepotAutoCommitReplenish(true);
+//		Conf.setCenterDepotAutoReviewReplenish(true);
+//		Conf.setCenterDepotAutoCreateOffShelfDispatcherForReplenish(true);
+//		Conf.setCenterDepotAutoReviewOffShelfDispatcherForReplenish(true);
+
+		String userId = "user_id_002";
+		//无库存对应的批次
+		String goodsLotId062_3600 = "goods_lot_id_062";
+		//有库存对应的批次
+		String goodsLotId061_6200 = "goods_lot_id_061";
+
+		PcsUser user = userRepository.findAll().findById(userId);
+		SpdReplenishBiz replenish = addNewCreatedReplenish(user);
+		replenish.setBizRuleId("rep_rule_id_16");
+		replenish = rbService.add(replenish, user);
+		wait(3);
+		
+		SpdDepotTasks depotTasks = dtRepository.findWithItemsByBizId(replenish.getBizId());
+		
+		depotTasks.getAllItems().forEach(taskItem->{
+			assertEquals(goodsLotId061_6200, taskItem.getLotId());
+		});
+	}
+	
+	private void checkItem(SpdDepotTask task, String lotId){
+		SpdOffShelfTaskItems items = new SpdOffShelfTaskItems(CollectionUtils.find("lotId", lotId, task.getItems()));
+		assertTrue(items.size()<=2);
+		
+		int pieceItemCount = 0;
+		int blockItemCount = 0;
+		for(SpdOffShelfTaskItem item : items){
+			float bigStoreRatio = SpdUnitUtils.computeUnitExchangeRatio(item.getGoods(), YdsUnitLv.big.getLv(), item.getGoods().getStoreUnitLv());
+			if((int)(item.getPlanQtyByStoreUnit()%bigStoreRatio) == 0){
+				blockItemCount++;
+			}else{
+				pieceItemCount++;
+			}
+		}
+		assertTrue(blockItemCount<=1);
+		assertTrue(pieceItemCount<=1);
+	}
+	
+	private SpdReplenishBiz addNewCreatedReplenish(PcsUser user){	
+		String fromDepotId = "depot_id_001";
+//		String fromOrgId = "626";
+//		String toDepotId = "depot_id_002";
+//		String toOrgId = "626";
+		String goodsId = "goods_id_021";
+		
+		YdsGoods goods = goodsRepository.findAll().findById(goodsId);
+		SpdReplenishBiz replenish = new SpdReplenishBiz();
+		replenish.setMaintenanceInfo(new MaintenanceInfo(user));
+		replenish.setCreatorDepotId(fromDepotId);
+		
+		SpdBizItems items = new SpdBizItems();
+		SpdBizItem item = new SpdBizItem(goodsId, null, goods.getStoreUnitLv(), 20, -1, 25.30f);
+		items.add(item);
+		replenish.setItems(items);
+		
+		return replenish;
+	}
+	
+}

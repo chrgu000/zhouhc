@@ -1,0 +1,95 @@
+package cn.ak4j.yard.pcs.domain;
+
+import java.util.List;
+
+import cn.ak4j.entity.Entities;
+import cn.ak4j.utils.CollectionUtils;
+import cn.ak4j.yard.enums.PcsAreaType;
+import cn.ak4j.yard.pcs.repository.PcsDepotAreaRepository;
+import cn.ak4j.yard.pcs.repository.PcsDepotRepository;
+import cn.ak4j.yard.spd.domain.SpdDepotCard;
+import cn.ak4j.yard.spd.domain.SpdDepotCards;
+import cn.ak4j.yard.spd.repository.SpdDepotCardRepository;
+import cn.ak4j.yard.yds.repository.YdsGoodsRepository;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class PcsDepotShelfs extends Entities<PcsDepotShelf> {
+	
+	public PcsDepotShelfs(List<PcsDepotShelf> shelfs){
+		super(shelfs);
+	}
+	
+	public PcsDepotShelf findById(String depotShelfId){
+		return CollectionUtils.findWhere("depotShelfId", depotShelfId, this);
+	}
+	
+	public PcsDepotShelfs findByIds(List<String> shelfIds){
+		PcsDepotShelfs result = new PcsDepotShelfs();
+		for(PcsDepotShelf shelf : this){
+			if(shelfIds.contains(shelf.getDepotShelfId())){
+				result.add(shelf);
+			}
+		}
+		
+		return result;
+	}
+	
+	public PcsDepotShelfs findByAreaIdAndShelfCode(String depotId, String areaId, String shelfCode){
+		PcsDepotShelfs result = new PcsDepotShelfs();
+		for(PcsDepotShelf shelf : this){
+			if(shelf.getDepotId().equals(depotId) && shelf.getAreaId().equals(areaId) && shelf.getShelfCode().equals(shelfCode)){
+				result.add(shelf);
+			}
+		}
+		return result;
+	}
+	
+	public PcsDepotShelfs findByAreaId(String areaId){
+		return new PcsDepotShelfs(CollectionUtils.find("areaId", areaId, this));
+	}
+
+	public PcsDepotShelfs findByShelfNameAndShelfCodeInArea(String depotId, String areaId, String shelfCode, String shelfName) {
+		PcsDepotShelfs result = new PcsDepotShelfs();
+		for(PcsDepotShelf shelf : this){
+			if(shelf.getDepotId().equals(depotId) && shelf.getAreaId().equals(areaId) && shelf.getShelfCode().equals(shelfCode)
+					&& shelf.getShelfName().equals(shelfName)){
+				result.add(shelf);
+			}
+		}
+		return result;
+	}
+	
+	
+	public PcsDepotShelf findByShelfCode(String shelfCode){
+		return CollectionUtils.findWhere("shelfCode", shelfCode, this);
+	}
+
+	public void fillDepotCard(YdsGoodsRepository goodsRepository, PcsDepotRepository depotRepository, SpdDepotCardRepository dcRepository) {
+		SpdDepotCards depotCards = dcRepository.findAll();
+		depotCards.fillGoodss(goodsRepository, depotRepository, dcRepository);
+		for(PcsDepotShelf shelf : this){
+			SpdDepotCard depotCard = null;
+			if(shelf.getArea().getAreaType().equals(PcsAreaType.normal.getCode())){
+				String[] strArray = {"depotId", "shelfId"};
+				depotCard = CollectionUtils.findWhere(strArray, depotCards, shelf.getDepotId(), shelf.getDepotShelfId());
+			}else if(shelf.getArea().getAreaType().equals(PcsAreaType.isolation.getCode())){
+				String[] strArray = {"depotId", "isolationShelfId"};
+				depotCard = CollectionUtils.findWhere(strArray, depotCards, shelf.getDepotId(), shelf.getDepotShelfId());
+			}else if(shelf.getArea().getAreaType().equals(PcsAreaType.unqualified.getCode())){
+				String[] strArray = {"depotId", "unqualifiedShelfId"};
+				depotCard = CollectionUtils.findWhere(strArray, depotCards, shelf.getDepotId(), shelf.getDepotShelfId());
+			}
+			shelf.setDepotCard(depotCard);
+		}
+	}
+
+	public void fillDepotArea(PcsDepotAreaRepository daRepository) {
+		PcsDepotAreas depotAreas = daRepository.findAllWithRelation();
+		this.forEach(shelf->{
+			shelf.setArea(CollectionUtils.findWhere("depotAreaId", shelf.getAreaId(), depotAreas));
+		});
+	}
+
+}

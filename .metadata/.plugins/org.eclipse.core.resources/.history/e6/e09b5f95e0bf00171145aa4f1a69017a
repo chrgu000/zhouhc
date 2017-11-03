@@ -1,0 +1,94 @@
+package cn.ak4j.yard.extend.zhjw;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.yard.domain.CheckState;
+import cn.ak4j.yard.enums.AmqpMsgType;
+import cn.ak4j.yard.extend.CustomComponentDoc;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.yds.domain.YdsEdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoods;
+import cn.ak4j.yard.yds.domain.YdsGoodsInfo;
+import cn.ak4j.yard.yds.service.IYdsGoodsEventProcessor;
+import cn.ak4j.yard.yds.service.YdsEdsGoodsService;
+import cn.ak4j.yard.yds.service.YdsGoodsInfoService;
+import cn.ak4j.yard.yds.service.YdsGoodsService;
+import lombok.Getter;
+
+public class ZhjwGoodsEventProcessor implements IYdsGoodsEventProcessor{
+	
+	@Autowired private YdsEdsGoodsService egService;	
+	@Autowired private PcsUserRepository userRepository;
+	@Autowired private YdsGoodsService goodsService;
+	@Autowired private YdsGoodsInfoService goodsInfoService;
+	
+	@Getter private CustomComponentDoc doc;
+	
+
+	/**
+	 * 康德莱机构Id
+	 */
+	private String kdlOrgId = "ff8080815d56150a015d59729a220000";
+	
+	public ZhjwGoodsEventProcessor(){
+		
+		String name = "珠海金湾医院标准产品事件处理器";
+		String summary = "处理标准产品相关事件";
+		String beanName = "defaultGoodsEventProcessor";
+		String className = getClass().getName();
+		
+		Map<String, String> methodDesc = new HashMap<String, String>();
+		methodDesc.put("新增标准产品事件", String.format("自动提交;自动创建所属机构为:[%s]的企业产品", kdlOrgId));
+		methodDesc.put("修改标准产品价格事件", "自动修改价格维护信息");
+		
+		doc = new CustomComponentDoc(name, summary, beanName, className, null, methodDesc);
+	}
+	
+	@Override
+	public void process(YdsGoods goods, String userId, AmqpMsgType msgType) {
+		PcsUser user = userRepository.findAll().findById(userId);
+		
+		if(msgType.equals(AmqpMsgType.ADD_GOODS)){
+			goodsService.updateCheckState(goods.getGoodsId(), CheckState.commited.getCode(), goods.getMaintenanceInfo().getLastDate(), user);
+			YdsEdsGoods edsGoods = buildEdsGoods(goods, user);
+			egService.add(edsGoods, user);
+		}else if(msgType.equals(AmqpMsgType.UPDATE_GOODS_PRICE)){
+			goodsInfoService.modify((new YdsGoodsInfo(goods)), user);
+		}
+	}
+
+	private YdsEdsGoods buildEdsGoods(YdsGoods goods, PcsUser user) {
+		YdsEdsGoods edsGoods = new YdsEdsGoods();
+		edsGoods.setYardGoodsId(goods.getGoodsId());
+		edsGoods.setEdsGoodsType(goods.getGoodsType());
+		edsGoods.setEdsWareName(goods.getWareName());
+		edsGoods.setEdsGoodsName(goods.getGoodsName());
+		edsGoods.setEdsGoodsCode(goods.getGoodsCode());
+		edsGoods.setEdsGoodsSpec(goods.getGoodsSpec());
+		edsGoods.setEdsGoodsModel(goods.getGoodsModel());
+		edsGoods.setEdsGoodsDesc(goods.getGoodsDesc());
+		edsGoods.setEdsPackingSpec(goods.getPackingSpec());
+		//同步过来的包装单位(采购、存储、结算、消耗)都为小包装
+		edsGoods.setDeliveryUnitName(goods.getMinName());
+		edsGoods.setEdsRegDoc(goods.getRegDoc());
+		edsGoods.setEdsAthDoc(goods.getAthDoc());
+		edsGoods.setEdsFactName(goods.getFactName());
+		edsGoods.setEquipmentSortName(goods.getEquipmentSortName());
+		edsGoods.setEquipmentLevel(goods.getEquipmentLevel());
+		//同步的转换比设为产品的大包装转换比
+		edsGoods.setEdsYdsUnitRatio(goods.getBigSum());
+		edsGoods.setEdsPrice(goods.getUnitPrice());
+		edsGoods.setEdsGoodsFormatName(goods.getFormatName());
+		edsGoods.setOwnerOrgId(kdlOrgId);
+		edsGoods.setEnabled(goods.getEnabled());
+		edsGoods.setCheckStateCode(CheckState.commited.getCode());
+		edsGoods.setMaintenanceInfo(goods.getMaintenanceInfo());
+		return edsGoods;
+	}
+
+
+}

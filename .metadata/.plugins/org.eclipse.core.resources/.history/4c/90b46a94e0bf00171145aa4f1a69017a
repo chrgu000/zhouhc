@@ -1,0 +1,16 @@
+package cn.ak4j.yard.spd.task.domain;
+
+import java.util.List;
+
+import cn.ak4j.yard.spd.domain.SpdGoodsItems;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor
+@SuppressWarnings({"serial"})
+public class SpdTaskItems<T extends SpdTaskItem> extends SpdGoodsItems<T>{
+
+	public SpdTaskItems(List<T> items){
+		super(items);
+	}
+
+}

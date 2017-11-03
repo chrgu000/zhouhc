@@ -1,0 +1,32 @@
+package cn.ak4j.yard.extend.zsy.domain;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLot;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodsLots;
+import cn.ak4j.yard.yds.domain.YdsEdsGoodss;
+
+@SuppressWarnings("serial")
+public class B2BTaskBills extends ArrayList<B2BTaskBill>{
+
+	public YdsEdsGoodsLots parseAllEdsGoodsLots(PcsUser user, String orgId, YdsEdsGoodss edsGoodss) {
+		YdsEdsGoodsLots edsGoodsLots = new YdsEdsGoodsLots();
+		getAllItems().forEach(item->{
+			YdsEdsGoodsLot newEdsGoodsLot = item.buildEdsGoodsLot(edsGoodss, orgId, user);
+			if(!edsGoodsLots.containedEdsLotNo(newEdsGoodsLot.getEdsLotNo(), newEdsGoodsLot.getEdsGoodsId())){
+				edsGoodsLots.add(newEdsGoodsLot);
+			}
+		});
+		return edsGoodsLots;
+	}
+	
+	public List<B2BTaskBillItem> getAllItems(){
+		List<B2BTaskBillItem> allItems = new ArrayList<B2BTaskBillItem>();
+		this.forEach(taskBill->{
+			allItems.addAll(taskBill.getItems());
+		});
+		return allItems;
+	}
+}

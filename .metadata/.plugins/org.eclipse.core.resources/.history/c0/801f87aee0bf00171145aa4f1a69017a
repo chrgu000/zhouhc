@@ -1,0 +1,39 @@
+package cn.ak4j.yard.spd.service;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import cn.ak4j.exception.common.InvalidDataException;
+import cn.ak4j.yard.BaseTest;
+import cn.ak4j.yard.pcs.domain.PcsUser;
+import cn.ak4j.yard.pcs.repository.PcsUserRepository;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrder;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItem;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrderItems;
+import cn.ak4j.yard.spd.supply.domain.SpdDeliveryOrders;
+import cn.ak4j.yard.spd.supply.service.SpdDeliveryOrderService;
+
+public class SpdDeliveryOrderServiceTest extends BaseTest{
+	
+	@Autowired private SpdDeliveryOrderService doService;
+	@Autowired private PcsUserRepository userRepository;
+	
+	@Rule public ExpectedException thrown = ExpectedException.none();
+	
+	@Test public void testAdd(){
+		SpdDeliveryOrders orders = new SpdDeliveryOrders();
+		SpdDeliveryOrder order = new SpdDeliveryOrder();
+		SpdDeliveryOrderItems items = new SpdDeliveryOrderItems();
+		SpdDeliveryOrderItem item = new SpdDeliveryOrderItem();
+		items.add(item);
+		order.setItems(items);
+		orders.add(order);
+		
+		PcsUser user = userRepository.findAll().findById(zsyUserId);
+		thrown.expect(InvalidDataException.class);
+		doService.checkExteralSystemDeliveryOrders(orders, user);
+	}
+
+}

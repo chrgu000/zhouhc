@@ -1,0 +1,45 @@
+package cn.ak4j.yard.spd.wrapper.domain;
+
+/**
+* @Description: 定数包装
+* @author zhengyf
+* @date 2017年7月13日 下午1:36:07
+* @version V1.0.0
+*/
+@SuppressWarnings("serial")
+public class SpdFixedWrapper extends SpdAbstractWrapper implements SpdIWrappable{
+
+	@Override
+	public void putIn(SpdIWrappable wrapperItem) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void getOut(SpdIWrappable wrapperItem) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void wrapped(SpdAbstractWrapper wrapper) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void unwrap() {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see cn.ak4j.yard.spd.wrapper.domain.SpdIWrappable#getParentWrapper()
+	 */
+	@Override
+	public SpdAbstractWrapper getParentWrapper() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+}
